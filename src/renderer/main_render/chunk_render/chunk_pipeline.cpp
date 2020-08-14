@@ -233,7 +233,7 @@ ChunkPipeline::ChunkPipeline(Device& device, Transfer& transfer, Swapchain& swap
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    pipeline = device->createGraphicsPipelines(nullptr, {pipelineInfo})[0];
+    pipeline = device->createGraphicsPipelines(nullptr, {pipelineInfo}).value[0];
 
     device->destroyShaderModule(static_cast<vk::ShaderModule> (fragShaderModule));
     device->destroyShaderModule(static_cast<vk::ShaderModule> (vertShaderModule));

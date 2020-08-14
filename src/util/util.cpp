@@ -27,13 +27,13 @@ std::vector<char> Util::readFile(const char* filename) {
 
 std::ostream & Util::log(Util::Level l) {
     switch(l) {
-        case TRACE:
-        case DEBUG:
-        case INFO:
+        case trace:
+        case debug:
+        case info:
             return std::cout;
-        case WARNING:
-        case ERROR:
-        case CRITICAL:
+        case warning:
+        case error:
+        case critical:
             return std::cerr;
         default:
             return std::cout;

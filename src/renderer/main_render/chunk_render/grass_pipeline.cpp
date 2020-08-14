@@ -3,6 +3,7 @@
 #include "util/util.h"
 
 #include <fstream>
+#include <filesystem>
 
 #include "renderer/device.h"
 #include "renderer/transfer.h"
@@ -80,8 +81,8 @@ GrassPipeline::GrassPipeline(Device& device, Transfer& transfer, Swapchain& swap
             raycastImageView = device->createImageView(vk::ImageViewCreateInfo({}, raycastImage.image, vk::ImageViewType::e3D, vk::Format::eR8G8B8A8Unorm, vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)));
             
         }
-        
-        std::ifstream is("./resources/raycast_data.bin");
+
+        std::ifstream is("./resources/raycast_data.bin", std::ios::binary);
         cereal::PortableBinaryInputArchive in(is);
         RaycastData* raycast = new RaycastData();
         in(*raycast);
@@ -305,7 +306,7 @@ GrassPipeline::GrassPipeline(Device& device, Transfer& transfer, Swapchain& swap
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    pipeline = device->createGraphicsPipelines(nullptr, {pipelineInfo})[0];
+    pipeline = device->createGraphicsPipelines(nullptr, {pipelineInfo}).value[0];
 
     device->destroyShaderModule(static_cast<vk::ShaderModule> (fragShaderModule));
     device->destroyShaderModule(static_cast<vk::ShaderModule> (vertShaderModule));

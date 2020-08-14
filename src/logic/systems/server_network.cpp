@@ -39,7 +39,7 @@ void ServerNetworkSys::tick() {
         auto& connection = view.get(entity).connection;
         int received = net->ReceiveMessagesOnConnection(connection, messages.data(), MESSAGE_BUFFER);
         if(received == -1) {
-            Util::log(Util::ERROR) << "OOF CAN'T RECEOVE ÙESSAGES" << std::endl;
+            Util::log(Util::error) << "OOF CAN'T RECEIVE ÙESSAGES" << std::endl;
         } else {
             for(int i = 0; i < received; ++i) {
                 Util::log() << (char*) messages[i]->m_pData << std::endl;

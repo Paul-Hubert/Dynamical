@@ -9,9 +9,9 @@ namespace Util {
     
     std::vector<char> readFile(char const* filename);
     
-    enum Level {TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL};
+    enum Level {trace, debug, info, warning, error, critical};
     
-    std::ostream& log(Level l = Level::TRACE);
+    std::ostream& log(Level l = Level::trace);
     
     
     
