@@ -37,10 +37,11 @@ public:
     vk::DescriptorSet descSet;
     
     vk::Sampler sampler;
-    
+
     VmaImage raycastImage;
     vk::ImageView raycastImageView;
-    
+
+    vk::Format noiseFormat;
     VmaImage noiseImage;
     vk::ImageView noiseImageView;
     

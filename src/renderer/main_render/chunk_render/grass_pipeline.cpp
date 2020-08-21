@@ -69,6 +69,7 @@ GrassPipeline::GrassPipeline(Device& device, Transfer& transfer, Swapchain& swap
         
         
         {
+
             VmaAllocationCreateInfo info {};
             info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
             raycastImage = VmaImage(device, &info, vk::ImageCreateInfo(
@@ -91,14 +92,22 @@ GrassPipeline::GrassPipeline(Device& device, Transfer& transfer, Swapchain& swap
         delete raycast;
         
         
-        
+
         {
+
+            auto imageInfo = vk::ImageCreateInfo(
+                {}, vk::ImageType::e2D, vk::Format::eR8G8B8Snorm, vk::Extent3D(noiseSize, noiseSize, 1), 1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+                concurrent ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive, concurrent ? 2 : 1, &qfs[0], vk::ImageLayout::eUndefined);
+
+            vk::ImageFormatProperties props;
+            vk::Result res = device.physical.getImageFormatProperties(imageInfo.format, imageInfo.imageType, imageInfo.tiling, imageInfo.usage, imageInfo.flags, &props);
+            if(res == vk::Result::eErrorFormatNotSupported) {
+                imageInfo.format = vk::Format::eR8G8B8A8Snorm;
+            }
+
             VmaAllocationCreateInfo info {};
             info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-            noiseImage = VmaImage(device, &info, vk::ImageCreateInfo(
-                {}, vk::ImageType::e2D, vk::Format::eR8G8B8Snorm, vk::Extent3D(noiseSize, noiseSize, 1), 1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, 
-                concurrent ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive, concurrent ? 2 : 1, &qfs[0], vk::ImageLayout::eUndefined)
-            );
+            noiseImage = VmaImage(device, &info, imageInfo);
             //SET_NAME(vk::ObjectType::eImage, (VkImage) raycastImage, Raycast3DTexture)
             
             noiseImageView = device->createImageView(vk::ImageViewCreateInfo({}, noiseImage, vk::ImageViewType::e2D, vk::Format::eR8G8B8Snorm, vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)));

@@ -146,7 +146,10 @@ void Swapchain::present(vk::Semaphore wait) {
 
 vk::SurfaceFormatKHR Swapchain::chooseSwapSurfaceFormat(std::vector<vk::SurfaceFormatKHR> &formats, vk::Format wantedFormat, vk::ColorSpaceKHR wantedColorSpace) {
     if (formats.size() == 1 && formats[0].format == vk::Format::eUndefined) {
-        return {wantedFormat, wantedColorSpace}; // Just give the format you want
+        vk::SurfaceFormatKHR sf;
+        sf.format = wantedFormat;
+        sf.colorSpace = wantedColorSpace;
+        return sf; // Just give the format you want
     }
 
     for (const auto& availableFormat : formats) {

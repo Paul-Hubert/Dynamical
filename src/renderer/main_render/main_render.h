@@ -12,6 +12,8 @@
 
 #include "renderer/num_frames.h"
 
+#include <vector>
+
 class Instance;
 class Transfer;
 class Device;
