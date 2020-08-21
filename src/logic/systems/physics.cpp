@@ -53,7 +53,7 @@ void PhysicsSys::tick() {
         
         if(!reg.has<SparseChunk>(chunk)) {
             if(reg.get<GlobalChunkEmpty>(chunk).mean < 0) return;
-            Util::log(Util::DEBUG) << "object in an empty sparse chunk" << std::endl;
+            Util::log(Util::debug) << "object in an empty sparse chunk" << std::endl;
             return;
         }
         

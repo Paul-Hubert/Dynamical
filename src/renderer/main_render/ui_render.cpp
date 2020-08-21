@@ -358,7 +358,7 @@ void UIRender::initPipeline(vk::RenderPass renderpass) {
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    graphicsPipeline = device->createGraphicsPipelines(nullptr, {pipelineInfo})[0];
+    graphicsPipeline = device->createGraphicsPipelines(nullptr, {pipelineInfo}).value[0];
 
     device->destroyShaderModule(static_cast<vk::ShaderModule> (fragShaderModule));
     device->destroyShaderModule(static_cast<vk::ShaderModule> (vertShaderModule));

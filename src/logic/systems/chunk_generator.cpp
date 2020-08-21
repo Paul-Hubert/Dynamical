@@ -108,7 +108,6 @@ void ChunkGeneratorSys::tick() {
                     int ry = chunk::base_size.y * chunk.pos.y + y * chunk::base_cube_size;
                     
                     float value = std::min(70 - ry + amplitude * chunk_data.data[index], 70. - Util::s_sq(150.*cav[index]-50.));
-                    value = -ry;
                     
                     
                     if(x == 0 && y == 0 && z == 0) {
