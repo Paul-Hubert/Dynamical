@@ -9,6 +9,8 @@
 Renderer::Renderer(entt::registry& reg) : System(reg), win(), instance(win), device(instance), transfer(device), swap(win, instance, device), camera(swap.extent.width, swap.extent.height), main_render(instance, device, transfer, swap, camera),
 waitsems(NUM_FRAMES), signalsems(NUM_FRAMES), computesems(NUM_FRAMES) {
     
+    main_render.setup();
+    
     for(int i = 0; i < waitsems.size(); i++) {
         waitsems[i] = device->createSemaphore({});
         signalsems[i] = device->createSemaphore({});
@@ -72,6 +74,8 @@ Renderer::~Renderer() {
     
     device->waitIdle();
     
+    main_render.cleanup();
+    
     for(int i = 0; i < waitsems.size(); i++) {
         device->destroy(waitsems[i]);
         device->destroy(signalsems[i]);
@@ -84,11 +88,9 @@ void Renderer::resize() {
     
     if(win.resize()) {
         
-        std::cout << "resize" << std::endl;
-        
         device->waitIdle();
         
-        main_render.rcleanup();
+        main_render.cleanup();
         
         swap.cleanup();
         
@@ -96,7 +98,7 @@ void Renderer::resize() {
         
         camera.setup(swap.extent.width, swap.extent.height);
         
-        main_render.rsetup();
+        main_render.setup();
     
     }
     

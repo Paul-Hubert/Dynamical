@@ -10,7 +10,7 @@
 
 class UISys;
 class Renderer;
-class GameSet;
+class SystemSet;
 
 class Game {
 public:
@@ -28,7 +28,7 @@ public:
     
     std::unique_ptr<Renderer> renderer;
     
-    std::unique_ptr<GameSet> game_set;
+    std::unique_ptr<SystemSet> set;
     
 };
 

@@ -4,26 +4,22 @@
 #include "chunkc.h"
 #include "renderer/num_frames.h"
 
-class ChunkSync {
-public:
-    ChunkSync(int index) : index(index) {}
-    int index;
-};
-
 struct ChunkData {
     float values[chunk::num_values.x * chunk::num_values.y * chunk::num_values.z];
 };
 
-class ChunkDataC {
+class StagedChunkData {
 public:
-    ChunkDataC() {
+    StagedChunkData() {
         for(int i = 0; i < data.size(); i++) {
             data[i] = nullptr;
             index[i] = 0;
         }
+        sync = 0;
     }
     std::array<ChunkData*, NUM_FRAMES> data;
     std::array<int, NUM_FRAMES> index;
+    int sync;
 };
 
 #endif

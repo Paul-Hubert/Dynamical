@@ -13,8 +13,6 @@ const int mhsize = ((int) std::pow(2, std::ceil(std::log2(chunk::max_num_values.
 
 constexpr float out_of_range = 1000.f;
 
-#if 0
-
 union indval {
     int ind;
     float val;
@@ -282,31 +280,6 @@ private:
     int index = 0;
 
 };
-#endif
 
-
-class SparseChunk {
-public:
-    
-    SparseChunk() {
-        
-    }
-    
-    void get(GlobalChunkData& data) {
-        data = this->data;
-    }
-    
-    void set(GlobalChunkData& cd) {
-        data = cd;
-    }
-    
-    float get(int x, int y, int z) {
-        return data.data[x * chunk::max_num_values.y * chunk::max_num_values.z + z * chunk::max_num_values.y + y];
-    }
-    
-private:
-    GlobalChunkData data;
-    
-};
 
 #endif

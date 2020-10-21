@@ -8,7 +8,7 @@
 #include "util/util.h"
 #include "renderer/num_frames.h"
 #include "renderer/marching_cubes/chunk.h"
-#include "logic/components/chunkc.h"
+#include "logic/components/chunk/chunkc.h"
 #include "logic/components/renderinfo.h"
 
 std::mutex Chunk::mutex;
@@ -27,18 +27,12 @@ MainRender::MainRender(Instance& instance, Device& device, Transfer& transfer, S
         
     }
     
-    setup();
-    
 }
+
 
 void MainRender::setup() {
     
-}
-
-void MainRender::rsetup() {
-    
     renderpass.setup();
-    setup();
     
 }
 
@@ -95,24 +89,12 @@ void MainRender::render(entt::registry& reg, uint32_t index, std::vector<vk::Sem
 void MainRender::cleanup() {
     
     device->resetCommandPool(commandPool, {});
-    
-}
-
-void MainRender::rcleanup() {
-    
-    cleanup();
     renderpass.cleanup();
     
 }
 
-void MainRender::reset() {
-    cleanup();
-    setup();
-}
 
 MainRender::~MainRender() {
-    
-    cleanup();
     
     for(int i = 0; i < commandBuffers.size(); i++) {
         

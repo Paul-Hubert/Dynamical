@@ -4,9 +4,9 @@
 #include "terrain.h"
 #include "util/util.h"
 #include "chunk.h"
-#include "logic/components/chunkc.h"
+#include "logic/components/chunk/chunkc.h"
 #include "util/profile.h"
-#include "logic/components/chunkdatac.h"
+#include "logic/components/chunk/chunkdatac.h"
 #include "logic/components/renderinfo.h"
 
 constexpr int timestamp_count = 2;
@@ -38,7 +38,9 @@ void MarchingCubes::init() {
 void MarchingCubes::tick() {
     
     Device& device = *reg.ctx<Device*>();
-    int index = reg.ctx<ChunkSync>().index;
+    
+    auto& cd = reg.ctx<StagedChunkData>();
+    int index = cd.sync;
     
     static float t = 0;
     
@@ -66,7 +68,6 @@ void MarchingCubes::tick() {
                     }
                 });
                 
-                auto& cd = reg.ctx<ChunkDataC>();
                 cd.index[i] = 0;
                 
                 if(marchingcubesprofiling) {

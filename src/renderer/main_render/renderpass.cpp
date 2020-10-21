@@ -41,8 +41,6 @@ device(device), swap(swap) {
     
     renderpass = device->createRenderPass(vk::RenderPassCreateInfo({}, attachments.size(), attachments.data(), subpasses.size(), subpasses.data(), 0, nullptr));
     
-    setup();
-    
 }
 
 void Renderpass::setup() {
@@ -83,8 +81,6 @@ void Renderpass::cleanup() {
 
 
 Renderpass::~Renderpass() {
-    
-    cleanup();
     
     device->destroy(renderpass);
     

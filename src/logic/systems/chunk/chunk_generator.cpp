@@ -1,18 +1,20 @@
-#include "system_list.h"
+#include "logic/systems/system_list.h"
 
 #include "FastNoiseSIMD/FastNoiseSIMD/FastNoiseSIMD.h"
 #include "taskflow/taskflow.hpp"
 
-#include "logic/components/chunk_map.h"
-#include "logic/components/chunkc.h"
-#include "logic/components/global_chunk_data.h"
-#include "logic/components/sparse_chunk.h"
+#include "logic/components/chunk/chunk_map.h"
+#include "logic/components/chunk/chunkc.h"
+#include "logic/components/chunk/global_chunk_data.h"
+#include "logic/components/chunk/stored_chunk.h"
 
-const static std::unique_ptr<FastNoiseSIMD> myNoise = std::unique_ptr<FastNoiseSIMD>(FastNoiseSIMD::NewFastNoiseSIMD());
-const static std::unique_ptr<FastNoiseSIMD> cavNoise = std::unique_ptr<FastNoiseSIMD>(FastNoiseSIMD::NewFastNoiseSIMD(2010));
-constexpr double frequency = 0.0006;
-constexpr double amplitude = 400.;
+const static std::unique_ptr<FastNoiseSIMD> terrain_noise = std::unique_ptr<FastNoiseSIMD>(FastNoiseSIMD::NewFastNoiseSIMD());
+const static std::unique_ptr<FastNoiseSIMD> cave_noise = std::unique_ptr<FastNoiseSIMD>(FastNoiseSIMD::NewFastNoiseSIMD(2010));
+constexpr double frequency = 0.001;
+constexpr double amplitude = 500.;
 constexpr int octaves = 4;
+
+constexpr double base_level = 70;
 
 static std::future<void> callback;
 static tf::Taskflow taskflow;
@@ -21,10 +23,10 @@ constexpr int max_threads = 20;
 
 void ChunkGeneratorSys::init() {
     
-    myNoise->SetFractalOctaves(octaves);
-    myNoise->SetFrequency(frequency);
-    cavNoise->SetFractalOctaves(octaves-1);
-    cavNoise->SetFrequency(frequency);
+    terrain_noise->SetFractalOctaves(octaves);
+    terrain_noise->SetFrequency(frequency);
+    cave_noise->SetFractalOctaves(octaves-1);
+    cave_noise->SetFrequency(frequency);
     
 }
 
@@ -43,7 +45,7 @@ void ChunkGeneratorSys::tick() {
             auto endView = reg.view<GlobalChunkEmpty, entt::tag<"loading"_hs>>();
             for(auto entity : endView) {
                 if(endView.get<GlobalChunkEmpty>(entity).mean != 0) {
-                    reg.remove<SparseChunk>(entity);
+                    reg.remove<StoredChunk>(entity);
                 } else {
                     reg.remove<GlobalChunkEmpty>(entity);
                 }
@@ -63,14 +65,14 @@ void ChunkGeneratorSys::tick() {
     reg.view<GlobalChunkC, entt::tag<"loading"_hs>>().each([this](const entt::entity entity, GlobalChunkC& chunk, auto) {
         if(current < max_threads && !reg.has<GeneratingChunk>(entity)) {
             reg.assign<GeneratingChunk>(entity, chunk);
-            reg.assign<SparseChunk>(entity);
+            reg.assign<StoredChunk>(entity);
             reg.assign<GlobalChunkEmpty>(entity, 0.f);
             current++;
         }
     });
     
     
-    auto view = reg.view<SparseChunk, GlobalChunkEmpty, GeneratingChunk>();
+    auto view = reg.view<StoredChunk, GlobalChunkEmpty, GeneratingChunk>();
     taskflow.parallel_for(view.begin(), view.end(), [view](const entt::entity entity) { 
         
         auto& chunk = view.get<GeneratingChunk>(entity).chunk;
@@ -79,13 +81,13 @@ void ChunkGeneratorSys::tick() {
         
         GlobalChunkData chunk_data;
         
-        myNoise->FillSimplexFractalSet(chunk_data.data.data(),
+        terrain_noise->FillSimplexFractalSet(chunk_data.data.data(),
             chunk::num_cubes.x * chunk.pos.x - chunk::border * chunk::max_mul,
             chunk::num_cubes.z * chunk.pos.z - chunk::border * chunk::max_mul,
             chunk::num_cubes.y * chunk.pos.y - chunk::border * chunk::max_mul,
             chunk::max_num_values.x, chunk::max_num_values.z, chunk::max_num_values.y, chunk::base_cube_size);
         
-        float* cav = cavNoise->GetSimplexFractalSet(
+        float* cav = cave_noise->GetSimplexFractalSet(
             chunk::num_cubes.x * chunk.pos.x - chunk::border * chunk::max_mul,
             chunk::num_cubes.z * chunk.pos.z - chunk::border * chunk::max_mul,
             chunk::num_cubes.y * chunk.pos.y - chunk::border * chunk::max_mul,
@@ -107,8 +109,7 @@ void ChunkGeneratorSys::tick() {
                     int rz = chunk::base_size.z * chunk.pos.z + z * chunk::base_cube_size;
                     int ry = chunk::base_size.y * chunk.pos.y + y * chunk::base_cube_size;
                     
-                    float value = std::min(70 - ry + amplitude * chunk_data.data[index], 70. - Util::s_sq(150.*cav[index]-50.));
-                    
+                    float value = std::min(base_level - ry + amplitude * chunk_data.data[index], base_level - Util::s_sq(150.*cav[index]-50.));
                     
                     if(x == 0 && y == 0 && z == 0) {
                         sign = std::signbit(value);
@@ -128,7 +129,7 @@ void ChunkGeneratorSys::tick() {
         if(empty) {
             chunk_mean = sum/index;
         } else {
-            auto& sparse_chunk = view.get<SparseChunk>(entity);
+            auto& sparse_chunk = view.get<StoredChunk>(entity);
             sparse_chunk.set(chunk_data);
         }
         

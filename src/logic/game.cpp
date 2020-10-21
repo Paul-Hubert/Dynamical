@@ -26,18 +26,18 @@ renderer(std::make_unique<Renderer>(reg)) {
 
 void Game::init() {
     
-    game_set = std::make_unique<GameSet>(*this);
+    set = std::make_unique<GameSet>(*this);
     
-    game_set->preinit();
+    set->preinit();
     
     auto player = reg.create();
     reg.assign<PlayerC>(player);
-    reg.assign<PhysicsC>(player, 60);
+    //reg.assign<PhysicsC>(player, 60);
     reg.assign<entt::tag<"forces"_hs>>(player);
     reg.assign<PositionC>(player);
     reg.set<Util::Entity<"player"_hs>>(player);
     
-    game_set->init();
+    set->init();
     
 }
 
@@ -45,7 +45,7 @@ void Game::start() {
     
     game_loop.run([this](float dt) {
         
-        game_set->tick();
+        set->tick();
         InputC* input = reg.try_ctx<InputC>();
         if(input != nullptr && input->on[Action::EXIT]) {
             game_loop.setQuitting();
@@ -54,7 +54,7 @@ void Game::start() {
         
     });
     
-    game_set->finish();
+    set->finish();
     
 }
 

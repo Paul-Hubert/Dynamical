@@ -5,9 +5,9 @@
 
 #include "logic/components/physicsc.h"
 #include "logic/components/positionc.h"
-#include "logic/components/chunkc.h"
-#include "logic/components/chunk_map.h"
-#include "logic/components/sparse_chunk.h"
+#include "logic/components/chunk/chunkc.h"
+#include "logic/components/chunk/chunk_map.h"
+#include "logic/components/chunk/stored_chunk.h"
 
 void PhysicsSys::preinit() {
     
@@ -51,13 +51,13 @@ void PhysicsSys::tick() {
             return;
         }
         
-        if(!reg.has<SparseChunk>(chunk)) {
+        if(!reg.has<StoredChunk>(chunk)) {
             if(reg.get<GlobalChunkEmpty>(chunk).mean < 0) return;
             Util::log(Util::debug) << "object in an empty sparse chunk" << std::endl;
             return;
         }
         
-        SparseChunk& sc = reg.get<SparseChunk>(chunk);
+        auto& sc = reg.get<StoredChunk>(chunk);
         
         auto ini = glm::ivec3(glm::floor(in));
         in -= ini;

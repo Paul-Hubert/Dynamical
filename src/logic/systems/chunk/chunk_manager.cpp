@@ -1,15 +1,14 @@
-#include "system_list.h"
+#include "logic/systems/system_list.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include "glm/gtx/norm.hpp"
 
 #include <util/util.h>
-#include <logic/components/chunkc.h>
-#include <logic/components/chunk_map.h>
+#include <logic/components/chunk/chunkc.h>
+#include <logic/components/chunk/chunk_map.h>
 #include <logic/components/camerac.h>
 #include <renderer/camera.h>
-#include "logic/components/global_chunk_data.h"
-#include "logic/components/sparse_chunk.h"
+#include "logic/components/chunk/global_chunk_data.h"
 #include "logic/components/positionc.h"
 
 #include <util/entt_util.h>

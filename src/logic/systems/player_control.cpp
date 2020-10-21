@@ -10,14 +10,14 @@
 #include "logic/components/playerc.h"
 #include "logic/components/positionc.h"
 
-void CameraSys::init() {
+void PlayerControlSys::init() {
     
     auto player = reg.ctx<Util::Entity<"player"_hs>>();
     reg.assign<CameraC>(player);
     
 }
 
-void CameraSys::tick() {
+void PlayerControlSys::tick() {
     
     auto player = reg.ctx<Util::Entity<"player"_hs>>();
     CameraC& camera = reg.get<CameraC>(player);
@@ -27,7 +27,7 @@ void CameraSys::tick() {
     
     if(input.mouseFree) return;
     
-    constexpr float base_speed = 6.f/60;
+    constexpr float base_speed = 60.f/60;
     
     if(input.on[Action::SPRINT]) {
         camera.sprinting = true;

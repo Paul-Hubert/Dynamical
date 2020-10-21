@@ -4,7 +4,7 @@
 #include "util/util.h"
 #include "terrain.h"
 
-#include "logic/components/chunkc.h"
+#include "logic/components/chunk/chunkc.h"
 
 #include "glm/glm.hpp"
 

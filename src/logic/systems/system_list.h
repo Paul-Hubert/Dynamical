@@ -22,9 +22,9 @@ public:
     const char* name() override {return "Debug";};
 };
 
-class CameraSys : public System {
+class PlayerControlSys : public System {
 public:
-    CameraSys(entt::registry& reg) : System(reg) {};
+    PlayerControlSys(entt::registry& reg) : System(reg) {};
     void init() override;
     void tick() override;
     const char* name() override {return "Camera";};

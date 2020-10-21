@@ -25,11 +25,8 @@ class MainRender {
 public:
     MainRender(Instance& instance, Device& device, Transfer& transfer, Swapchain& swap, Camera& camera);
     void setup();
-    void rsetup();
     void render(entt::registry& reg, uint32_t index, std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals);
     void cleanup();
-    void rcleanup();
-    void reset();
     ~MainRender();
     
 private:

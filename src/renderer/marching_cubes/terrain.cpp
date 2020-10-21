@@ -2,10 +2,10 @@
 
 #include "renderer/device.h"
 
-#include "logic/components/chunkc.h"
+#include "logic/components/chunk/chunkc.h"
 #include "logic/components/positionc.h"
 #include "chunk.h"
-#include "logic/components/chunkdatac.h"
+#include "logic/components/chunk/chunkdatac.h"
 #include "marching_cubes.h"
 #include "logic/components/renderinfo.h"
 
@@ -21,8 +21,6 @@ Terrain::Terrain(entt::registry& reg) : System(reg) {
 
 void Terrain::preinit() {
     
-    ChunkDataC& cd = reg.set<ChunkDataC>();
-    
     //reg.on_construct<ChunkC>().connect<&Terrain::construction>(this);
     reg.on_destroy<Chunk>().connect<&Terrain::destructionChunk>(this);
     reg.on_destroy<ChunkBuild>().connect<&Terrain::destructionChunkBuild>(this);
@@ -32,6 +30,8 @@ void Terrain::preinit() {
 void Terrain::init() {
     
     Device& device = *reg.ctx<Device*>();
+    
+    reg.set<StagedChunkData>();
     
     auto poolSizes = std::vector {
         vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, max_per_frame*NUM_FRAMES*2),
@@ -59,7 +59,7 @@ void Terrain::init() {
         
         chunkData[i] = VmaBuffer(device, &allocInfo, vk::BufferCreateInfo({}, max_per_frame * sizeof(ChunkData), vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive, 1, &device.c_i));
         
-        ChunkDataC& cd = reg.ctx<ChunkDataC>();
+        StagedChunkData& cd = reg.ctx<StagedChunkData>();
         
         VmaAllocationInfo inf;
         vmaGetAllocationInfo(device, chunkData[i].allocation, &inf);
@@ -126,7 +126,7 @@ void Terrain::allocate(Chunk& chonk, ChunkBuild& build) {
     
     build.set = device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &descLayout))[0];
     
-    int ri = reg.ctx<ChunkSync>().index;
+    int ri = reg.ctx<StagedChunkData>().sync;
     auto triInfo = vk::DescriptorBufferInfo(chonk.triangles, 0, NUM_TRIANGLES * sizeof(Triangle));
     auto indInfo = vk::DescriptorBufferInfo(chonk.indirect, chonk.indirect_offset * sizeof(vk::DrawIndirectCommand), sizeof(vk::DrawIndirectCommand));
     auto uniformInfo = vk::DescriptorBufferInfo(chunkData[ri], 0, sizeof(ChunkData));

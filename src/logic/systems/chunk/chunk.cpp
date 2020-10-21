@@ -1,31 +1,30 @@
-#include "system_list.h"
+#include "logic/systems/system_list.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include "glm/gtx/norm.hpp"
 
-#include "logic/components/chunkc.h"
+#include "logic/components/chunk/chunkc.h"
 #include "util/util.h"
 
-#include "logic/components/chunkdatac.h"
-#include "logic/components/chunk_map.h"
+#include "logic/components/chunk/chunkdatac.h"
+#include "logic/components/chunk/chunk_map.h"
+#include "logic/components/chunk/global_chunk_data.h"
+#include "logic/components/chunk/stored_chunk.h"
+
 #include "logic/components/camerac.h"
 #include "renderer/camera.h"
 #include "renderer/marching_cubes/chunk.h"
 #include "renderer/marching_cubes/marching_cubes.h"
 #include "logic/components/renderinfo.h"
-#include "logic/components/global_chunk_data.h"
-#include "logic/components/sparse_chunk.h"
 
 void ChunkSys::init() {
-    
-    reg.set<ChunkSync>(0);
     
 }
 
 void ChunkSys::tick() {
     
-    auto& cd = reg.ctx<ChunkDataC>();
-    int& ri = reg.ctx<ChunkSync>().index;
+    auto& cd = reg.ctx<StagedChunkData>();
+    int& ri = cd.sync;
     ri = (ri+1)%NUM_FRAMES;
     
     
@@ -38,13 +37,13 @@ void ChunkSys::tick() {
             
             if(cd.index[ri] >= max_per_frame) break;
             
-            if(reg.has<SparseChunk>(outer)) {
+            if(reg.has<StoredChunk>(outer)) {
                 reg.assign<entt::tag<"modified"_hs>>(entity);
                 ChunkBuild& cb = reg.assign<ChunkBuild>(entity);
                 cb.index = cd.index[ri];
                 cd.index[ri]++;
                 
-                auto& global_chunk = reg.get<SparseChunk>(outer);
+                auto& global_chunk = reg.get<StoredChunk>(outer);
                 
                 GlobalChunkData chunk_data;
                 global_chunk.get(chunk_data);

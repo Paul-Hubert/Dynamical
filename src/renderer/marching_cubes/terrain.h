@@ -6,7 +6,7 @@
 #include "entt/entt.hpp"
 
 #include "chunk.h"
-#include "logic/components/chunkc.h"
+#include "logic/components/chunk/chunkc.h"
 
 #include "logic/systems/system.h"
 

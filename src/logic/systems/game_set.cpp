@@ -48,7 +48,7 @@ GameSet::GameSet(Game& game) : SystemSet(game.reg) {
         MAKE_SYSTEM(InputSys, input)
         MAKE_SYSTEM(DebugSys, debug)
         add(game.ui.get());
-        MAKE_SYSTEM(CameraSys, camera)
+        MAKE_SYSTEM(PlayerControlSys, camera)
         
         MAKE_SYSTEM(ChunkManagerSys, chunk_manager)
         MAKE_SYSTEM(ChunkLoaderSys, chunk_loader)
