@@ -7,8 +7,6 @@
 #include "renderer/marching_cubes/terrain.h"
 #include "renderer/marching_cubes/marching_cubes.h"
 #include "logic/components/settingsc.h"
-#include "client_network.h"
-#include "server_network.h"
 #include "physics.h"
 
 #include "logic/game.h"
@@ -31,11 +29,11 @@ GameSet::GameSet(Game& game) : SystemSet(game.reg) {
     
 #ifndef NDEBUG
     if(s.server_side) {
-        Util::log(Util::INFO) << "server_side" << std::endl;
+        Util::log(Util::trace) << "server_side" << std::endl;
     } else if(s.client_side) {
-        Util::log(Util::INFO) << "client_side" << std::endl;
+        Util::log(Util::trace) << "client_side" << std::endl;
     } else {
-        Util::log(Util::INFO) << "single_player" << std::endl;
+        Util::log(Util::trace) << "single_player" << std::endl;
     }
 #endif
     bool server = s.server_side;
@@ -56,8 +54,6 @@ GameSet::GameSet(Game& game) : SystemSet(game.reg) {
     }
     
     MAKE_SYSTEM(PhysicsSys, physics)
-    if(server) {MAKE_SYSTEM(ServerNetworkSys, server_network)}
-    if(client) {MAKE_SYSTEM(ClientNetworkSys, client_network)}
     
     if(user) {
         MAKE_SYSTEM(ChunkSys, chunk)

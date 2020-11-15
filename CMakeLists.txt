@@ -4,9 +4,6 @@ set(CMAKE_CXX_STANDARD 17)
 
 project(dynamical)
 
-add_subdirectory(3rdparty/FastNoiseSIMD)
-add_subdirectory(3rdparty/GameNetworkingSockets)
-
 include_directories("./src")
 include_directories("./3rdparty")
 include_directories("./extra")
@@ -24,9 +21,6 @@ target_link_libraries(dynamical PRIVATE Vulkan::Vulkan)
 find_package(SDL2 CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE SDL2::SDL2 SDL2::SDL2main)
 include_directories(${SDL2_INCLUDE_DIRS})
-
-target_link_libraries(dynamical PRIVATE FastNoiseSIMD)
-target_link_libraries(dynamical PRIVATE GameNetworkingSockets_s)
 
 
 # Copy resources to build

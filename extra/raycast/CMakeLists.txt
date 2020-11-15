@@ -14,8 +14,6 @@ add_custom_command(OUTPUT ${PROJECT_SOURCE_DIR}/raycast_data.bin
   DEPENDS raycast
 )
 
-message(${PROJECT_BINARY_DIR})
-
 add_custom_target(raycast_run ALL
    DEPENDS ${PROJECT_SOURCE_DIR}/raycast_data.bin
 )

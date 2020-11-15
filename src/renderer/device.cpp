@@ -23,7 +23,7 @@ Device::Device(Instance &inst) : instance(inst) {
     uint32_t index = 1000, max = 0;
     for(uint32_t i = 0; i<p_devices.size(); i++) {
         uint32_t score = getScore(p_devices[i]);
-        if(score > max) { // Takes only a score higher than the last (implicitely higher than 0)
+        if(score > max) { // Takes only a score higher than the last (implicitly higher than 0)
             max = score;
             index = i;
         }
