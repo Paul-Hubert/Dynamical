@@ -39,6 +39,12 @@ target_include_directories(dynamical PRIVATE ${STB_INCLUDE_DIRS})
 find_package(unofficial-vulkan-memory-allocator CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE unofficial::vulkan-memory-allocator::vulkan-memory-allocator)
 
+find_package(OpenXR CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE OpenXR::headers OpenXR::openxr_loader OpenXR::openxr-all-supported)
+
+find_package(Bullet CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE LinearMath Bullet3Common BulletDynamics BulletSoftBody)
+
 
 # Copy resources to build
 file(
