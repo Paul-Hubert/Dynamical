@@ -1,7 +1,7 @@
 #ifndef VMA_H
 #define VMA_H
 
-#include "vma/vk_mem_alloc.h"
+#include "vk_mem_alloc.h"
 #include "vulkan/vulkan.hpp"
 
 #include <iostream>

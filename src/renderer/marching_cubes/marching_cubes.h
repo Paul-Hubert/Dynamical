@@ -2,7 +2,7 @@
 #define MARCHING_CUBES_H
 
 #include "vulkan/vulkan.hpp"
-#include "vma/vk_mem_alloc.h"
+#include "vk_mem_alloc.h"
 
 #include "renderer/num_frames.h"
 

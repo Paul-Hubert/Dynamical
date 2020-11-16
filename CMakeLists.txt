@@ -33,6 +33,12 @@ target_link_libraries(dynamical PRIVATE cereal)
 find_package(Taskflow CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE Taskflow::Taskflow)
 
+find_path(STB_INCLUDE_DIRS "stb.h")
+target_include_directories(dynamical PRIVATE ${STB_INCLUDE_DIRS})
+
+find_package(unofficial-vulkan-memory-allocator CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE unofficial::vulkan-memory-allocator::vulkan-memory-allocator)
+
 
 # Copy resources to build
 file(
