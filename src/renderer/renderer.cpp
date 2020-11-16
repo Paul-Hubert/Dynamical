@@ -1,6 +1,7 @@
 #include "renderer.h"
 
 #include <iostream>
+#include "util/util.h"
 
 #include "logic/components/inputc.h"
 #include "num_frames.h"
@@ -70,10 +71,16 @@ void Renderer::tick() {
     
 }
 
+void Renderer::finish() {
+
+    device->waitIdle();
+
+}
+
 Renderer::~Renderer() {
     
-    device->waitIdle();
-    
+    Util::log(Util::debug) << "end renderer\n";
+
     main_render.cleanup();
     
     for(int i = 0; i < waitsems.size(); i++) {

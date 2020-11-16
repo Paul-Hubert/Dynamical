@@ -63,7 +63,7 @@ void MarchingCubes::tick() {
                         reg.remove<computing>(entity);
                         reg.remove<ChunkBuild>(entity);
                         Chunk::mutex.lock();
-                        reg.assign<entt::tag<"ready"_hs>>(entity);
+                        reg.emplace<entt::tag<"ready"_hs>>(entity);
                         Chunk::mutex.unlock();
                     }
                 });
@@ -85,13 +85,14 @@ void MarchingCubes::tick() {
     }
     
     if(Chunk::mutex.try_lock()) {
-        reg.view<entt::tag<"destroying"_hs>>().each([&](entt::entity entity, auto) {
+        auto view = reg.view<entt::tag<"destroying"_hs>>();
+        for(auto entity : view) {
             
             if(!reg.has<computing>(entity)) {
                 reg.destroy(entity);
             }
             
-        });
+        }
         Chunk::mutex.unlock();
     }
     
@@ -126,7 +127,7 @@ void MarchingCubes::tick() {
             constexpr glm::ivec3 dispatchSizes(chunk::num_cubes/local_size);
             commandBuffer.dispatch(dispatchSizes.x, dispatchSizes.y, dispatchSizes.z);
             
-            reg.assign<computing>(entity, index);
+            reg.emplace<computing>(entity, index);
             reg.remove<entt::tag<"modified"_hs>>(entity);
             
             per_frame[index].chunk_count++;

@@ -19,14 +19,14 @@ public:
     void start();
     ~Game();
     
+    std::unique_ptr<UISys> ui;
+
+    std::unique_ptr<Renderer> renderer;
+
     entt::registry reg;
     
     GameLoop game_loop;
     SettingSys settings;
-    
-    std::unique_ptr<UISys> ui;
-    
-    std::unique_ptr<Renderer> renderer;
     
     std::unique_ptr<SystemSet> set;
     

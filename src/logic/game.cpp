@@ -31,10 +31,10 @@ void Game::init() {
     set->preinit();
     
     auto player = reg.create();
-    reg.assign<PlayerC>(player);
-    //reg.assign<PhysicsC>(player, 60);
-    reg.assign<entt::tag<"forces"_hs>>(player);
-    reg.assign<PositionC>(player);
+    reg.emplace<PlayerC>(player);
+    //reg.emplace<PhysicsC>(player, 60);
+    reg.emplace<entt::tag<"forces"_hs>>(player);
+    reg.emplace<PositionC>(player);
     reg.set<Util::Entity<"player"_hs>>(player);
     
     set->init();

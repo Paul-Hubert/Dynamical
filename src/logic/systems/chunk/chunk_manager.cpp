@@ -30,7 +30,7 @@ void ChunkManagerSys::tick() {
     reg.view<ChunkC>().each([&](entt::entity entity, ChunkC& chunk) {
         if(glm::distance2(glm::vec3(chunk.getPosition()), pos) > Util::sq(render_distance + chunk.getSize().x*2)) {
             map.set(entt::null, chunk.pos.x, chunk.pos.y, chunk.pos.z, chunk::max_mul/2);
-            if(!reg.has<entt::tag<"destroying"_hs>>(entity)) reg.assign<entt::tag<"destroying"_hs>>(entity);
+            if(!reg.has<entt::tag<"destroying"_hs>>(entity)) reg.emplace<entt::tag<"destroying"_hs>>(entity);
         }
     });
     
@@ -45,12 +45,12 @@ void ChunkManagerSys::tick() {
                     entt::entity global_entity = global_map.get(g_chunk.pos.x, g_chunk.pos.y, g_chunk.pos.z, chunk::max_mul/2);
                     if(global_entity == entt::null) {
                         global_entity = reg.create();
-                        reg.assign<GlobalChunkC>(global_entity, (g_chunk.pos/chunk::max_mul)*chunk::max_mul, chunk::max_lod);
+                        reg.emplace<GlobalChunkC>(global_entity, (g_chunk.pos/chunk::max_mul)*chunk::max_mul, chunk::max_lod);
                         global_map.set(global_entity, g_chunk.pos.x, g_chunk.pos.y, g_chunk.pos.z, chunk::max_mul/2);
                     }
                     
                     if(!reg.has<entt::tag<"loading"_hs>>(global_entity) && !reg.has<entt::tag<"loaded"_hs>>(global_entity))
-                        reg.assign<entt::tag<"loading"_hs>>(global_entity);
+                        reg.emplace<entt::tag<"loading"_hs>>(global_entity);
                     
                     ChunkC chunk;
                     chunk.lod = chunk::max_lod;
@@ -58,12 +58,12 @@ void ChunkManagerSys::tick() {
                     int mul = chunk.getLOD();
                     
                     auto chunk_entity = reg.create();
-                    reg.assign<ChunkC>(chunk_entity, chunk);
+                    reg.emplace<ChunkC>(chunk_entity, chunk);
                     map.set(chunk_entity, chunk.pos.x, chunk.pos.y, chunk.pos.z, mul/2);
                     
-                    reg.assign<OuterGlobalChunk>(chunk_entity, global_entity);
+                    reg.emplace<OuterGlobalChunk>(chunk_entity, global_entity);
                     if(!reg.has<GlobalChunkEmpty>(global_entity))
-                        reg.assign<entt::tag<"preparing"_hs>>(chunk_entity);
+                        reg.emplace<entt::tag<"preparing"_hs>>(chunk_entity);
                     
                     
                 }

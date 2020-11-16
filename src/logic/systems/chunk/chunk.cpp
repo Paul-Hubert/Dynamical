@@ -38,8 +38,8 @@ void ChunkSys::tick() {
             if(cd.index[ri] >= max_per_frame) break;
             
             if(reg.has<StoredChunk>(outer)) {
-                reg.assign<entt::tag<"modified"_hs>>(entity);
-                ChunkBuild& cb = reg.assign<ChunkBuild>(entity);
+                reg.emplace<entt::tag<"modified"_hs>>(entity);
+                ChunkBuild& cb = reg.emplace<ChunkBuild>(entity);
                 cb.index = cd.index[ri];
                 cd.index[ri]++;
                 

@@ -3,7 +3,7 @@
 
 #include "system.h"
 
-#include "imgui/imgui.h"
+#include "imgui.h"
 #include <SDL.h>
 
 class UISys : public System {

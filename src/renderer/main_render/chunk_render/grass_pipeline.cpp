@@ -16,7 +16,7 @@
 #include "raycast/include/raycast_data.h"
 
 #include "cereal/archives/portable_binary.hpp"
-#include "imgui/imgui.h"
+#include "imgui.h"
 
 #include "util/tiled_noise.h"
 

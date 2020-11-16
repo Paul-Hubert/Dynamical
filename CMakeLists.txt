@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.8)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -20,7 +20,18 @@ target_link_libraries(dynamical PRIVATE Vulkan::Vulkan)
 
 find_package(SDL2 CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE SDL2::SDL2 SDL2::SDL2main)
-include_directories(${SDL2_INCLUDE_DIRS})
+
+find_package(imgui CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE imgui::imgui)
+
+find_package(EnTT CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE EnTT::EnTT)
+
+find_package(cereal CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE cereal)
+
+find_package(Taskflow CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE Taskflow::Taskflow)
 
 
 # Copy resources to build

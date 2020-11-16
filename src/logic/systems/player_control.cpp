@@ -13,7 +13,7 @@
 void PlayerControlSys::init() {
     
     auto player = reg.ctx<Util::Entity<"player"_hs>>();
-    reg.assign<CameraC>(player);
+    reg.emplace<CameraC>(player);
     
 }
 

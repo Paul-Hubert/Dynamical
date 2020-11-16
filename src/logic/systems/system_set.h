@@ -19,6 +19,8 @@ public:
     void tick();
     
     void finish();
+
+    ~SystemSet();
     
 private:
     std::list<System*> systems;

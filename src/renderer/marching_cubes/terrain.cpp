@@ -72,7 +72,7 @@ void Terrain::init() {
 
 void Terrain::construction(entt::registry& reg, entt::entity entity, ChunkC& chunk) {
     
-    reg.assign<Chunk>(entity);
+    reg.emplace<Chunk>(entity);
     
 }
 
@@ -180,7 +180,7 @@ void Terrain::tick() {
             deallocate(device, build);
             allocate(chonk, build);
         } else {
-            auto& chonk = reg.assign<Chunk>(entity);
+            auto& chonk = reg.emplace<Chunk>(entity);
             allocate(chonk, build);
         }
         Chunk::mutex.unlock();
@@ -191,19 +191,22 @@ void Terrain::tick() {
 
 void Terrain::finish() {
     
-    Device& device = *reg.ctx<Device*>();
-    
-    device->waitIdle();
-    
-    device->destroy(descLayout);
-    
-    device->destroy(descPool);
-    
 }
 
 
 Terrain::~Terrain() {
-    
+
+    Device& device = *reg.ctx<Device*>();
+
+    Util::log(Util::debug) << "kek\n";
+
+    reg.clear<Chunk>();
+    reg.clear<ChunkBuild>();
+
+    device->destroy(descLayout);
+
+    device->destroy(descPool);
+
 }
 
 VmaBuffer Terrain::make_triangles(Device& device, uint32_t numTriangles) {

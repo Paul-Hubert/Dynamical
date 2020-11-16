@@ -20,6 +20,7 @@ public:
     void init() override;
     void tick() override;
     const char* name() override {return "Renderer";};
+    void finish() override;
     ~Renderer() override;
     
     void resize();

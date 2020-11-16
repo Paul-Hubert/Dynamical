@@ -25,9 +25,11 @@ void ChunkRender::render(entt::registry& reg, vk::CommandBuffer command, vk::Des
     command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, chunk_pipeline, 0, {set}, {});
     
     command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, chunk_pipeline, 1, {chunk_pipeline.materialSet}, {});
-    
-    reg.view<Chunk, entt::tag<"ready"_hs>>().each([&](Chunk& chonk, auto) {
-        
+
+    auto view = reg.view<Chunk, entt::tag<"ready"_hs>>();
+    for(auto entity : view) {
+        Chunk& chonk = view.get<Chunk>(entity);
+
         command.bindVertexBuffers(0, {chonk.triangles}, {chonk.triangles_offset * sizeof(Triangle)});
         
         ChunkPipeline::PC pc {glm::vec3(0, 0, 0)};
@@ -35,7 +37,7 @@ void ChunkRender::render(entt::registry& reg, vk::CommandBuffer command, vk::Des
         
         command.drawIndirect(chonk.indirect, chonk.indirect_offset * sizeof(vk::DrawIndirectCommand), 1, 0);
         
-    });
+    }
     
     /*
     command.bindPipeline(vk::PipelineBindPoint::eGraphics, grass_pipeline);

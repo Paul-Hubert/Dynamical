@@ -2,6 +2,7 @@
 
 #include "instance.h"
 #include "loader.inl"
+#include "util/util.h"
 
 #include <iostream>
 #include <set>
@@ -227,6 +228,8 @@ bool Device::isDedicated() {
 
 Device::~Device() {
     
+    Util::log(Util::debug) << "fefef\n";
+
     vmaDestroyAllocator(allocator);
     
     logical.destroy();

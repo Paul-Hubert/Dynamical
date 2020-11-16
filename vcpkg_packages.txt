@@ -1,0 +1,1 @@
+vcpkg install cereal entt glm imgui openssl protobuf sdl2[vulkan] taskflow --triplet x64-windows

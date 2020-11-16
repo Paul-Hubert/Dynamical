@@ -18,12 +18,12 @@ void PhysicsSys::init() {
 }
 
 void PhysicsSys::tick() {
-    
-    reg.view<PhysicsC, PositionC, entt::tag<"forces"_hs>>().each([](PhysicsC& physics, PositionC& pos, auto) {
-        
+
+    auto view = reg.view<PhysicsC, PositionC, entt::tag<"forces"_hs>>();
+    for(auto entity : view) {
+        PhysicsC& physics = view.get<PhysicsC>(entity);
         physics.v.y -= 9.81f / 60.f;
-        
-    });
+    }
     
     reg.view<PhysicsC, PositionC>().each([this](auto entity, PhysicsC& physics, PositionC& pos) {
         
@@ -40,14 +40,14 @@ void PhysicsSys::tick() {
         
         if(chunk == entt::null) {
             chunk = reg.create();
-            reg.assign<GlobalChunkC>(chunk, coords, chunk::max_lod);
-            reg.assign<entt::tag<"loading"_hs>>(chunk);
+            reg.emplace<GlobalChunkC>(chunk, coords, chunk::max_lod);
+            reg.emplace<entt::tag<"loading"_hs>>(chunk);
             map.set(chunk, coords.x, coords.y, coords.z, chunk::max_mul/2);
             return;
         }
         
         if(!reg.has<entt::tag<"loaded"_hs>>(chunk)) {
-            if(!reg.has<entt::tag<"loading"_hs>>(chunk)) reg.assign<entt::tag<"loading"_hs>>(chunk);
+            if(!reg.has<entt::tag<"loading"_hs>>(chunk)) reg.emplace<entt::tag<"loading"_hs>>(chunk);
             return;
         }
         
