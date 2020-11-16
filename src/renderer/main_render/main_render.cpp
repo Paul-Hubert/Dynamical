@@ -82,8 +82,6 @@ void MainRender::render(entt::registry& reg, uint32_t index, std::vector<vk::Sem
     )}, fences[ri.frame_index]);
     device.g_mutex->unlock();
     
-    device->waitForFences(fences[ri.frame_index], VK_TRUE, std::numeric_limits<uint64_t>::max());
-    
 }
 
 void MainRender::cleanup() {
