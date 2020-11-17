@@ -8,11 +8,13 @@ constexpr float render_distance = 1000.f;
 constexpr float render_min = 0.1f;
 constexpr float render_fov = 70.f;
 
+class Context;
+
 class Camera {
 public:
-    Camera(int width, int height);
+    Camera(entt::registry& reg, Context& ctx);
     void setup(int width, int height);
-    void update(entt::registry& reg);
+    void update();
     ~Camera();
     
     glm::mat4& getProjection();
@@ -22,6 +24,8 @@ public:
     glm::vec3 getViewPosition();
     
 private:
+    entt::registry& reg;
+    Context& ctx;
     
     glm::vec3 position;
     

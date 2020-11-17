@@ -1,8 +1,6 @@
 #include "swapchain.h"
 
-#include "windu.h"
-#include "instance.h"
-#include "device.h"
+#include "context.h"
 #include "loader.inl"
 #include "num_frames.h"
 
@@ -10,22 +8,22 @@
 #include <iostream>
 #include <time.h>
 
-Swapchain::Swapchain(Windu& win, Instance& instance, Device &device) : win(win), instance(instance), device(device) {
+Swapchain::Swapchain(Context& ctx) : ctx(ctx) {
     
     INST_LOAD(vkGetPhysicalDeviceSurfaceCapabilitiesKHR)
     INST_LOAD(vkGetPhysicalDeviceSurfaceFormatsKHR)
     INST_LOAD(vkGetPhysicalDeviceSurfacePresentModesKHR)
     
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(static_cast<VkPhysicalDevice> (device), win.surface, reinterpret_cast<VkSurfaceCapabilitiesKHR*> (&capabilities));
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(static_cast<VkPhysicalDevice> (ctx.device), ctx.win.surface, reinterpret_cast<VkSurfaceCapabilitiesKHR*> (&capabilities));
     
     uint32_t num;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(static_cast<VkPhysicalDevice> (device), win.surface, &num, nullptr);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(static_cast<VkPhysicalDevice> (ctx.device), ctx.win.surface, &num, nullptr);
     formats.resize(num);
-    vkGetPhysicalDeviceSurfaceFormatsKHR(static_cast<VkPhysicalDevice> (device), win.surface, &num, reinterpret_cast<VkSurfaceFormatKHR*> (formats.data()));
+    vkGetPhysicalDeviceSurfaceFormatsKHR(static_cast<VkPhysicalDevice> (ctx.device), ctx.win.surface, &num, reinterpret_cast<VkSurfaceFormatKHR*> (formats.data()));
     
-    vkGetPhysicalDeviceSurfacePresentModesKHR(static_cast<VkPhysicalDevice> (device), win.surface, &num, nullptr);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(static_cast<VkPhysicalDevice> (ctx.device), ctx.win.surface, &num, nullptr);
     presentModes.resize(num);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(static_cast<VkPhysicalDevice> (device), win.surface, &num, reinterpret_cast<VkPresentModeKHR*> (presentModes.data()));
+    vkGetPhysicalDeviceSurfacePresentModesKHR(static_cast<VkPhysicalDevice> (ctx.device), ctx.win.surface, &num, reinterpret_cast<VkPresentModeKHR*> (presentModes.data()));
     
     vk::SurfaceFormatKHR surfaceformat = chooseSwapSurfaceFormat(formats, vk::Format::eB8G8R8A8Unorm, vk::ColorSpaceKHR::eSrgbNonlinear);
     presentMode = chooseSwapPresentMode(presentModes, vk::PresentModeKHR::eFifo);
@@ -43,8 +41,8 @@ Swapchain::Swapchain(Windu& win, Instance& instance, Device &device) : win(win),
 
 void Swapchain::setup() {
     
-    vk::SwapchainCreateInfoKHR createInfo({}, win.surface, num_frames, format, colorSpace, extent, 1, vk::ImageUsageFlagBits::eColorAttachment, vk::SharingMode::eExclusive,
-        1, &device.g_i, capabilities.currentTransform, vk::CompositeAlphaFlagBitsKHR::eOpaque, presentMode, VK_TRUE, swapchain
+    vk::SwapchainCreateInfoKHR createInfo({}, ctx.win.surface, num_frames, format, colorSpace, extent, 1, vk::ImageUsageFlagBits::eColorAttachment, vk::SharingMode::eExclusive,
+        1, &ctx.device.g_i, capabilities.currentTransform, vk::CompositeAlphaFlagBitsKHR::eOpaque, presentMode, VK_TRUE, swapchain
     );
     
     DEV_LOAD(vkCreateSwapchainKHR)
@@ -52,15 +50,15 @@ void Swapchain::setup() {
     auto info = static_cast<VkSwapchainCreateInfoKHR> (createInfo);
     
     VkSwapchainKHR newSwapchain;
-    vkCreateSwapchainKHR(device, &info, nullptr, &newSwapchain);
+    vkCreateSwapchainKHR(ctx.device, &info, nullptr, &newSwapchain);
     
     if(swapchain) {
         
         for (auto imageView : imageViews) {
-            device->destroy(imageView);
+            ctx.device->destroy(imageView);
         }
         DEV_LOAD(vkDestroySwapchainKHR)
-        vkDestroySwapchainKHR(device, static_cast<VkSwapchainKHR> (swapchain), nullptr);
+        vkDestroySwapchainKHR(ctx.device, static_cast<VkSwapchainKHR> (swapchain), nullptr);
         
     }
     
@@ -69,17 +67,17 @@ void Swapchain::setup() {
     DEV_LOAD(vkGetSwapchainImagesKHR)
     
     uint32_t num;
-    vkGetSwapchainImagesKHR(device, static_cast<VkSwapchainKHR> (swapchain), &num, nullptr);
+    vkGetSwapchainImagesKHR(ctx.device, static_cast<VkSwapchainKHR> (swapchain), &num, nullptr);
     
     if(num_frames != num) std::cout << "number of frames changed to : " << num << std::endl;
     
     images.resize(num_frames);
-    vkGetSwapchainImagesKHR(device, static_cast<VkSwapchainKHR> (swapchain), &num, reinterpret_cast<VkImage*> (images.data()));
+    vkGetSwapchainImagesKHR(ctx.device, static_cast<VkSwapchainKHR> (swapchain), &num, reinterpret_cast<VkImage*> (images.data()));
     
     imageViews.resize(num_frames);
     for(uint32_t i = 0; i < imageViews.size(); i++) {
         
-        imageViews[i] = device->createImageView(vk::ImageViewCreateInfo({}, images[i], vk::ImageViewType::e2D, format,
+        imageViews[i] = ctx.device->createImageView(vk::ImageViewCreateInfo({}, images[i], vk::ImageViewType::e2D, format,
                                     vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
         ));
         
@@ -95,11 +93,11 @@ void Swapchain::setup() {
 void Swapchain::cleanup() {
     
     for (auto imageView : imageViews) {
-        device->destroy(imageView);
+        ctx.device->destroy(imageView);
     }
     
     DEV_LOAD(vkDestroySwapchainKHR)
-    vkDestroySwapchainKHR(device, swapchain, nullptr);
+    vkDestroySwapchainKHR(ctx.device, swapchain, nullptr);
     swapchain = nullptr;
     
 }
@@ -117,7 +115,7 @@ Swapchain::~Swapchain() {
 
 uint32_t Swapchain::acquire(vk::Semaphore signal) {
     
-    auto resultvalue = device->acquireNextImageKHR(swapchain, std::numeric_limits<uint64_t>::max(), signal, nullptr, *this);
+    auto resultvalue = ctx.device->acquireNextImageKHR(swapchain, std::numeric_limits<uint64_t>::max(), signal, nullptr, *this);
     current = resultvalue.value;
     
     if(resultvalue.result == vk::Result::eSuboptimalKHR) {
@@ -131,7 +129,7 @@ uint32_t Swapchain::acquire(vk::Semaphore signal) {
 void Swapchain::present(vk::Semaphore wait) {
     
     // This will display the image
-    auto result = device.graphics.presentKHR(vk::PresentInfoKHR((wait ? 1 : 0), &wait, 1, &swapchain, &current), *this);
+    auto result = ctx.device.graphics.presentKHR(vk::PresentInfoKHR((wait ? 1 : 0), &wait, 1, &swapchain, &current), *this);
     
     if(result == vk::Result::eSuboptimalKHR) {
         throw vk::OutOfDateKHRError("Suboptimal swapchain");
@@ -174,7 +172,7 @@ vk::PresentModeKHR Swapchain::chooseSwapPresentMode(std::vector<vk::PresentModeK
 
 vk::Extent2D Swapchain::chooseSwapExtent(vk::SurfaceCapabilitiesKHR &capabilities) {
 
-    vk::Extent2D actualExtent((uint32_t) win.getWidth(), (uint32_t) win.getHeight());
+    vk::Extent2D actualExtent((uint32_t) ctx.win.getWidth(), (uint32_t) ctx.win.getHeight());
 
     actualExtent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, actualExtent.width));
     actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));
@@ -185,7 +183,7 @@ vk::Extent2D Swapchain::chooseSwapExtent(vk::SurfaceCapabilitiesKHR &capabilitie
 
 vk::Format Swapchain::findSupportedFormat(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) {
     for (vk::Format format : candidates) {
-        vk::FormatProperties props = device.physical.getFormatProperties(format);
+        vk::FormatProperties props = ctx.device.physical.getFormatProperties(format);
 
         if (tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features) {
             return format;

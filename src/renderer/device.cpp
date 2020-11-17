@@ -1,14 +1,14 @@
 #include "device.h"
 
-#include "instance.h"
 #include "loader.inl"
 #include "util/util.h"
+#include "context.h"
 
 #include <iostream>
 #include <set>
 #include <string>
 
-Device::Device(Instance &inst) : instance(inst) {
+Device::Device(Context& ctx) : ctx(ctx) {
     
     requiredFeatures = vk::PhysicalDeviceFeatures();
     requiredFeatures.samplerAnisotropy = true;
@@ -18,7 +18,7 @@ Device::Device(Instance &inst) : instance(inst) {
     requiredExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     // HERE : enable needed extensions (if present in 'extensions')
     
-    std::vector<vk::PhysicalDevice> p_devices = instance->enumeratePhysicalDevices();
+    std::vector<vk::PhysicalDevice> p_devices = ctx.instance->enumeratePhysicalDevices();
     
     // Rate each device and pick the first best in the list, if its score is > 0
     uint32_t index = 1000, max = 0;
@@ -58,7 +58,7 @@ Device::Device(Instance &inst) : instance(inst) {
     // Gets the first available queue family that supports graphics and presentation
     g_i = 1000;
     for(uint32_t i = 0; i < queueFamilies.size(); i++) {
-        if(queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics && instance.supportsPresent(static_cast<VkPhysicalDevice> (physical), i)) {
+        if(queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics && ctx.instance.supportsPresent(static_cast<VkPhysicalDevice> (physical), i)) {
             g_i = i;
             countF++;
             pqinfo[0] = {{}, i, 1, priorities.data()};

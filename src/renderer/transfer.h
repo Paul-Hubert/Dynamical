@@ -6,11 +6,11 @@
 
 #include "vmapp.h"
 
-class Device;
+class Context;
 
 class Transfer {
 public:
-    Transfer(Device& device);
+    Transfer(Context& ctx);
     void flush();
     vk::CommandBuffer getCommandBuffer();
     
@@ -20,7 +20,7 @@ public:
     
     ~Transfer();
 private:
-    Device& device;
+    Context& ctx;
     
     vk::CommandPool pool;
     std::array<vk::CommandBuffer, 2> commandBuffers;

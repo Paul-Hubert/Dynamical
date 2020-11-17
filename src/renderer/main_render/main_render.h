@@ -2,6 +2,7 @@
 #define MAIN_RENDER_H
 
 #include "renderpass.h"
+#include "object_render.h"
 #include "ui_render.h"
 #include "ubo_descriptor.h"
 
@@ -13,30 +14,24 @@
 
 #include <vector>
 
-class Instance;
-class Transfer;
-class Device;
-class Swapchain;
+class Context;
 class Camera;
-class Terrain;
 
 class MainRender {
 public:
-    MainRender(Instance& instance, Device& device, Transfer& transfer, Swapchain& swap, Camera& camera);
+    MainRender(entt::registry& reg, Context& ctx);
     void setup();
-    void render(entt::registry& reg, uint32_t index, std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals);
+    void render(uint32_t index, Camera& camera, std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals);
     void cleanup();
     ~MainRender();
     
 private:
+    entt::registry& reg;
+    Context& ctx;
     Renderpass renderpass;
     UBODescriptor ubo;
+    ObjectRender object_render;
     UIRender ui_render;
-    Instance& instance;
-    Device& device;
-    Transfer& transfer;
-    Swapchain& swap;
-    Camera& camera;
     
     vk::CommandPool commandPool;
     std::array<vk::CommandBuffer, NUM_FRAMES> commandBuffers;

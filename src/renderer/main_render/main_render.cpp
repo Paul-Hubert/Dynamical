@@ -1,29 +1,22 @@
 #include "main_render.h"
 
-#include "renderer/instance.h"
-#include "renderer/device.h"
-#include "renderer/swapchain.h"
+#include "renderer/context.h"
 #include "renderer/camera.h"
-#include "renderer/marching_cubes/terrain.h"
 #include "util/util.h"
 #include "renderer/num_frames.h"
-#include "renderer/marching_cubes/chunk.h"
-#include "logic/components/chunk/chunkc.h"
 #include "logic/components/renderinfo.h"
 
-std::mutex Chunk::mutex;
-
-MainRender::MainRender(Instance& instance, Device& device, Transfer& transfer, Swapchain& swap, Camera& camera) : renderpass(device, swap), ubo(device), ui_render(device, swap, transfer, renderpass), instance(instance), device(device), transfer(transfer), swap(swap), camera(camera) {
+MainRender::MainRender(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx), renderpass(ctx), ubo(ctx),  object_render(reg, ctx, renderpass, ubo), ui_render(ctx, renderpass) {
     
-    commandPool = device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, device.g_i));
+    commandPool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx.device.g_i));
     
-    auto temp = device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, NUM_FRAMES));
+    auto temp = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, NUM_FRAMES));
     
     for(int i = 0; i < NUM_FRAMES; i++) {
         
         commandBuffers[i] = temp[i];
         
-        fences[i] = device->createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
+        fences[i] = ctx.device->createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
         
     }
     
@@ -36,13 +29,13 @@ void MainRender::setup() {
     
 }
 
-void MainRender::render(entt::registry& reg, uint32_t index, std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals) {
+void MainRender::render(uint32_t index, Camera& camera, std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals) {
     
     auto& ri = reg.ctx<RenderInfo>();
     
-    vk::Result res = device->waitForFences(fences[ri.frame_index], VK_TRUE, std::numeric_limits<uint64_t>::max());
+    vk::Result res = ctx.device->waitForFences(fences[ri.frame_index], VK_TRUE, std::numeric_limits<uint64_t>::max());
     
-    device->resetFences(fences[ri.frame_index]);
+    ctx.device->resetFences(fences[ri.frame_index]);
     
     static float t = 0.f;
     t += 1.f/60.f;
@@ -57,12 +50,14 @@ void MainRender::render(entt::registry& reg, uint32_t index, std::vector<vk::Sem
     auto clearValues = std::vector<vk::ClearValue> {
         vk::ClearValue(vk::ClearColorValue(std::array<float, 4> { 0.2f, 0.2f, 0.2f, 1.0f })),
         vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0))};
-    command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.framebuffers[index], vk::Rect2D({}, swap.extent), clearValues.size(), clearValues.data()), vk::SubpassContents::eInline);
+    command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.framebuffers[index], vk::Rect2D({}, ctx.swap.extent), clearValues.size(), clearValues.data()), vk::SubpassContents::eInline);
     
-    command.setViewport(0, vk::Viewport(0, (float) swap.extent.height, swap.extent.width, -((float) swap.extent.height), 0, 1));
+    command.setViewport(0, vk::Viewport(0, (float) ctx.swap.extent.height, ctx.swap.extent.width, -((float)ctx.swap.extent.height), 0, 1));
     
-    command.setScissor(0, vk::Rect2D(vk::Offset2D(), swap.extent));
+    command.setScissor(0, vk::Rect2D(vk::Offset2D(), ctx.swap.extent));
     
+    object_render.render(command, ri.frame_index);
+
     ui_render.render(command, ri.frame_index);
     
     command.endRenderPass();
@@ -72,19 +67,19 @@ void MainRender::render(entt::registry& reg, uint32_t index, std::vector<vk::Sem
 
     auto stages = std::vector<vk::PipelineStageFlags> {vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTopOfPipe};
     
-    device.g_mutex->lock();
-    device.graphics.submit({vk::SubmitInfo(
+    ctx.device.g_mutex->lock();
+    ctx.device.graphics.submit({vk::SubmitInfo(
         Util::removeElement<vk::Semaphore>(waits, nullptr), waits.data(), stages.data(),
         1, &commandBuffers[ri.frame_index],
         Util::removeElement<vk::Semaphore>(signals, nullptr), signals.data()
     )}, fences[ri.frame_index]);
-    device.g_mutex->unlock();
+    ctx.device.g_mutex->unlock();
     
 }
 
 void MainRender::cleanup() {
     
-    device->resetCommandPool(commandPool, {});
+    ctx.device->resetCommandPool(commandPool, {});
     renderpass.cleanup();
     
 }
@@ -94,10 +89,10 @@ MainRender::~MainRender() {
     
     for(int i = 0; i < commandBuffers.size(); i++) {
         
-        device->destroy(fences[i]);
+        ctx.device->destroy(fences[i]);
         
     }
     
-    device->destroy(commandPool);
+    ctx.device->destroy(commandPool);
     
 }

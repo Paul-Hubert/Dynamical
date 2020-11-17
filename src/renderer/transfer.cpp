@@ -1,18 +1,18 @@
 #include "transfer.h"
 
-#include "device.h"
+#include "context.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-Transfer::Transfer(Device& device) : device(device) {
+Transfer::Transfer(Context& ctx) : ctx(ctx) {
     
-    pool = device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer, device.t_i));
+    pool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx.device.t_i));
     
     vk::CommandBufferAllocateInfo info(pool, vk::CommandBufferLevel::ePrimary, 2);
-    device->allocateCommandBuffers(&info, commandBuffers.data());
+    ctx.device->allocateCommandBuffers(&info, commandBuffers.data());
     
-    fence = device->createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
+    fence = ctx.device->createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
     
     commandBuffers[index].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
     
@@ -20,15 +20,15 @@ Transfer::Transfer(Device& device) : device(device) {
 
 void Transfer::flush() {
     
-    device->waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+    ctx.device->waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
     
     if(!empty) {
         
         commandBuffers[index].end();
         
-        device->resetFences(fence);
+        ctx.device->resetFences(fence);
         
-        device.transfer.submit(vk::SubmitInfo(0, nullptr, nullptr, 1, &commandBuffers[index], 0, nullptr), fence);
+        ctx.device.transfer.submit(vk::SubmitInfo(0, nullptr, nullptr, 1, &commandBuffers[index], 0, nullptr), fence);
         
         index = (index+1)%2;
         
@@ -62,13 +62,13 @@ void Transfer::prepareImage(const void* data, size_t size, VmaImage& image, vk::
     VmaAllocationCreateInfo info {};
     info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
     info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-    stagingBuffers[index].push_back(VmaBuffer(device, &info, vk::BufferCreateInfo(
-        {}, image.size, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, 1, &device.t_i
+    stagingBuffers[index].push_back(VmaBuffer(ctx.device, &info, vk::BufferCreateInfo(
+        {}, image.size, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, 1, &ctx.device.t_i
     )));
     const VmaBuffer& stagingBuffer = stagingBuffers[index].back();
     
     VmaAllocationInfo inf;
-    vmaGetAllocationInfo(device, stagingBuffer.allocation, &inf);
+    vmaGetAllocationInfo(ctx.device, stagingBuffer.allocation, &inf);
     
     memcpy(inf.pMappedData, data, size);
     
@@ -93,7 +93,7 @@ void Transfer::prepareImage(const void* data, size_t size, VmaImage& image, vk::
 
 bool Transfer::prepareBuffer(const void* data, VmaBuffer& buffer) {
     
-    bool needsStaging = device.isDedicated();
+    bool needsStaging = ctx.device.isDedicated();
     
     
     if(needsStaging) {
@@ -101,13 +101,13 @@ bool Transfer::prepareBuffer(const void* data, VmaBuffer& buffer) {
         VmaAllocationCreateInfo info {};
         info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
         info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-        stagingBuffers[index].push_back(VmaBuffer(device, &info, vk::BufferCreateInfo(
-            {}, buffer.size, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, 1, &device.t_i
+        stagingBuffers[index].push_back(VmaBuffer(ctx.device, &info, vk::BufferCreateInfo(
+            {}, buffer.size, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, 1, &ctx.device.t_i
         )));
         const VmaBuffer& stagingBuffer = stagingBuffers[index].back();
         
         VmaAllocationInfo inf;
-        vmaGetAllocationInfo(device, stagingBuffer.allocation, &inf);
+        vmaGetAllocationInfo(ctx.device, stagingBuffer.allocation, &inf);
         
         memcpy(inf.pMappedData, data, buffer.size);
         
@@ -117,11 +117,11 @@ bool Transfer::prepareBuffer(const void* data, VmaBuffer& buffer) {
         
     } else {
         
-        void* dest = device->mapMemory(buffer.memory, buffer.offset, buffer.size, {});
+        void* dest = ctx.device->mapMemory(buffer.memory, buffer.offset, buffer.size, {});
         
         memcpy(dest, data, buffer.size);
         
-        device->unmapMemory(buffer.memory);
+        ctx.device->unmapMemory(buffer.memory);
         
     }
     
@@ -140,8 +140,8 @@ Transfer::~Transfer() {
         stagingBuffers[i].clear();
     }
     
-    device->destroy(fence);
+    ctx.device->destroy(fence);
     
-    device->destroy(pool);
+    ctx.device->destroy(pool);
     
 }

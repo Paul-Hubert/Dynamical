@@ -4,12 +4,11 @@
 #include "renderer/vk.h"
 #include "renderer/vmapp.h"
 
-class Device;
-class Swapchain;
+class Context;
 
 class Renderpass {
 public:
-    Renderpass(Device& device, Swapchain& swap);
+    Renderpass(Context& ctx);
     void setup();
     void cleanup();
     ~Renderpass();
@@ -24,8 +23,7 @@ public:
     vk::RenderPass renderpass;
     
 private:
-    Device& device;
-    Swapchain& swap;
+    Context& ctx;
     
 };
 

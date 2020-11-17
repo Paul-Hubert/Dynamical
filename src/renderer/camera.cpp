@@ -1,6 +1,6 @@
 #include "camera.h"
 
-#include "device.h"
+#include "context.h"
 #include "swapchain.h"
 
 #include "glm/gtc/matrix_transform.hpp"
@@ -10,8 +10,8 @@
 #include "logic/components/positionc.h"
 #include "logic/components/camerac.h"
 
-Camera::Camera(int width, int height) {
-    setup(width, height);
+Camera::Camera(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx) {
+    setup(ctx.swap.extent.width, ctx.swap.extent.height);
 }
 
 void Camera::setup(int width, int height) {
@@ -20,7 +20,7 @@ void Camera::setup(int width, int height) {
     
 }
 
-void Camera::update(entt::registry& reg) {
+void Camera::update() {
     
     auto player = reg.ctx<Util::Entity<"player"_hs>>();
     CameraC& cam = reg.get<CameraC>(player);

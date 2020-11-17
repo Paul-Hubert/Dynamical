@@ -8,9 +8,7 @@
 
 #include "renderer/num_frames.h"
 
-class Device;
-class Transfer;
-class Swapchain;
+class Context;
 class Renderpass;
 
 // Frame data
@@ -26,7 +24,7 @@ public:
 
 class UIRender {
 public:
-    UIRender(Device &win, Swapchain& swap, Transfer& transfer, Renderpass& renderpass);
+    UIRender(Context& ctx, Renderpass& renderpass);
     ~UIRender();
     
     void createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buffer_memory, vk::DeviceSize& p_buffer_size, size_t new_size,vk::BufferUsageFlagBits usage);
@@ -47,9 +45,7 @@ public:
     
 private:
     
-    Device& device;
-    Swapchain& swap;
-    Transfer& transfer;
+    Context& ctx;
     
     void initPipeline(vk::RenderPass);
     

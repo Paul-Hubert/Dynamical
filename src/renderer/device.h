@@ -5,7 +5,7 @@
 #include "vk_mem_alloc.h"
 #include <mutex>
 
-class Instance;
+class Context;
 
 #ifndef NDEBUG
 #define SET_NAME(TYPE, HANDLE, STR) \
@@ -16,7 +16,7 @@ device->setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT(TYPE, (uint64
 
 class Device {
 public :
-    Device(Instance &inst);
+    Device(Context& ctx);
     ~Device();
     
     vk::Device* operator->() {return &logical;}
@@ -52,7 +52,7 @@ public :
     PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT;
     
 private:
-    Instance &instance;
+    Context& ctx;
 };
 
 #endif

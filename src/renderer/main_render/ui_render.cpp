@@ -1,8 +1,6 @@
 #include "ui_render.h"
 
-#include "renderer/device.h"
-#include "renderer/swapchain.h"
-#include "renderer/transfer.h"
+#include "renderer/context.h"
 #include "renderpass.h"
 
 #include "imgui.h"
@@ -10,7 +8,7 @@
 #include "renderer/num_frames.h"
 #include "util/util.h"
 
-UIRender::UIRender(Device &device, Swapchain& swap, Transfer& transfer, Renderpass& renderpass) : device(device), swap(swap), transfer(transfer) {
+UIRender::UIRender(Context& ctx, Renderpass& renderpass) : ctx(ctx) {
     
     auto& io = ImGui::GetIO();
     
@@ -18,24 +16,24 @@ UIRender::UIRender(Device &device, Swapchain& swap, Transfer& transfer, Renderpa
     int tex_w, tex_h;
     io.Fonts->GetTexDataAsRGBA32(&tex_pixels, &tex_w, &tex_h);
     
-    bool concurrent = (device.g_i != device.t_i);
-    uint32_t qfs[2] = {device.g_i, device.t_i};
+    bool concurrent = (ctx.device.g_i != ctx.device.t_i);
+    uint32_t qfs[2] = { ctx.device.g_i, ctx.device.t_i};
         
     VmaAllocationCreateInfo allocInfo{};
     allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    fontAtlas = VmaImage(device, &allocInfo, vk::ImageCreateInfo(
+    fontAtlas = VmaImage(ctx.device, &allocInfo, vk::ImageCreateInfo(
         {}, vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(tex_w, tex_h, 1), 1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, 
         concurrent ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive, concurrent ? 2 : 1, &qfs[0], vk::ImageLayout::eUndefined)
     );
     
-    transfer.prepareImage(tex_pixels, tex_w * tex_h * 4, fontAtlas, vk::Extent3D(tex_w, tex_h, 1), 0, 0);
+    ctx.transfer.prepareImage(tex_pixels, tex_w * tex_h * 4, fontAtlas, vk::Extent3D(tex_w, tex_h, 1), 0, 0);
     
-    fontView = device->createImageView(vk::ImageViewCreateInfo(
+    fontView = ctx.device->createImageView(vk::ImageViewCreateInfo(
         {}, fontAtlas, vk::ImageViewType::e2D, vk::Format::eR8G8B8A8Unorm, {}, 
         vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
     ));
     
-    fontSampler = device->createSampler(vk::SamplerCreateInfo(
+    fontSampler = ctx.device->createSampler(vk::SamplerCreateInfo(
         {}, vk::Filter::eLinear, vk::Filter::eLinear, vk::SamplerMipmapMode::eLinear,
         vk::SamplerAddressMode::eClampToEdge, vk::SamplerAddressMode::eClampToEdge, vk::SamplerAddressMode::eClampToEdge
     ));
@@ -44,22 +42,22 @@ UIRender::UIRender(Device &device, Swapchain& swap, Transfer& transfer, Renderpa
         auto poolSizes = std::vector {
             vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1),
         };
-        descPool = device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, 1, poolSizes.size(), poolSizes.data()));
+        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, 1, poolSizes.size(), poolSizes.data()));
     }
     
     {
         auto bindings = std::vector {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment)
         };
-        descLayout = device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, bindings.size(), bindings.data()));
+        descLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, bindings.size(), bindings.data()));
         
-        descSet = device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &descLayout))[0];
+        descSet = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &descLayout))[0];
         
     }
     
     auto info = vk::DescriptorImageInfo(fontSampler, fontView, vk::ImageLayout::eShaderReadOnlyOptimal);
         
-    device->updateDescriptorSets({vk::WriteDescriptorSet(descSet, 0, 0, 1, vk::DescriptorType::eCombinedImageSampler, &info, 0, 0)}, {});
+    ctx.device->updateDescriptorSets({vk::WriteDescriptorSet(descSet, 0, 0, 1, vk::DescriptorType::eCombinedImageSampler, &info, 0, 0)}, {});
     
     initPipeline(renderpass);
     
@@ -68,19 +66,19 @@ UIRender::UIRender(Device &device, Swapchain& swap, Transfer& transfer, Renderpa
 void UIRender::createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buffer_memory, vk::DeviceSize& p_buffer_size, size_t new_size, vk::BufferUsageFlagBits usage) {
     
     if (buffer)
-        device->destroyBuffer(buffer);
+        ctx.device->destroyBuffer(buffer);
     if (buffer_memory)
-        device->freeMemory(buffer_memory);
+        ctx.device->freeMemory(buffer_memory);
     
-    buffer = device->createBuffer(vk::BufferCreateInfo({}, new_size, usage, vk::SharingMode::eExclusive));
+    buffer = ctx.device->createBuffer(vk::BufferCreateInfo({}, new_size, usage, vk::SharingMode::eExclusive));
 
-    vk::MemoryRequirements req = device->getBufferMemoryRequirements(buffer);
+    vk::MemoryRequirements req = ctx.device->getBufferMemoryRequirements(buffer);
     
-    buffer_memory = device->allocateMemory(
+    buffer_memory = ctx.device->allocateMemory(
         vk::MemoryAllocateInfo(req.size,
-                               device.getMemoryType(req.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)));
+            ctx.device.getMemoryType(req.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)));
     
-    device->bindBufferMemory(buffer, buffer_memory, 0);
+    ctx.device->bindBufferMemory(buffer, buffer_memory, 0);
     p_buffer_size = new_size;
     
 }
@@ -110,8 +108,8 @@ void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t i) {
 
     // Upload Vertex and index Data:
     {
-        ImDrawVert* vtx_dst = (ImDrawVert*) device->mapMemory(fd->vertexBufferMemory, 0, vertex_size, {});
-        ImDrawIdx* idx_dst = (ImDrawIdx*) device->mapMemory(fd->indexBufferMemory, 0, index_size, {});
+        ImDrawVert* vtx_dst = (ImDrawVert*)ctx.device->mapMemory(fd->vertexBufferMemory, 0, vertex_size, {});
+        ImDrawIdx* idx_dst = (ImDrawIdx*)ctx.device->mapMemory(fd->indexBufferMemory, 0, index_size, {});
         
         for (int n = 0; n < draw_data->CmdListsCount; n++)
         {
@@ -122,8 +120,8 @@ void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t i) {
             idx_dst += cmd_list->IdxBuffer.Size;
         }
         
-        device->unmapMemory(fd->vertexBufferMemory);
-        device->unmapMemory(fd->indexBufferMemory);
+        ctx.device->unmapMemory(fd->vertexBufferMemory);
+        ctx.device->unmapMemory(fd->indexBufferMemory);
     }
     
     
@@ -213,11 +211,11 @@ void UIRender::initPipeline(vk::RenderPass renderpass) {
     
     moduleInfo.codeSize = vertShaderCode.size();
     moduleInfo.pCode = reinterpret_cast<const uint32_t*>(vertShaderCode.data());
-    VkShaderModule vertShaderModule = static_cast<VkShaderModule> (device->createShaderModule(moduleInfo));
+    VkShaderModule vertShaderModule = static_cast<VkShaderModule> (ctx.device->createShaderModule(moduleInfo));
     
     moduleInfo.codeSize = fragShaderCode.size();
     moduleInfo.pCode = reinterpret_cast<const uint32_t*>(fragShaderCode.data());
-    VkShaderModule fragShaderModule = static_cast<VkShaderModule> (device->createShaderModule(moduleInfo));
+    VkShaderModule fragShaderModule = static_cast<VkShaderModule> (ctx.device->createShaderModule(moduleInfo));
 
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -258,14 +256,14 @@ void UIRender::initPipeline(vk::RenderPass renderpass) {
     VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = (float) swap.extent.width;
-    viewport.height = (float) swap.extent.height;
+    viewport.width = (float) ctx.swap.extent.width;
+    viewport.height = (float) ctx.swap.extent.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
     VkRect2D scissor = {};
     scissor.offset = {0, 0};
-    scissor.extent = swap.extent;
+    scissor.extent = ctx.swap.extent;
 
     VkPipelineViewportStateCreateInfo viewportState = {};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -337,7 +335,7 @@ void UIRender::initPipeline(vk::RenderPass renderpass) {
     
     auto range = vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, 4 * sizeof(float));
     
-    pipelineLayout = device->createPipelineLayout(vk::PipelineLayoutCreateInfo(
+    pipelineLayout = ctx.device->createPipelineLayout(vk::PipelineLayoutCreateInfo(
         {}, layouts.size(), layouts.data(), 1, &range
     ));
     
@@ -358,10 +356,10 @@ void UIRender::initPipeline(vk::RenderPass renderpass) {
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    graphicsPipeline = device->createGraphicsPipeline(nullptr, {pipelineInfo}).value;
+    graphicsPipeline = ctx.device->createGraphicsPipeline(nullptr, {pipelineInfo}).value;
 
-    device->destroyShaderModule(static_cast<vk::ShaderModule> (fragShaderModule));
-    device->destroyShaderModule(static_cast<vk::ShaderModule> (vertShaderModule));
+    ctx.device->destroyShaderModule(static_cast<vk::ShaderModule> (fragShaderModule));
+    ctx.device->destroyShaderModule(static_cast<vk::ShaderModule> (vertShaderModule));
     
 }
 
@@ -369,23 +367,23 @@ UIRender::~UIRender() {
     
     // Free/Destroy ce qui est créé dans init();
     
-    device->destroy(descPool);
+    ctx.device->destroy(descPool);
     
-    device->destroy(descLayout);
+    ctx.device->destroy(descLayout);
     
-    device->destroy(fontSampler);
+    ctx.device->destroy(fontSampler);
     
-    device->destroy(fontView);
+    ctx.device->destroy(fontView);
     
     for(FrameDataForRender& fd : g_FramesDataBuffers) {
-        device->destroy(fd.vertexBuffer);
-        device->destroy(fd.indexBuffer);
-        device->free(fd.vertexBufferMemory);
-        device->free(fd.indexBufferMemory);
+        ctx.device->destroy(fd.vertexBuffer);
+        ctx.device->destroy(fd.indexBuffer);
+        ctx.device->free(fd.vertexBufferMemory);
+        ctx.device->free(fd.indexBufferMemory);
     }
     
-    device->destroy(graphicsPipeline);
+    ctx.device->destroy(graphicsPipeline);
     
-    device->destroy(pipelineLayout);
+    ctx.device->destroy(pipelineLayout);
     
 }

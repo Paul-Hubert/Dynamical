@@ -7,26 +7,23 @@
 #include "num_frames.h"
 #include "logic/components/renderinfo.h"
 
-Renderer::Renderer(entt::registry& reg) : System(reg), win(), instance(win), device(instance), transfer(device), swap(win, instance, device), camera(swap.extent.width, swap.extent.height), main_render(instance, device, transfer, swap, camera),
-waitsems(NUM_FRAMES), signalsems(NUM_FRAMES), computesems(NUM_FRAMES) {
+Renderer::Renderer(entt::registry& reg) : System(reg), ctx(std::make_unique<Context>(reg)), camera(reg, *ctx), main_render(reg, *ctx), waitsems(NUM_FRAMES), signalsems(NUM_FRAMES), computesems(NUM_FRAMES) {
     
-    main_render.setup();
-    
-    for(int i = 0; i < waitsems.size(); i++) {
-        waitsems[i] = device->createSemaphore({});
-        signalsems[i] = device->createSemaphore({});
-        computesems[i] = device->createSemaphore({});
+    for (int i = 0; i < waitsems.size(); i++) {
+        waitsems[i] = ctx->device->createSemaphore({});
+        signalsems[i] = ctx->device->createSemaphore({});
+        computesems[i] = ctx->device->createSemaphore({});
     }
-    
-    transfer.flush();
+
+    main_render.setup();
     
 }
 
 void Renderer::preinit() {
     
-    reg.set<SDL_Window*>(win);
+    reg.set<SDL_Window*>(ctx->win);
     
-    reg.set<Device*>(&device);
+    reg.set<Device*>(&ctx->device);
     
     auto& ri = reg.set<RenderInfo>();
     ri.frame_index = 0;
@@ -53,15 +50,15 @@ void Renderer::tick() {
     
     try {
         
-        transfer.flush();
+        ctx->transfer.flush();
         
-        camera.update(reg);
+        camera.update();
         
-        uint32_t index = swap.acquire(waitsems[ri.frame_index]);
+        uint32_t index = ctx->swap.acquire(waitsems[ri.frame_index]);
         
-        main_render.render(reg, index, {waitsems[ri.frame_index]}, {signalsems[ri.frame_index]});
+        main_render.render(index, camera, { waitsems[ri.frame_index]}, { signalsems[ri.frame_index]});
         
-        swap.present(signalsems[ri.frame_index]);
+        ctx->swap.present(signalsems[ri.frame_index]);
         
     } catch(vk::OutOfDateKHRError&) {
         
@@ -73,7 +70,7 @@ void Renderer::tick() {
 
 void Renderer::finish() {
 
-    device->waitIdle();
+    ctx->device->waitIdle();
 
 }
 
@@ -82,26 +79,26 @@ Renderer::~Renderer() {
     main_render.cleanup();
     
     for(int i = 0; i < waitsems.size(); i++) {
-        device->destroy(waitsems[i]);
-        device->destroy(signalsems[i]);
-        device->destroy(computesems[i]);
+        ctx->device->destroy(waitsems[i]);
+        ctx->device->destroy(signalsems[i]);
+        ctx->device->destroy(computesems[i]);
     }
     
 }
 
 void Renderer::resize() {
     
-    if(win.resize()) {
+    if(ctx->win.resize()) {
         
-        device->waitIdle();
+        ctx->device->waitIdle();
         
         main_render.cleanup();
         
-        swap.cleanup();
+        ctx->swap.cleanup();
         
-        swap.setup();
+        ctx->swap.setup();
         
-        camera.setup(swap.extent.width, swap.extent.height);
+        camera.setup(ctx->swap.extent.width, ctx->swap.extent.height);
         
         main_render.setup();
     

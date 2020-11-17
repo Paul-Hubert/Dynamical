@@ -1,10 +1,11 @@
 #include "instance.h"
 
-#include "windu.h"
 #include "loader.inl"
 
 #include <SDL_vulkan.h>
 #include <iostream>
+
+#include "context.h"
 
 #define LOG_LEVEL VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
 
@@ -89,12 +90,12 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     return VK_FALSE;
 }
 
-Instance::Instance(Windu& win) : win(win) {
+Instance::Instance(Context& ctx) : ctx(ctx) {
     
     uint32_t extensionCount;
-    SDL_Vulkan_GetInstanceExtensions(win, &extensionCount, nullptr);
+    SDL_Vulkan_GetInstanceExtensions(ctx.win, &extensionCount, nullptr);
     std::vector<const char *> extensionNames(extensionCount);
-    SDL_Vulkan_GetInstanceExtensions(win, &extensionCount, extensionNames.data());
+    SDL_Vulkan_GetInstanceExtensions(ctx.win, &extensionCount, extensionNames.data());
 
     vk::ApplicationInfo appInfo("Test", VK_MAKE_VERSION(1, 0, 0), "Dynamical", VK_MAKE_VERSION(1, 0, 0), VK_MAKE_VERSION(1, 1, 0));
 
@@ -143,8 +144,8 @@ Instance::Instance(Windu& win) : win(win) {
 #endif
     
     VkSurfaceKHR surf;
-    SDL_Vulkan_CreateSurface(win, instance, &surf);
-    win.surface = surf;
+    SDL_Vulkan_CreateSurface(ctx.win, instance, &surf);
+    ctx.win.surface = surf;
     
     INST_LOAD(vkGetPhysicalDeviceSurfaceSupportKHR);
     this->vkGetPhysicalDeviceSurfaceSupportKHR = vkGetPhysicalDeviceSurfaceSupportKHR;
@@ -153,13 +154,13 @@ Instance::Instance(Windu& win) : win(win) {
 
 bool Instance::supportsPresent(VkPhysicalDevice device, int i) {
     VkBool32 b;
-    vkGetPhysicalDeviceSurfaceSupportKHR(device, i, win, &b);
+    vkGetPhysicalDeviceSurfaceSupportKHR(device, i, ctx.win, &b);
     return b == VK_TRUE;
 }
 
 Instance::~Instance() {
     
-    instance.destroy(win.surface);
+    instance.destroy(ctx.win.surface);
 
 #ifndef NDEBUG
     {

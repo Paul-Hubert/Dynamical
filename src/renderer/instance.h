@@ -3,11 +3,11 @@
 
 #include <renderer/vk.h>
 
-class Windu;
+class Context;
 
 class Instance {
 public:
-    Instance(Windu& win);
+    Instance(Context& ctx);
     ~Instance();
     vk::Instance* operator->() {return &instance;}
     operator vk::Instance() { return instance; }
@@ -15,8 +15,9 @@ public:
     bool supportsPresent(VkPhysicalDevice device, int i);
     VkDebugUtilsMessengerEXT messenger;
 private:
+    Context& ctx;
     vk::Instance instance;
-    Windu& win;
+    
     PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
 };
 

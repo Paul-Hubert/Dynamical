@@ -5,8 +5,9 @@
 
 #include <SDL_vulkan.h>
 #include "renderer/vk.h"
+#include "context.h"
 
-Windu::Windu() {
+Windu::Windu(Context& ctx) : ctx(ctx) {
     
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
     

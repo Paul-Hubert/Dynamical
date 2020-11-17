@@ -17,11 +17,11 @@ struct UBO {
     
 };
 
-class Device;
+class Context;
 
 class UBODescriptor {
 public:
-    UBODescriptor(Device& device);
+    UBODescriptor(Context& ctx);
     ~UBODescriptor();
     
     vk::DescriptorPool descPool;
@@ -31,7 +31,7 @@ public:
     std::array<VmaBuffer, NUM_FRAMES> ubos;
     std::array<UBO*, NUM_FRAMES> pointers;
 private:
-    Device& device;
+    Context& ctx;
     
 };
 

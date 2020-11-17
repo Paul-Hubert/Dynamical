@@ -5,13 +5,11 @@
 
 #include "num_frames.h"
 
-class Windu;
-class Instance;
-class Device;
+class Context;
 
 class Swapchain {
 public :
-    Swapchain(Windu& win, Instance& instance, Device &device);
+    Swapchain(Context& ctx);
     void setup();
     void cleanup();
     ~Swapchain();
@@ -19,9 +17,6 @@ public :
     uint32_t acquire(vk::Semaphore signal);
     void present(vk::Semaphore wait);
     
-    Windu& win;
-    Instance& instance;
-    Device& device;
     
     vk::SwapchainKHR swapchain;
     std::vector<vk::Image> images;
@@ -45,6 +40,8 @@ public :
     PFN_vkQueuePresentKHR vkQueuePresentKHR;
     
 private :
+    Context& ctx;
+
     vk::SurfaceFormatKHR chooseSwapSurfaceFormat(std::vector<vk::SurfaceFormatKHR> &formats, vk::Format wantedFormat, vk::ColorSpaceKHR wantedColorSpace);
     vk::PresentModeKHR chooseSwapPresentMode(std::vector<vk::PresentModeKHR> &presentModes, vk::PresentModeKHR wantedMode);
     vk::Extent2D chooseSwapExtent(vk::SurfaceCapabilitiesKHR &capabilities);
