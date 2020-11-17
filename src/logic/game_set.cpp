@@ -3,16 +3,16 @@
 #include <iostream>
 
 #include "taskflow/taskflow.hpp"
-#include "system_list.h"
+#include "systems/system_list.h"
 #include "renderer/marching_cubes/terrain.h"
 #include "renderer/marching_cubes/marching_cubes.h"
 #include "logic/components/settingsc.h"
-#include "physics.h"
+#include "systems/physics.h"
 
 #include "logic/game.h"
 
 #include "renderer/renderer.h"
-#include "ui.h"
+#include "systems/ui.h"
 
 #define MAKE_SYSTEM(TYPE, NAME) \
 owned_systems.push_back(std::make_unique<TYPE>(reg)); \
@@ -27,15 +27,6 @@ GameSet::GameSet(Game& game) : SystemSet(game.reg) {
     
     SettingsC& s = reg.ctx<SettingsC>();
     
-#ifndef NDEBUG
-    if(s.server_side) {
-        Util::log(Util::trace) << "server_side" << std::endl;
-    } else if(s.client_side) {
-        Util::log(Util::trace) << "client_side" << std::endl;
-    } else {
-        Util::log(Util::trace) << "single_player" << std::endl;
-    }
-#endif
     bool server = s.server_side;
     bool client = s.client_side;
     bool multiplayer = server || client;
@@ -47,18 +38,11 @@ GameSet::GameSet(Game& game) : SystemSet(game.reg) {
         MAKE_SYSTEM(DebugSys, debug)
         add(game.ui.get());
         MAKE_SYSTEM(PlayerControlSys, camera)
-        
-        MAKE_SYSTEM(ChunkManagerSys, chunk_manager)
-        MAKE_SYSTEM(ChunkLoaderSys, chunk_loader)
-        MAKE_SYSTEM(ChunkGeneratorSys, chunk_generator)
     }
     
     MAKE_SYSTEM(PhysicsSys, physics)
     
     if(user) {
-        MAKE_SYSTEM(ChunkSys, chunk)
-        MAKE_SYSTEM(Terrain, terrain)
-        MAKE_SYSTEM(MarchingCubes, marching_cubes)
         add(game.renderer.get());
     }
     

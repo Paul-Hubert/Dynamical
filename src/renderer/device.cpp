@@ -227,12 +227,10 @@ bool Device::isDedicated() {
 }
 
 Device::~Device() {
-    
-    Util::log(Util::debug) << "fefef\n";
 
     vmaDestroyAllocator(allocator);
     
-    instance->destroy();
+    logical.destroy();
     
 }
 

@@ -78,8 +78,6 @@ void Renderer::finish() {
 }
 
 Renderer::~Renderer() {
-    
-    Util::log(Util::debug) << "end renderer\n";
 
     main_render.cleanup();
     

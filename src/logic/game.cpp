@@ -7,7 +7,7 @@
 #include "systems/ui.h"
 #include "renderer/renderer.h"
 
-#include "systems/game_set.h"
+#include "game_set.h"
 
 
 #include "logic/components/playerc.h"

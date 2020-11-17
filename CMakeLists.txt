@@ -56,7 +56,6 @@ add_custom_command(TARGET dynamical POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources" "${PROJECT_BINARY_DIR}/resources"
 )
 
-
 ### PREPROCESS RAYCAST DATA
 add_subdirectory(extra/raycast)
 

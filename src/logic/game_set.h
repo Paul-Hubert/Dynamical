@@ -4,7 +4,7 @@
 #include <memory>
 #include <vector>
 
-#include "system_set.h"
+#include "systems/system_set.h"
 #include "entt/entt.hpp"
 
 class Game;

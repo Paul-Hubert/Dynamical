@@ -2,7 +2,6 @@
 #define MAIN_RENDER_H
 
 #include "renderpass.h"
-#include "chunk_render/chunk_render.h"
 #include "ui_render.h"
 #include "ubo_descriptor.h"
 
@@ -32,7 +31,6 @@ public:
 private:
     Renderpass renderpass;
     UBODescriptor ubo;
-    ChunkRender chunk_render;
     UIRender ui_render;
     Instance& instance;
     Device& device;
