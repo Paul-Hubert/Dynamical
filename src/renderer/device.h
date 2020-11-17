@@ -1,7 +1,7 @@
 #ifndef DEVICE_H
 #define DEVICE_H
 
-#include <vulkan/vulkan.hpp>
+#include "renderer/vk.h"
 #include "vk_mem_alloc.h"
 #include <mutex>
 

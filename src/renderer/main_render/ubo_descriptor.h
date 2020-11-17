@@ -1,7 +1,7 @@
 #ifndef UBO_DESCRIPTOR_H
 #define UBO_DESCRIPTOR_H
 
-#include "vulkan/vulkan.hpp"
+#include "renderer/vk.h"
 
 #include "renderer/vmapp.h"
 

@@ -1,7 +1,7 @@
 #ifndef CHUNK_H
 #define CHUNK_H
 
-#include "vulkan/vulkan.hpp"
+#include "renderer/vk.h"
 
 #include <mutex>
 

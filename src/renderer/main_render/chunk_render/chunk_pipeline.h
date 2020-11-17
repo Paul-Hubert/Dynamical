@@ -1,7 +1,7 @@
 #ifndef CHUNK_PIPELINE_H
 #define CHUNK_PIPELINE_H
 
-#include "vulkan/vulkan.hpp"
+#include "renderer/vk.h"
 
 #include "renderer/vmapp.h"
 

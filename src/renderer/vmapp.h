@@ -2,7 +2,7 @@
 #define VMA_H
 
 #include "vk_mem_alloc.h"
-#include "vulkan/vulkan.hpp"
+#include "renderer/vk.h"
 
 #include <iostream>
 

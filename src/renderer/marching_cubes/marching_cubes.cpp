@@ -73,7 +73,7 @@ void MarchingCubes::tick() {
                 if(marchingcubesprofiling) {
                     if(per_frame[i].chunk_count > 0) {
                         std::array<uint64_t, timestamp_count> timestamps;
-                        device->getQueryPoolResults(queryPool, 0, timestamp_count, timestamps.size() * sizeof(uint64_t), timestamps.data(), sizeof(uint64_t), vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWait);
+                        vk::Result res = device->getQueryPoolResults(queryPool, 0, timestamp_count, timestamps.size() * sizeof(uint64_t), timestamps.data(), sizeof(uint64_t), vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWait);
                         
                         std::cout << "Chunk rendering took " << (timestamps[timestamps.size()-1] - timestamps[0])*device.properties.limits.timestampPeriod/1000000./per_frame[i].chunk_count << " per chunk for " << per_frame[i].chunk_count << " chunks" << std::endl;
                     }

@@ -232,7 +232,7 @@ Device::~Device() {
 
     vmaDestroyAllocator(allocator);
     
-    logical.destroy();
+    instance->destroy();
     
 }
 

@@ -71,7 +71,7 @@ MCPipeline::MCPipeline(Device& device, vk::DescriptorSetLayout setlayout) : devi
             vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, computeShader, "main", &specConstants),
             layout
         )
-    ).value;
+    );
     
     device->destroy(computeShader);
     

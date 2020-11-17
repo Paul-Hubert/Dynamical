@@ -2,7 +2,7 @@
 #define WINDU_H
 
 #include <SDL.h>
-#include <vulkan/vulkan.hpp>
+#include "renderer/vk.h"
 
 class Windu {
 public:

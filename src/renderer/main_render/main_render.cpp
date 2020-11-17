@@ -40,7 +40,7 @@ void MainRender::render(entt::registry& reg, uint32_t index, std::vector<vk::Sem
     
     auto& ri = reg.ctx<RenderInfo>();
     
-    device->waitForFences(fences[ri.frame_index], VK_TRUE, std::numeric_limits<uint64_t>::max());
+    vk::Result res = device->waitForFences(fences[ri.frame_index], VK_TRUE, std::numeric_limits<uint64_t>::max());
     
     device->resetFences(fences[ri.frame_index]);
     

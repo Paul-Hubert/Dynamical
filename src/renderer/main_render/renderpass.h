@@ -1,7 +1,7 @@
 #ifndef RENDERPASS_H
 #define RENDERPASS_H
 
-#include "vulkan/vulkan.hpp"
+#include "renderer/vk.h"
 #include "renderer/vmapp.h"
 
 class Device;

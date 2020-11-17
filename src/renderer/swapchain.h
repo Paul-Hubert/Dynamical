@@ -1,7 +1,7 @@
 #ifndef SWAPCHAIN_H
 #define SWAPCHAIN_H
 
-#include <vulkan/vulkan.hpp>
+#include "renderer/vk.h"
 
 #include "num_frames.h"
 

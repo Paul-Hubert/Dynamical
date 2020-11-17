@@ -1,7 +1,7 @@
 #ifndef INSTANCE_H
 #define INSTANCE_H
 
-#include <vulkan/vulkan.hpp>
+#include <renderer/vk.h>
 
 class Windu;
 
