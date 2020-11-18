@@ -23,7 +23,7 @@ public:
     Swapchain swap;
 
     int frame_num = 0;
-    int semindex = 0;
+    int frame_index = 0;
 };
 
 #endif

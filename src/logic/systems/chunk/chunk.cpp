@@ -15,7 +15,10 @@
 #include "renderer/camera.h"
 #include "renderer/marching_cubes/chunk.h"
 #include "renderer/marching_cubes/marching_cubes.h"
-#include "logic/components/renderinfo.h"
+
+void ChunkSys::preinit() {
+
+}
 
 void ChunkSys::init() {
     
@@ -69,4 +72,8 @@ void ChunkSys::tick() {
         
     }
     
+}
+
+void ChunkSys::finish() {
+
 }

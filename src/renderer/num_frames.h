@@ -3,6 +3,6 @@
 
 #include <vector>
 
-constexpr uint32_t NUM_FRAMES = 3;
+constexpr uint32_t NUM_FRAMES = 2;
 
 #endif

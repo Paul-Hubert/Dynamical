@@ -7,7 +7,6 @@
 #include "chunk.h"
 #include "logic/components/chunk/chunkdatac.h"
 #include "marching_cubes.h"
-#include "logic/components/renderinfo.h"
 
 #include <iostream>
 

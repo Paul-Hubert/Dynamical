@@ -7,7 +7,6 @@
 #include "logic/components/chunk/chunkc.h"
 #include "util/profile.h"
 #include "logic/components/chunk/chunkdatac.h"
-#include "logic/components/renderinfo.h"
 
 constexpr int timestamp_count = 2;
 constexpr int total_timestamp_count = timestamp_count*NUM_FRAMES;

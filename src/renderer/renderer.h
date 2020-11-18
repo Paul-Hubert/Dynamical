@@ -1,13 +1,14 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include "context.h"
 #include "camera.h"
 #include "main_render/main_render.h"
 
 #include "logic/systems/system.h"
 
 #include "entt/entt.hpp"
+
+class Context;
 
 class Renderer : public System {
 public:

@@ -15,6 +15,10 @@ static tf::Taskflow taskflow;
 
 constexpr int max_threads = 20;
 
+void ChunkGeneratorSys::preinit() {
+
+}
+
 void ChunkGeneratorSys::init() {
     
 }

@@ -15,12 +15,6 @@ class Context;
 class Renderpass;
 class UBODescriptor;
 
-struct Vert {
-    glm::vec3 pos;
-    glm::vec3 normal;
-    glm::vec2 uv;
-};
-
 class ObjectRender {
 public:
     ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, UBODescriptor& ubo);

@@ -13,6 +13,10 @@
 
 #include <util/entt_util.h>
 
+void ChunkManagerSys::preinit() {
+
+}
+
 void ChunkManagerSys::init() {
     reg.set<ChunkMap>();
 }
@@ -72,4 +76,8 @@ void ChunkManagerSys::tick() {
         }
     }
     
+}
+
+void ChunkManagerSys::finish() {
+
 }

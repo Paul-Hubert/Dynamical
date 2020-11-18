@@ -45,6 +45,9 @@ target_link_libraries(dynamical PRIVATE OpenXR::headers OpenXR::openxr_loader Op
 find_package(Bullet CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE LinearMath Bullet3Common BulletDynamics BulletSoftBody)
 
+find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
+target_include_directories(dynamical PRIVATE ${TINYGLTF_INCLUDE_DIRS})
+
 
 # Copy resources to build
 file(

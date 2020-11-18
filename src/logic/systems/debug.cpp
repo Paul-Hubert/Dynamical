@@ -3,6 +3,10 @@
 #include "logic/components/inputc.h"
 #include "logic/components/show_debug.h"
 
+void DebugSys::preinit() {
+
+}
+
 void DebugSys::init() {
     
 }
@@ -21,4 +25,8 @@ void DebugSys::tick() {
         input.on.set(Action::DEBUG, false);
     }
     
+}
+
+void DebugSys::finish() {
+
 }

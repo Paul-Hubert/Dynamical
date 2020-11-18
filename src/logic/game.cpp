@@ -13,6 +13,7 @@
 #include "logic/components/playerc.h"
 #include "logic/components/physicsc.h"
 #include "logic/components/positionc.h"
+#include "logic/components/model/imageuploadc.h"
 
 #include "util/entt_util.h"
 
@@ -38,6 +39,7 @@ void Game::init() {
     reg.set<Util::Entity<"player"_hs>>(player);
     
     set->init();
+
     
 }
 

@@ -2,6 +2,8 @@
 
 #include "util/util.h"
 
+#include "logic/components/model/meshc.h"
+
 #include <fstream>
 
 #include "renderer/context.h"
@@ -17,6 +19,7 @@ ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& render
 
 
 void ObjectRender::render(vk::CommandBuffer command, uint32_t i) {
+
 
 
 }
@@ -60,18 +63,18 @@ void ObjectRender::createPipeline(UBODescriptor& ubo) {
     fragShaderStageInfo.module = fragShaderModule;
     fragShaderStageInfo.pName = "main";
 
-    VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
     // VERTEX INPUT
 
     auto vertexInputBindings = std::vector{
-        vk::VertexInputBindingDescription(0, sizeof(Vert), vk::VertexInputRate::eVertex),
+        vk::VertexInputBindingDescription(0, sizeof(MeshC::Vertex), vk::VertexInputRate::eVertex),
     };
     // Inpute attribute bindings describe shader attribute locations and memory layouts
     auto vertexInputAttributs = std::vector{
-        vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vert, pos)),
-        vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vert, normal)),
-        vk::VertexInputAttributeDescription(2, 0, vk::Format::eR32G32Sfloat, offsetof(Vert, uv)),
+        vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(MeshC::Vertex, pos)),
+        vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat, offsetof(MeshC::Vertex, normal)),
+        vk::VertexInputAttributeDescription(2, 0, vk::Format::eR32G32Sfloat, offsetof(MeshC::Vertex, uv)),
     };
 
     auto vertexInputState = vk::PipelineVertexInputStateCreateInfo({}, vertexInputBindings.size(), vertexInputBindings.data(), vertexInputAttributs.size(), vertexInputAttributs.data());

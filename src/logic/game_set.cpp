@@ -8,6 +8,7 @@
 #include "renderer/marching_cubes/marching_cubes.h"
 #include "logic/components/settingsc.h"
 #include "systems/physics.h"
+#include "systems/uploader.h"
 
 #include "logic/game.h"
 
@@ -37,12 +38,13 @@ GameSet::GameSet(Game& game) : SystemSet(game.reg) {
         MAKE_SYSTEM(InputSys, input)
         MAKE_SYSTEM(DebugSys, debug)
         add(game.ui.get());
-        MAKE_SYSTEM(PlayerControlSys, camera)
+        MAKE_SYSTEM(VRPlayerControlSys, control)
     }
     
     MAKE_SYSTEM(PhysicsSys, physics)
     
     if(user) {
+        MAKE_SYSTEM(UploaderSys, uploader)
         add(game.renderer.get());
     }
     

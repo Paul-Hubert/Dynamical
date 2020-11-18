@@ -2,7 +2,7 @@
 
 #include "logic/components/inputc.h"
 
-#include <SDL.h>
+#include "renderer/context.h"
 
 #include <iostream>
 
@@ -23,17 +23,21 @@ std::unordered_map<SDL_Scancode, Action> actionMap = {
 void InputSys::preinit() {
     
     InputC& input = reg.set<InputC>();
-    input.mouseFree = false;
+    input.mouseFree = true;
     
 }
 
 void InputSys::init() {
     
-    SDL_Window* win = reg.ctx<SDL_Window*>();
-    
-    int w, h;
-    SDL_GetWindowSize(win, &w, &h);
-    SDL_WarpMouseInWindow(win, w / 2, h / 2);
+    InputC& input = reg.set<InputC>();
+
+    if (!input.mouseFree) {
+        Context* ctx = reg.ctx<Context*>();
+
+        int w, h;
+        SDL_GetWindowSize(ctx->win, &w, &h);
+        SDL_WarpMouseInWindow(ctx->win, w / 2, h / 2);
+    }
     
 }
 
@@ -43,9 +47,9 @@ void InputSys::tick() {
     
     input.mouseRight = input.mouseLeft = input.mouseMiddle = false;
     
-    SDL_Window* win = reg.ctx<SDL_Window*>();
+    Context* ctx = reg.ctx<Context*>();
 
-    auto flags = SDL_GetWindowFlags(win);
+    auto flags = SDL_GetWindowFlags(ctx->win);
 
     input.focused = flags & SDL_WINDOW_MOUSE_FOCUS;
     
@@ -99,11 +103,16 @@ void InputSys::tick() {
         SDL_GetMouseState(&x, &y);
         
         int w, h;
-        SDL_GetWindowSize(win, &w, &h);
-        if(!input.mouseFree) SDL_WarpMouseInWindow(win, w / 2, h / 2);
+        SDL_GetWindowSize(ctx->win, &w, &h);
+        if(!input.mouseFree) SDL_WarpMouseInWindow(ctx->win, w / 2, h / 2);
         
         input.mousePos = glm::ivec2(x, y);
         input.mouseDiff = glm::ivec2(x - w / 2, y - h / 2);
     }
     
+}
+
+
+void InputSys::finish() {
+
 }

@@ -10,6 +10,10 @@
 #include "logic/components/playerc.h"
 #include "logic/components/positionc.h"
 
+void PlayerControlSys::preinit() {
+
+}
+
 void PlayerControlSys::init() {
     
     auto player = reg.ctx<Util::Entity<"player"_hs>>();
@@ -67,4 +71,8 @@ void PlayerControlSys::tick() {
     camera.yAxis -= (input.mouseDiff.x) * (M_PI*0.1/180.);
     camera.xAxis = std::max(std::min(camera.xAxis - (input.mouseDiff.y) * (M_PI*0.1/180.), M_PI/2.), -M_PI/2.);
     
+}
+
+void PlayerControlSys::finish() {
+
 }

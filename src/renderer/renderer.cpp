@@ -3,9 +3,10 @@
 #include <iostream>
 #include "util/util.h"
 
+#include "context.h"
+
 #include "logic/components/inputc.h"
 #include "num_frames.h"
-#include "logic/components/renderinfo.h"
 
 Renderer::Renderer(entt::registry& reg) : System(reg), ctx(std::make_unique<Context>(reg)), camera(reg, *ctx), main_render(reg, *ctx), waitsems(NUM_FRAMES), signalsems(NUM_FRAMES), computesems(NUM_FRAMES) {
     
@@ -21,13 +22,7 @@ Renderer::Renderer(entt::registry& reg) : System(reg), ctx(std::make_unique<Cont
 
 void Renderer::preinit() {
     
-    reg.set<SDL_Window*>(ctx->win);
-    
-    reg.set<Device*>(&ctx->device);
-    
-    auto& ri = reg.set<RenderInfo>();
-    ri.frame_index = 0;
-    ri.frame_num = 0;
+    reg.set<Context*>(ctx.get());
     
 }
 
@@ -37,10 +32,8 @@ void Renderer::init() {
 
 void Renderer::tick() {
     
-    auto& ri = reg.ctx<RenderInfo>();
-    
-    ri.frame_index = (ri.frame_index+1)%NUM_FRAMES;
-    ri.frame_num++;
+    ctx->frame_index = (ctx->frame_index+1)%NUM_FRAMES;
+    ctx->frame_num++;
     
     InputC& input = reg.ctx<InputC>();
     if(input.on[Action::RESIZE]) {
@@ -54,11 +47,11 @@ void Renderer::tick() {
         
         camera.update();
         
-        uint32_t index = ctx->swap.acquire(waitsems[ri.frame_index]);
+        uint32_t index = ctx->swap.acquire(waitsems[ctx->frame_index]);
         
-        main_render.render(index, camera, { waitsems[ri.frame_index]}, { signalsems[ri.frame_index]});
+        main_render.render(index, camera, { waitsems[ctx->frame_index]}, { signalsems[ctx->frame_index]});
         
-        ctx->swap.present(signalsems[ri.frame_index]);
+        ctx->swap.present(signalsems[ctx->frame_index]);
         
     } catch(vk::OutOfDateKHRError&) {
         

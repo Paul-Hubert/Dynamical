@@ -5,62 +5,32 @@
 
 #include "system.h"
 
-class InputSys : public System {
-public:
-    InputSys(entt::registry& reg) : System(reg) {};
-    void preinit() override;
-    void init() override;
-    void tick() override;
-    const char* name() override {return "Input";};
+#define DEFINE_SYSTEM(NAME) \
+class NAME : public System { \
+public: \
+    NAME(entt::registry& reg) : System(reg) {}; \
+    void preinit() override; \
+    void init() override; \
+    void tick() override; \
+    void finish() override; \
+    const char* name() override { return #NAME; }; \
 };
 
-class DebugSys : public System {
-public:
-    DebugSys(entt::registry& reg) : System(reg) {};
-    void init() override;
-    void tick() override;
-    const char* name() override {return "Debug";};
-};
+DEFINE_SYSTEM(InputSys)
 
-class PlayerControlSys : public System {
-public:
-    PlayerControlSys(entt::registry& reg) : System(reg) {};
-    void init() override;
-    void tick() override;
-    const char* name() override {return "Camera";};
-};
+DEFINE_SYSTEM(DebugSys)
 
-class ChunkManagerSys : public System {
-public:
-    ChunkManagerSys(entt::registry& reg) : System(reg) {};
-    void init() override;
-    void tick() override;
-    const char* name() override {return "ChunkManager";};
-};
+DEFINE_SYSTEM(PlayerControlSys)
 
-class ChunkLoaderSys : public System {
-public:
-    ChunkLoaderSys(entt::registry& reg) : System(reg) {};
-    void init() override;
-    void tick() override;
-    const char* name() override {return "ChunkLoader";};
-};
+DEFINE_SYSTEM(VRPlayerControlSys)
 
-class ChunkGeneratorSys : public System {
-public:
-    ChunkGeneratorSys(entt::registry& reg) : System(reg) {};
-    void init() override;
-    void tick() override;
-    void finish() override;
-    const char* name() override {return "ChunkGenerator";};
-};
+DEFINE_SYSTEM(ChunkManagerSys)
 
-class ChunkSys : public System {
-public:
-    ChunkSys(entt::registry& reg) : System(reg) {};
-    void init() override;
-    void tick() override;
-    const char* name() override {return "Chunk";};
-};
+DEFINE_SYSTEM(ChunkLoaderSys)
 
+DEFINE_SYSTEM(ChunkGeneratorSys)
+
+DEFINE_SYSTEM(ChunkSys)
+
+#undef DEFINE_SYSTEM
 #endif

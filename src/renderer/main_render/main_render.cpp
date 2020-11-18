@@ -4,7 +4,6 @@
 #include "renderer/camera.h"
 #include "util/util.h"
 #include "renderer/num_frames.h"
-#include "logic/components/renderinfo.h"
 
 MainRender::MainRender(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx), renderpass(ctx), ubo(ctx),  object_render(reg, ctx, renderpass, ubo), ui_render(ctx, renderpass) {
     
@@ -31,19 +30,17 @@ void MainRender::setup() {
 
 void MainRender::render(uint32_t index, Camera& camera, std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals) {
     
-    auto& ri = reg.ctx<RenderInfo>();
+    vk::Result res = ctx.device->waitForFences(fences[ctx.frame_index], VK_TRUE, std::numeric_limits<uint64_t>::max());
     
-    vk::Result res = ctx.device->waitForFences(fences[ri.frame_index], VK_TRUE, std::numeric_limits<uint64_t>::max());
-    
-    ctx.device->resetFences(fences[ri.frame_index]);
+    ctx.device->resetFences(fences[ctx.frame_index]);
     
     static float t = 0.f;
     t += 1.f/60.f;
     
-    ubo.pointers[ri.frame_index]->viewproj = camera.getViewProjection();
-    ubo.pointers[ri.frame_index]->viewpos = glm::vec4(camera.getViewPosition(), t);
+    ubo.pointers[ctx.frame_index]->viewproj = camera.getViewProjection();
+    ubo.pointers[ctx.frame_index]->viewpos = glm::vec4(camera.getViewPosition(), t);
     
-    vk::CommandBuffer command = commandBuffers[ri.frame_index];
+    vk::CommandBuffer command = commandBuffers[ctx.frame_index];
         
     command.begin(vk::CommandBufferBeginInfo({}, nullptr));
     
@@ -56,9 +53,9 @@ void MainRender::render(uint32_t index, Camera& camera, std::vector<vk::Semaphor
     
     command.setScissor(0, vk::Rect2D(vk::Offset2D(), ctx.swap.extent));
     
-    object_render.render(command, ri.frame_index);
+    object_render.render(command, ctx.frame_index);
 
-    ui_render.render(command, ri.frame_index);
+    ui_render.render(command, ctx.frame_index);
     
     command.endRenderPass();
     
@@ -70,9 +67,9 @@ void MainRender::render(uint32_t index, Camera& camera, std::vector<vk::Semaphor
     ctx.device.g_mutex->lock();
     ctx.device.graphics.submit({vk::SubmitInfo(
         Util::removeElement<vk::Semaphore>(waits, nullptr), waits.data(), stages.data(),
-        1, &commandBuffers[ri.frame_index],
+        1, &commandBuffers[ctx.frame_index],
         Util::removeElement<vk::Semaphore>(signals, nullptr), signals.data()
-    )}, fences[ri.frame_index]);
+    )}, fences[ctx.frame_index]);
     ctx.device.g_mutex->unlock();
     
 }

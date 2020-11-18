@@ -1,5 +1,7 @@
 #include "ui.h"
 
+#include "renderer/context.h"
+
 #include "logic/components/inputc.h"
 
 UISys::UISys(entt::registry& reg) : System(reg) {
@@ -32,7 +34,7 @@ void UISys::tick() {
     
     auto& input = reg.ctx<InputC>();
     
-    SDL_Window* window = reg.ctx<SDL_Window*>();
+    Context* ctx = reg.ctx<Context*>();
     
     ImGuiIO& io = ImGui::GetIO();
     if (io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange)
@@ -77,7 +79,7 @@ void UISys::tick() {
     }
     
     int w, h;
-    SDL_GetWindowSize(window, &w, &h);
+    SDL_GetWindowSize(ctx->win, &w, &h);
     io.DisplaySize = ImVec2((float)w, (float)h);
     
     static Uint64 frequency = SDL_GetPerformanceFrequency();

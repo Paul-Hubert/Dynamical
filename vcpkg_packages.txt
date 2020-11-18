@@ -1,1 +1,1 @@
-vcpkg install cereal entt glm imgui openssl protobuf sdl2[vulkan] taskflow stb vulkan vulkan-memory-allocator vulkan-headers openxr-loader[vulkan] bullet3[multithreading] --triplet x64-windows
+cereal entt glm imgui openssl protobuf sdl2[vulkan] taskflow stb vulkan vulkan-memory-allocator vulkan-headers openxr-loader[vulkan] bullet3[multithreading] tinygltf
