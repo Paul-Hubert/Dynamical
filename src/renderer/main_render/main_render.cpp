@@ -53,7 +53,7 @@ void MainRender::render(uint32_t index, Camera& camera, std::vector<vk::Semaphor
     
     command.setScissor(0, vk::Rect2D(vk::Offset2D(), ctx.swap.extent));
     
-    object_render.render(command, ctx.frame_index);
+    object_render.render(command, ctx.frame_index, ubo.descSets[ctx.frame_index]);
 
     ui_render.render(command, ctx.frame_index);
     

@@ -18,7 +18,7 @@ class UBODescriptor;
 class ObjectRender {
 public:
     ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, UBODescriptor& ubo);
-    void render(vk::CommandBuffer command, uint32_t i);
+    void render(vk::CommandBuffer command, uint32_t i, vk::DescriptorSet set);
     ~ObjectRender();
 
     void createPipeline(UBODescriptor& ubo);

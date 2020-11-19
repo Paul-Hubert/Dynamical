@@ -23,8 +23,6 @@ void UploaderSys::tick() {
 
 	Context& ctx = *reg.ctx<Context*>();
 
-	auto it = uploads.begin();
-
 	for (auto it = uploads.begin(); it != uploads.end();) {
 		Upload& upload = *it;
 		vk::Result result = ctx.device->waitForFences({ upload.fence }, VK_TRUE, 0);
@@ -34,7 +32,6 @@ void UploaderSys::tick() {
 			ctx.device->freeCommandBuffers(pool, {upload.command});
 
 			for (auto entity : upload.uploaded) {
-				reg.emplace<entt::tag<"uploaded"_hs>>(entity);
 				if (reg.has<BufferUploadC>(entity)) {
 					reg.remove<BufferUploadC>(entity);
 				} else {
@@ -56,7 +53,7 @@ void UploaderSys::tick() {
 
 	if(!bview.empty() || !iview.empty()) {
 
-		current.fence = ctx.device->createFence(vk::FenceCreateInfo({}));
+		current.fence = ctx.device->createFence({});
 		current.command = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(pool, vk::CommandBufferLevel::ePrimary, 1))[0];
 		current.command.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
@@ -68,15 +65,15 @@ void UploaderSys::tick() {
 
 				VmaAllocationCreateInfo info{};
 				info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+				upload.info.usage |= vk::BufferUsageFlagBits::eTransferDst;
 				auto& buffer = reg.emplace<VmaBuffer>(entity, ctx.device, &info, upload.info);
-				
+
 				current.command.copyBuffer(upload.buffer, buffer, { vk::BufferCopy(0, 0, buffer.size) });
 
 			} else {
 
 				reg.emplace<VmaBuffer>(entity, std::move(upload.buffer));
 
-				reg.emplace<entt::tag<"uploaded"_hs>>(entity);
 				reg.remove<BufferUploadC>(entity);
 
 			}

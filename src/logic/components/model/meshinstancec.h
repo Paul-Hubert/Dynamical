@@ -3,6 +3,7 @@
 
 class MeshInstanceC {
 public:
+	MeshInstanceC(entt::entity mesh) : mesh(mesh) {}
 	entt::entity mesh;
 };
 

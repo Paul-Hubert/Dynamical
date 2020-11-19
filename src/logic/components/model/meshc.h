@@ -13,6 +13,10 @@ public:
 	};
 
 	std::vector<Vertex> vertices{};
+	std::vector<uint16_t> indices{};
+
+	entt::entity vertex_buffer;
+	entt::entity index_buffer;
 
 };
 

@@ -10,6 +10,9 @@
 #include "renderer/main_render/renderpass.h"
 #include "renderer/num_frames.h"
 #include "renderer/main_render/ubo_descriptor.h"
+#include "logic/components/model/meshinstancec.h"
+#include "logic/components/model/meshc.h"
+#include "logic/components/model/bufferuploadc.h"
 
 ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, UBODescriptor& ubo) : reg(reg), ctx(ctx), renderpass(renderpass) {
 
@@ -18,9 +21,30 @@ ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& render
 }
 
 
-void ObjectRender::render(vk::CommandBuffer command, uint32_t i) {
+void ObjectRender::render(vk::CommandBuffer command, uint32_t i, vk::DescriptorSet set) {
 
+    command.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
+    command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, 0, {set}, nullptr);
+
+    reg.view<MeshInstanceC>().each([&](auto entity, MeshInstanceC& instance) {
+
+        MeshC& mesh = reg.get<MeshC>(instance.mesh);
+        if(reg.has<entt::tag<"uploading"_hs>>(instance.mesh)) {
+            if(!reg.has<BufferUploadC>(mesh.index_buffer) && !reg.has<BufferUploadC>(mesh.vertex_buffer)) {
+                reg.remove<entt::tag<"uploading"_hs>>(instance.mesh);
+            } else {
+                return;
+            }
+        }
+
+        command.bindIndexBuffer(reg.get<VmaBuffer>(mesh.index_buffer).buffer, 0, vk::IndexType::eUint16);
+
+        command.bindVertexBuffers(0, {reg.get<VmaBuffer>(mesh.vertex_buffer).buffer}, {0});
+
+        command.drawIndexed(mesh.indices.size(), 1, 0, 0, 0);
+
+    });
 
 }
 

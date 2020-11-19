@@ -8,6 +8,7 @@
 #include "util/entt_util.h"
 
 #include "logic/components/positionc.h"
+#include "logic/components/camerac.h"
 #include "logic/components/vrcamerac.h"
 
 Camera::Camera(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx) {
@@ -23,14 +24,14 @@ void Camera::setup(int width, int height) {
 void Camera::update() {
     
     auto player = reg.ctx<Util::Entity<"player"_hs>>();
-    auto cam = reg.get<VRCameraC>(player);
+    auto cam = reg.get<CameraC>(player);
     auto pos = reg.get<PositionC>(player).pos;
     pos.y += 1.80f;
     
     view = glm::mat4(1.0);
     view = glm::translate(view, pos);
-    //view = glm::rotate(view, (float) cam.yAxis, glm::vec3(0.0f, 1.0f, 0.0f));
-    //view = glm::rotate(view, (float) cam.xAxis, glm::vec3(1.0f, 0.0f, 0.0f));
+    view = glm::rotate(view, (float) cam.yAxis, glm::vec3(0.0f, 1.0f, 0.0f));
+    view = glm::rotate(view, (float) cam.xAxis, glm::vec3(1.0f, 0.0f, 0.0f));
     view = glm::inverse(view);
     
     viewProjection = projection * view;
@@ -39,15 +40,15 @@ void Camera::update() {
     
 }
 
-glm::mat4 & Camera::getProjection() {
+glm::mat4& Camera::getProjection() {
     return projection;
 }
 
-glm::mat4 & Camera::getView() {
+glm::mat4& Camera::getView() {
     return view;
 }
 
-glm::mat4 & Camera::getViewProjection() {
+glm::mat4& Camera::getViewProjection() {
     return viewProjection;
 }
 

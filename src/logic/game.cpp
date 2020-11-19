@@ -13,7 +13,9 @@
 #include "logic/components/playerc.h"
 #include "logic/components/physicsc.h"
 #include "logic/components/positionc.h"
-#include "logic/components/model/imageuploadc.h"
+#include "logic/components/model/bufferuploadc.h"
+#include "logic/components/model/meshc.h"
+#include "logic/components/model/meshinstancec.h"
 
 #include "util/entt_util.h"
 
@@ -40,6 +42,42 @@ void Game::init() {
     
     set->init();
 
+    Context& ctx = *reg.ctx<Context*>();
+
+    {
+        auto mesh = reg.create();
+        reg.emplace<entt::tag<"uploading"_hs>>(mesh);
+        auto &meshc = reg.emplace<MeshC>(mesh);
+
+        meshc.vertices.push_back({{0, 0, 0},
+                                  {},
+                                  {}});
+        meshc.vertices.push_back({{1, 0, 0},
+                                  {},
+                                  {}});
+        meshc.vertices.push_back({{1, 1, 0},
+                                  {},
+                                  {}});
+
+        meshc.indices.push_back(0);
+        meshc.indices.push_back(1);
+        meshc.indices.push_back(2);
+
+        meshc.index_buffer = reg.create();
+        vk::BufferCreateInfo info({}, meshc.indices.size() * sizeof(uint16_t), vk::BufferUsageFlagBits::eIndexBuffer,
+                                  vk::SharingMode::eExclusive, 1, &ctx.device.g_i);
+        auto& index = reg.emplace<BufferUploadC>(meshc.index_buffer, ctx, info);
+        memcpy(index.data, meshc.indices.data(), index.size);
+
+        meshc.vertex_buffer = reg.create();
+        info.size = meshc.vertices.size() * sizeof(MeshC::Vertex);
+        info.usage = vk::BufferUsageFlagBits::eVertexBuffer;
+        auto& vertex = reg.emplace<BufferUploadC>(meshc.vertex_buffer, ctx, info);
+        memcpy(vertex.data, meshc.vertices.data(), vertex.size);
+
+        auto object = reg.create();
+        reg.emplace<MeshInstanceC>(object, mesh);
+    }
     
 }
 

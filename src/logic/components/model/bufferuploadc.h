@@ -6,7 +6,7 @@
 
 class BufferUploadC {
 public:
-	BufferUploadC(Context& ctx, uint32_t size, vk::BufferCreateInfo info) : size(size), info(info) {
+	BufferUploadC(Context& ctx, vk::BufferCreateInfo info) : size(info.size), info(info) {
 
 		VmaAllocationCreateInfo ainfo{};
 		ainfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
