@@ -64,8 +64,7 @@ void Game::init() {
         meshc.indices.push_back(2);
 
         meshc.index_buffer = reg.create();
-        vk::BufferCreateInfo info({}, meshc.indices.size() * sizeof(uint16_t), vk::BufferUsageFlagBits::eIndexBuffer,
-                                  vk::SharingMode::eExclusive, 1, &ctx.device.g_i);
+        vk::BufferCreateInfo info({}, meshc.indices.size() * sizeof(uint16_t), vk::BufferUsageFlagBits::eIndexBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i);
         auto& index = reg.emplace<BufferUploadC>(meshc.index_buffer, ctx, info);
         memcpy(index.data, meshc.indices.data(), index.size);
 

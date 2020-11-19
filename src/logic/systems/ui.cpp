@@ -27,7 +27,9 @@ UISys::UISys(entt::registry& reg) : System(reg) {
 }
 
 void UISys::init() {
-    
+
+    entt::monostate<"imgui_frame"_hs>{} = false;
+
 }
 
 void UISys::tick() {
@@ -37,47 +39,14 @@ void UISys::tick() {
     Context* ctx = reg.ctx<Context*>();
     
     ImGuiIO& io = ImGui::GetIO();
-    if (io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange)
-        return;
 
-    ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
-    if (!input.mouseFree || io.MouseDrawCursor || imgui_cursor == ImGuiMouseCursor_None)
-    {
-        // Hide OS mouse cursor if imgui is drawing it or if it wants no cursor
-        SDL_ShowCursor(SDL_FALSE);
-    }
-    else
-    {
-        // Show OS mouse cursor
-        SDL_SetCursor(g_MouseCursors[imgui_cursor] ? g_MouseCursors[imgui_cursor] : g_MouseCursors[ImGuiMouseCursor_Arrow]);
-        SDL_ShowCursor(SDL_TRUE);
-    }
-    
     io.MouseDown[0] = input.mouseLeft || input.on[Action::PRIMARY];
     io.MouseDown[1] = input.mouseRight || input.on[Action::SECONDARY];
     io.MouseDown[2] = input.mouseMiddle || input.on[Action::TERTIARY];
 
     if(input.focused)
         io.MousePos = ImVec2(input.mousePos.x, input.mousePos.y);
-    
-    
-    if (!(io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange)) {
 
-        ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
-        if (!input.mouseFree || io.MouseDrawCursor || imgui_cursor == ImGuiMouseCursor_None)
-        {
-            // Hide OS mouse cursor if imgui is drawing it or if it wants no cursor
-            SDL_ShowCursor(SDL_FALSE);
-        }
-        else
-        {
-            // Show OS mouse cursor
-            SDL_SetCursor(g_MouseCursors[imgui_cursor] ? g_MouseCursors[imgui_cursor] : g_MouseCursors[ImGuiMouseCursor_Arrow]);
-            SDL_ShowCursor(SDL_TRUE);
-        }
-        
-    }
-    
     int w, h;
     SDL_GetWindowSize(ctx->win, &w, &h);
     io.DisplaySize = ImVec2((float)w, (float)h);
@@ -86,8 +55,11 @@ void UISys::tick() {
     Uint64 current_time = SDL_GetPerformanceCounter();
     io.DeltaTime = g_Time > 0 ? (float)((double)(current_time - g_Time) / frequency) : (float)(1.0f / 60.0f);
     g_Time = current_time;
-    
+
+    if(entt::monostate<"imgui_frame"_hs>{}) ImGui::Render();
+
     ImGui::NewFrame();
+    entt::monostate<"imgui_frame"_hs>{} = true;
     
 }
 

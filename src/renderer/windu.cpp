@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <vector>
+#include "util/util.h"
 
 #include <SDL_vulkan.h>
 #include "renderer/vk.h"
@@ -17,15 +18,13 @@ Windu::Windu(Context& ctx) : ctx(ctx) {
     
     window = SDL_CreateWindow("Dynamical",
                               SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                              1920, 1080,
-                              SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_FULLSCREEN
+                              mode.w, mode.h,
+                              SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN
              );
     
     if (window == nullptr) {
         std::cout << "Could not create SDL window: " << SDL_GetError() << std::endl;
     }
-    
-    SDL_ShowCursor(SDL_FALSE);
     
     SDL_GetWindowSize(window, &width, &height);
     

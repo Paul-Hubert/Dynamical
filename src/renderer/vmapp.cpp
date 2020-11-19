@@ -22,7 +22,7 @@ VmaBuffer::VmaBuffer(Device& device, VmaAllocationCreateInfo* allocInfo, const v
         }
     }
     
-    size = info.size;
+    size = bufferInfo.size;
     offset = info.offset;
     memory = info.deviceMemory;
     

@@ -6,6 +6,7 @@
 #include "device.h"
 #include "transfer.h"
 #include "swapchain.h"
+#include "vr_context.h"
 
 #include "logic/systems/system.h"
 
@@ -21,6 +22,7 @@ public:
     Device device;
     Transfer transfer;
     Swapchain swap;
+    VRContext vr;
 
     int frame_num = 0;
     int frame_index = 0;

@@ -31,32 +31,32 @@ void Renderer::init() {
 }
 
 void Renderer::tick() {
-    
-    ctx->frame_index = (ctx->frame_index+1)%NUM_FRAMES;
-    ctx->frame_num++;
+
+    ctx->transfer.flush();
     
     InputC& input = reg.ctx<InputC>();
+    if(!input.window_showing) return;
+
     if(input.on[Action::RESIZE]) {
         resize();
         input.on.set(Action::RESIZE, false);
     }
-    
+
+    ctx->frame_index = (ctx->frame_index+1)%NUM_FRAMES;
+    ctx->frame_num++;
+
+    camera.update();
+
     try {
-        
-        ctx->transfer.flush();
-        
-        camera.update();
-        
+
         uint32_t index = ctx->swap.acquire(waitsems[ctx->frame_index]);
-        
-        main_render.render(index, camera, { waitsems[ctx->frame_index]}, { signalsems[ctx->frame_index]});
-        
+
+        main_render.render(index, camera, {waitsems[ctx->frame_index]}, {signalsems[ctx->frame_index]});
+
         ctx->swap.present(signalsems[ctx->frame_index]);
-        
+
     } catch(vk::OutOfDateKHRError&) {
-        
         resize();
-        
     }
     
 }
@@ -88,6 +88,8 @@ void Renderer::resize() {
         main_render.cleanup();
         
         ctx->swap.cleanup();
+
+        ctx->win.resize();
         
         ctx->swap.setup();
         

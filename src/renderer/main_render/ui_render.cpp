@@ -86,6 +86,7 @@ void UIRender::createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buffer
 void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t i) {
 
     ImGui::Render();
+    entt::monostate<"imgui_frame"_hs>{} = false;
     
     ImDrawData* draw_data = ImGui::GetDrawData();
     

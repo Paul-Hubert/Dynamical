@@ -3,6 +3,7 @@
 #include "logic/components/inputc.h"
 
 #include "renderer/context.h"
+#include "util/util.h"
 
 #include <iostream>
 
@@ -17,22 +18,25 @@ std::unordered_map<SDL_Scancode, Action> actionMap = {
     {SDL_SCANCODE_SPACE, Action::UP},
     {SDL_SCANCODE_LSHIFT, Action::DOWN},
     {SDL_SCANCODE_M, Action::MENU},
-    {SDL_SCANCODE_K, Action::DEBUG}
+    {SDL_SCANCODE_K, Action::DEBUG},
+    {SDL_SCANCODE_P, Action::MOUSE}
 };
 
 void InputSys::preinit() {
     
     InputC& input = reg.set<InputC>();
-    input.mouseFree = true;
+    input.mouseFree = false;
     
 }
 
 void InputSys::init() {
     
-    InputC& input = reg.set<InputC>();
+    InputC& input = reg.ctx<InputC>();
 
     if (!input.mouseFree) {
         Context* ctx = reg.ctx<Context*>();
+
+        SDL_ShowCursor(SDL_DISABLE);
 
         int w, h;
         SDL_GetWindowSize(ctx->win, &w, &h);
@@ -41,6 +45,8 @@ void InputSys::init() {
     
 }
 
+
+
 void InputSys::tick() {
     
     InputC& input = reg.ctx<InputC>();
@@ -48,18 +54,35 @@ void InputSys::tick() {
     input.mouseRight = input.mouseLeft = input.mouseMiddle = false;
     
     Context* ctx = reg.ctx<Context*>();
-
-    auto flags = SDL_GetWindowFlags(ctx->win);
-
-    input.focused = flags & SDL_WINDOW_MOUSE_FOCUS;
     
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
-        
+
         if(e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
-            
+
+            Util::log(Util::trace) << "resize\n";
             input.on.set(Action::RESIZE);
             
+        } else if(e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+
+            input.focused = true;
+
+        } else if(e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+
+            input.focused = false;
+
+        } else if(e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESTORED) {
+
+            input.window_showing = true;
+
+            int w, h;
+            SDL_GetWindowSize(ctx->win, &w, &h);
+            if(!input.mouseFree) SDL_WarpMouseInWindow(ctx->win, w / 2, h / 2);
+
+        } else if(e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_MINIMIZED) {
+
+            input.window_showing = false;
+
         } else if(e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.scancode == SDL_SCANCODE_ESCAPE)) {
             
             input.on.set(Action::EXIT);
@@ -96,6 +119,15 @@ void InputSys::tick() {
             
         }
         
+    }
+
+    if(input.on[Action::MOUSE]) {
+        input.on.set(Action::MOUSE, false);
+        input.mouseFree = !input.mouseFree;
+        SDL_ShowCursor(input.mouseFree ? SDL_ENABLE : SDL_DISABLE);
+        int w, h;
+        SDL_GetWindowSize(ctx->win, &w, &h);
+        if(!input.mouseFree) SDL_WarpMouseInWindow(ctx->win, w / 2, h / 2);
     }
     
     if (input.focused) {

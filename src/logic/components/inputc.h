@@ -20,6 +20,7 @@ enum Action : char {
     MENU,
     DEBUG,
     EXIT,
+    MOUSE,
     END_ENUM
 };
 
@@ -33,7 +34,8 @@ public:
     bool mouseLeft = false;
     bool mouseRight = false;
     bool mouseMiddle = false;
-	bool focused = true;
+	bool focused = false;
+	bool window_showing = true;
 };
 
 #endif
