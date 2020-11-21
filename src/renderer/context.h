@@ -17,12 +17,12 @@ public:
     Context(entt::registry& reg);
     ~Context();
 
+    VRContext vr;
     Windu win;
     Instance instance;
     Device device;
     Transfer transfer;
     Swapchain swap;
-    VRContext vr;
 
     int frame_num = 0;
     int frame_index = 0;

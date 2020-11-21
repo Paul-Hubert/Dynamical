@@ -4,6 +4,9 @@
 
 #include <SDL_vulkan.h>
 #include <iostream>
+#include <util/util.h>
+
+#include "vr_context.h"
 
 #include "context.h"
 
@@ -97,7 +100,36 @@ Instance::Instance(Context& ctx) : ctx(ctx) {
     std::vector<const char *> extensionNames(extensionCount);
     SDL_Vulkan_GetInstanceExtensions(ctx.win, &extensionCount, extensionNames.data());
 
-    vk::ApplicationInfo appInfo("Test", VK_MAKE_VERSION(1, 0, 0), "Dynamical", VK_MAKE_VERSION(1, 0, 0), VK_MAKE_VERSION(1, 1, 0));
+
+
+    uint32_t size = 0;
+    PFN_xrGetVulkanInstanceExtensionsKHR xrGetVulkanInstanceExtensionsKHR = nullptr;
+    xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanInstanceExtensionsKHR", (PFN_xrVoidFunction*)&xrGetVulkanInstanceExtensionsKHR));
+
+    xrCheckResult(xrGetVulkanInstanceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, 0, &size, nullptr));
+
+    std::vector<char> buf(size);
+    xrCheckResult(xrGetVulkanInstanceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, size, &size, buf.data()));
+    if(buf[0] != '\0') extensionNames.push_back(buf.data());
+    for(int i = 0; i<buf.size(); i++) {
+        if(buf[i] == ' ') {
+            buf[i] = '\0';
+            extensionNames.push_back(&buf[i+1]);
+        }
+    }
+
+    PFN_xrGetVulkanGraphicsRequirementsKHR xrGetVulkanGraphicsRequirementsKHR = nullptr;
+    xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanGraphicsRequirementsKHR", (PFN_xrVoidFunction *)(&xrGetVulkanGraphicsRequirementsKHR)));
+
+    XrGraphicsRequirementsVulkanKHR requirement = { XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR };
+    xrCheckResult(xrGetVulkanGraphicsRequirementsKHR(ctx.vr.instance, ctx.vr.system_id, &requirement));
+
+    uint32_t version = VK_MAKE_VERSION(1,1,0);
+    version = VK_MAKE_VERSION(std::min(std::max(VK_VERSION_MAJOR(version), (uint32_t) (XR_VERSION_MAJOR(requirement.minApiVersionSupported))), (uint32_t) (XR_VERSION_MAJOR(requirement.maxApiVersionSupported))),
+                              std::min(std::max(VK_VERSION_MINOR(version), (uint32_t) (XR_VERSION_MINOR(requirement.minApiVersionSupported))), (uint32_t) (XR_VERSION_MINOR(requirement.maxApiVersionSupported))),
+                              std::min(std::max(VK_VERSION_PATCH(version), (uint32_t) (XR_VERSION_PATCH(requirement.minApiVersionSupported))), (uint32_t) (XR_VERSION_PATCH(requirement.maxApiVersionSupported))));
+
+    vk::ApplicationInfo appInfo("Test", VK_MAKE_VERSION(1, 0, 0), "Dynamical", VK_MAKE_VERSION(1, 0, 0), version);
 
     std::vector<const char *> layerNames {};
 

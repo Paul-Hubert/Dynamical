@@ -7,6 +7,7 @@ project(dynamical)
 include_directories("./src")
 include_directories("./3rdparty")
 include_directories("./extra")
+include_directories("./3rdparty/OpenXR-SDK/include")
 file(GLOB_RECURSE sources ./src/main.cpp ./src/*.cpp ./src/*.h)
 
 add_executable(dynamical ${sources})
@@ -39,8 +40,8 @@ target_include_directories(dynamical PRIVATE ${STB_INCLUDE_DIRS})
 find_package(unofficial-vulkan-memory-allocator CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE unofficial::vulkan-memory-allocator::vulkan-memory-allocator)
 
-find_package(OpenXR CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE OpenXR::headers OpenXR::openxr_loader OpenXR::openxr-all-supported)
+add_subdirectory(3rdparty/OpenXR-SDK)
+target_link_libraries(dynamical PRIVATE openxr_loader openxr-all-supported)
 
 find_package(Bullet CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE LinearMath Bullet3Common BulletDynamics BulletSoftBody)
@@ -84,7 +85,7 @@ foreach(GLSL ${GLSL_SOURCE_FILES})
   add_custom_command(
     OUTPUT ${SPIRV}
     COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/resources/shaders/"
-    COMMAND ${GLSL_VALIDATOR} -V --target-env vulkan1.1 ${GLSL} -o ${SPIRV}
+    COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}
     DEPENDS ${GLSL})
   list(APPEND SPIRV_BINARY_FILES ${SPIRV})
 endforeach(GLSL)

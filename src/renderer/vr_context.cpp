@@ -5,12 +5,13 @@
 #include <algorithm>
 #include <cstring>
 #include <debugapi.h>
+#include "context.h"
 
 #define LOG_LEVEL VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
 
-static void debugCallback(XrDebugUtilsMessageSeverityFlagsEXT messageSeverity, XrDebugUtilsMessageTypeFlagsEXT messageType, const XrDebugUtilsMessengerCallbackDataEXT* msg, void* user_data) {
+static XRAPI_ATTR XrBool32 XRAPI_CALL debugCallback(XrDebugUtilsMessageSeverityFlagsEXT messageSeverity, XrDebugUtilsMessageTypeFlagsEXT messageType, const XrDebugUtilsMessengerCallbackDataEXT* msg, void* user_data) {
 
-    if(messageSeverity < LOG_LEVEL) return;
+    if(messageSeverity < LOG_LEVEL) return XR_FALSE;
 
     if(messageType == XR_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) {
         std::cerr << "    General ";
@@ -35,38 +36,38 @@ static void debugCallback(XrDebugUtilsMessageSeverityFlagsEXT messageSeverity, X
     if(messageSeverity >= XR_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
         std::cerr << std::endl;
     }
+
+    return XR_FALSE;
 }
+
+void xrCheckResult(XrResult result) {
+    if(result != XR_SUCCESS) {
+        Util::log(Util::error) << "XR Error : " << result << "\n";
+    }
+}
+
+const XrPosef  pose_identity = { {0,0,0,1}, {0,0,0} };
 
 VRContext::VRContext(Context &ctx) : ctx(ctx) {
 
-    // OpenXR will fail to initialize if we ask for an extension that OpenXR
-    // can't provide! So we need to check our all extensions before
-    // initializing OpenXR with them. Note that even if the extension is
-    // present, it's still possible you may not be able to use it. For
-    // example: the hand tracking extension may be present, but the hand
-    // sensor might not be plugged in or turned on. There are often
-    // additional checks that should be made before using certain features!
     std::vector<const char*> use_extensions;
-    const char         *ask_extensions[] = {
-            XR_KHR_VULKAN_ENABLE_EXTENSION_NAME, // Use Direct3D11 for rendering
-            XR_EXT_DEBUG_UTILS_EXTENSION_NAME,  // Debug utils for extra info
+    const char* ask_extensions[] = {
+            XR_KHR_VULKAN_ENABLE_EXTENSION_NAME,
+            XR_EXT_DEBUG_UTILS_EXTENSION_NAME,
     };
 
-    // We'll get a list of extensions that OpenXR provides using this
-    // enumerate pattern. OpenXR often uses a two-call enumeration pattern
-    // where the first call will tell you how much memory to allocate, and
-    // the second call will provide you with the actual data!
+   
+
+
     uint32_t ext_count = 0;
-    xrEnumerateInstanceExtensionProperties(nullptr, 0, &ext_count, nullptr);
+    xrCheckResult(xrEnumerateInstanceExtensionProperties(nullptr, 0, &ext_count, nullptr));
     std::vector<XrExtensionProperties> xr_exts(ext_count, { XR_TYPE_EXTENSION_PROPERTIES });
-    xrEnumerateInstanceExtensionProperties(nullptr, ext_count, &ext_count, xr_exts.data());
+    xrCheckResult(xrEnumerateInstanceExtensionProperties(nullptr, ext_count, &ext_count, xr_exts.data()));
 
     Util::log(Util::trace) << "OpenXR extensions available:\n";
     for (size_t i = 0; i < xr_exts.size(); i++) {
         Util::log(Util::trace) << "- " << xr_exts[i].extensionName << "\n";
 
-        // Check if we're asking for this extensions, and add it to our use
-        // list!
         for (int32_t ask = 0; ask < _countof(ask_extensions); ask++) {
             if (strcmp(ask_extensions[ask], xr_exts[i].extensionName) == 0) {
                 use_extensions.push_back(ask_extensions[ask]);
@@ -74,9 +75,20 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
             }
         }
     }
-    // If a required extension isn't present, you want to ditch out here!
-    // It's possible something like your rendering API might not be provided
-    // by the active runtime. APIs like OpenGL don't have universal support.
+
+
+    uint32_t layer_count = 0;
+    xrCheckResult(xrEnumerateApiLayerProperties(0, &layer_count, nullptr));
+    std::vector<XrApiLayerProperties> xr_layers(layer_count, {XR_TYPE_API_LAYER_PROPERTIES});
+    xrCheckResult(xrEnumerateApiLayerProperties(layer_count, &layer_count, xr_layers.data()));
+
+    Util::log(Util::trace) << "OpenXR layers available:\n";
+    for(size_t i = 0; i < xr_layers.size(); i++) {
+        Util::log(Util::trace) << "- " << xr_layers[i].layerName << "\n";
+
+    }
+
+
     if (!std::any_of( use_extensions.begin(), use_extensions.end(),
                       [] (const char *ext) {
                           return strcmp(ext, XR_KHR_VULKAN_ENABLE_EXTENSION_NAME)==0;
@@ -84,39 +96,20 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
         throw std::runtime_error("OpenXR extensions not available\n");
 
 
-    // Initialize OpenXR with the extensions we've found!
     XrInstanceCreateInfo createInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
     createInfo.enabledExtensionCount      = use_extensions.size();
     createInfo.enabledExtensionNames      = use_extensions.data();
     createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
     strcpy_s(createInfo.applicationInfo.applicationName, "Dynamical");
-    xrCreateInstance(&createInfo, &instance);
+    
+    xrCheckResult(xrCreateInstance(&createInfo, &instance));
 
-    // Check if OpenXR is on this system, if this is null here, the user
-    // needs to install an OpenXR runtime and ensure it's active!
+
     if (instance == nullptr)
         throw std::runtime_error("OpenXR instance could not be created\n");
 
 
-    // Load extension methods that we'll need for this application! There's a
-    // couple ways to do this, and this is a fairly manual one. Chek out this
-    // file for another way to do it:
-    // https://github.com/maluoi/StereoKit/blob/master/StereoKitC/systems/platform/openxr_extensions.h
 
-    // Function pointers for some OpenXR extension methods we'll use.
-    PFN_xrGetVulkanGraphicsRequirementsKHR ext_xrGetVulkanGraphicsRequirementsKHR = nullptr;
-    PFN_xrCreateDebugUtilsMessengerEXT    ext_xrCreateDebugUtilsMessengerEXT    = nullptr;
-    PFN_xrDestroyDebugUtilsMessengerEXT   ext_xrDestroyDebugUtilsMessengerEXT   = nullptr;
-
-    xrGetInstanceProcAddr(instance, "xrCreateDebugUtilsMessengerEXT", (PFN_xrVoidFunction *)(&ext_xrCreateDebugUtilsMessengerEXT));
-    xrGetInstanceProcAddr(instance, "xrDestroyDebugUtilsMessengerEXT", (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT));
-    xrGetInstanceProcAddr(instance, "xrGetVulkanGraphicsRequirementsKHR", (PFN_xrVoidFunction *)(&ext_xrGetVulkanGraphicsRequirementsKHR));
-
-    // Set up a really verbose debug log! Great for dev, but turn this off or
-    // down for final builds. WMR doesn't produce much output here, but it
-    // may be more useful for other runtimes?
-    // Here's some extra information about the message types and severities:
-    // https://www.khronos.org/registry/OpenXR/specs/1.0/html/xrspec.html#debug-message-categorization
     XrDebugUtilsMessengerCreateInfoEXT debug_info = { XR_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
     debug_info.messageTypes =
             XR_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT     |
@@ -128,24 +121,118 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
             XR_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT    |
             XR_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
             XR_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    debug_info.userCallback = [](XrDebugUtilsMessageSeverityFlagsEXT severity, XrDebugUtilsMessageTypeFlagsEXT types, const XrDebugUtilsMessengerCallbackDataEXT *msg, void* user_data) {
-        // Print the debug message we got! There's a bunch more info we could
-        // add here too, but this is a pretty good start, and you can always
-        // add a breakpoint this line!
-        printf("%s: %s\n", msg->functionName, msg->message);
+    debug_info.userCallback = &debugCallback;
 
-        // Output to debug window
-        char text[512];
-        sprintf_s(text, "%s: %s", msg->functionName, msg->message);
-
-        // Returning XR_TRUE here will force the calling function to fail
-        return (XrBool32)XR_FALSE;
-    };
+    PFN_xrCreateDebugUtilsMessengerEXT ext_xrCreateDebugUtilsMessengerEXT = nullptr;
+    xrCheckResult(xrGetInstanceProcAddr(instance, "xrCreateDebugUtilsMessengerEXT", (PFN_xrVoidFunction *)(&ext_xrCreateDebugUtilsMessengerEXT)));
+    if (ext_xrCreateDebugUtilsMessengerEXT)
+        xrCheckResult(ext_xrCreateDebugUtilsMessengerEXT(instance, &debug_info, &debug));
 
 
+    XrSystemGetInfo systemInfo = { XR_TYPE_SYSTEM_GET_INFO };
+    systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
+    xrCheckResult(xrGetSystem(instance, &systemInfo, &system_id));
+
+}
+
+void VRContext::init() {
+
+
+    XrGraphicsBindingVulkanKHR binding = { XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR };
+    binding.instance = ctx.instance;
+    binding.physicalDevice = ctx.device.physical;
+    binding.device = ctx.device.logical;
+    binding.queueFamilyIndex = ctx.device.g_i;
+    binding.queueIndex = 0;
+    XrSessionCreateInfo sessionInfo = { XR_TYPE_SESSION_CREATE_INFO };
+    sessionInfo.next = &binding;
+    sessionInfo.systemId = system_id;
+    xrCheckResult(xrCreateSession(instance, &sessionInfo, &session));
+
+    if (session == nullptr)
+        throw std::runtime_error("OpenXR session could not be created\n");
+
+
+    /*
+    XrReferenceSpaceCreateInfo ref_space = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
+    ref_space.poseInReferenceSpace = pose_identity;
+    ref_space.referenceSpaceType   = XR_REFERENCE_SPACE_TYPE_STAGE;
+    xrCheckResult(xrCreateReferenceSpace(session, &ref_space, &space));
+
+
+    uint32_t view_count = 0;
+    xrCheckResult(xrEnumerateViewConfigurationViews(instance, system_id, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, &view_count, nullptr));
+
+    swapchains.resize(view_count);
+    std::vector<XrViewConfigurationView> views(view_count, { XR_TYPE_VIEW_CONFIGURATION_VIEW });
+    xrCheckResult(xrEnumerateViewConfigurationViews(instance, system_id, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, view_count, &view_count, views.data()));
+
+
+    for (uint32_t i = 0; i < view_count; i++) {
+        VRContext::swapchain& swapchain = swapchains[i];
+
+        XrViewConfigurationView& view = views[i];
+        XrSwapchainCreateInfo swapchain_info = { XR_TYPE_SWAPCHAIN_CREATE_INFO };
+        swapchain_info.arraySize = 1;
+        swapchain_info.mipCount = 1;
+        swapchain_info.faceCount = 1;
+        swapchain_info.format = swapchain_format;
+        swapchain_info.width = view.recommendedImageRectWidth;
+        swapchain_info.height = view.recommendedImageRectHeight;
+        swapchain_info.sampleCount = 1;
+        swapchain_info.usageFlags = XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
+        xrCheckResult(xrCreateSwapchain(session, &swapchain_info, &swapchain.handle));
+
+        swapchain.width  = swapchain_info.width;
+        swapchain.height = swapchain_info.height;
+
+        uint32_t surface_count = 0;
+        xrCheckResult(xrEnumerateSwapchainImages(swapchain.handle, 0, &surface_count, nullptr));
+        swapchain.images.resize(surface_count);
+
+        std::vector<XrSwapchainImageVulkanKHR> surface_images(surface_count, {XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR});
+        xrCheckResult(xrEnumerateSwapchainImages(swapchain.handle, surface_count, &surface_count, reinterpret_cast<XrSwapchainImageBaseHeader*> (surface_images.data())));
+
+        for (uint32_t i = 0; i < surface_count; i++) {
+
+            auto& image = swapchain.images[i];
+
+            image.image = surface_images[i].image;
+
+            vk::ImageViewCreateInfo info({}, image.image, vk::ImageViewType::e2D, vk::Format(swapchain_format),
+                                         {}, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
+            image.view = ctx.device->createImageView(info);
+
+        }
+
+    }
+    */
+
+}
+
+
+void VRContext::finish() {
+
+    for(int i = 0; i<swapchains.size(); i++) {
+        for(int j = 0; j<swapchains[i].images.size(); j++) {
+            //ctx.device->destroy(swapchains[i].images[j].view);
+        }
+        //xrDestroySwapchain(swapchains[i].handle);
+    }
+
+    //xrDestroySpace(space);
+
+    xrDestroySession(session);
 
 }
 
 VRContext::~VRContext() {
+
+    PFN_xrDestroyDebugUtilsMessengerEXT ext_xrDestroyDebugUtilsMessengerEXT = nullptr;
+    xrGetInstanceProcAddr(instance, "xrDestroyDebugUtilsMessengerEXT", (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT));
+    if(ext_xrDestroyDebugUtilsMessengerEXT)
+        xrGetInstanceProcAddr(instance, "xrDestroyDebugUtilsMessengerEXT", (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT));
+
+    xrDestroyInstance(instance);
 
 }

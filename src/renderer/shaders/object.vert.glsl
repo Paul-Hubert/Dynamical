@@ -22,5 +22,7 @@ void main() {
     v_position = a_pos;
     v_normal = a_normal;
     v_uv = a_uv;
+
+    gl_Position.y = -gl_Position.y;
     
 }

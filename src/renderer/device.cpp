@@ -12,15 +12,35 @@ Device::Device(Context& ctx) : ctx(ctx) {
     
     requiredFeatures = vk::PhysicalDeviceFeatures();
     requiredFeatures.samplerAnisotropy = true;
+    requiredFeatures.shaderStorageImageMultisample = true;
     // HERE : enable needed features (if present in 'features')
     
     requiredExtensions = {};
     requiredExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    // HERE : enable needed extensions (if present in 'extensions')
+
+    uint32_t size = 0;
+    PFN_xrGetVulkanDeviceExtensionsKHR xrGetVulkanDeviceExtensionsKHR = nullptr;
+    xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanDeviceExtensionsKHR", (PFN_xrVoidFunction*)&xrGetVulkanDeviceExtensionsKHR));
+
+    xrCheckResult(xrGetVulkanDeviceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, 0, &size, nullptr));
+
+    std::vector<char> buf(size);
+    xrCheckResult(xrGetVulkanDeviceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, size, &size, buf.data()));
+    if(buf[0] != '\0') requiredExtensions.push_back(buf.data());
+    for(int i = 0; i<buf.size(); i++) {
+        if(buf[i] == ' ') {
+            buf[i] = '\0';
+            requiredExtensions.push_back(&buf[i+1]);
+        }
+    }
+
+
+
     
     std::vector<vk::PhysicalDevice> p_devices = ctx.instance->enumeratePhysicalDevices();
-    
+
     // Rate each device and pick the first best in the list, if its score is > 0
+    /*
     uint32_t index = 1000, max = 0;
     for(uint32_t i = 0; i<p_devices.size(); i++) {
         uint32_t score = getScore(p_devices[i]);
@@ -29,13 +49,16 @@ Device::Device(Context& ctx) : ctx(ctx) {
             index = i;
         }
     }
-    
-    if(index == 1000) {  // if no suitable device is found just take down the whole place
-        throw std::runtime_error("No suitable vulkan device found. Please check your driver and hardware.");
-    }
-    
-    physical =  p_devices[index]; // Found physical device
-    
+    */
+
+    PFN_xrGetVulkanGraphicsDeviceKHR xrGetVulkanGraphicsDeviceKHR = nullptr;
+    xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanGraphicsDeviceKHR", (PFN_xrVoidFunction *)(&xrGetVulkanGraphicsDeviceKHR)));
+
+    VkPhysicalDevice phy;
+    xrCheckResult(xrGetVulkanGraphicsDeviceKHR(ctx.vr.instance, ctx.vr.system_id, ctx.instance, &phy));
+
+    physical = phy;
+
     
     // Get device properties
     properties = physical.getProperties();

@@ -1,6 +1,8 @@
 #include "context.h"
 
-Context::Context(entt::registry& reg) : win(*this), instance(*this), device(*this), transfer(*this), swap(*this), vr(*this) {
+Context::Context(entt::registry& reg) : vr(*this), win(*this), instance(*this), device(*this), transfer(*this), swap(*this) {
+
+    vr.init();
 
     transfer.flush();
 
@@ -8,6 +10,6 @@ Context::Context(entt::registry& reg) : win(*this), instance(*this), device(*thi
 
 Context::~Context() {
 
-    
+    vr.finish();
 
 }

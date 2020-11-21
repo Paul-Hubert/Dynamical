@@ -49,7 +49,7 @@ void MainRender::render(uint32_t index, Camera& camera, std::vector<vk::Semaphor
         vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0))};
     command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.framebuffers[index], vk::Rect2D({}, ctx.swap.extent), clearValues.size(), clearValues.data()), vk::SubpassContents::eInline);
     
-    command.setViewport(0, vk::Viewport(0, (float) ctx.swap.extent.height, ctx.swap.extent.width, -((float)ctx.swap.extent.height), 0, 1));
+    command.setViewport(0, vk::Viewport(0, 0, ctx.swap.extent.width, ctx.swap.extent.height, 0, 1));
     
     command.setScissor(0, vk::Rect2D(vk::Offset2D(), ctx.swap.extent));
     

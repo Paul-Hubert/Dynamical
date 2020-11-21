@@ -20,4 +20,6 @@ void main() {
     gl_Position = vec4(a_position*pc.uScale+pc.uTranslate, 0, 1);
     v_color = a_color;
     v_uv = a_uv;
+
+    gl_Position.y = -gl_Position.y;
 }
