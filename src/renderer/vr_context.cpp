@@ -50,8 +50,7 @@ const XrPosef  pose_identity = { {0,0,0,1}, {0,0,0} };
 
 VRContext::VRContext(Context &ctx) : ctx(ctx) {
 
-    std::vector<const char*> use_extensions;
-    const char* ask_extensions[] = {
+    std::vector<const char*> use_extensions {
             XR_KHR_VULKAN_ENABLE_EXTENSION_NAME,
             XR_EXT_DEBUG_UTILS_EXTENSION_NAME,
     };
@@ -64,36 +63,11 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
     std::vector<XrExtensionProperties> xr_exts(ext_count, { XR_TYPE_EXTENSION_PROPERTIES });
     xrCheckResult(xrEnumerateInstanceExtensionProperties(nullptr, ext_count, &ext_count, xr_exts.data()));
 
-    Util::log(Util::trace) << "OpenXR extensions available:\n";
-    for (size_t i = 0; i < xr_exts.size(); i++) {
-        Util::log(Util::trace) << "- " << xr_exts[i].extensionName << "\n";
-
-        for (int32_t ask = 0; ask < _countof(ask_extensions); ask++) {
-            if (strcmp(ask_extensions[ask], xr_exts[i].extensionName) == 0) {
-                use_extensions.push_back(ask_extensions[ask]);
-                break;
-            }
-        }
-    }
-
 
     uint32_t layer_count = 0;
     xrCheckResult(xrEnumerateApiLayerProperties(0, &layer_count, nullptr));
     std::vector<XrApiLayerProperties> xr_layers(layer_count, {XR_TYPE_API_LAYER_PROPERTIES});
     xrCheckResult(xrEnumerateApiLayerProperties(layer_count, &layer_count, xr_layers.data()));
-
-    Util::log(Util::trace) << "OpenXR layers available:\n";
-    for(size_t i = 0; i < xr_layers.size(); i++) {
-        Util::log(Util::trace) << "- " << xr_layers[i].layerName << "\n";
-
-    }
-
-
-    if (!std::any_of( use_extensions.begin(), use_extensions.end(),
-                      [] (const char *ext) {
-                          return strcmp(ext, XR_KHR_VULKAN_ENABLE_EXTENSION_NAME)==0;
-                      }))
-        throw std::runtime_error("OpenXR extensions not available\n");
 
 
     XrInstanceCreateInfo createInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
@@ -153,7 +127,7 @@ void VRContext::init() {
         throw std::runtime_error("OpenXR session could not be created\n");
 
 
-    /*
+
     XrReferenceSpaceCreateInfo ref_space = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
     ref_space.poseInReferenceSpace = pose_identity;
     ref_space.referenceSpaceType   = XR_REFERENCE_SPACE_TYPE_STAGE;
@@ -206,7 +180,7 @@ void VRContext::init() {
         }
 
     }
-    */
+
 
 }
 
@@ -215,12 +189,12 @@ void VRContext::finish() {
 
     for(int i = 0; i<swapchains.size(); i++) {
         for(int j = 0; j<swapchains[i].images.size(); j++) {
-            //ctx.device->destroy(swapchains[i].images[j].view);
+            ctx.device->destroy(swapchains[i].images[j].view);
         }
-        //xrDestroySwapchain(swapchains[i].handle);
+        xrDestroySwapchain(swapchains[i].handle);
     }
 
-    //xrDestroySpace(space);
+    xrDestroySpace(space);
 
     xrDestroySession(session);
 

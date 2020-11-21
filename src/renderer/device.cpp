@@ -18,19 +18,21 @@ Device::Device(Context& ctx) : ctx(ctx) {
     requiredExtensions = {};
     requiredExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
-    uint32_t size = 0;
-    PFN_xrGetVulkanDeviceExtensionsKHR xrGetVulkanDeviceExtensionsKHR = nullptr;
-    xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanDeviceExtensionsKHR", (PFN_xrVoidFunction*)&xrGetVulkanDeviceExtensionsKHR));
+    {
+        uint32_t size = 0;
+        PFN_xrGetVulkanDeviceExtensionsKHR xrGetVulkanDeviceExtensionsKHR = nullptr;
+        xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanDeviceExtensionsKHR", (PFN_xrVoidFunction*)&xrGetVulkanDeviceExtensionsKHR));
 
-    xrCheckResult(xrGetVulkanDeviceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, 0, &size, nullptr));
+        xrCheckResult(xrGetVulkanDeviceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, 0, &size, nullptr));
 
-    std::vector<char> buf(size);
-    xrCheckResult(xrGetVulkanDeviceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, size, &size, buf.data()));
-    if(buf[0] != '\0') requiredExtensions.push_back(buf.data());
-    for(int i = 0; i<buf.size(); i++) {
-        if(buf[i] == ' ') {
-            buf[i] = '\0';
-            requiredExtensions.push_back(&buf[i+1]);
+        char* buf = (char*)malloc(size * sizeof(char));
+        xrCheckResult(xrGetVulkanDeviceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, size, &size, buf));
+        if(buf[0] != '\0') requiredExtensions.push_back(buf);
+        for(int i = 0; buf[i] != '\0'; i++) {
+            if(buf[i] == ' ') {
+                buf[i] = '\0';
+                requiredExtensions.push_back(&buf[i + 1]);
+            }
         }
     }
 

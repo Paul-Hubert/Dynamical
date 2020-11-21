@@ -102,20 +102,24 @@ Instance::Instance(Context& ctx) : ctx(ctx) {
 
 
 
-    uint32_t size = 0;
-    PFN_xrGetVulkanInstanceExtensionsKHR xrGetVulkanInstanceExtensionsKHR = nullptr;
-    xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanInstanceExtensionsKHR", (PFN_xrVoidFunction*)&xrGetVulkanInstanceExtensionsKHR));
+    {
+        uint32_t size = 0;
+        PFN_xrGetVulkanInstanceExtensionsKHR xrGetVulkanInstanceExtensionsKHR = nullptr;
+        xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanInstanceExtensionsKHR", (PFN_xrVoidFunction*)&xrGetVulkanInstanceExtensionsKHR));
 
-    xrCheckResult(xrGetVulkanInstanceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, 0, &size, nullptr));
+        xrCheckResult(xrGetVulkanInstanceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, 0, &size, nullptr));
 
-    std::vector<char> buf(size);
-    xrCheckResult(xrGetVulkanInstanceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, size, &size, buf.data()));
-    if(buf[0] != '\0') extensionNames.push_back(buf.data());
-    for(int i = 0; i<buf.size(); i++) {
-        if(buf[i] == ' ') {
-            buf[i] = '\0';
-            extensionNames.push_back(&buf[i+1]);
+        char* buf = (char*)malloc(size * sizeof(char));
+        xrCheckResult(xrGetVulkanInstanceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, size, &size, buf));
+
+        if(buf[0] != '\0') extensionNames.push_back(buf);
+        for(int i = 0; buf[i] != '\0'; i++) {
+            if(buf[i] == ' ') {
+                buf[i] = '\0';
+                extensionNames.push_back(&buf[i + 1]);
+            }
         }
+
     }
 
     PFN_xrGetVulkanGraphicsRequirementsKHR xrGetVulkanGraphicsRequirementsKHR = nullptr;
