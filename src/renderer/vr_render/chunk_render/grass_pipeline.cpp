@@ -1,4 +1,4 @@
-#include "chunk_pipeline.h"
+#include "grass_pipeline.h"
 
 #include "util/util.h"
 
@@ -7,77 +7,158 @@
 #include "renderer/device.h"
 #include "renderer/transfer.h"
 #include "renderer/swapchain.h"
-#include "renderer/main_render/renderpass.h"
+#include "renderer/vr_render/renderpass.h"
 #include "renderer/num_frames.h"
-#include "renderer/main_render/ubo_descriptor.h"
+#include "renderer/vr_render/ubo_descriptor.h"
 
 #include "renderer/marching_cubes/terrain.h"
 
-ChunkPipeline::ChunkPipeline(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, UBODescriptor& ubo) : device(device), transfer(transfer), swap(swap), renderpass(renderpass) {
+#include "raycast/include/raycast_data.h"
+
+#include "cereal/archives/portable_binary.hpp"
+#include "imgui.h"
+
+#include "util/tiled_noise.h"
+
+constexpr int noiseSize = 512;
+
+GrassPipeline::GrassPipeline(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, UBODescriptor& ubo) : device(device), transfer(transfer), swap(swap), renderpass(renderpass) {
+    
+    pc.tile_size = 1;
+    pc.grass_height = 1;
+    pc.base_normal[0] = 0;
+    pc.base_normal[1] = 1;
+    pc.base_normal[2] = 0;
+    pc.base_normal[3] = 0;
+    pc.noise_frequency = 0.0001;
+    pc.noise_amplitude = 0.1;
     
     {
         auto poolSizes = std::vector {
-            vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1),
+            vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 2),
         };
         descPool = device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, 1, poolSizes.size(), poolSizes.data()));
     }
     
     {
         auto bindings = std::vector {
-            vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment)
+            vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment),
+            vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment)
         };
-        materialLayout = device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, bindings.size(), bindings.data()));
+        descLayout = device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, bindings.size(), bindings.data()));
         
-        materialSet = device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &materialLayout))[0];
+        descSet = device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &descLayout))[0];
         
         
         bool concurrent = (device.g_i != device.t_i);
         uint32_t qfs[2] = {device.g_i, device.t_i};
         
-        {
-            VmaAllocationCreateInfo info{};
-            info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-            materialTexture = VmaImage(device, &info,
-                vk::ImageCreateInfo({}, vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(450, 450, 1), 1, num_textures, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                concurrent ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive, concurrent ? 2 : 1, &qfs[0], vk::ImageLayout::eUndefined)
-            );
-        }
+        /*
+        sampler = device->createSampler(vk::SamplerCreateInfo(
+            {}, vk::Filter::eNearest, vk::Filter::eNearest, vk::SamplerMipmapMode::eNearest,
+            vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat
+        ));
+        */
         
-        transfer.prepareImage(std::string("./resources/grass.png"), materialTexture, 4, 0, 0);
-        transfer.prepareImage(std::string("./resources/rock.jpg"), materialTexture, 4, 0, 1);
         
         sampler = device->createSampler(vk::SamplerCreateInfo(
             {}, vk::Filter::eLinear, vk::Filter::eLinear, vk::SamplerMipmapMode::eLinear,
             vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat
+            //, 0, VK_TRUE, device.properties.limits.maxSamplerAnisotropy
         ));
         
-        materialTextureView = device->createImageView(vk::ImageViewCreateInfo({}, materialTexture.image, vk::ImageViewType::e2DArray, vk::Format::eR8G8B8A8Unorm, vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, num_textures)));
+        
+        {
+
+            VmaAllocationCreateInfo info {};
+            info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+            raycastImage = VmaImage(device, &info, vk::ImageCreateInfo(
+                {}, vk::ImageType::e3D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(num_samples, num_samples, num_angles), 1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, 
+                concurrent ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive, concurrent ? 2 : 1, &qfs[0], vk::ImageLayout::eUndefined)
+            );
+            //SET_NAME(vk::ObjectType::eImage, (VkImage) raycastImage, Raycast3DTexture)
+            
+            raycastImageView = device->createImageView(vk::ImageViewCreateInfo({}, raycastImage.image, vk::ImageViewType::e3D, vk::Format::eR8G8B8A8Unorm, vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)));
+            
+        }
+
+        std::ifstream is("./resources/raycast_data.bin", std::ios::binary);
+        cereal::PortableBinaryInputArchive in(is);
+        RaycastData* raycast = new RaycastData();
+        in(*raycast);
+        
+        transfer.prepareImage(raycast->data.data(), sizeof(uint8_t) * 4 * num_samples * num_samples * num_angles, raycastImage, vk::Extent3D(num_samples, num_samples, num_angles), 0, 0);
+        
+        delete raycast;
         
         
-        const auto image_info = vk::DescriptorImageInfo(sampler, materialTextureView, vk::ImageLayout::eShaderReadOnlyOptimal);
+
+        {
+
+            auto imageInfo = vk::ImageCreateInfo(
+                {}, vk::ImageType::e2D, vk::Format::eR8G8B8Snorm, vk::Extent3D(noiseSize, noiseSize, 1), 1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+                concurrent ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive, concurrent ? 2 : 1, &qfs[0], vk::ImageLayout::eUndefined);
+
+            vk::ImageFormatProperties props;
+            vk::Result res = device.physical.getImageFormatProperties(imageInfo.format, imageInfo.imageType, imageInfo.tiling, imageInfo.usage, imageInfo.flags, &props);
+            if(res == vk::Result::eErrorFormatNotSupported) {
+                imageInfo.format = vk::Format::eR8G8B8A8Snorm;
+            }
+
+            VmaAllocationCreateInfo info {};
+            info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+            noiseImage = VmaImage(device, &info, imageInfo);
+            //SET_NAME(vk::ObjectType::eImage, (VkImage) raycastImage, Raycast3DTexture)
+            
+            noiseImageView = device->createImageView(vk::ImageViewCreateInfo({}, noiseImage, vk::ImageViewType::e2D, vk::Format::eR8G8B8Snorm, vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)));
+            
+        }
+        
+        Util::TiledNoise* noise = new Util::TiledNoise();
+        
+        int8_t* noiseData = new int8_t[3*noiseSize*noiseSize];
+        
+        for(int x = 0; x<noiseSize; x++) {
+            for(int y = 0; y<noiseSize; y++) {
+                noiseData[(x*noiseSize+y) * 3] = static_cast<int8_t> (std::clamp(noise->octaveNoise(x*10./noiseSize, y*10./noiseSize, 0, 2) * 128., -127., 127.));
+                noiseData[(x*noiseSize+y) * 3 + 1] = static_cast<int8_t> (std::clamp(noise->octaveNoise(x*10./noiseSize, y*10./noiseSize, 1000, 2) * 128., -127., 127.));
+                noiseData[(x*noiseSize+y) * 3 + 2] = static_cast<int8_t> (std::clamp(noise->octaveNoise(x*10./noiseSize, y*10./noiseSize, 2000, 2) * 128., -127., 127.));
+            }
+        }
+        
+        transfer.prepareImage(noiseData, 3 * sizeof(int8_t) * noiseSize * noiseSize, noiseImage, vk::Extent3D(noiseSize, noiseSize, 1), 0, 0);
+        
+        delete[] noiseData;
+        
+        const auto raycast_info = vk::DescriptorImageInfo(sampler, raycastImageView, vk::ImageLayout::eShaderReadOnlyOptimal);
+        const auto noise_info = vk::DescriptorImageInfo(sampler, noiseImageView, vk::ImageLayout::eShaderReadOnlyOptimal);
         device->updateDescriptorSets({
-            vk::WriteDescriptorSet(materialSet, 0, 0, 1, vk::DescriptorType::eCombinedImageSampler, &image_info, nullptr, nullptr)
+            vk::WriteDescriptorSet(descSet, 0, 0, 1, vk::DescriptorType::eCombinedImageSampler, &raycast_info, nullptr, nullptr),
+            vk::WriteDescriptorSet(descSet, 1, 0, 1, vk::DescriptorType::eCombinedImageSampler, &noise_info, nullptr, nullptr)
         }, {});
         
     }
     
-    
+    /*
     struct Constants {
-        int chunk_size;
+        int grass_height;
+        int tile_size;
     } constants;
-    constants.chunk_size = chunk::base_length * chunk::max_mul;
+    constants.grass_height = grass_height;
+    constants.tile_size = tile_size;
     
     auto mapEntries = std::array {
-        vk::SpecializationMapEntry(0, offsetof(Constants, chunk_size), sizeof(int))
+        vk::SpecializationMapEntry(0, offsetof(Constants, grass_height), sizeof(int)),
+        vk::SpecializationMapEntry(1, offsetof(Constants, tile_size), sizeof(int))
     };
     
     auto specConstants = vk::SpecializationInfo(mapEntries.size(), mapEntries.data(), sizeof(Constants), &constants);
-    
+    */
     
     // PIPELINE INFO
     
-    auto vertShaderCode = Util::readFile("./resources/shaders/chunk.vert.glsl.spv");
-    auto fragShaderCode = Util::readFile("./resources/shaders/chunk.frag.glsl.spv");
+    auto vertShaderCode = Util::readFile("./resources/shaders/grass.vert.glsl.spv");
+    auto fragShaderCode = Util::readFile("./resources/shaders/grass.frag.glsl.spv");
     
     VkShaderModuleCreateInfo moduleInfo = {};
     moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -95,13 +176,14 @@ ChunkPipeline::ChunkPipeline(Device& device, Transfer& transfer, Swapchain& swap
     vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
     vertShaderStageInfo.module = vertShaderModule;
     vertShaderStageInfo.pName = "main";
+    //vertShaderStageInfo.pSpecializationInfo = reinterpret_cast<VkSpecializationInfo*> (&specConstants);
 
     VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
     fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
     fragShaderStageInfo.module = fragShaderModule;
     fragShaderStageInfo.pName = "main";
-    fragShaderStageInfo.pSpecializationInfo = reinterpret_cast<VkSpecializationInfo*> (&specConstants);
+    //fragShaderStageInfo.pSpecializationInfo = reinterpret_cast<VkSpecializationInfo*> (&specConstants);
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
     
@@ -164,7 +246,6 @@ ChunkPipeline::ChunkPipeline(Device& device, Transfer& transfer, Swapchain& swap
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_FALSE;
-    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
     colorBlendAttachment.srcColorBlendFactor=VK_BLEND_FACTOR_SRC_ALPHA;
     colorBlendAttachment.dstColorBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     colorBlendAttachment.colorBlendOp=VK_BLEND_OP_ADD;
@@ -206,12 +287,12 @@ ChunkPipeline::ChunkPipeline(Device& device, Transfer& transfer, Swapchain& swap
     
     
     {
-        auto layouts = std::vector<vk::DescriptorSetLayout> {ubo.descLayout, materialLayout};
+        auto layouts = std::vector<vk::DescriptorSetLayout> {ubo.descLayout, descLayout};
         
-        auto pcl = vk::PushConstantRange(vk::ShaderStageFlagBits::eFragment, 0, sizeof(PC));
+        auto pc = vk::PushConstantRange(vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eVertex, 0, sizeof(GrassPC));
         
         layout = device->createPipelineLayout(vk::PipelineLayoutCreateInfo(
-            {}, layouts.size(), layouts.data(), 1, &pcl
+            {}, layouts.size(), layouts.data(), 1, &pc
         ));
     }
     
@@ -240,18 +321,41 @@ ChunkPipeline::ChunkPipeline(Device& device, Transfer& transfer, Swapchain& swap
     
 }
 
-ChunkPipeline::~ChunkPipeline() {
+void GrassPipeline::makeDebugWindow() {
+    
+    ImGui::Begin("Grass Debug Window");
+    
+    ImGui::SliderFloat("tile_size", &pc.tile_size, 0.01, 1);
+    
+    ImGui::SliderFloat("grass_height", &pc.grass_height, 0.01, 5);
+    
+    ImGui::SliderFloat3("base_normal", &pc.base_normal[0], -1, 1);
+    
+    ImGui::SliderFloat("noise_frequency", &pc.noise_frequency, 0.0001, 1, "%.5g", 10);
+    
+    ImGui::SliderFloat("noise_amplitude", &pc.noise_amplitude, 0.0001, 1, "%.5g", 10);
+    
+    ImGui::End();
+    
+}
+
+
+GrassPipeline::~GrassPipeline() {
     
     device->destroy(pipeline);
     
     device->destroy(layout);
     
     
+    device->destroy(noiseImageView);
+    
+    device->destroy(raycastImageView);
+    
+    
     device->destroy(sampler);
     
-    device->destroy(materialTextureView);
     
-    device->destroy(materialLayout);
+    device->destroy(descLayout);
     
     
     device->destroy(descPool);

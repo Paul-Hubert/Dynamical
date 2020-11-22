@@ -2,7 +2,7 @@
 #define RENDERER_H
 
 #include "camera.h"
-#include "main_render/main_render.h"
+#include "vr_render/vr_render.h"
 
 #include "logic/systems/system.h"
 
@@ -20,12 +20,10 @@ public:
     void finish() override;
     ~Renderer() override;
     
-    void resize();
-    
 private:
     std::unique_ptr<Context> ctx;
     Camera camera;
-    MainRender main_render;
+    VRRender vr_render;
 
     std::vector<vk::Semaphore> waitsems;
     std::vector<vk::Semaphore> signalsems;

@@ -111,6 +111,7 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
 
 void VRContext::init() {
 
+    // Session
 
     XrGraphicsBindingVulkanKHR binding = { XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR };
     binding.instance = ctx.instance;
@@ -127,12 +128,16 @@ void VRContext::init() {
         throw std::runtime_error("OpenXR session could not be created\n");
 
 
+    // Space
 
     XrReferenceSpaceCreateInfo ref_space = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
     ref_space.poseInReferenceSpace = pose_identity;
     ref_space.referenceSpaceType   = XR_REFERENCE_SPACE_TYPE_STAGE;
     xrCheckResult(xrCreateReferenceSpace(session, &ref_space, &space));
 
+
+
+    // Swapchains
 
     uint32_t view_count = 0;
     xrCheckResult(xrEnumerateViewConfigurationViews(instance, system_id, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, &view_count, nullptr));
@@ -172,6 +177,8 @@ void VRContext::init() {
             auto& image = swapchain.images[i];
 
             image.image = surface_images[i].image;
+
+            // Swpachain image views
 
             vk::ImageViewCreateInfo info({}, image.image, vk::ImageViewType::e2D, vk::Format(swapchain_format),
                                          {}, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));

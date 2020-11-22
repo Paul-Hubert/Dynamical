@@ -139,7 +139,7 @@ Instance::Instance(Context& ctx) : ctx(ctx) {
 
 #ifndef NDEBUG
     extensionNames.push_back("VK_EXT_debug_utils");
-    layerNames.push_back("VK_LAYER_KHRONOS_validation");
+    // layerNames.push_back("VK_LAYER_KHRONOS_validation");
     if(!checkLayers(layerNames)) {
         std::vector<vk::LayerProperties> availables = vk::enumerateInstanceLayerProperties();
 

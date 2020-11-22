@@ -1,11 +1,11 @@
-#include "main_render.h"
+#include "vr_render.h"
 
 #include "renderer/context.h"
 #include "renderer/camera.h"
 #include "util/util.h"
 #include "renderer/num_frames.h"
 
-MainRender::MainRender(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx), renderpass(ctx), ubo(ctx),  object_render(reg, ctx, renderpass, ubo), ui_render(ctx, renderpass) {
+VRRender::VRRender(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx), renderpass(ctx), ubo(ctx),  object_render(reg, ctx, renderpass, ubo), ui_render(ctx, renderpass) {
     
     commandPool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx.device.g_i));
     
@@ -22,13 +22,13 @@ MainRender::MainRender(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx), 
 }
 
 
-void MainRender::setup() {
+void VRRender::setup() {
     
     renderpass.setup();
     
 }
 
-void MainRender::render(uint32_t index, Camera& camera, std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals) {
+void VRRender::render(uint32_t index, Camera& camera, std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals) {
     
     vk::Result res = ctx.device->waitForFences(fences[ctx.frame_index], VK_TRUE, std::numeric_limits<uint64_t>::max());
     
@@ -74,7 +74,7 @@ void MainRender::render(uint32_t index, Camera& camera, std::vector<vk::Semaphor
     
 }
 
-void MainRender::cleanup() {
+void VRRender::cleanup() {
     
     ctx.device->resetCommandPool(commandPool, {});
     renderpass.cleanup();
@@ -82,7 +82,7 @@ void MainRender::cleanup() {
 }
 
 
-MainRender::~MainRender() {
+VRRender::~VRRender() {
     
     for(int i = 0; i < commandBuffers.size(); i++) {
         

@@ -46,6 +46,18 @@ public:
     };
     std::vector<swapchain> swapchains;
 
+    struct input_state_t {
+        XrActionSet actionSet;
+        XrAction    poseAction;
+        XrAction    selectAction;
+        XrPath   handSubactionPath[2];
+        XrSpace  handSpace[2];
+        XrPosef  handPose[2];
+        XrBool32 renderHand[2];
+        XrBool32 handSelect[2];
+    };
+    input_state_t input;
+
 private:
     Context& ctx;
 };

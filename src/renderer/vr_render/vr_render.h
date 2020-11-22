@@ -17,13 +17,13 @@
 class Context;
 class Camera;
 
-class MainRender {
+class VRRender {
 public:
-    MainRender(entt::registry& reg, Context& ctx);
+    VRRender(entt::registry& reg, Context& ctx);
     void setup();
     void render(uint32_t index, Camera& camera, std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals);
     void cleanup();
-    ~MainRender();
+    ~VRRender();
     
 private:
     entt::registry& reg;

@@ -7,9 +7,9 @@
 #include <fstream>
 
 #include "renderer/context.h"
-#include "renderer/main_render/renderpass.h"
+#include "renderer/vr_render/renderpass.h"
 #include "renderer/num_frames.h"
-#include "renderer/main_render/ubo_descriptor.h"
+#include "renderer/vr_render/ubo_descriptor.h"
 #include "logic/components/model/meshinstancec.h"
 #include "logic/components/model/meshc.h"
 #include "logic/components/model/bufferuploadc.h"
