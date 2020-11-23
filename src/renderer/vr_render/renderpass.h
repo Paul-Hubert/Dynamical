@@ -9,18 +9,25 @@ class Context;
 class Renderpass {
 public:
     Renderpass(Context& ctx);
-    void setup();
-    void cleanup();
     ~Renderpass();
-    
+
     operator vk::RenderPass() { return renderpass; }
     operator VkRenderPass() { return static_cast<VkRenderPass>(renderpass); }
-    
-    vk::Format depthFormat;
-    std::vector<VmaImage> depthImages;
-    std::vector<vk::ImageView> depthViews;
-    std::vector<vk::Framebuffer> framebuffers;
+
     vk::RenderPass renderpass;
+
+    vk::Format depthFormat;
+
+    struct View {
+        std::vector<VmaImage> depthImages;
+        std::vector<vk::ImageView> depthViews;
+        std::vector<vk::Framebuffer> framebuffers;
+
+    };
+    std::vector<View> views;
+
+
+
     
 private:
     Context& ctx;

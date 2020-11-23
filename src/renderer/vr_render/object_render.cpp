@@ -8,20 +8,19 @@
 
 #include "renderer/context.h"
 #include "renderer/vr_render/renderpass.h"
-#include "renderer/num_frames.h"
-#include "renderer/vr_render/ubo_descriptor.h"
+#include "renderer/vr_render/view_ubo.h"
 #include "logic/components/model/meshinstancec.h"
 #include "logic/components/model/meshc.h"
 #include "logic/components/model/bufferuploadc.h"
 
-ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, UBODescriptor& ubo) : reg(reg), ctx(ctx), renderpass(renderpass) {
+ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, ViewUBO& ubo) : reg(reg), ctx(ctx), renderpass(renderpass) {
 
     createPipeline(ubo);
 
 }
 
 
-void ObjectRender::render(vk::CommandBuffer command, uint32_t i, vk::DescriptorSet set) {
+void ObjectRender::render(vk::CommandBuffer command, vk::DescriptorSet set) {
 
     command.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
@@ -57,7 +56,7 @@ ObjectRender::~ObjectRender() {
 }
 
 
-void ObjectRender::createPipeline(UBODescriptor& ubo) {
+void ObjectRender::createPipeline(ViewUBO& ubo) {
 
     // PIPELINE INFO
 
@@ -136,7 +135,7 @@ void ObjectRender::createPipeline(UBODescriptor& ubo) {
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
 

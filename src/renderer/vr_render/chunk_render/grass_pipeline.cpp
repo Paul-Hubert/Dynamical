@@ -9,7 +9,7 @@
 #include "renderer/swapchain.h"
 #include "renderer/vr_render/renderpass.h"
 #include "renderer/num_frames.h"
-#include "renderer/vr_render/ubo_descriptor.h"
+#include "renderer/vr_render/view_ubo.h"
 
 #include "renderer/marching_cubes/terrain.h"
 
@@ -22,7 +22,7 @@
 
 constexpr int noiseSize = 512;
 
-GrassPipeline::GrassPipeline(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, UBODescriptor& ubo) : device(device), transfer(transfer), swap(swap), renderpass(renderpass) {
+GrassPipeline::GrassPipeline(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, ViewUBO& ubo) : device(device), transfer(transfer), swap(swap), renderpass(renderpass) {
     
     pc.tile_size = 1;
     pc.grass_height = 1;

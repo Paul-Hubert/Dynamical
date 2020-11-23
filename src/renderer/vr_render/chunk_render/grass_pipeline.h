@@ -13,7 +13,7 @@ class Device;
 class Transfer;
 class Swapchain;
 class Renderpass;
-class UBODescriptor;
+class ViewUBO;
 
 struct GrassPC {
     float base_normal[4];
@@ -25,7 +25,7 @@ struct GrassPC {
 
 class GrassPipeline {
 public:
-    GrassPipeline(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, UBODescriptor& ubo);
+    GrassPipeline(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, ViewUBO& ubo);
     void makeDebugWindow();
     ~GrassPipeline();
     

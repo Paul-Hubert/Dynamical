@@ -10,26 +10,30 @@
 #include "glm/glm.hpp"
 
 struct UBO {
-    
-    glm::mat4 viewproj;
-    
-    glm::vec4 viewpos;
+
+    glm::mat4 view_projection;
+    glm::vec4 position;
     
 };
 
 class Context;
 
-class UBODescriptor {
+class ViewUBO {
 public:
-    UBODescriptor(Context& ctx);
-    ~UBODescriptor();
+    ViewUBO(Context& ctx);
+    ~ViewUBO();
     
     vk::DescriptorPool descPool;
     vk::DescriptorSetLayout descLayout;
-    std::vector<vk::DescriptorSet> descSets;
-    
-    std::array<VmaBuffer, NUM_FRAMES> ubos;
-    std::array<UBO*, NUM_FRAMES> pointers;
+
+    struct View {
+        std::vector<vk::DescriptorSet> descSets;
+
+        std::array<VmaBuffer, NUM_FRAMES> ubos;
+        std::array<UBO*, NUM_FRAMES> pointers;
+    };
+    std::vector<View> views;
+
 private:
     Context& ctx;
     

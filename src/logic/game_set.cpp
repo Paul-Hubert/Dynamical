@@ -36,6 +36,7 @@ GameSet::GameSet(Game& game) : SystemSet(game.reg) {
     
     if(user) {
         MAKE_SYSTEM(InputSys, input)
+        MAKE_SYSTEM(VRInputSys, vr_input)
         MAKE_SYSTEM(DebugSys, debug)
         add(game.ui.get());
         MAKE_SYSTEM(PlayerControlSys, control)

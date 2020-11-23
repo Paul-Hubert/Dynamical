@@ -27,11 +27,12 @@ public:
     ~VRContext();
 
     XrInstance instance = {};
-    XrSession session = {};
     XrDebugUtilsMessengerEXT debug = {};
+    XrSystemId system_id;
+    XrEnvironmentBlendMode blend;
+    XrSession session = {};
     XrSessionState session_state = XR_SESSION_STATE_UNKNOWN;
     XrSpace space = {};
-    XrSystemId system_id = XR_NULL_SYSTEM_ID;
 
     VkFormat swapchain_format = VK_FORMAT_R8G8B8A8_UNORM;
     struct swapchain {
@@ -45,18 +46,6 @@ public:
         std::vector<image> images;
     };
     std::vector<swapchain> swapchains;
-
-    struct input_state_t {
-        XrActionSet actionSet;
-        XrAction    poseAction;
-        XrAction    selectAction;
-        XrPath   handSubactionPath[2];
-        XrSpace  handSpace[2];
-        XrPosef  handPose[2];
-        XrBool32 renderHand[2];
-        XrBool32 handSelect[2];
-    };
-    input_state_t input;
 
 private:
     Context& ctx;

@@ -7,7 +7,7 @@
 #include "logic/components/show_debug.h"
 #include "logic/components/positionc.h"
 
-ChunkRender::ChunkRender(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, UBODescriptor& ubo) : chunk_pipeline(device, transfer, swap, renderpass, ubo), grass_pipeline(device, transfer, swap, renderpass, ubo), device(device), transfer(transfer), swap(swap), renderpass(renderpass) {
+ChunkRender::ChunkRender(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, ViewUBO& ubo) : chunk_pipeline(device, transfer, swap, renderpass, ubo), grass_pipeline(device, transfer, swap, renderpass, ubo), device(device), transfer(transfer), swap(swap), renderpass(renderpass) {
     
 }
 

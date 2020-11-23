@@ -22,12 +22,7 @@ public:
     
 private:
     std::unique_ptr<Context> ctx;
-    Camera camera;
     VRRender vr_render;
-
-    std::vector<vk::Semaphore> waitsems;
-    std::vector<vk::Semaphore> signalsems;
-    std::vector<vk::Semaphore> computesems;
 };
 
 #endif

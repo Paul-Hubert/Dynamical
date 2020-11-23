@@ -18,6 +18,8 @@ public: \
 
 DEFINE_SYSTEM(InputSys)
 
+DEFINE_SYSTEM(VRInputSys)
+
 DEFINE_SYSTEM(DebugSys)
 
 DEFINE_SYSTEM(PlayerControlSys)

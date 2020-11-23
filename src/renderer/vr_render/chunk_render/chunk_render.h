@@ -10,11 +10,11 @@ class Transfer;
 class Device;
 class Swapchain;
 class Renderpass;
-class UBODescriptor;
+class ViewUBO;
 
 class ChunkRender {
 public:
-    ChunkRender(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, UBODescriptor& ubo);
+    ChunkRender(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, ViewUBO& ubo);
     void render(entt::registry& reg, vk::CommandBuffer commandBuffer, vk::DescriptorSet set);
     ~ChunkRender();
     

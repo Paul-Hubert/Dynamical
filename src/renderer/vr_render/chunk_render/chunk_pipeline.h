@@ -13,13 +13,13 @@ class Device;
 class Transfer;
 class Swapchain;
 class Renderpass;
-class UBODescriptor;
+class ViewUBO;
 
 constexpr int num_textures = 2;
 
 class ChunkPipeline {
 public:
-    ChunkPipeline(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, UBODescriptor& ubo);
+    ChunkPipeline(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, ViewUBO& ubo);
     ~ChunkPipeline();
     
     operator vk::Pipeline() { return pipeline; }

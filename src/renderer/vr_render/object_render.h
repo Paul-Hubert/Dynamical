@@ -7,21 +7,19 @@
 
 #include "glm/glm.hpp"
 
-#include "renderer/num_frames.h"
-
 #include "entt/entt.hpp"
 
 class Context;
 class Renderpass;
-class UBODescriptor;
+class ViewUBO;
 
 class ObjectRender {
 public:
-    ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, UBODescriptor& ubo);
-    void render(vk::CommandBuffer command, uint32_t i, vk::DescriptorSet set);
+    ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, ViewUBO& ubo);
+    void render(vk::CommandBuffer command, vk::DescriptorSet set);
     ~ObjectRender();
 
-    void createPipeline(UBODescriptor& ubo);
+    void createPipeline(ViewUBO& ubo);
 
     operator vk::Pipeline() { return pipeline; }
     operator vk::PipelineLayout() { return layout; }

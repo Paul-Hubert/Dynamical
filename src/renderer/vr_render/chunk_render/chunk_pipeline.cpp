@@ -9,11 +9,11 @@
 #include "renderer/swapchain.h"
 #include "renderer/vr_render/renderpass.h"
 #include "renderer/num_frames.h"
-#include "renderer/vr_render/ubo_descriptor.h"
+#include "renderer/vr_render/view_ubo.h"
 
 #include "renderer/marching_cubes/terrain.h"
 
-ChunkPipeline::ChunkPipeline(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, UBODescriptor& ubo) : device(device), transfer(transfer), swap(swap), renderpass(renderpass) {
+ChunkPipeline::ChunkPipeline(Device& device, Transfer& transfer, Swapchain& swap, Renderpass& renderpass, ViewUBO& ubo) : device(device), transfer(transfer), swap(swap), renderpass(renderpass) {
     
     {
         auto poolSizes = std::vector {

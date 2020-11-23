@@ -2,7 +2,6 @@
 
 #include <vector>
 #include "util/util.h"
-#include <algorithm>
 #include <cstring>
 #include <debugapi.h>
 #include "context.h"
@@ -106,6 +105,8 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
     XrSystemGetInfo systemInfo = { XR_TYPE_SYSTEM_GET_INFO };
     systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
     xrCheckResult(xrGetSystem(instance, &systemInfo, &system_id));
+
+    blend = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
 
 }
 

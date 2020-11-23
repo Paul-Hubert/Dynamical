@@ -8,10 +8,6 @@ layout(location = 0) out vec4 outColor;
 
 //layout(set = 1, binding = 0) uniform sampler2DArray u_color;
 
-layout(std140, set = 0, binding = 0) uniform UBO {
-    mat4 viewproj;
-};
-
 void main() {
     
     vec3 color = vec3(1,0,0);

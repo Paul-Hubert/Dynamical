@@ -4,13 +4,24 @@
 #include "renderpass.h"
 #include "object_render.h"
 #include "ui_render.h"
-#include "ubo_descriptor.h"
+#include "view_ubo.h"
 
 #include "renderer/vmapp.h"
 
 #include "entt/entt.hpp"
 
 #include "renderer/num_frames.h"
+
+#define XR_USE_GRAPHICS_API_VULKAN
+#if defined(WIN32)
+#define XR_USE_PLATFORM_WIN32
+#include <Windows.h>
+#else
+#define XR_USE_PLATFORM_XLIB
+#endif
+
+#include <openxr/openxr.h>
+#include <openxr/openxr_platform.h>
 
 #include <vector>
 
@@ -20,23 +31,33 @@ class Camera;
 class VRRender {
 public:
     VRRender(entt::registry& reg, Context& ctx);
-    void setup();
-    void render(uint32_t index, Camera& camera, std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals);
-    void cleanup();
+
+    void render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals);
+
     ~VRRender();
     
 private:
     entt::registry& reg;
     Context& ctx;
     Renderpass renderpass;
-    UBODescriptor ubo;
+    ViewUBO ubo;
     ObjectRender object_render;
     UIRender ui_render;
     
     vk::CommandPool commandPool;
     std::array<vk::CommandBuffer, NUM_FRAMES> commandBuffers;
     std::array<vk::Fence, NUM_FRAMES> fences;
-    
+
+    std::vector<XrCompositionLayerProjectionView> proj_views;
+    XrTime last_predicted_time;
+    bool begun = false;
+
+
+    uint32_t frame_index = 0;
+
+    std::vector<vk::Semaphore> waitsems;
+    std::vector<vk::Semaphore> signalsems;
+
 };
 
 #endif

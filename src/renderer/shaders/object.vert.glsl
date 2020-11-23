@@ -14,6 +14,7 @@ out gl_PerVertex {
 
 layout(std140, set = 0, binding = 0) uniform UBO {
     mat4 viewproj;
+    vec4 position;
 };
 
 void main() {
@@ -22,7 +23,5 @@ void main() {
     v_position = a_pos;
     v_normal = a_normal;
     v_uv = a_uv;
-
-    gl_Position.y = -gl_Position.y;
     
 }

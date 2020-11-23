@@ -36,6 +36,7 @@ public:
     bool mouseMiddle = false;
 	bool focused = false;
 	bool window_showing = true;
+	bool vr_showing = false;
 };
 
 #endif
