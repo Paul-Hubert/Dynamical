@@ -26,13 +26,5 @@ DEFINE_SYSTEM(PlayerControlSys)
 
 DEFINE_SYSTEM(VRPlayerControlSys)
 
-DEFINE_SYSTEM(ChunkManagerSys)
-
-DEFINE_SYSTEM(ChunkLoaderSys)
-
-DEFINE_SYSTEM(ChunkGeneratorSys)
-
-DEFINE_SYSTEM(ChunkSys)
-
 #undef DEFINE_SYSTEM
 #endif

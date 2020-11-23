@@ -8,15 +8,36 @@
 #include <set>
 #include <string>
 
+bool checkDeviceExtensions(std::vector<const char*> extensionNames, std::vector<vk::ExtensionProperties> availableExtensions) {
+
+    for(const char* extensionName : extensionNames) {
+        bool layerFound = false;
+
+        for(const auto& extensionsProperties : availableExtensions) {
+            if(strcmp(extensionName, extensionsProperties.extensionName) == 0) {
+                layerFound = true;
+                break;
+            }
+        }
+
+        if(!layerFound) {
+            return false;
+        }
+    }
+
+    return true;
+
+}
+
 Device::Device(Context& ctx) : ctx(ctx) {
     
-    requiredFeatures = vk::PhysicalDeviceFeatures();
-    requiredFeatures.samplerAnisotropy = true;
-    requiredFeatures.shaderStorageImageMultisample = true;
+    vk::PhysicalDeviceFeatures requiredFeatures = vk::PhysicalDeviceFeatures();
+    //requiredFeatures.samplerAnisotropy = true;
+    //requiredFeatures.shaderStorageImageMultisample = true;
     // HERE : enable needed features (if present in 'features')
-    
-    requiredExtensions = {};
-    requiredExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+    std::vector<const char*> extensions;
+    extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
     {
         uint32_t size = 0;
@@ -27,31 +48,22 @@ Device::Device(Context& ctx) : ctx(ctx) {
 
         char* buf = (char*)malloc(size * sizeof(char));
         xrCheckResult(xrGetVulkanDeviceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, size, &size, buf));
-        if(buf[0] != '\0') requiredExtensions.push_back(buf);
+        if(buf[0] != '\0') extensions.push_back(buf);
         for(int i = 0; buf[i] != '\0'; i++) {
             if(buf[i] == ' ') {
                 buf[i] = '\0';
-                requiredExtensions.push_back(&buf[i + 1]);
+                extensions.push_back(&buf[i + 1]);
             }
         }
     }
 
 
 
+
+
     
     std::vector<vk::PhysicalDevice> p_devices = ctx.instance->enumeratePhysicalDevices();
 
-    // Rate each device and pick the first best in the list, if its score is > 0
-    /*
-    uint32_t index = 1000, max = 0;
-    for(uint32_t i = 0; i<p_devices.size(); i++) {
-        uint32_t score = getScore(p_devices[i]);
-        if(score > max) { // Takes only a score higher than the last (implicitly higher than 0)
-            max = score;
-            index = i;
-        }
-    }
-    */
 
     PFN_xrGetVulkanGraphicsDeviceKHR xrGetVulkanGraphicsDeviceKHR = nullptr;
     xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanGraphicsDeviceKHR", (PFN_xrVoidFunction *)(&xrGetVulkanGraphicsDeviceKHR)));
@@ -62,13 +74,10 @@ Device::Device(Context& ctx) : ctx(ctx) {
     physical = phy;
 
     
-    // Get device properties
-    properties = physical.getProperties();
-    features = physical.getFeatures();
-    memoryProperties = physical.getMemoryProperties();
-    
-    queueFamilies = physical.getQueueFamilyProperties();
-    extensions = physical.enumerateDeviceExtensionProperties();
+
+    extensions = checkExtensions(extensions, physical.enumerateDeviceExtensionProperties());
+
+
     
     // Prepare queue choice data : GRAPHICS / COMPUTE / TRANSFER
     uint32_t countF = 0;
@@ -77,7 +86,7 @@ Device::Device(Context& ctx) : ctx(ctx) {
     
     std::vector<vk::DeviceQueueCreateInfo> pqinfo(3); // Number of queues
     
-    
+    std::vector<vk::QueueFamilyProperties> queueFamilies = physical.getQueueFamilyProperties();
     
     
     // Gets the first available queue family that supports graphics and presentation
@@ -136,7 +145,7 @@ Device::Device(Context& ctx) : ctx(ctx) {
     
     // Create Device
     
-    logical = physical.createDevice(vk::DeviceCreateInfo({}, countF, pqinfo.data(), 0, nullptr, requiredExtensions.size(), requiredExtensions.data(), &requiredFeatures));
+    logical = physical.createDevice(vk::DeviceCreateInfo({}, countF, pqinfo.data(), 0, nullptr, extensions.size(), extensions.data(), &requiredFeatures));
     
     
 #ifndef NDEBUG
@@ -192,41 +201,9 @@ Device::Device(Context& ctx) : ctx(ctx) {
     
 }
 
-uint32_t Device::getScore(vk::PhysicalDevice &device) {
-    // Get device properties
-    
-    uint32_t score = 1;
-    
-    properties = device.getProperties();
-    features = device.getFeatures();
-    std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
-    std::vector<vk::ExtensionProperties> extensions = device.enumerateDeviceExtensionProperties();
-    
-    if(properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) score++; // is a dedicated graphics card
-    if(queueFamilies.size() > 1) score ++; // has more than one queue family
-    
-    std::set<std::string> required(requiredExtensions.begin(), requiredExtensions.end());
-    for(const auto &ext : extensions) {
-        required.erase(ext.extensionName);
-    }
-    
-    if(!required.empty()) score = 0;
-    
-    auto prop2 = device.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceSubgroupProperties>();
-    auto subgroup = prop2.get<vk::PhysicalDeviceSubgroupProperties>();
-    
-    if(!(subgroup.supportedOperations & vk::SubgroupFeatureFlagBits::eArithmetic && subgroup.supportedOperations & vk::SubgroupFeatureFlagBits::eBallot)) {
-        score = 0;
-    }
-    
-    if(!features.samplerAnisotropy) {
-        score = 0;
-    }
-    
-    return score;
-}
 
 uint32_t Device::getMemoryType(uint32_t typeBits, vk::MemoryPropertyFlags properties) {
+    auto memoryProperties = physical.getMemoryProperties();
     for(uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
         if((typeBits & 1) == 1) {
             if((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
@@ -239,7 +216,7 @@ uint32_t Device::getMemoryType(uint32_t typeBits, vk::MemoryPropertyFlags proper
 }
 
 bool Device::isDedicated() {
-    
+    auto memoryProperties = physical.getMemoryProperties();
     for(uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
         if(
             (memoryProperties.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal) == vk::MemoryPropertyFlagBits::eDeviceLocal &&

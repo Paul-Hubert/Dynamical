@@ -35,15 +35,7 @@ public :
     uint32_t g_i = 0, c_i = 0, t_i = 0;
     std::mutex *g_mutex, *c_mutex, *t_mutex;
     std::unique_ptr<std::mutex> g_mutex_, c_mutex_, t_mutex_;
-    
-    vk::PhysicalDeviceFeatures requiredFeatures;
-    std::vector<const char*> requiredExtensions;
-    
-    vk::PhysicalDeviceProperties properties;
-    vk::PhysicalDeviceFeatures features;
-    vk::PhysicalDeviceMemoryProperties memoryProperties;
-    std::vector<vk::QueueFamilyProperties> queueFamilies;
-    std::vector<vk::ExtensionProperties> extensions;
+
     
     vk::PhysicalDevice physical;
     vk::Device logical;

@@ -12,51 +12,56 @@
 
 #define LOG_LEVEL VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
 
-bool checkLayers(std::vector<const char *> layerNames) {
+std::vector<const char*> checkLayers(std::vector<const char *> layers, std::vector<vk::LayerProperties> availableLayers) {
     
-    std::vector<vk::LayerProperties> availableLayers = vk::enumerateInstanceLayerProperties();
-    
-    for (const char* layerName : layerNames) {
+    std::vector<const char*> out_layers;
+
+    for (const char* layerName : layers) {
         bool layerFound = false;
 
         for (const auto& layerProperties : availableLayers) {
             if (strcmp(layerName, layerProperties.layerName) == 0) {
+                out_layers.push_back(layerName);
                 layerFound = true;
                 break;
             }
         }
 
         if (!layerFound) {
-            return false;
+            Util::log(Util::warning) << "Layer requested, but not available : " << layerName << "\n";
         }
     }
 
-    return true;
+    return out_layers;
     
 }
 
-bool checkInstanceExtensions(std::vector<const char *> extensionNames) {
+std::vector<const char*> checkExtensions(std::vector<const char *> extensions, std::vector<vk::ExtensionProperties> availableExtensions) {
     
-    std::vector<vk::ExtensionProperties> availableExtensions = vk::enumerateInstanceExtensionProperties();
-    
-    for (const char* extensionName : extensionNames) {
+    std::vector<const char*> out_extensions;
+
+    for (const char* extensionName : extensions) {
         bool layerFound = false;
 
         for (const auto& extensionsProperties : availableExtensions) {
             if (strcmp(extensionName, extensionsProperties.extensionName) == 0) {
+                out_extensions.push_back(extensionName);
                 layerFound = true;
                 break;
             }
         }
 
         if (!layerFound) {
-            return false;
+            Util::log(Util::warning) << "Instance Extension requested, but not available : " << extensionName << "\n";
         }
     }
 
-    return true;
+    return out_extensions;
     
 }
+
+#ifndef NDEBUG
+bool Instance::debugOutput = true;
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -64,8 +69,19 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
     void* pUserData) {
     
-    if(messageSeverity < LOG_LEVEL) return VK_FALSE;
+    if(!Instance::debugOutput)
+        return VK_FALSE;
+
+    if(messageSeverity < LOG_LEVEL)
+        return VK_FALSE;
     
+    if(pCallbackData->messageIdNumber == 0x6bbb14
+        || pCallbackData->messageIdNumber == 0xe92b452d
+        || pCallbackData->messageIdNumber == 0x4dae5635
+        || pCallbackData->messageIdNumber == 0x71500fba)
+        return VK_FALSE;
+
+    /*
     if(messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) {
         std::cerr << "    General ";
     } else if(messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
@@ -83,6 +99,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     } else if(messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
         std::cerr << "Error   ";
     }
+    */
     
     std::cerr << pCallbackData->pMessage << std::endl;
     
@@ -92,14 +109,25 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     
     return VK_FALSE;
 }
+#endif
 
 Instance::Instance(Context& ctx) : ctx(ctx) {
     
     uint32_t extensionCount;
     SDL_Vulkan_GetInstanceExtensions(ctx.win, &extensionCount, nullptr);
-    std::vector<const char *> extensionNames(extensionCount);
-    SDL_Vulkan_GetInstanceExtensions(ctx.win, &extensionCount, extensionNames.data());
+    std::vector<const char *> extensions(extensionCount);
+    SDL_Vulkan_GetInstanceExtensions(ctx.win, &extensionCount, extensions.data());
 
+    std::vector<const char*> layers{};
+
+#ifndef NDEBUG
+    extensions.push_back("VK_EXT_debug_utils");
+    layers.push_back("VK_LAYER_KHRONOS_validation");
+#endif
+
+    layers = checkLayers(layers, vk::enumerateInstanceLayerProperties());
+
+    extensions = checkExtensions(extensions, vk::enumerateInstanceExtensionProperties());
 
 
     {
@@ -112,11 +140,11 @@ Instance::Instance(Context& ctx) : ctx(ctx) {
         char* buf = (char*)malloc(size * sizeof(char));
         xrCheckResult(xrGetVulkanInstanceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, size, &size, buf));
 
-        if(buf[0] != '\0') extensionNames.push_back(buf);
+        if(buf[0] != '\0') extensions.push_back(buf);
         for(int i = 0; buf[i] != '\0'; i++) {
             if(buf[i] == ' ') {
                 buf[i] = '\0';
-                extensionNames.push_back(&buf[i + 1]);
+                extensions.push_back(&buf[i + 1]);
             }
         }
 
@@ -133,37 +161,12 @@ Instance::Instance(Context& ctx) : ctx(ctx) {
                               std::min(std::max(VK_VERSION_MINOR(version), (uint32_t) (XR_VERSION_MINOR(requirement.minApiVersionSupported))), (uint32_t) (XR_VERSION_MINOR(requirement.maxApiVersionSupported))),
                               std::min(std::max(VK_VERSION_PATCH(version), (uint32_t) (XR_VERSION_PATCH(requirement.minApiVersionSupported))), (uint32_t) (XR_VERSION_PATCH(requirement.maxApiVersionSupported))));
 
+
+
     vk::ApplicationInfo appInfo("Test", VK_MAKE_VERSION(1, 0, 0), "Dynamical", VK_MAKE_VERSION(1, 0, 0), version);
 
-    std::vector<const char *> layerNames {};
 
-#ifndef NDEBUG
-    extensionNames.push_back("VK_EXT_debug_utils");
-    //layerNames.push_back("VK_LAYER_KHRONOS_validation");
-
-    if(!checkLayers(layerNames)) {
-        std::vector<vk::LayerProperties> availables = vk::enumerateInstanceLayerProperties();
-
-        for (vk::LayerProperties available : availables) {
-            std::cout << available.layerName << "\n";
-        }
-
-        throw std::runtime_error("Validation layers requested, but not available!");
-    }
-#endif
-    
-    if(!checkInstanceExtensions(extensionNames)) {
-        
-        std::vector<vk::ExtensionProperties> availables = vk::enumerateInstanceExtensionProperties();
-        
-        for (vk::ExtensionProperties available : availables) {
-            std::cout << available.extensionName << "\n";
-        }
-        
-        throw std::runtime_error("Instance Extensions requested, but not available!");
-    }
-
-    instance = vk::createInstance(vk::InstanceCreateInfo({}, &appInfo, layerNames.size(), layerNames.data(), extensionNames.size(), extensionNames.data()));
+    instance = vk::createInstance(vk::InstanceCreateInfo({}, &appInfo, layers.size(), layers.data(), extensions.size(), extensions.data()));
 
     Instance &instance = *this;
 
@@ -177,7 +180,6 @@ Instance::Instance(Context& ctx) : ctx(ctx) {
     INST_LOAD(vkCreateDebugUtilsMessengerEXT);
     
     vkCreateDebugUtilsMessengerEXT(instance, &info, nullptr, &messenger);
-    
 #endif
     
     VkSurfaceKHR surf;

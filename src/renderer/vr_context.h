@@ -27,14 +27,16 @@ public:
     ~VRContext();
 
     XrInstance instance = {};
+#ifndef NDEBUG
     XrDebugUtilsMessengerEXT debug = {};
+#endif
     XrSystemId system_id;
     XrEnvironmentBlendMode blend;
     XrSession session = {};
     XrSessionState session_state = XR_SESSION_STATE_UNKNOWN;
     XrSpace space = {};
 
-    VkFormat swapchain_format = VK_FORMAT_R8G8B8A8_UNORM;
+    VkFormat swapchain_format = VK_FORMAT_R8G8B8A8_SRGB;
     struct swapchain {
         XrSwapchain handle;
         uint32_t width;

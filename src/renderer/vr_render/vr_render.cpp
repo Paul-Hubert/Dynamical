@@ -17,22 +17,11 @@
 VRRender::VRRender(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx), renderpass(ctx), ubo(ctx),  object_render(reg, ctx, renderpass, ubo), ui_render(ctx, renderpass) {
     
     commandPool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx.device.g_i));
-    
-    auto temp = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, NUM_FRAMES));
-    
-    for(int i = 0; i < NUM_FRAMES; i++) {
-        
-        commandBuffers[i] = temp[i];
-        
-        fences[i] = ctx.device->createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
-        
-    }
 
-    for (int i = 0; i < waitsems.size(); i++) {
-        waitsems[i] = ctx.device->createSemaphore({});
-        signalsems[i] = ctx.device->createSemaphore({});
-    }
-    
+    commandBuffer = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, NUM_FRAMES))[0];
+
+    fence = ctx.device->createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
+
 }
 
 static glm::mat4 projection_fov(const XrFovf fov, const float near_z, const float far_z) {
@@ -84,39 +73,13 @@ static glm::mat4 view_pose(XrPosef& pose) {
 
 void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals) {
 
-    if(begun) {
-
-        ctx.device->waitForFences(fences[frame_index], VK_TRUE, std::numeric_limits<uint64_t>::max());
-        ctx.device->resetFences(fences[frame_index]);
-
-        for(uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
-            xrReleaseSwapchainImage(ctx.vr.swapchains[v].handle, nullptr);
-        }
-
-        XrCompositionLayerProjection layer_proj = {XR_TYPE_COMPOSITION_LAYER_PROJECTION};
-        layer_proj.space     = ctx.vr.space;
-        layer_proj.viewCount = (uint32_t) proj_views.size();
-        layer_proj.views     = proj_views.data();
-
-        XrCompositionLayerBaseHeader* layer = reinterpret_cast<XrCompositionLayerBaseHeader*> (&layer_proj);
-
-        XrFrameEndInfo end_info{XR_TYPE_FRAME_END_INFO};
-        end_info.displayTime = last_predicted_time;
-        end_info.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
-        end_info.layerCount = 1;
-        end_info.layers = &layer;
-        xrEndFrame(ctx.vr.session, &end_info);
-        begun = false;
-
-    }
-
-
-
     InputC& input = reg.ctx<InputC>();
 
-    if(!input.vr_showing) return;
+    if(!input.vr_showing) {
+        Util::log() << "frame discarded\n";
+        return;
+    }
 
-    frame_index = (frame_index+1)%NUM_FRAMES;
 
     static float t = 0.f;
     t += 1.f / 60.f;
@@ -130,22 +93,17 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
 
 
 
-
-
-
     XrFrameState frame_state = {XR_TYPE_FRAME_STATE};
     xrCheckResult(xrWaitFrame(ctx.vr.session, nullptr, &frame_state));
-    last_predicted_time = frame_state.predictedDisplayTime;
 
     XrResult result = xrBeginFrame(ctx.vr.session, nullptr);
-    begun = true;
+
     if(result == XR_FRAME_DISCARDED || result == XR_SESSION_NOT_FOCUSED || frame_state.shouldRender == XR_FALSE) {
         Util::log(Util::trace) << "frame discarded\n";
-        XrFrameEndInfo end_info{XR_TYPE_FRAME_END_INFO};
+        XrFrameEndInfo end_info {XR_TYPE_FRAME_END_INFO};
         end_info.displayTime = frame_state.predictedDisplayTime;
         end_info.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
         xrEndFrame(ctx.vr.session, &end_info);
-        begun = false;
         return;
     }
 
@@ -161,11 +119,11 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
     std::vector<XrView> views(ctx.vr.swapchains.size(), {XR_TYPE_VIEW});
     xrLocateViews(ctx.vr.session, &locate_info, &view_state, (uint32_t)views.size(), &view_count, views.data());
 
-    proj_views.resize(ctx.vr.swapchains.size());
+
+    std::vector<XrCompositionLayerProjectionView> proj_views(ctx.vr.swapchains.size());
 
 
-
-    vk::CommandBuffer command = commandBuffers[frame_index];
+    vk::CommandBuffer command = commandBuffer;
 
     command.begin(vk::CommandBufferBeginInfo({}, nullptr));
 
@@ -173,13 +131,12 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
         auto& swapchain = ctx.vr.swapchains[v];
         auto& view = views[v];
 
-        ubo.views[v].pointers[frame_index]->view_projection = projection_fov(views[v].fov, 0.01, 100.) * view_pose(view.pose);
-        ubo.views[v].pointers[frame_index]->position = glm::vec4(view.pose.position.x, -view.pose.position.y, view.pose.position.z, 1.0f);
+        ubo.views[v].pointers[0]->view_projection = projection_fov(views[v].fov, 0.01, 100.) * view_pose(view.pose);
+        ubo.views[v].pointers[0]->position = glm::vec4(view.pose.position.x, -view.pose.position.y, view.pose.position.z, 1.0f);
 
 
         uint32_t image_index;
-        XrSwapchainImageAcquireInfo acquire_info = {XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-        xrAcquireSwapchainImage(swapchain.handle, &acquire_info, &image_index);
+        xrAcquireSwapchainImage(swapchain.handle, nullptr, &image_index);
 
         XrSwapchainImageWaitInfo wait_info = {XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
         wait_info.timeout = XR_INFINITE_DURATION;
@@ -198,9 +155,9 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
 
         command.setScissor(0, vk::Rect2D(vk::Offset2D(), vk::Extent2D(swapchain.width, swapchain.height)));
 
-        object_render.render(command, ubo.views[v].descSets[frame_index]);
+        object_render.render(command, ubo.views[v].descSets[0]);
 
-        ui_render.render(command, frame_index);
+        ui_render.render(command, 0);
 
         command.endRenderPass();
 
@@ -221,10 +178,33 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
     ctx.device.g_mutex->lock();
     ctx.device.graphics.submit({vk::SubmitInfo(
             Util::removeElement<vk::Semaphore>(waits, nullptr), waits.data(), stages.data(),
-            1, &commandBuffers[frame_index],
+            1, &commandBuffer,
             Util::removeElement<vk::Semaphore>(signals, nullptr), signals.data()
-    )}, fences[frame_index]);
+    )}, fence);
     ctx.device.g_mutex->unlock();
+
+
+    ctx.device->waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+    ctx.device->resetFences(fence);
+
+
+    for(uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
+        xrReleaseSwapchainImage(ctx.vr.swapchains[v].handle, nullptr);
+    }
+
+    XrCompositionLayerProjection layer_proj = {XR_TYPE_COMPOSITION_LAYER_PROJECTION};
+    layer_proj.space = ctx.vr.space;
+    layer_proj.viewCount = (uint32_t)proj_views.size();
+    layer_proj.views = proj_views.data();
+
+    XrCompositionLayerBaseHeader* layer = reinterpret_cast<XrCompositionLayerBaseHeader*> (&layer_proj);
+
+    XrFrameEndInfo end_info{XR_TYPE_FRAME_END_INFO};
+    end_info.displayTime = frame_state.predictedDisplayTime;
+    end_info.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+    end_info.layerCount = 1;
+    end_info.layers = &layer;
+    xrEndFrame(ctx.vr.session, &end_info);
 
     
 }
@@ -233,16 +213,7 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
 
 VRRender::~VRRender() {
 
-    for(int i = 0; i < waitsems.size(); i++) {
-        ctx.device->destroy(waitsems[i]);
-        ctx.device->destroy(signalsems[i]);
-    }
-
-    for(int i = 0; i < commandBuffers.size(); i++) {
-        
-        ctx.device->destroy(fences[i]);
-        
-    }
+    ctx.device->destroy(fence);
     
     ctx.device->destroy(commandPool);
     

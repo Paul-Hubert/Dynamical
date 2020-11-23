@@ -45,18 +45,8 @@ private:
     UIRender ui_render;
     
     vk::CommandPool commandPool;
-    std::array<vk::CommandBuffer, NUM_FRAMES> commandBuffers;
-    std::array<vk::Fence, NUM_FRAMES> fences;
-
-    std::vector<XrCompositionLayerProjectionView> proj_views;
-    XrTime last_predicted_time;
-    bool begun = false;
-
-
-    uint32_t frame_index = 0;
-
-    std::vector<vk::Semaphore> waitsems;
-    std::vector<vk::Semaphore> signalsems;
+    vk::CommandBuffer commandBuffer;
+    vk::Fence fence;
 
 };
 

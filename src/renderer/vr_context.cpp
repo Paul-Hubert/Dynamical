@@ -49,18 +49,21 @@ const XrPosef  pose_identity = { {0,0,0,1}, {0,0,0} };
 
 VRContext::VRContext(Context &ctx) : ctx(ctx) {
 
-    std::vector<const char*> use_extensions {
-            XR_KHR_VULKAN_ENABLE_EXTENSION_NAME,
-            XR_EXT_DEBUG_UTILS_EXTENSION_NAME,
-    };
+    std::vector<const char*> extensions;
+    extensions.push_back(XR_KHR_VULKAN_ENABLE_EXTENSION_NAME);
 
-   
+    std::vector<const char*> layers;
 
+#ifndef NDEBUG
+    extensions.push_back(XR_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    layers.push_back("XR_APILAYER_LUNARG_core_validation");
+#endif
 
     uint32_t ext_count = 0;
     xrCheckResult(xrEnumerateInstanceExtensionProperties(nullptr, 0, &ext_count, nullptr));
     std::vector<XrExtensionProperties> xr_exts(ext_count, { XR_TYPE_EXTENSION_PROPERTIES });
     xrCheckResult(xrEnumerateInstanceExtensionProperties(nullptr, ext_count, &ext_count, xr_exts.data()));
+
 
 
     uint32_t layer_count = 0;
@@ -69,9 +72,10 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
     xrCheckResult(xrEnumerateApiLayerProperties(layer_count, &layer_count, xr_layers.data()));
 
 
+
     XrInstanceCreateInfo createInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
-    createInfo.enabledExtensionCount      = use_extensions.size();
-    createInfo.enabledExtensionNames      = use_extensions.data();
+    createInfo.enabledExtensionCount      = extensions.size();
+    createInfo.enabledExtensionNames      = extensions.data();
     createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
     strcpy_s(createInfo.applicationInfo.applicationName, "Dynamical");
     
@@ -82,7 +86,7 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
         throw std::runtime_error("OpenXR instance could not be created\n");
 
 
-
+#ifndef NDEBUG
     XrDebugUtilsMessengerCreateInfoEXT debug_info = { XR_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
     debug_info.messageTypes =
             XR_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT     |
@@ -100,7 +104,7 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
     xrCheckResult(xrGetInstanceProcAddr(instance, "xrCreateDebugUtilsMessengerEXT", (PFN_xrVoidFunction *)(&ext_xrCreateDebugUtilsMessengerEXT)));
     if (ext_xrCreateDebugUtilsMessengerEXT)
         xrCheckResult(ext_xrCreateDebugUtilsMessengerEXT(instance, &debug_info, &debug));
-
+#endif
 
     XrSystemGetInfo systemInfo = { XR_TYPE_SYSTEM_GET_INFO };
     systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
@@ -136,7 +140,23 @@ void VRContext::init() {
     ref_space.referenceSpaceType   = XR_REFERENCE_SPACE_TYPE_STAGE;
     xrCheckResult(xrCreateReferenceSpace(session, &ref_space, &space));
 
-
+    {
+        uint32_t count = 0;
+        xrEnumerateSwapchainFormats(session, 0, &count, nullptr);
+        std::vector<int64_t> formats(count);
+        xrEnumerateSwapchainFormats(session, count, &count, formats.data());
+        bool found = false;
+        for(uint32_t i = 0; i < count; i++) {
+            if(swapchain_format == formats[i]) {
+                found = true;
+                break;
+            }
+        }
+        if(!found) {
+            Util::log(Util::warning) << "Required VkFormat is not supported by OpenXR Runtime, switching to : " << formats[0] << "\n";
+            swapchain_format = static_cast<VkFormat> (formats[0]);
+        }
+    }
 
     // Swapchains
 
@@ -189,7 +209,6 @@ void VRContext::init() {
 
     }
 
-
 }
 
 
@@ -210,10 +229,12 @@ void VRContext::finish() {
 
 VRContext::~VRContext() {
 
+#ifndef NDEBUG
     PFN_xrDestroyDebugUtilsMessengerEXT ext_xrDestroyDebugUtilsMessengerEXT = nullptr;
     xrGetInstanceProcAddr(instance, "xrDestroyDebugUtilsMessengerEXT", (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT));
     if(ext_xrDestroyDebugUtilsMessengerEXT)
         xrGetInstanceProcAddr(instance, "xrDestroyDebugUtilsMessengerEXT", (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT));
+#endif
 
     xrDestroyInstance(instance);
 

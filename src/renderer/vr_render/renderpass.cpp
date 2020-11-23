@@ -10,7 +10,7 @@ Renderpass::Renderpass(Context& ctx) : views(ctx.vr.swapchains.size()), ctx(ctx)
     );
 
     auto attachments = std::vector<vk::AttachmentDescription>{
-            vk::AttachmentDescription({}, vk::Format(ctx.swap.format), vk::SampleCountFlagBits::e1,
+            vk::AttachmentDescription({}, vk::Format(ctx.vr.swapchain_format), vk::SampleCountFlagBits::e1,
                                       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
                                       vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
                                       vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eColorAttachmentOptimal
@@ -18,7 +18,7 @@ Renderpass::Renderpass(Context& ctx) : views(ctx.vr.swapchains.size()), ctx(ctx)
             vk::AttachmentDescription({}, depthFormat, vk::SampleCountFlagBits::e1,
                                       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
                                       vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-                                      vk::ImageLayout::eUndefined, vk::ImageLayout::eUndefined
+                                      vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthAttachmentStencilReadOnlyOptimal
             )
     };
 
