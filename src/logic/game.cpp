@@ -82,21 +82,23 @@ void Game::init() {
 
 void Game::start() {
     
-    game_loop.run([this](float dt) {
+    bool running = true;
+    while(running) {
         
         set->tick();
         InputC* input = reg.try_ctx<InputC>();
         if(input != nullptr && input->on[Action::EXIT]) {
-            game_loop.setQuitting();
+            running = false;
             input->on.set(Action::EXIT, false);
         }
         
-    });
+    }
     
-    set->finish();
     
 }
 
 Game::~Game() {
     
+    set->finish();
+
 }

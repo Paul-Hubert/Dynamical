@@ -6,57 +6,20 @@
 #include <debugapi.h>
 #include "context.h"
 
-#define LOG_LEVEL VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
-
-static XRAPI_ATTR XrBool32 XRAPI_CALL debugCallback(XrDebugUtilsMessageSeverityFlagsEXT messageSeverity, XrDebugUtilsMessageTypeFlagsEXT messageType, const XrDebugUtilsMessengerCallbackDataEXT* msg, void* user_data) {
-
-    if(messageSeverity < LOG_LEVEL) return XR_FALSE;
-
-    if(messageType == XR_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) {
-        std::cerr << "    General ";
-    } else if(messageType == XR_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
-        std::cerr << "Performance ";
-    } else if(messageType == XR_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) {
-        std::cerr << " Validation ";
-    }
-
-    if(messageSeverity == XR_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-        std::cerr << "Verbose ";
-    } else if(messageSeverity == XR_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-        std::cerr << "Info    ";
-    } else if(messageSeverity == XR_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-        std::cerr << "Warning ";
-    } else if(messageSeverity == XR_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-        std::cerr << "Error   ";
-    }
-
-    std::cerr << msg->message << std::endl;
-
-    if(messageSeverity >= XR_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-        std::cerr << std::endl;
-    }
-
-    return XR_FALSE;
-}
-
-void xrCheckResult(XrResult result) {
-    if(result != XR_SUCCESS) {
-        Util::log(Util::error) << "XR Error : " << result << "\n";
-    }
-}
+#include "vk_util.h"
 
 const XrPosef  pose_identity = { {0,0,0,1}, {0,0,0} };
 
 VRContext::VRContext(Context &ctx) : ctx(ctx) {
 
     std::vector<const char*> extensions;
-    extensions.push_back(XR_KHR_VULKAN_ENABLE_EXTENSION_NAME);
-
     std::vector<const char*> layers;
+
+    extensions.push_back(XR_KHR_VULKAN_ENABLE_EXTENSION_NAME);
 
 #ifndef NDEBUG
     extensions.push_back(XR_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    layers.push_back("XR_APILAYER_LUNARG_core_validation");
+    //layers.push_back("XR_APILAYER_LUNARG_core_validation");
 #endif
 
     uint32_t ext_count = 0;
@@ -64,18 +27,22 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
     std::vector<XrExtensionProperties> xr_exts(ext_count, { XR_TYPE_EXTENSION_PROPERTIES });
     xrCheckResult(xrEnumerateInstanceExtensionProperties(nullptr, ext_count, &ext_count, xr_exts.data()));
 
-
+    extensions = checkExtensions(extensions, xr_exts);
 
     uint32_t layer_count = 0;
     xrCheckResult(xrEnumerateApiLayerProperties(0, &layer_count, nullptr));
     std::vector<XrApiLayerProperties> xr_layers(layer_count, {XR_TYPE_API_LAYER_PROPERTIES});
     xrCheckResult(xrEnumerateApiLayerProperties(layer_count, &layer_count, xr_layers.data()));
 
+    layers = checkLayers(layers, xr_layers);
+
 
 
     XrInstanceCreateInfo createInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
-    createInfo.enabledExtensionCount      = extensions.size();
-    createInfo.enabledExtensionNames      = extensions.data();
+    createInfo.enabledExtensionCount = extensions.size();
+    createInfo.enabledExtensionNames = extensions.data();
+    createInfo.enabledApiLayerCount = layers.size();
+    createInfo.enabledApiLayerNames = layers.data();
     createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
     strcpy_s(createInfo.applicationInfo.applicationName, "Dynamical");
     

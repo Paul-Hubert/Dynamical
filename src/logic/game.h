@@ -2,7 +2,6 @@
 #define GAME_H
 
 #include <memory>
-#include "util/game_loop.h"
 
 #include "entt/entt.hpp"
 
@@ -25,7 +24,6 @@ public:
 
     entt::registry reg;
     
-    GameLoop game_loop;
     SettingSys settings;
     
     std::unique_ptr<SystemSet> set;

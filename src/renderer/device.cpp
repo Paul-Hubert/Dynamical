@@ -8,6 +8,8 @@
 #include <set>
 #include <string>
 
+#include "vk_util.h"
+
 bool checkDeviceExtensions(std::vector<const char*> extensionNames, std::vector<vk::ExtensionProperties> availableExtensions) {
 
     for(const char* extensionName : extensionNames) {
