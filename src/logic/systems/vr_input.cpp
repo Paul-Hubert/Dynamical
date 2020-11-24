@@ -2,6 +2,7 @@
 
 #include "renderer/context.h"
 #include "logic/components/inputc.h"
+#include "util/util.h"
 
 void VRInputSys::preinit() {
 
@@ -24,21 +25,27 @@ void VRInputSys::tick() {
                 XrEventDataSessionStateChanged *changed = (XrEventDataSessionStateChanged*)&event_buffer;
                 ctx.vr.session_state = changed->state;
 
-                // Session state change is where we can begin and end sessions, as well as find quit messages!
                 switch (ctx.vr.session_state) {
                     case XR_SESSION_STATE_READY: {
-                        XrSessionBeginInfo begin_info = { XR_TYPE_SESSION_BEGIN_INFO };
+                        XrSessionBeginInfo begin_info = {XR_TYPE_SESSION_BEGIN_INFO};
                         begin_info.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
                         xrBeginSession(ctx.vr.session, &begin_info);
-                        input.vr_showing = true;
-                    } break;
-                    case XR_SESSION_STATE_STOPPING: {
-                        input.vr_showing = false;
+                        ctx.vr.rendering = true;
+                        break;
+                    }
+                    case XR_SESSION_STATE_SYNCHRONIZED:
+                    case XR_SESSION_STATE_VISIBLE:
+                    case XR_SESSION_STATE_FOCUSED:
+                        ctx.vr.rendering = true;
+                        break;
+                    case XR_SESSION_STATE_STOPPING:
                         xrEndSession(ctx.vr.session);
-                    } break;
+                        ctx.vr.rendering = false;
+                        break;
                     case XR_SESSION_STATE_EXITING:
                     case XR_SESSION_STATE_LOSS_PENDING:
                         input.on.set(Action::EXIT);
+                        ctx.vr.rendering = false;
                         return;
                     default:
                         break;

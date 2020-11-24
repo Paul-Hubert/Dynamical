@@ -170,29 +170,19 @@ Device::Device(Context& ctx) : ctx(ctx) {
     
     SET_NAME(vk::ObjectType::eQueue, (VkQueue) graphics, graphics)
     
-    g_mutex_ = std::make_unique<std::mutex>();
-    g_mutex = g_mutex_.get();
-    
     if(c_i == g_i) {
         compute = graphics;
-        c_mutex = g_mutex_.get();
     } else {
         compute = logical.getQueue(c_i, 0);
-        c_mutex_ = std::make_unique<std::mutex>();
-        c_mutex = c_mutex_.get();
         SET_NAME(vk::ObjectType::eQueue, (VkQueue) compute, compute)
     }
     
     if(t_i == g_i) {
         transfer = graphics;
-        t_mutex = g_mutex_.get();
     } else if(t_i == c_i) {
         transfer = compute;
-        t_mutex = c_mutex_.get();
     } else {
         transfer = logical.getQueue(t_i, 0);
-        t_mutex_ = std::make_unique<std::mutex>();
-        t_mutex = t_mutex_.get();
         SET_NAME(vk::ObjectType::eQueue, (VkQueue) transfer, transfer)
     }
     

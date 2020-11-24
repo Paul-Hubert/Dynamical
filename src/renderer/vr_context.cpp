@@ -12,6 +12,8 @@ const XrPosef  pose_identity = { {0,0,0,1}, {0,0,0} };
 
 VRContext::VRContext(Context &ctx) : ctx(ctx) {
 
+    // Extensions and layers
+
     std::vector<const char*> extensions;
     std::vector<const char*> layers;
 
@@ -36,7 +38,9 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
 
     layers = checkLayers(layers, xr_layers);
 
+    
 
+    // Instance
 
     XrInstanceCreateInfo createInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
     createInfo.enabledExtensionCount = extensions.size();
@@ -52,6 +56,8 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
     if (instance == nullptr)
         throw std::runtime_error("OpenXR instance could not be created\n");
 
+
+    // Debug messenger
 
 #ifndef NDEBUG
     XrDebugUtilsMessengerCreateInfoEXT debug_info = { XR_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
@@ -72,6 +78,9 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
     if (ext_xrCreateDebugUtilsMessengerEXT)
         xrCheckResult(ext_xrCreateDebugUtilsMessengerEXT(instance, &debug_info, &debug));
 #endif
+
+
+    // System
 
     XrSystemGetInfo systemInfo = { XR_TYPE_SYSTEM_GET_INFO };
     systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
@@ -102,16 +111,37 @@ void VRContext::init() {
 
     // Space
 
-    XrReferenceSpaceCreateInfo ref_space = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
-    ref_space.poseInReferenceSpace = pose_identity;
-    ref_space.referenceSpaceType   = XR_REFERENCE_SPACE_TYPE_STAGE;
-    xrCheckResult(xrCreateReferenceSpace(session, &ref_space, &space));
+    {
+        uint32_t count = 0;
+        xrCheckResult(xrEnumerateReferenceSpaces(session, 0, &count, nullptr));
+        std::vector<XrReferenceSpaceType> space_types(count);
+        xrCheckResult(xrEnumerateReferenceSpaces(session, count, &count, space_types.data()));
+
+        bool found = false;
+        for(int i = 0; i < count; i++) {
+            if(space_types[i] == XR_REFERENCE_SPACE_TYPE_STAGE) {
+                found = true;
+                break;
+            }
+        }
+        if(!found) {
+            Util::log(Util::warning) << "Stage reference space is not supported by OpenXR Runtime, switching to Local\n";
+        }
+
+        XrReferenceSpaceCreateInfo ref_space = {XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
+        ref_space.poseInReferenceSpace = pose_identity;
+        ref_space.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+        xrCheckResult(xrCreateReferenceSpace(session, &ref_space, &space));
+    }
+
+
+    // Format
 
     {
         uint32_t count = 0;
-        xrEnumerateSwapchainFormats(session, 0, &count, nullptr);
+        xrCheckResult(xrEnumerateSwapchainFormats(session, 0, &count, nullptr));
         std::vector<int64_t> formats(count);
-        xrEnumerateSwapchainFormats(session, count, &count, formats.data());
+        xrCheckResult(xrEnumerateSwapchainFormats(session, count, &count, formats.data()));
         bool found = false;
         for(uint32_t i = 0; i < count; i++) {
             if(swapchain_format == formats[i]) {
@@ -125,17 +155,41 @@ void VRContext::init() {
         }
     }
 
+    // View Configuration
+
+    std::vector<XrViewConfigurationView> views;
+    {
+        uint32_t count = 0;
+        xrCheckResult(xrEnumerateViewConfigurations(instance, system_id, 0, &count, nullptr));
+        std::vector<XrViewConfigurationType> types(count);
+        xrCheckResult(xrEnumerateViewConfigurations(instance, system_id, count, &count, types.data()));
+
+
+        bool found = false;
+        for(uint32_t i = 0; i < count; i++) {
+            if(types[i] == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO) {
+                found = true;
+                break;
+            }
+        }
+        if(!found) {
+            throw std::runtime_error("Required View Configuration Stereo is not supported by OpenXR Runtime\n");
+        }
+
+
+        count = 0;
+        xrCheckResult(xrEnumerateViewConfigurationViews(instance, system_id, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, &count, nullptr));
+
+        swapchains.resize(count);
+        views.resize(count, {XR_TYPE_VIEW_CONFIGURATION_VIEW});
+        xrCheckResult(xrEnumerateViewConfigurationViews(instance, system_id, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, count, &count, views.data()));
+
+    }
+
+
     // Swapchains
 
-    uint32_t view_count = 0;
-    xrCheckResult(xrEnumerateViewConfigurationViews(instance, system_id, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, &view_count, nullptr));
-
-    swapchains.resize(view_count);
-    std::vector<XrViewConfigurationView> views(view_count, { XR_TYPE_VIEW_CONFIGURATION_VIEW });
-    xrCheckResult(xrEnumerateViewConfigurationViews(instance, system_id, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, view_count, &view_count, views.data()));
-
-
-    for (uint32_t i = 0; i < view_count; i++) {
+    for (uint32_t i = 0; i < views.size(); i++) {
         VRContext::swapchain& swapchain = swapchains[i];
 
         XrViewConfigurationView& view = views[i];
@@ -153,6 +207,8 @@ void VRContext::init() {
         swapchain.width  = swapchain_info.width;
         swapchain.height = swapchain_info.height;
 
+        // Swapchain images
+
         uint32_t surface_count = 0;
         xrCheckResult(xrEnumerateSwapchainImages(swapchain.handle, 0, &surface_count, nullptr));
         swapchain.images.resize(surface_count);
@@ -166,7 +222,8 @@ void VRContext::init() {
 
             image.image = surface_images[i].image;
 
-            // Swpachain image views
+
+            // Swapchain image views
 
             vk::ImageViewCreateInfo info({}, image.image, vk::ImageViewType::e2D, vk::Format(swapchain_format),
                                          {}, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
@@ -185,12 +242,12 @@ void VRContext::finish() {
         for(int j = 0; j<swapchains[i].images.size(); j++) {
             ctx.device->destroy(swapchains[i].images[j].view);
         }
-        xrDestroySwapchain(swapchains[i].handle);
+        xrCheckResult(xrDestroySwapchain(swapchains[i].handle));
     }
 
-    xrDestroySpace(space);
+    xrCheckResult(xrDestroySpace(space));
 
-    xrDestroySession(session);
+    xrCheckResult(xrDestroySession(session));
 
 }
 
@@ -198,11 +255,11 @@ VRContext::~VRContext() {
 
 #ifndef NDEBUG
     PFN_xrDestroyDebugUtilsMessengerEXT ext_xrDestroyDebugUtilsMessengerEXT = nullptr;
-    xrGetInstanceProcAddr(instance, "xrDestroyDebugUtilsMessengerEXT", (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT));
+    xrCheckResult(xrGetInstanceProcAddr(instance, "xrDestroyDebugUtilsMessengerEXT", (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT)));
     if(ext_xrDestroyDebugUtilsMessengerEXT)
-        xrGetInstanceProcAddr(instance, "xrDestroyDebugUtilsMessengerEXT", (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT));
+        xrCheckResult(xrGetInstanceProcAddr(instance, "xrDestroyDebugUtilsMessengerEXT", (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT)));
 #endif
 
-    xrDestroyInstance(instance);
+    xrCheckResult(xrDestroyInstance(instance));
 
 }

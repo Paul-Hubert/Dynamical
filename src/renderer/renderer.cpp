@@ -26,9 +26,6 @@ void Renderer::tick() {
 
     ctx->transfer.flush();
     
-    InputC& input = reg.ctx<InputC>();
-    if(!input.window_showing && !input.vr_showing) return;
-
     vr_render.render({}, {});
 
 }

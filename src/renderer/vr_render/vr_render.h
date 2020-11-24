@@ -6,6 +6,8 @@
 #include "ui_render.h"
 #include "view_ubo.h"
 
+#include <taskflow/taskflow.hpp>
+
 #include "renderer/vmapp.h"
 
 #include "entt/entt.hpp"
@@ -43,10 +45,15 @@ private:
     ViewUBO ubo;
     ObjectRender object_render;
     UIRender ui_render;
+
+    uint32_t frame_index = 0;
     
     vk::CommandPool commandPool;
-    vk::CommandBuffer commandBuffer;
+    std::array<vk::CommandBuffer, NUM_FRAMES> commandBuffers;
     vk::Fence fence;
+
+    tf::Taskflow taskflow;
+    std::future<void> future;
 
 };
 

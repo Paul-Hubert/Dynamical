@@ -9,6 +9,8 @@
 
 #include "game_set.h"
 
+#include <taskflow/taskflow.hpp>
+
 
 #include "logic/components/playerc.h"
 #include "logic/components/physicsc.h"
@@ -28,6 +30,8 @@ renderer(std::make_unique<Renderer>(reg)) {
 }
 
 void Game::init() {
+
+    reg.set<tf::Executor>();
     
     set = std::make_unique<GameSet>(*this);
     

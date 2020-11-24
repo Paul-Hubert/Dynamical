@@ -34,6 +34,7 @@ public:
     XrEnvironmentBlendMode blend;
     XrSession session = {};
     XrSessionState session_state = XR_SESSION_STATE_UNKNOWN;
+    bool rendering = false;
     XrSpace space = {};
 
     VkFormat swapchain_format = VK_FORMAT_R8G8B8A8_SRGB;
