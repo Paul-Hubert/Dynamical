@@ -34,6 +34,7 @@ class VRRender {
 public:
     VRRender(entt::registry& reg, Context& ctx);
 
+    void record(vk::CommandBuffer command);
     void render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals);
 
     ~VRRender();
@@ -47,6 +48,8 @@ private:
     UIRender ui_render;
 
     uint32_t frame_index = 0;
+    std::vector<uint32_t> swapchain_image_indices;
+    bool ready = false;
     
     vk::CommandPool commandPool;
     std::array<vk::CommandBuffer, NUM_FRAMES> commandBuffers;
