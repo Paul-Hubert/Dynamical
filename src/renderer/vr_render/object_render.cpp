@@ -2,15 +2,11 @@
 
 #include "util/util.h"
 
-#include "logic/components/model/meshc.h"
-
-#include <fstream>
-
 #include "renderer/context.h"
 #include "renderer/vr_render/renderpass.h"
 #include "renderer/vr_render/view_ubo.h"
-#include "logic/components/model/meshinstancec.h"
-#include "logic/components/model/meshc.h"
+#include "logic/components/model/renderablec.h"
+#include "logic/components/model/modelc.h"
 #include "logic/components/model/bufferuploadc.h"
 
 ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, ViewUBO& ubo) : reg(reg), ctx(ctx), renderpass(renderpass) {
@@ -26,22 +22,23 @@ void ObjectRender::render(vk::CommandBuffer command, vk::DescriptorSet set) {
 
     command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, 0, {set}, nullptr);
 
-    reg.view<MeshInstanceC>().each([&](auto entity, MeshInstanceC& instance) {
+    reg.view<RenderableC>().each([&](auto entity, RenderableC& renderable) {
 
-        MeshC& mesh = reg.get<MeshC>(instance.mesh);
-        if(reg.has<entt::tag<"uploading"_hs>>(instance.mesh)) {
-            if(!reg.has<BufferUploadC>(mesh.index_buffer) && !reg.has<BufferUploadC>(mesh.vertex_buffer)) {
-                reg.remove<entt::tag<"uploading"_hs>>(instance.mesh);
-            } else {
-                return;
-            }
+        ModelC& model = reg.get<ModelC>(renderable.model);
+        if(!model.isReady(reg, entity)) return;
+
+        for(auto& part : model.parts) {
+
+            command.bindIndexBuffer(reg.get<VmaBuffer>(part.index.buffer).buffer, part.index.offset, vk::IndexType::eUint16);
+
+            command.bindVertexBuffers(0,
+                {reg.get<VmaBuffer>(part.position.buffer).buffer, reg.get<VmaBuffer>(part.normal.buffer).buffer},
+                {part.position.offset, part.normal.offset});
+
+            command.drawIndexed(part.index.size / sizeof(uint16_t), 1, 0, 0, 0);
+
         }
-
-        command.bindIndexBuffer(reg.get<VmaBuffer>(mesh.index_buffer).buffer, 0, vk::IndexType::eUint16);
-
-        command.bindVertexBuffers(0, {reg.get<VmaBuffer>(mesh.vertex_buffer).buffer}, {0});
-
-        command.drawIndexed(mesh.indices.size(), 1, 0, 0, 0);
+        
 
     });
 
@@ -91,13 +88,13 @@ void ObjectRender::createPipeline(ViewUBO& ubo) {
     // VERTEX INPUT
 
     auto vertexInputBindings = std::vector{
-        vk::VertexInputBindingDescription(0, sizeof(MeshC::Vertex), vk::VertexInputRate::eVertex),
+        vk::VertexInputBindingDescription(0, 3 * sizeof(float), vk::VertexInputRate::eVertex),
+        vk::VertexInputBindingDescription(1, 3 * sizeof(float), vk::VertexInputRate::eVertex)
     };
     // Inpute attribute bindings describe shader attribute locations and memory layouts
     auto vertexInputAttributs = std::vector{
-        vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(MeshC::Vertex, pos)),
-        vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat, offsetof(MeshC::Vertex, normal)),
-        vk::VertexInputAttributeDescription(2, 0, vk::Format::eR32G32Sfloat, offsetof(MeshC::Vertex, uv)),
+        vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32Sfloat, 0),
+        vk::VertexInputAttributeDescription(1, 1, vk::Format::eR32G32B32Sfloat, 0),
     };
 
     auto vertexInputState = vk::PipelineVertexInputStateCreateInfo({}, vertexInputBindings.size(), vertexInputBindings.data(), vertexInputAttributs.size(), vertexInputAttributs.data());

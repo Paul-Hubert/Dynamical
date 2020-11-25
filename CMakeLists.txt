@@ -49,6 +49,8 @@ target_link_libraries(dynamical PRIVATE LinearMath Bullet3Common BulletDynamics 
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
 target_include_directories(dynamical PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 
+find_package(nlohmann_json CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE nlohmann_json nlohmann_json::nlohmann_json)
 
 # Copy resources to build
 file(

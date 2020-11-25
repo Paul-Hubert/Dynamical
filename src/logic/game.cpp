@@ -10,14 +10,13 @@
 #include "game_set.h"
 
 #include <taskflow/taskflow.hpp>
-
+#include "util/services/gltf_loader.h"
 
 #include "logic/components/playerc.h"
 #include "logic/components/physicsc.h"
 #include "logic/components/positionc.h"
 #include "logic/components/model/bufferuploadc.h"
-#include "logic/components/model/meshc.h"
-#include "logic/components/model/meshinstancec.h"
+#include "logic/components/model/renderablec.h"
 
 #include "util/entt_util.h"
 
@@ -32,6 +31,7 @@ renderer(std::make_unique<Renderer>(reg)) {
 void Game::init() {
 
     reg.set<tf::Executor>();
+    auto& loader = reg.set<GLTFLoader>(reg);
     
     set = std::make_unique<GameSet>(*this);
     
@@ -46,12 +46,15 @@ void Game::init() {
     
     set->init();
 
-    Context& ctx = *reg.ctx<Context*>();
+    entt::entity box_model = loader.load("./resources/Box.glb");
 
-    {
+    entt::entity box = reg.create();
+    reg.emplace<RenderableC>(box, box_model);
+
+    /*{
         auto mesh = reg.create();
         reg.emplace<entt::tag<"uploading"_hs>>(mesh);
-        auto &meshc = reg.emplace<MeshC>(mesh);
+        auto& meshc = reg.emplace<MeshC>(mesh);
 
         meshc.vertices.push_back({{0, 0, 0},
                                   {},
@@ -79,8 +82,8 @@ void Game::init() {
         memcpy(vertex.data, meshc.vertices.data(), vertex.size);
 
         auto object = reg.create();
-        reg.emplace<MeshInstanceC>(object, mesh);
-    }
+        reg.emplace<RenderableC>(object, mesh);
+    }*/
     
 }
 
