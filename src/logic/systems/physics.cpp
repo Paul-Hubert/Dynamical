@@ -4,7 +4,24 @@
 #include "glm/gtx/norm.hpp"
 
 #include "logic/components/physicsc.h"
-#include "logic/components/positionc.h"
+
+
+#include "bullet/btBulletDynamicsCommon.h"
+
+PhysicsSys::PhysicsSys(entt::registry& reg) : System(reg)
+/*
+collisionConfiguration(),
+dispatcher(&collisionConfiguration),
+overlappingPairCache(),
+solver(),
+dynamicsWorld(&dispatcher, &overlappingPairCache, &solver, &collisionConfiguration)
+*/
+{
+    btDefaultCollisionConfiguration* collisionConfiguration = new btDefaultCollisionConfiguration();
+
+	//dynamicsWorld.setGravity(btVector3(0, -10, 0));
+
+}
 
 void PhysicsSys::preinit() {
     
@@ -12,22 +29,20 @@ void PhysicsSys::preinit() {
 
 void PhysicsSys::init() {
     
+	
+
 }
 
 void PhysicsSys::tick() {
 
-    auto view = reg.view<PhysicsC, PositionC, entt::tag<"forces"_hs>>();
-    for(auto entity : view) {
-        PhysicsC& physics = view.get<PhysicsC>(entity);
-        physics.v.y -= 9.81f / 60.f;
-    }
-    
-    reg.view<PhysicsC, PositionC>().each([this](auto entity, PhysicsC& physics, PositionC& pos) {
-        
-        pos.pos += physics.v / 60.f;
-        
-    });
+
+
     
     
-    
+}
+
+PhysicsSys::~PhysicsSys() {
+
+
+
 }

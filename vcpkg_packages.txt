@@ -1,1 +1,1 @@
-cereal entt glm imgui openssl protobuf sdl2[vulkan] taskflow stb vulkan vulkan-memory-allocator vulkan-headers openxr-loader[vulkan] bullet3[multithreading] tinygltf
+cereal entt glm imgui openssl sdl2[vulkan] taskflow stb vulkan vulkan-memory-allocator openxr-loader[vulkan] bullet3[multithreading] tinygltf nlohmann-json

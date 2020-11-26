@@ -7,7 +7,6 @@ project(dynamical)
 include_directories("./src")
 include_directories("./3rdparty")
 include_directories("./extra")
-include_directories("./3rdparty/OpenXR-SDK/include")
 file(GLOB_RECURSE sources ./src/main.cpp ./src/*.cpp ./src/*.h)
 
 add_executable(dynamical ${sources})
@@ -40,11 +39,11 @@ target_include_directories(dynamical PRIVATE ${STB_INCLUDE_DIRS})
 find_package(unofficial-vulkan-memory-allocator CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE unofficial::vulkan-memory-allocator::vulkan-memory-allocator)
 
-add_subdirectory(3rdparty/OpenXR-SDK)
-target_link_libraries(dynamical PRIVATE openxr_loader openxr-all-supported)
+find_package(OpenXR CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE OpenXR::headers OpenXR::openxr_loader OpenXR::openxr-all-supported)
 
 find_package(Bullet CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE LinearMath Bullet3Common BulletDynamics BulletSoftBody)
+target_link_libraries(dynamical PRIVATE LinearMath Bullet3Common BulletDynamics)
 
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
 target_include_directories(dynamical PRIVATE ${TINYGLTF_INCLUDE_DIRS})
@@ -61,20 +60,6 @@ file(
 add_custom_command(TARGET dynamical POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources" "${PROJECT_BINARY_DIR}/resources"
 )
-
-### PREPROCESS RAYCAST DATA
-add_subdirectory(extra/raycast)
-
-# Copy data to resources
-add_custom_target(raycast_copy ALL
-   DEPENDS raycast_run
-)
-
-add_custom_command(TARGET raycast_copy POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/extra/raycast/raycast_data.bin" "${PROJECT_BINARY_DIR}/resources/raycast_data.bin"
-)
-
-add_dependencies(dynamical raycast_copy)
 
 ### COMPILE SHADERS
 set(GLSL_VALIDATOR "glslangValidator")
