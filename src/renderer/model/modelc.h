@@ -4,30 +4,32 @@
 #include "entt/entt.hpp"
 #include "glm/glm.hpp"
 
-#include "bufferuploadc.h"
-#include "imageuploadc.h"
+#include "bufferc.h"
+#include "imagec.h"
+#include "materialc.h"
 
 class ModelC {
 public:
-
 	bool ready = false;
 
 	struct Part {
 		struct View {
-			entt::entity buffer = entt::null;
-			uint32_t size;
-			uint32_t offset;
+			std::shared_ptr<BufferC> buffer;
+			size_t size;
+			size_t offset;
 		};
 		View index;
 		View position;
 		View normal;
 		View uv;
+
+		std::shared_ptr<MaterialC> material;
 	};
 
 	std::vector<Part> parts;
 
 	// Material
-	entt::entity color_image = entt::null;
+	std::shared_ptr<ImageC> color_image;
 
 	// Checks if ready, if not check if everything is uploaded and set to ready
 	bool isReady(entt::registry& reg, entt::entity model) {
@@ -36,10 +38,10 @@ public:
 		}
 		for(auto& part : parts) {
 			if(
-				(part.index.buffer != entt::null && reg.has<BufferUploadC>(part.index.buffer)) ||
-				(part.position.buffer != entt::null && reg.has<BufferUploadC>(part.position.buffer)) ||
-				(part.normal.buffer != entt::null && reg.has<BufferUploadC>(part.normal.buffer)) ||
-				(part.uv.buffer != entt::null && reg.has<BufferUploadC>(part.uv.buffer))
+				(part.index.buffer && !part.index.buffer->ready) ||
+				(part.position.buffer && !part.position.buffer->ready) ||
+				(part.normal.buffer && !part.normal.buffer->ready) ||
+				(part.uv.buffer && !part.uv.buffer->ready)
 				) {
 				return false;
 			}
@@ -47,6 +49,7 @@ public:
 		ready = true;
 		return true;
 	}
+
 };
 
 #endif

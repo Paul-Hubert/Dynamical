@@ -10,18 +10,17 @@
 #define TINYGLTF_USE_CPP14
 #include "tiny_gltf.h"
 
-
-#include "logic/components/model/modelc.h"
+#include "renderer/model/modelc.h"
 
 class GLTFLoader {
 public:
 	GLTFLoader(entt::registry& reg);
-	entt::entity load(std::string path);
+	std::shared_ptr<ModelC> load(std::string path);
 	~GLTFLoader();
 private:
 	entt::registry& reg;
 	tinygltf::TinyGLTF loader;
-	void makePart(tinygltf::Model& m, int index, ModelC::Part::View& v, std::vector<entt::entity>& buffers, int type);
+	void makePart(tinygltf::Model& m, int index, ModelC::Part::View& v, std::vector<std::shared_ptr<BufferC>>& buffers, int type);
 
 };
 

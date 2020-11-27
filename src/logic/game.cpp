@@ -17,6 +17,8 @@
 
 #include "util/entt_util.h"
 
+#include "logic/components/renderablec.h"
+
 Game::Game(int argc, char** argv) : reg(), settings(reg, argc, argv),
 ui(std::make_unique<UISys>(reg)),
 renderer(std::make_unique<Renderer>(reg)) {
@@ -40,9 +42,10 @@ void Game::init() {
     
     set->init();
 
-    entt::entity box_model = loader.load("./resources/Box.glb");
+    auto box_model = loader.load("./resources/box.glb");
 
-    entt::entity box = ObjectFactory::build(reg, box_model);
+    entt::entity box = reg.create();
+    reg.emplace<RenderableC>(box, box_model);
     
 }
 

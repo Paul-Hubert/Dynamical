@@ -5,6 +5,7 @@
 #include "object_render.h"
 #include "ui_render.h"
 #include "view_ubo.h"
+#include "material_manager.h"
 
 #include <taskflow/taskflow.hpp>
 
@@ -44,6 +45,7 @@ private:
     Context& ctx;
     Renderpass renderpass;
     ViewUBO ubo;
+    MaterialManager material_manager;
     ObjectRender object_render;
     UIRender ui_render;
 

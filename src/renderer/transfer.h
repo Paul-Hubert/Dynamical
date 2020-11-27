@@ -4,7 +4,12 @@
 #include <array>
 #include <renderer/vk.h>
 
+#include <memory>
+
 #include "vmapp.h"
+
+#include "model/bufferc.h"
+#include "model/imagec.h"
 
 class Context;
 
@@ -14,22 +19,29 @@ public:
     void flush();
     vk::CommandBuffer getCommandBuffer();
     
-    void prepareImage(std::string str, VmaImage& image, int num_components, int base_mip, int base_array);
-    void prepareImage(const void* data, size_t size, VmaImage& image, vk::Extent3D sizes, int base_mip, int base_array);
-    bool prepareBuffer(const void* data, VmaBuffer& image);
+    std::shared_ptr<ImageC> createImage(const void* data, size_t real_size, vk::ImageCreateInfo info, vk::ImageLayout layout);
+    std::shared_ptr<BufferC> createBuffer(const void* data, vk::BufferCreateInfo info);
     
     ~Transfer();
 private:
     Context& ctx;
     
     vk::CommandPool pool;
-    std::array<vk::CommandBuffer, 2> commandBuffers;
-    vk::Fence fence;
+
+    struct Upload {
+        void reset(Context& ctx, vk::CommandPool pool);
+        vk::CommandBuffer command;
+        vk::Fence fence;
+        std::vector<VmaBuffer> stagingBuffers;
+
+        std::vector<std::shared_ptr<BufferC>> uploaded_buffers;
+        std::vector<std::shared_ptr<ImageC>> uploaded_images;
+    };
+
+    std::vector<Upload> uploads;
+    Upload current;
     
-    int index = 0;
     bool empty = true;
-    
-    std::array<std::vector<VmaBuffer>, 2> stagingBuffers;
     
 };
 

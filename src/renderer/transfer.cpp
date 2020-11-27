@@ -2,39 +2,58 @@
 
 #include "context.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "util/util.h"
 
 Transfer::Transfer(Context& ctx) : ctx(ctx) {
     
-    pool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx.device.t_i));
-    
-    vk::CommandBufferAllocateInfo info(pool, vk::CommandBufferLevel::ePrimary, 2);
-    ctx.device->allocateCommandBuffers(&info, commandBuffers.data());
-    
-    fence = ctx.device->createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
-    
-    commandBuffers[index].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+    pool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eTransient, ctx.device.t_i));
+
+    current.reset(ctx, pool);
+
+    current.command.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
     
 }
 
+void Transfer::Upload::reset(Context& ctx, vk::CommandPool pool) {
+    fence = ctx.device->createFence({});
+    command = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(pool, vk::CommandBufferLevel::ePrimary, 1))[0];
+}
+
 void Transfer::flush() {
-    
-    ctx.device->waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+
+    for(auto it = uploads.begin(); it != uploads.end();) {
+        Upload& upload = *it;
+        vk::Result result = ctx.device->waitForFences({upload.fence}, VK_TRUE, 0);
+        if(result == vk::Result::eSuccess) {
+
+            ctx.device->destroy(upload.fence);
+            ctx.device->freeCommandBuffers(pool, {upload.command});
+
+            for(auto& buffer : upload.uploaded_buffers) {
+                buffer->ready = true;
+            }
+
+            for(auto& image : upload.uploaded_images) {
+                image->ready = true;
+            }
+
+            it = uploads.erase(it);
+
+        } else {
+            ++it;
+        }
+    }
     
     if(!empty) {
         
-        commandBuffers[index].end();
+        current.command.end();
         
-        ctx.device->resetFences(fence);
+        ctx.device.transfer.submit(vk::SubmitInfo(0, nullptr, nullptr, 1, &current.command, 0, nullptr), current.fence);
         
-        ctx.device.transfer.submit(vk::SubmitInfo(0, nullptr, nullptr, 1, &commandBuffers[index], 0, nullptr), fence);
+        uploads.push_back(std::move(current));
+        current.reset(ctx, pool);
         
-        index = (index+1)%2;
-        
-        stagingBuffers[index].clear();
-        
-        commandBuffers[index].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+        current.command.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
         
         empty = true;
         
@@ -42,106 +61,108 @@ void Transfer::flush() {
     
 }
 
-void Transfer::prepareImage(std::string str, VmaImage& image, int num_components = 4, int base_mip = 0, int base_array = 0) {
+std::shared_ptr<ImageC> Transfer::createImage(const void* data, size_t real_size, vk::ImageCreateInfo info, vk::ImageLayout layout) {
     
-    int x, y, channels;
-    stbi_uc* data = stbi_load(str.c_str(), &x, &y, &channels, num_components);
+    VmaAllocationCreateInfo ainfo{};
+    ainfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    ainfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    auto binfo = vk::BufferCreateInfo({}, real_size, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, 1, &ctx.device.t_i);
+    
+    current.stagingBuffers.push_back(VmaBuffer(ctx.device, &ainfo, binfo));
+    auto& stage = current.stagingBuffers.back();
 
-    if(data == nullptr) {
-        std::cout << "image " << str << " could not be loaded because : " << stbi_failure_reason() << std::endl;
-    }
-    
-	prepareImage(data, sizeof(stbi_uc) * x * y * num_components, image, vk::Extent3D(x, y, 1), base_mip, base_array);
-    
-    stbi_image_free(data);
-    
-}
-
-void Transfer::prepareImage(const void* data, size_t size, VmaImage& image, vk::Extent3D sizes, int base_mip = 0, int base_array = 0) {
-    
-    VmaAllocationCreateInfo info {};
-    info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-    stagingBuffers[index].push_back(VmaBuffer(ctx.device, &info, vk::BufferCreateInfo(
-        {}, image.size, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, 1, &ctx.device.t_i
-    )));
-    const VmaBuffer& stagingBuffer = stagingBuffers[index].back();
-    
     VmaAllocationInfo inf;
-    vmaGetAllocationInfo(ctx.device, stagingBuffer.allocation, &inf);
+    vmaGetAllocationInfo(ctx.device, stage.allocation, &inf);
+
+    memcpy(inf.pMappedData, data, real_size);
+
+    VmaAllocationCreateInfo alloc_info{};
+    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    std::shared_ptr<ImageC> image = std::make_shared<ImageC>(ctx.device, &alloc_info, info);
+
     
-    memcpy(inf.pMappedData, data, size);
-    
-    vk::CommandBuffer buffer = getCommandBuffer();
-    
-    buffer.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eTransfer, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ImageMemoryBarrier(
+    current.command.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eTransfer, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ImageMemoryBarrier(
         {}, vk::AccessFlagBits::eTransferWrite, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal,
-		VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image.image, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, base_mip, 1, base_array, 1)
+		VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image->image, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
     ));
     
-    buffer.copyBufferToImage(stagingBuffer.buffer, image.image, vk::ImageLayout::eTransferDstOptimal,
-        vk::BufferImageCopy(0, 0, 0, vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, base_mip, base_array, 1), vk::Offset3D(0, 0, 0), vk::Extent3D(sizes.width, sizes.height, sizes.depth)));
+    current.command.copyBufferToImage(stage, image->image, vk::ImageLayout::eTransferDstOptimal,
+        vk::BufferImageCopy(0, 0, 0, vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1), vk::Offset3D(0, 0, 0), info.extent));
     
-    buffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTopOfPipe, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ImageMemoryBarrier(
-		vk::AccessFlagBits::eTransferWrite, {},
-        vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
-		VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image.image, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, base_mip, 1, base_array, 1)
+    current.command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTopOfPipe, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ImageMemoryBarrier(
+		vk::AccessFlagBits::eTransferWrite, {}, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
+		VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image->image, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
     ));
-    
+
+    current.uploaded_images.push_back(image);
+
+    empty = false;
+
+    return image;
+
 }
 
 
-bool Transfer::prepareBuffer(const void* data, VmaBuffer& buffer) {
+std::shared_ptr<BufferC> Transfer::createBuffer(const void* data, vk::BufferCreateInfo info) {
     
-    bool needsStaging = ctx.device.isDedicated();
-    
-    
-    if(needsStaging) {
-        
-        VmaAllocationCreateInfo info {};
-        info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-        stagingBuffers[index].push_back(VmaBuffer(ctx.device, &info, vk::BufferCreateInfo(
-            {}, buffer.size, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, 1, &ctx.device.t_i
-        )));
-        const VmaBuffer& stagingBuffer = stagingBuffers[index].back();
-        
+    if(ctx.device.isDedicated()) {
+
+        VmaAllocationCreateInfo ainfo{};
+        ainfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        ainfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+        auto binfo = vk::BufferCreateInfo({}, info.size, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, 1, &ctx.device.t_i);
+
+        current.stagingBuffers.push_back(VmaBuffer(ctx.device, &ainfo, binfo));
+        auto& stage = current.stagingBuffers.back();
+
         VmaAllocationInfo inf;
-        vmaGetAllocationInfo(ctx.device, stagingBuffer.allocation, &inf);
-        
-        memcpy(inf.pMappedData, data, buffer.size);
-        
-        vk::CommandBuffer commandBuffer = getCommandBuffer();
-        
-        commandBuffer.copyBuffer(stagingBuffer.buffer, buffer.buffer, vk::BufferCopy(0, 0, buffer.size));
-        
+        vmaGetAllocationInfo(ctx.device, stage.allocation, &inf);
+
+        memcpy(inf.pMappedData, data, info.size);
+
+        VmaAllocationCreateInfo alloc_info{};
+        alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        info.usage |= vk::BufferUsageFlagBits::eTransferDst;
+        std::shared_ptr<BufferC> buffer = std::make_shared<BufferC>(ctx.device, &alloc_info, info);
+
+        current.command.copyBuffer(stage, buffer->buffer, {vk::BufferCopy(0, 0, buffer->buffer.size)});
+
+        current.uploaded_buffers.push_back(buffer);
+
+        empty = false;
+
+        return buffer;
+
     } else {
+
+        VmaAllocationCreateInfo ainfo{};
+        ainfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        ainfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+        auto binfo = vk::BufferCreateInfo({}, info.size, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, 1, &ctx.device.t_i);
         
-        void* dest = ctx.device->mapMemory(buffer.memory, buffer.offset, buffer.size, {});
-        
-        memcpy(dest, data, buffer.size);
-        
-        ctx.device->unmapMemory(buffer.memory);
+        auto buffer = VmaBuffer(ctx.device, &ainfo, binfo);
+
+        VmaAllocationInfo inf;
+        vmaGetAllocationInfo(ctx.device, buffer.allocation, &inf);
+
+        memcpy(inf.pMappedData, data, info.size);
+
+        auto b = std::make_shared<BufferC>(std::move(buffer));
+        b->ready = true;
+        return b;
         
     }
-    
-    return !needsStaging;
-    
+
 }
 
 vk::CommandBuffer Transfer::getCommandBuffer() {
     empty = false;
-    return commandBuffers[index];
+    return current.command;
 }
 
 Transfer::~Transfer() {
-    
-    for(int i = 0; i<2; i++) {
-        stagingBuffers[i].clear();
-    }
-    
-    ctx.device->destroy(fence);
-    
+  
     ctx.device->destroy(pool);
     
 }

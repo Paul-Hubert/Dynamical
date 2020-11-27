@@ -5,8 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 project(dynamical)
 
 include_directories("./src")
-include_directories("./3rdparty")
-include_directories("./extra")
+
 file(GLOB_RECURSE sources ./src/main.cpp ./src/*.cpp ./src/*.h)
 
 add_executable(dynamical ${sources})

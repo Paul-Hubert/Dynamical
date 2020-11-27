@@ -45,7 +45,7 @@ void UISys::tick() {
     io.MouseDown[2] = input.mouseMiddle || input.on[Action::TERTIARY];
 
     if(input.focused)
-        io.MousePos = ImVec2(input.mousePos.x, input.mousePos.y);
+        io.MousePos = ImVec2((float) input.mousePos.x, (float) input.mousePos.y);
 
     int w, h;
     SDL_GetWindowSize(ctx->win, &w, &h);

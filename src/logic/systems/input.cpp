@@ -91,7 +91,7 @@ void InputSys::tick() {
             
             try {
                 input.on.set(actionMap.at(e.key.keysym.scancode), e.type == SDL_KEYDOWN);
-            } catch(std::out_of_range& err) {}
+            } catch(std::out_of_range&) {}
             
         } else if(e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) {
             

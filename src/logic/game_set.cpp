@@ -6,7 +6,6 @@
 #include "systems/system_list.h"
 #include "logic/components/settingsc.h"
 #include "systems/physics.h"
-#include "systems/uploader.h"
 
 #include "logic/game.h"
 
@@ -37,13 +36,11 @@ GameSet::GameSet(Game& game) : SystemSet(game.reg) {
         MAKE_SYSTEM(VRInputSys, vr_input)
         MAKE_SYSTEM(DebugSys, debug)
         add(game.ui.get());
-        MAKE_SYSTEM(PlayerControlSys, control)
     }
     
     MAKE_SYSTEM(PhysicsSys, physics)
     
     if(user) {
-        MAKE_SYSTEM(UploaderSys, uploader)
         add(game.renderer.get());
     }
     

@@ -43,9 +43,9 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
     // Instance
 
     XrInstanceCreateInfo createInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
-    createInfo.enabledExtensionCount = extensions.size();
+    createInfo.enabledExtensionCount = (uint32_t) extensions.size();
     createInfo.enabledExtensionNames = extensions.data();
-    createInfo.enabledApiLayerCount = layers.size();
+    createInfo.enabledApiLayerCount = (uint32_t) layers.size();
     createInfo.enabledApiLayerNames = layers.data();
     createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
     strcpy_s(createInfo.applicationInfo.applicationName, "Dynamical");
@@ -118,7 +118,7 @@ void VRContext::init() {
         xrCheckResult(xrEnumerateReferenceSpaces(session, count, &count, space_types.data()));
 
         bool found = false;
-        for(int i = 0; i < count; i++) {
+        for(uint32_t i = 0; i < count; i++) {
             if(space_types[i] == XR_REFERENCE_SPACE_TYPE_STAGE) {
                 found = true;
                 break;

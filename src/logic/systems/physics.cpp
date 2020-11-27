@@ -5,9 +5,6 @@
 
 #include "logic/components/physicsc.h"
 
-
-#include "bullet/btBulletDynamicsCommon.h"
-
 PhysicsSys::PhysicsSys(entt::registry& reg) : System(reg)
 /*
 collisionConfiguration(),
@@ -17,7 +14,7 @@ solver(),
 dynamicsWorld(&dispatcher, &overlappingPairCache, &solver, &collisionConfiguration)
 */
 {
-    btDefaultCollisionConfiguration* collisionConfiguration = new btDefaultCollisionConfiguration();
+    //btDefaultCollisionConfiguration* collisionConfiguration = new btDefaultCollisionConfiguration();
 
 	//dynamicsWorld.setGravity(btVector3(0, -10, 0));
 

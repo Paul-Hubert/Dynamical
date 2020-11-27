@@ -64,6 +64,7 @@ XRAPI_ATTR XrBool32 XRAPI_CALL debugCallback(XrDebugUtilsMessageSeverityFlagsEXT
 
     if(messageSeverity < XR_LOG_LEVEL) return XR_FALSE;
 
+    /*
     if(messageType == XR_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) {
         std::cerr << "    General ";
     } else if(messageType == XR_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
@@ -81,6 +82,7 @@ XRAPI_ATTR XrBool32 XRAPI_CALL debugCallback(XrDebugUtilsMessageSeverityFlagsEXT
     } else if(messageSeverity == XR_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
         std::cerr << "Error   ";
     }
+    */
 
     std::cerr << msg->message << std::endl;
 

@@ -12,9 +12,9 @@ ViewUBO::ViewUBO(Context& ctx) : views(ctx.vr.swapchains.size()), ctx(ctx) {
 
     {
         auto poolSizes = std::vector {
-            vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, NUM_FRAMES*views.size()),
+            vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, (uint32_t) (NUM_FRAMES*views.size())),
         };
-        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, NUM_FRAMES * views.size(), poolSizes.size(), poolSizes.data()));
+        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, (uint32_t) (NUM_FRAMES * views.size()), (uint32_t) poolSizes.size(), poolSizes.data()));
     }
 
     {
@@ -23,7 +23,7 @@ ViewUBO::ViewUBO(Context& ctx) : views(ctx.vr.swapchains.size()), ctx(ctx) {
                                                vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
         };
         descLayout = ctx.device->createDescriptorSetLayout(
-                vk::DescriptorSetLayoutCreateInfo({}, bindings.size(), bindings.data()));
+                vk::DescriptorSetLayoutCreateInfo({}, (uint32_t) bindings.size(), bindings.data()));
     }
 
     for(int i = 0; i<views.size(); i++){

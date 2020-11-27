@@ -2,8 +2,10 @@
 
 #include "util/util.h"
 #include "renderer/context.h"
+#include "renderer/model/materialc.h"
 
 #define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "tiny_gltf.h"
 
@@ -13,7 +15,7 @@ GLTFLoader::GLTFLoader(entt::registry& reg) : reg(reg) {
 
 }
 
-entt::entity GLTFLoader::load(std::string path) {
+std::shared_ptr<ModelC> GLTFLoader::load(std::string path) {
 
 	Model m;
 	std::string err;
@@ -41,16 +43,26 @@ entt::entity GLTFLoader::load(std::string path) {
 
 	Context& ctx = *reg.ctx<Context*>();
 
-	entt::entity entity = reg.create();
-	ModelC& model = reg.emplace<ModelC>(entity);
+	std::shared_ptr<ModelC> model = std::make_shared<ModelC>();
 
-	std::vector<entt::entity> buffers;
+	std::vector<std::shared_ptr<BufferC>> buffers;
 	for(auto& b : m.buffers) {
-		entt::entity buffer = reg.create();
 		vk::BufferCreateInfo info({}, b.data.size(), vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i);
-		auto& vertex = reg.emplace<BufferUploadC>(buffer, ctx, info);
-		memcpy(vertex.data, b.data.data(), b.data.size());
-		buffers.push_back(buffer);
+		buffers.push_back(ctx.transfer.createBuffer(b.data.data(), info));
+	}
+
+	std::vector<std::shared_ptr<ImageC>> images;
+	for(auto& i : m.images) {
+		vk::Format format = vk::Format::eR8G8B8A8Unorm;
+		vk::ImageCreateInfo info({}, vk::ImageType::e2D, format, vk::Extent3D(i.width, i.height, 1), 1, 1, vk::SampleCountFlagBits::e1,
+			vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+			vk::SharingMode::eExclusive, 1, & ctx.device.g_i, vk::ImageLayout::eUndefined);
+		images.push_back(ctx.transfer.createImage(i.image.data(), i.image.size(), info, vk::ImageLayout::eShaderReadOnlyOptimal));
+	}
+
+	std::vector<std::shared_ptr<MaterialC>> materials;
+	for(auto& mat : m.materials) {
+		materials.push_back(std::make_shared<MaterialC>(images[mat.pbrMetallicRoughness.baseColorTexture.index]));
 	}
 
 	for(auto& mesh : m.meshes) {
@@ -62,6 +74,8 @@ entt::entity GLTFLoader::load(std::string path) {
 
 			ModelC::Part part;
 			
+			part.material = materials[primitive.material];
+
 			makePart(m, primitive.indices, part.index, buffers, 0);
 
 			{
@@ -74,20 +88,27 @@ entt::entity GLTFLoader::load(std::string path) {
 			{
 				auto it = primitive.attributes.find("NORMAL");
 				if(it == primitive.attributes.end())
-					Util::log(Util::warning) << "GLTFLoader : Position needed\n";
+					Util::log(Util::warning) << "GLTFLoader : Normal needed\n";
 				makePart(m, it->second, part.normal, buffers, 1);
 			}
 
-			model.parts.push_back(part);
+			{
+				auto it = primitive.attributes.find("TEXCOORD_0");
+				if(it == primitive.attributes.end())
+					Util::log(Util::warning) << "GLTFLoader : UV needed\n";
+				makePart(m, it->second, part.uv, buffers, 2);
+			}
+
+			model->parts.push_back(part);
 
 		}
 	}
 
-	return entity;
+	return model;
 
 }
 
-void GLTFLoader::makePart(Model& m, int index, ModelC::Part::View& v, std::vector<entt::entity>& buffers, int type) {
+void GLTFLoader::makePart(Model& m, int index, ModelC::Part::View& v, std::vector<std::shared_ptr<BufferC>>& buffers, int type) {
 	auto& acc = m.accessors[index];
 	auto& view = m.bufferViews[acc.bufferView];
 

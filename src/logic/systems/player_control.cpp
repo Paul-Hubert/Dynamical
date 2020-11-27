@@ -37,24 +37,24 @@ void PlayerControlSys::tick() {
         camera.sprinting = true;
     }
     
-    float speed = camera.sprinting ? base_speed * 10. : base_speed;
+    float speed = (float) (camera.sprinting ? base_speed * 10. : base_speed);
     
     bool moving = false;
     if(input.on[Action::FORWARD]) {
-        pos.x -= speed * std::sin(camera.yAxis);//*dt;
-        pos.z -= speed * std::cos(camera.yAxis);//*dt;
+        pos.x -= speed * (float) std::sin(camera.yAxis);//*dt;
+        pos.z -= speed * (float) std::cos(camera.yAxis);//*dt;
         moving = true;
     } if(input.on[Action::BACKWARD]) {
-        pos.x += speed * std::sin(camera.yAxis);//*dt;
-        pos.z += speed * std::cos(camera.yAxis);//*dt;
+        pos.x += speed * (float) std::sin(camera.yAxis);//*dt;
+        pos.z += speed * (float) std::cos(camera.yAxis);//*dt;
         moving = true;
     } if(input.on[Action::LEFT]) {
-        pos.x -= speed * std::sin(M_PI/2.0 + camera.yAxis);//*dt;
-        pos.z -= speed * std::cos(M_PI/2.0 + camera.yAxis);//*dt;
+        pos.x -= speed * (float) std::sin(M_PI/2.0 + camera.yAxis);//*dt;
+        pos.z -= speed * (float) std::cos(M_PI/2.0 + camera.yAxis);//*dt;
         moving = true;
     } if(input.on[Action::RIGHT]) {
-        pos.x += speed * std::sin(M_PI/2.0 + camera.yAxis);//*dt;
-        pos.z += speed * std::cos(M_PI/2.0 + camera.yAxis);//*dt;
+        pos.x += speed * (float) std::sin(M_PI/2.0 + camera.yAxis);//*dt;
+        pos.z += speed * (float) std::cos(M_PI/2.0 + camera.yAxis);//*dt;
         moving = true;
     } if(input.on[Action::UP]) {
         pos.y += speed;
@@ -68,8 +68,8 @@ void PlayerControlSys::tick() {
         camera.sprinting = false;
     }
     
-    camera.yAxis -= (input.mouseDiff.x) * (M_PI*0.1/180.);
-    camera.xAxis = std::max(std::min(camera.xAxis - (input.mouseDiff.y) * (M_PI*0.1/180.), M_PI/2.), -M_PI/2.);
+    camera.yAxis -= (float) ((input.mouseDiff.x) * (M_PI*0.1/180.));
+    camera.xAxis = (float) std::max(std::min(camera.xAxis - (input.mouseDiff.y) * (M_PI*0.1/180.), M_PI/2.), -M_PI/2.);
     
 }
 

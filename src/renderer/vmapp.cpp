@@ -79,6 +79,7 @@ VmaImage::VmaImage(Device& device, VmaAllocationCreateInfo* allocInfo, const vk:
     size = info.size;
     offset = info.offset;
     memory = info.deviceMemory;
+    format = imageInfo.format;
     
 }
 

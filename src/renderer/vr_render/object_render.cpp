@@ -5,37 +5,33 @@
 #include "renderer/context.h"
 #include "renderer/vr_render/renderpass.h"
 #include "renderer/vr_render/view_ubo.h"
-#include "logic/components/model/renderablec.h"
-#include "logic/components/model/modelc.h"
-#include "logic/components/model/bufferuploadc.h"
+#include "logic/components/renderablec.h"
 
-ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, ViewUBO& ubo) : reg(reg), ctx(ctx), renderpass(renderpass) {
+ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, std::vector<vk::DescriptorSetLayout> layouts) : reg(reg), ctx(ctx), renderpass(renderpass) {
 
-    createPipeline(ubo);
+    createPipeline(layouts);
 
 }
 
 
-void ObjectRender::render(vk::CommandBuffer command, vk::DescriptorSet set) {
+void ObjectRender::render(vk::CommandBuffer command) {
 
     command.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
-    command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, 0, {set}, nullptr);
-
     reg.view<RenderableC>().each([&](auto entity, RenderableC& renderable) {
 
-        ModelC& model = reg.get<ModelC>(renderable.model);
+        ModelC& model = *renderable.model.get();
         if(!model.isReady(reg, entity)) return;
 
         for(auto& part : model.parts) {
 
-            command.bindIndexBuffer(reg.get<VmaBuffer>(part.index.buffer).buffer, part.index.offset, vk::IndexType::eUint16);
+            command.bindIndexBuffer(part.index.buffer->buffer, part.index.offset, vk::IndexType::eUint16);
 
             command.bindVertexBuffers(0,
-                {reg.get<VmaBuffer>(part.position.buffer).buffer, reg.get<VmaBuffer>(part.normal.buffer).buffer},
+                {part.position.buffer->buffer, part.normal.buffer->buffer},
                 {part.position.offset, part.normal.offset});
 
-            command.drawIndexed(part.index.size / sizeof(uint16_t), 1, 0, 0, 0);
+            command.drawIndexed((uint32_t) (part.index.size / sizeof(uint16_t)), 1, 0, 0, 0);
 
         }
         
@@ -53,7 +49,7 @@ ObjectRender::~ObjectRender() {
 }
 
 
-void ObjectRender::createPipeline(ViewUBO& ubo) {
+void ObjectRender::createPipeline(std::vector<vk::DescriptorSetLayout> layouts) {
 
     // PIPELINE INFO
 
@@ -97,7 +93,7 @@ void ObjectRender::createPipeline(ViewUBO& ubo) {
         vk::VertexInputAttributeDescription(1, 1, vk::Format::eR32G32B32Sfloat, 0),
     };
 
-    auto vertexInputState = vk::PipelineVertexInputStateCreateInfo({}, vertexInputBindings.size(), vertexInputBindings.data(), vertexInputAttributs.size(), vertexInputAttributs.data());
+    auto vertexInputState = vk::PipelineVertexInputStateCreateInfo({}, (uint32_t) vertexInputBindings.size(), vertexInputBindings.data(), (uint32_t) vertexInputAttributs.size(), vertexInputAttributs.data());
 
 
 
@@ -109,9 +105,9 @@ void ObjectRender::createPipeline(ViewUBO& ubo) {
 
     VkViewport viewport = {};
     viewport.x = 0.0f;
-    viewport.y = ctx.swap.extent.height;
+    viewport.y = 0.0f;
     viewport.width = (float) ctx.swap.extent.width;
-    viewport.height = -((float) ctx.swap.extent.height);
+    viewport.height = (float) ctx.swap.extent.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
@@ -188,7 +184,7 @@ void ObjectRender::createPipeline(ViewUBO& ubo) {
     {
 
         layout = ctx.device->createPipelineLayout(vk::PipelineLayoutCreateInfo(
-            {}, 1, &ubo.descLayout, 0, nullptr
+            {}, layouts, {}
         ));
     }
 

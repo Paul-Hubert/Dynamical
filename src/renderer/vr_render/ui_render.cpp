@@ -16,20 +16,15 @@ UIRender::UIRender(Context& ctx, Renderpass& renderpass) : ctx(ctx) {
     int tex_w, tex_h;
     io.Fonts->GetTexDataAsRGBA32(&tex_pixels, &tex_w, &tex_h);
     
-    bool concurrent = (ctx.device.g_i != ctx.device.t_i);
-    uint32_t qfs[2] = { ctx.device.g_i, ctx.device.t_i};
-        
-    VmaAllocationCreateInfo allocInfo{};
-    allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    fontAtlas = VmaImage(ctx.device, &allocInfo, vk::ImageCreateInfo(
-        {}, vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(tex_w, tex_h, 1), 1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, 
-        concurrent ? vk::SharingMode::eConcurrent : vk::SharingMode::eExclusive, concurrent ? 2 : 1, &qfs[0], vk::ImageLayout::eUndefined)
-    );
-    
-    ctx.transfer.prepareImage(tex_pixels, tex_w * tex_h * 4, fontAtlas, vk::Extent3D(tex_w, tex_h, 1), 0, 0);
+    {
+        vk::ImageCreateInfo info(
+            {}, vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(tex_w, tex_h, 1), 1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+            vk::SharingMode::eExclusive, 1, &ctx.device.g_i, vk::ImageLayout::eUndefined);
+        fontAtlas = ctx.transfer.createImage(tex_pixels, tex_w * tex_h * 4, info, vk::ImageLayout::eShaderReadOnlyOptimal);
+    }
     
     fontView = ctx.device->createImageView(vk::ImageViewCreateInfo(
-        {}, fontAtlas, vk::ImageViewType::e2D, vk::Format::eR8G8B8A8Unorm, {}, 
+        {}, fontAtlas->image, vk::ImageViewType::e2D, vk::Format::eR8G8B8A8Unorm, {}, 
         vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
     ));
     
@@ -42,23 +37,25 @@ UIRender::UIRender(Context& ctx, Renderpass& renderpass) : ctx(ctx) {
         auto poolSizes = std::vector {
             vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1),
         };
-        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, 1, poolSizes.size(), poolSizes.data()));
+        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, 1, (uint32_t) poolSizes.size(), poolSizes.data()));
     }
     
     {
         auto bindings = std::vector {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment)
         };
-        descLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, bindings.size(), bindings.data()));
+        descLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, (uint32_t) bindings.size(), bindings.data()));
         
         descSet = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &descLayout))[0];
         
     }
     
-    auto info = vk::DescriptorImageInfo(fontSampler, fontView, vk::ImageLayout::eShaderReadOnlyOptimal);
-        
-    ctx.device->updateDescriptorSets({vk::WriteDescriptorSet(descSet, 0, 0, 1, vk::DescriptorType::eCombinedImageSampler, &info, 0, 0)}, {});
-    
+    {
+        auto info = vk::DescriptorImageInfo(fontSampler, fontView, vk::ImageLayout::eShaderReadOnlyOptimal);
+
+        ctx.device->updateDescriptorSets({vk::WriteDescriptorSet(descSet, 0, 0, 1, vk::DescriptorType::eCombinedImageSampler, &info, 0, 0)}, {});
+    }
+
     initPipeline(renderpass);
     
 }
@@ -244,7 +241,7 @@ void UIRender::initPipeline(vk::RenderPass renderpass) {
         {2, 0, vk::Format::eR8G8B8A8Unorm, offsetof(ImDrawVert, col)}
     };
 
-    auto vertexInputState = vk::PipelineVertexInputStateCreateInfo({}, vertexInputBindings.size(), vertexInputBindings.data(), vertexInputAttributs.size(), vertexInputAttributs.data());
+    auto vertexInputState = vk::PipelineVertexInputStateCreateInfo({}, (uint32_t) vertexInputBindings.size(), vertexInputBindings.data(), (uint32_t) vertexInputAttributs.size(), vertexInputAttributs.data());
     
     
     
@@ -337,7 +334,7 @@ void UIRender::initPipeline(vk::RenderPass renderpass) {
     auto range = vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, 4 * sizeof(float));
     
     pipelineLayout = ctx.device->createPipelineLayout(vk::PipelineLayoutCreateInfo(
-        {}, layouts.size(), layouts.data(), 1, &range
+        {}, (uint32_t) layouts.size(), layouts.data(), 1, &range
     ));
     
     VkGraphicsPipelineCreateInfo pipelineInfo = {};

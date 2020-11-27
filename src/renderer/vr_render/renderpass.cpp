@@ -34,9 +34,7 @@ Renderpass::Renderpass(Context& ctx) : views(ctx.vr.swapchains.size()), ctx(ctx)
 
     };
 
-    renderpass = ctx.device->createRenderPass(
-            vk::RenderPassCreateInfo({}, attachments.size(), attachments.data(), subpasses.size(), subpasses.data(),
-                                     0, nullptr));
+    renderpass = ctx.device->createRenderPass( vk::RenderPassCreateInfo({}, (uint32_t) attachments.size(), attachments.data(), (uint32_t) subpasses.size(), subpasses.data(), 0, nullptr));
 
     for(int v = 0; v<views.size(); v++) {
         auto& swapchain = ctx.vr.swapchains[v];
@@ -66,8 +64,7 @@ Renderpass::Renderpass(Context& ctx) : views(ctx.vr.swapchains.size()), ctx(ctx)
             auto image_views = std::vector<vk::ImageView>{swapchain.images[i].view, view.depthViews[i]};
 
             view.framebuffers[i] = ctx.device->createFramebuffer(
-                    vk::FramebufferCreateInfo({}, renderpass, image_views.size(), image_views.data(), swapchain.width,
-                                              swapchain.height, 1));
+                    vk::FramebufferCreateInfo({}, renderpass, (uint32_t) image_views.size(), image_views.data(), swapchain.width, swapchain.height, 1));
 
         }
     }

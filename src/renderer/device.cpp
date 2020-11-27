@@ -147,7 +147,7 @@ Device::Device(Context& ctx) : ctx(ctx) {
     
     // Create Device
     
-    logical = physical.createDevice(vk::DeviceCreateInfo({}, countF, pqinfo.data(), 0, nullptr, extensions.size(), extensions.data(), &requiredFeatures));
+    logical = physical.createDevice(vk::DeviceCreateInfo({}, countF, pqinfo.data(), 0, nullptr, (uint32_t) extensions.size(), extensions.data(), &requiredFeatures));
     
     
 #ifndef NDEBUG

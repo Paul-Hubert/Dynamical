@@ -68,6 +68,7 @@ public:
         this->size = image.size;
         this->offset = image.offset;
         this->memory = image.memory;
+        this->format = image.format;
         image.device = nullptr;
     }
     
@@ -83,6 +84,7 @@ public:
         this->size = image.size;
         this->offset = image.offset;
         this->memory = image.memory;
+        this->format = image.format;
         image.device = nullptr;
         return *this;
     }
@@ -96,6 +98,8 @@ public:
     vk::DeviceSize size;
     vk::DeviceSize offset;
     vk::DeviceMemory memory;
+
+    vk::Format format;
     
 private:
     Device* device;

@@ -66,7 +66,7 @@ Instance::Instance(Context& ctx) : ctx(ctx) {
     vk::ApplicationInfo appInfo("Test", VK_MAKE_VERSION(1, 0, 0), "Dynamical", VK_MAKE_VERSION(1, 0, 0), version);
 
 
-    instance = vk::createInstance(vk::InstanceCreateInfo({}, &appInfo, layers.size(), layers.data(), extensions.size(), extensions.data()));
+    instance = vk::createInstance(vk::InstanceCreateInfo({}, &appInfo, (uint32_t) layers.size(), layers.data(), (uint32_t) extensions.size(), extensions.data()));
 
     Instance &instance = *this;
 

@@ -13,8 +13,9 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-
-VRRender::VRRender(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx), renderpass(ctx), ubo(ctx),  object_render(reg, ctx, renderpass, ubo), ui_render(ctx, renderpass), swapchain_image_indices(ctx.vr.swapchains.size()) {
+VRRender::VRRender(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx), renderpass(ctx), ubo(ctx), material_manager(reg, ctx),
+object_render(reg, ctx, renderpass, std::vector<vk::DescriptorSetLayout>{ubo.descLayout}), ui_render(ctx, renderpass),
+swapchain_image_indices(ctx.vr.swapchains.size()) {
     
     commandPool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx.device.g_i));
 
@@ -56,8 +57,8 @@ static glm::mat4 projection_fov(const XrFovf fov, const float near_z, const floa
 
 static glm::mat4 view_pose(XrPosef& pose) {
 
-    glm::quat quat = glm::quat(pose.orientation.w * -1.0, pose.orientation.x,
-                               pose.orientation.y * -1.0, pose.orientation.z);
+    glm::quat quat = glm::quat(pose.orientation.w * -1.0f, pose.orientation.x,
+                               pose.orientation.y * -1.0f, pose.orientation.z);
     glm::mat4 rotation = glm::mat4_cast(quat);
 
     glm::vec3 position =
@@ -84,13 +85,16 @@ void VRRender::record(vk::CommandBuffer command) {
         auto clearValues = std::vector<vk::ClearValue>{
                 vk::ClearValue(vk::ClearColorValue(std::array<float, 4> { 0.2f, 0.2f, 0.2f, 1.0f })),
                 vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0))};
-        command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.views[v].framebuffers[image_index], vk::Rect2D({}, vk::Extent2D(swapchain.width, swapchain.height)), clearValues.size(), clearValues.data()), vk::SubpassContents::eInline);
 
-        command.setViewport(0, vk::Viewport(0, 0, swapchain.width, swapchain.height, 0, 1));
+        command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.views[v].framebuffers[image_index], vk::Rect2D({}, vk::Extent2D(swapchain.width, swapchain.height)), (uint32_t) clearValues.size(), clearValues.data()), vk::SubpassContents::eInline);
+
+        command.setViewport(0, vk::Viewport(0.f, 0.f, (float) swapchain.width, (float)swapchain.height, 0.f, 1.f));
 
         command.setScissor(0, vk::Rect2D(vk::Offset2D(), vk::Extent2D(swapchain.width, swapchain.height)));
 
-        object_render.render(command, ubo.views[v].descSets[0]);
+        command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, object_render.layout, 0, {ubo.views[v].descSets[0]}, nullptr);
+
+        object_render.render(command);
 
         ui_render.render(command, 0);
 
@@ -109,6 +113,8 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
     if(!ctx.vr.rendering) {
         return;
     }
+
+    material_manager.update();
 
 
     static float t = 0.f;
@@ -185,7 +191,7 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
     for(uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
         auto& view = views[v];
 
-        ubo.views[v].pointers[0]->view_projection = projection_fov(views[v].fov, 0.01, 100.) * view_pose(view.pose);
+        ubo.views[v].pointers[0]->view_projection = projection_fov(views[v].fov, 0.01f, 100.f) * view_pose(view.pose);
         ubo.views[v].pointers[0]->position = glm::vec4(view.pose.position.x, -view.pose.position.y, view.pose.position.z, 1.0f);
 
     }
