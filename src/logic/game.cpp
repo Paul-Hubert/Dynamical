@@ -10,7 +10,6 @@
 #include "game_set.h"
 
 #include <taskflow/taskflow.hpp>
-#include "util/services/gltf_loader.h"
 
 #include "logic/components/playerc.h"
 #include "factories/factory_list.h"
@@ -18,6 +17,7 @@
 #include "util/entt_util.h"
 
 #include "logic/components/renderablec.h"
+#include "renderer/model/model_manager.h"
 
 Game::Game(int argc, char** argv) : reg(), settings(reg, argc, argv),
 ui(std::make_unique<UISys>(reg)),
@@ -30,7 +30,6 @@ renderer(std::make_unique<Renderer>(reg)) {
 void Game::init() {
 
     reg.set<tf::Executor>();
-    auto& loader = reg.set<GLTFLoader>(reg);
     
     set = std::make_unique<GameSet>(*this);
     
@@ -42,10 +41,14 @@ void Game::init() {
     
     set->init();
 
-    auto box_model = loader.load("./resources/box.glb");
+    ModelManager& manager = reg.set<ModelManager>(reg);
+    
+    manager.load("./resources/box.glb");
+    auto box_model = manager.get("./resources/box.glb");
 
     entt::entity box = reg.create();
     reg.emplace<RenderableC>(box, box_model);
+    
     
 }
 

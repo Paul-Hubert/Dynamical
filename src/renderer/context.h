@@ -12,6 +12,8 @@
 
 #include "entt/entt.hpp"
 
+#include <memory>
+
 class Context {
 public:
     Context(entt::registry& reg);

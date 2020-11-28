@@ -15,7 +15,7 @@
 class GLTFLoader {
 public:
 	GLTFLoader(entt::registry& reg);
-	std::shared_ptr<ModelC> load(std::string path);
+	entt::entity load(std::string path);
 	~GLTFLoader();
 private:
 	entt::registry& reg;

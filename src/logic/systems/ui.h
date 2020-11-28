@@ -4,7 +4,7 @@
 #include "system.h"
 
 #include "imgui.h"
-#include <SDL.h>
+#include <sdl2/SDL.h>
 
 class UISys : public System {
 public:

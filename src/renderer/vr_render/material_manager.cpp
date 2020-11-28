@@ -13,8 +13,12 @@ MaterialManager::MaterialManager(entt::registry& reg, Context& ctx) : reg(reg), 
 
 void MaterialManager::update() {
 
+
+
 }
 
 MaterialManager::~MaterialManager() {
+
 	ctx.device->destroy(layout);
+
 }

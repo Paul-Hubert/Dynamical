@@ -1,7 +1,7 @@
 #ifndef WINDU_H
 #define WINDU_H
 
-#include <SDL.h>
+#include <sdl2/SDL.h>
 #include "renderer/vk.h"
 
 class Context;

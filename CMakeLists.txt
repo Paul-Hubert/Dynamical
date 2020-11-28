@@ -6,6 +6,7 @@ project(dynamical)
 
 include_directories("./src")
 
+
 file(GLOB_RECURSE sources ./src/main.cpp ./src/*.cpp ./src/*.h)
 
 add_executable(dynamical ${sources})
@@ -13,6 +14,7 @@ add_executable(dynamical ${sources})
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(dynamical PRIVATE -Werror -Wall -Wextra -Wno-sign-compare -Wno-unused-variable -Wno-unused-parameter -Wno-class-memaccess -Wno-unused-but-set-variable -Wno-reorder -Wno-missing-field-initializers -Wno-unused-function -Wno-type-limits)
 endif()
+
 
 find_package(Vulkan REQUIRED)
 target_link_libraries(dynamical PRIVATE Vulkan::Vulkan)
@@ -42,13 +44,15 @@ find_package(OpenXR CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE OpenXR::headers OpenXR::openxr_loader OpenXR::openxr-all-supported)
 
 find_package(Bullet CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE LinearMath Bullet3Common BulletDynamics)
+target_link_libraries(dynamical PRIVATE BulletDynamics BulletCollision LinearMath)
 
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
 target_include_directories(dynamical PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 
 find_package(nlohmann_json CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE nlohmann_json nlohmann_json::nlohmann_json)
+
+
 
 # Copy resources to build
 file(

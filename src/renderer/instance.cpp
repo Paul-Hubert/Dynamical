@@ -2,7 +2,7 @@
 
 #include "loader.inl"
 
-#include <SDL_vulkan.h>
+#include <sdl2/SDL_vulkan.h>
 #include <iostream>
 #include <util/util.h>
 

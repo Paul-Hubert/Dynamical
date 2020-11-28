@@ -6,6 +6,7 @@
 #include "renderer/vr_render/renderpass.h"
 #include "renderer/vr_render/view_ubo.h"
 #include "logic/components/renderablec.h"
+#include "renderer/model/modelc.h"
 
 ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, std::vector<vk::DescriptorSetLayout> layouts) : reg(reg), ctx(ctx), renderpass(renderpass) {
 
@@ -20,7 +21,7 @@ void ObjectRender::render(vk::CommandBuffer command) {
 
     reg.view<RenderableC>().each([&](auto entity, RenderableC& renderable) {
 
-        ModelC& model = *renderable.model.get();
+        ModelC& model = reg.get<ModelC>(renderable.model);
         if(!model.isReady(reg, entity)) return;
 
         for(auto& part : model.parts) {

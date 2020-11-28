@@ -1,14 +1,12 @@
 #ifndef RENDERABLEC_H
 #define RENDERABLEC_H
 
-#include <memory>
-
-#include "renderer/model/modelc.h"
+#include "entt/entt.hpp"
 
 class RenderableC {
 public:
-	RenderableC(std::shared_ptr<ModelC> model) : model(model) {}
-	std::shared_ptr<ModelC> model;
+	RenderableC(entt::entity model) : model(model) {}
+	entt::entity model;
 };
 
 #endif

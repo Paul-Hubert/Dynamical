@@ -15,7 +15,7 @@ GLTFLoader::GLTFLoader(entt::registry& reg) : reg(reg) {
 
 }
 
-std::shared_ptr<ModelC> GLTFLoader::load(std::string path) {
+entt::entity GLTFLoader::load(std::string path) {
 
 	Model m;
 	std::string err;
@@ -43,7 +43,8 @@ std::shared_ptr<ModelC> GLTFLoader::load(std::string path) {
 
 	Context& ctx = *reg.ctx<Context*>();
 
-	std::shared_ptr<ModelC> model = std::make_shared<ModelC>();
+	entt::entity model_entity = reg.create();
+	ModelC& model = reg.emplace<ModelC>(model_entity);
 
 	std::vector<std::shared_ptr<BufferC>> buffers;
 	for(auto& b : m.buffers) {
@@ -99,12 +100,12 @@ std::shared_ptr<ModelC> GLTFLoader::load(std::string path) {
 				makePart(m, it->second, part.uv, buffers, 2);
 			}
 
-			model->parts.push_back(part);
+			model.parts.push_back(part);
 
 		}
 	}
 
-	return model;
+	return model_entity;
 
 }
 

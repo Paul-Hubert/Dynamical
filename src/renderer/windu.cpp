@@ -4,7 +4,7 @@
 #include <vector>
 #include "util/util.h"
 
-#include <SDL_vulkan.h>
+#include <sdl2/SDL_vulkan.h>
 #include "renderer/vk.h"
 #include "context.h"
 

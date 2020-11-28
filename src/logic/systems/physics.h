@@ -3,6 +3,7 @@
 
 #include "system.h"
 
+#include "bullet/btBulletDynamicsCommon.h"
 
 class PhysicsSys : public System {
 public:
@@ -12,12 +13,12 @@ public:
     void tick() override;
     ~PhysicsSys();
     const char* name() override {return "Physics";};
-    /*
+    
     btDefaultCollisionConfiguration collisionConfiguration;
     btCollisionDispatcher dispatcher;
     btDbvtBroadphase overlappingPairCache;
     btSequentialImpulseConstraintSolver solver;
-    btDiscreteDynamicsWorld dynamicsWorld;*/
+    btDiscreteDynamicsWorld dynamicsWorld;
 
 };
 
