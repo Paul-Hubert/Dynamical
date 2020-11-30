@@ -4,16 +4,7 @@
 
 #include "logic/components/inputc.h"
 
-UISys::UISys(entt::registry& reg) : System(reg) {
-    
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-    auto& io = ImGui::GetIO(); (void) io;
-    io.Fonts->AddFontDefault();
-    //io.Fonts->AddFontFromFileTTF("./resources/fonts/aniron.ttf", 50.0f, NULL, io.Fonts->GetGlyphRangesDefault());
-    
-    io.IniFilename = nullptr;
+void UISys::init() {
 
     g_MouseCursors[ImGuiMouseCursor_Arrow] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
     g_MouseCursors[ImGuiMouseCursor_TextInput] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_IBEAM);
@@ -23,16 +14,14 @@ UISys::UISys(entt::registry& reg) : System(reg) {
     g_MouseCursors[ImGuiMouseCursor_ResizeNESW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENESW);
     g_MouseCursors[ImGuiMouseCursor_ResizeNWSE] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE);
     g_MouseCursors[ImGuiMouseCursor_Hand] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
-    
-}
-
-void UISys::init() {
 
     entt::monostate<"imgui_frame"_hs>{} = false;
 
 }
 
 void UISys::tick() {
+
+    OPTICK_EVENT();
     
     auto& input = reg.ctx<InputC>();
     

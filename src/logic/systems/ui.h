@@ -8,7 +8,7 @@
 
 class UISys : public System {
 public:
-    UISys(entt::registry& reg);
+    UISys(entt::registry& reg) : System(reg) {}
     void init() override;
     void tick() override;
     ~UISys() override;

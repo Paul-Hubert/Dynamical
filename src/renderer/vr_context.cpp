@@ -18,6 +18,7 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
     std::vector<const char*> layers;
 
     extensions.push_back(XR_KHR_VULKAN_ENABLE_EXTENSION_NAME);
+    //extensions.push_back("XR_KHR_convert_timespec_time");
 
 #ifndef NDEBUG
     extensions.push_back(XR_EXT_DEBUG_UTILS_EXTENSION_NAME);

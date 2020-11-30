@@ -3,7 +3,7 @@
 
 #include "system.h"
 
-#include "bullet/btBulletDynamicsCommon.h"
+#include "btBulletDynamicsCommon.h"
 
 class PhysicsSys : public System {
 public:
@@ -18,7 +18,7 @@ public:
     btCollisionDispatcher dispatcher;
     btDbvtBroadphase overlappingPairCache;
     btSequentialImpulseConstraintSolver solver;
-    btDiscreteDynamicsWorld dynamicsWorld;
+    btDiscreteDynamicsWorld world;
 
 };
 

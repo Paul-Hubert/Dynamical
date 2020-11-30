@@ -9,7 +9,7 @@ Renderpass::Renderpass(Context& ctx) : views(ctx.vr.swapchains.size()), ctx(ctx)
         vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment // | vk::FormatFeatureFlagBits::eTransferSrc
     );
 
-    auto attachments = std::vector<vk::AttachmentDescription>{
+    std::vector<vk::AttachmentDescription> attachments {
             vk::AttachmentDescription({}, vk::Format(ctx.vr.swapchain_format), vk::SampleCountFlagBits::e1,
                                       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
                                       vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
@@ -22,15 +22,15 @@ Renderpass::Renderpass(Context& ctx) : views(ctx.vr.swapchains.size()), ctx(ctx)
             )
     };
 
-    auto colorRef = vk::AttachmentReference(0, vk::ImageLayout::eColorAttachmentOptimal);
-    auto depthRef = vk::AttachmentReference(1, vk::ImageLayout::eDepthAttachmentStencilReadOnlyOptimal);
+    vk::AttachmentReference colorRef(0, vk::ImageLayout::eColorAttachmentOptimal);
+    vk::AttachmentReference depthRef(1, vk::ImageLayout::eDepthAttachmentStencilReadOnlyOptimal);
 
-    auto subpasses = std::vector<vk::SubpassDescription>{
+    std::vector<vk::SubpassDescription> subpasses {
             vk::SubpassDescription({}, vk::PipelineBindPoint::eGraphics, 0, nullptr, 1, &colorRef, nullptr,
                                    &depthRef, 0, nullptr)
     };
 
-    auto dependencies = std::vector<vk::SubpassDependency>{
+    std::vector<vk::SubpassDependency> dependencies {
 
     };
 
@@ -52,7 +52,7 @@ Renderpass::Renderpass(Context& ctx) : views(ctx.vr.swapchains.size()), ctx(ctx)
             view.depthImages[i] = VmaImage(ctx.device, &allocInfo, vk::ImageCreateInfo(
                     {}, vk::ImageType::e2D, depthFormat, vk::Extent3D(swapchain.width, swapchain.height, 1),
                     1, 1, vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal,
-                    vk::ImageUsageFlagBits::eDepthStencilAttachment, // | vk::ImageUsageFlagBits::eTransferSrc,
+                    vk::ImageUsageFlagBits::eDepthStencilAttachment,
                     vk::SharingMode::eExclusive, 1, &ctx.device.g_i, vk::ImageLayout::eUndefined
             ));
 

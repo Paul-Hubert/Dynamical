@@ -8,6 +8,9 @@
 #include "imagec.h"
 #include "materialc.h"
 
+#include "BulletCollision/Gimpact/btGImpactShape.h"
+#include <BulletCollision/CollisionShapes/btTriangleIndexVertexArray.h>
+
 class ModelC {
 public:
 	bool ready = false;
@@ -23,6 +26,9 @@ public:
 		View normal;
 		View uv;
 
+		std::vector<int> index_data;
+		std::vector<btScalar> vertex_data;
+
 		std::shared_ptr<MaterialC> material;
 	};
 
@@ -30,6 +36,13 @@ public:
 
 	// Material
 	std::shared_ptr<ImageC> color_image;
+
+
+	btScalar mass;
+
+	std::unique_ptr<btTriangleIndexVertexArray> tivma = nullptr;
+
+	std::unique_ptr<btCollisionShape> shape = nullptr;
 
 	// Checks if ready, if not check if everything is uploaded and set to ready
 	bool isReady(entt::registry& reg, entt::entity model) {

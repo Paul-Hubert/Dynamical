@@ -17,6 +17,8 @@ void VRPlayerControlSys::init() {
 
 void VRPlayerControlSys::tick() {
 
+	OPTICK_EVENT();
+
 }
 
 void VRPlayerControlSys::finish() {

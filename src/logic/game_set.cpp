@@ -35,14 +35,10 @@ GameSet::GameSet(Game& game) : SystemSet(game.reg) {
         MAKE_SYSTEM(InputSys, input)
         MAKE_SYSTEM(VRInputSys, vr_input)
         MAKE_SYSTEM(DebugSys, debug)
-        add(game.ui.get());
+        MAKE_SYSTEM(UISys, ui)
     }
     
     MAKE_SYSTEM(PhysicsSys, physics)
-    
-    if(user) {
-        add(game.renderer.get());
-    }
     
 }
 

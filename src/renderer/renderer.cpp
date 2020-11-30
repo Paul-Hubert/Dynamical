@@ -8,7 +8,9 @@
 #include "logic/components/inputc.h"
 #include "num_frames.h"
 
-Renderer::Renderer(entt::registry& reg) : System(reg), ctx(std::make_unique<Context>(reg)), vr_render(reg, *ctx) {
+#include "optick.h"
+
+Renderer::Renderer(entt::registry& reg) : reg(reg), ctx(std::make_unique<Context>(reg)), vr_render(reg, *ctx) {
 
 }
 
@@ -22,7 +24,9 @@ void Renderer::init() {
     
 }
 
-void Renderer::tick() {
+void Renderer::render() {
+    
+    OPTICK_EVENT();
 
     ctx->transfer.flush();
     

@@ -5,9 +5,11 @@ set(CMAKE_CXX_STANDARD 17)
 project(dynamical)
 
 include_directories("./src")
-
+include_directories("./3rdparty")
 
 file(GLOB_RECURSE sources ./src/main.cpp ./src/*.cpp ./src/*.h)
+
+
 
 add_executable(dynamical ${sources})
 
@@ -44,6 +46,7 @@ find_package(OpenXR CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE OpenXR::headers OpenXR::openxr_loader OpenXR::openxr-all-supported)
 
 find_package(Bullet CONFIG REQUIRED)
+target_include_directories(dynamical PUBLIC ${BULLET_INCLUDE_DIRS})
 target_link_libraries(dynamical PRIVATE BulletDynamics BulletCollision LinearMath)
 
 find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
@@ -53,6 +56,12 @@ find_package(nlohmann_json CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE nlohmann_json nlohmann_json::nlohmann_json)
 
 
+set(OPTICK_INSTALL_TARGETS OFF)
+set(OPTICK_ENABLED ON)
+set(OPTICK_USE_VULKAN ON)
+
+add_subdirectory(3rdparty/optick)
+target_link_libraries(dynamical PRIVATE OptickCore)
 
 # Copy resources to build
 file(

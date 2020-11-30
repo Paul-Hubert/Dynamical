@@ -5,10 +5,11 @@
 
 #include "entt/entt.hpp"
 
+#include "systems/ui.h"
+#include "renderer/renderer.h"
+
 #include "systems/settings.h"
 
-class UISys;
-class Renderer;
 class SystemSet;
 
 class Game {
@@ -17,10 +18,8 @@ public:
     void init();
     void start();
     ~Game();
-    
-    std::unique_ptr<UISys> ui;
 
-    std::unique_ptr<Renderer> renderer;
+    Renderer renderer;
 
     entt::registry reg;
     

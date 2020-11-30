@@ -8,7 +8,6 @@
 #include "logic/components/inputc.h"
 #include "logic/components/camerac.h"
 #include "logic/components/playerc.h"
-#include "logic/components/positionc.h"
 
 void PlayerControlSys::preinit() {
 
@@ -22,7 +21,10 @@ void PlayerControlSys::init() {
 }
 
 void PlayerControlSys::tick() {
+
+    OPTICK_EVENT();
     
+    /*
     auto player = reg.ctx<Util::Entity<"player"_hs>>();
     CameraC& camera = reg.get<CameraC>(player);
     auto& pos = reg.get<PositionC>(player).pos;
@@ -71,6 +73,8 @@ void PlayerControlSys::tick() {
     camera.yAxis -= (float) ((input.mouseDiff.x) * (M_PI*0.1/180.));
     camera.xAxis = (float) std::max(std::min(camera.xAxis - (input.mouseDiff.y) * (M_PI*0.1/180.), M_PI/2.), -M_PI/2.);
     
+    */
+
 }
 
 void PlayerControlSys::finish() {

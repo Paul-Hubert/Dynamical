@@ -10,7 +10,15 @@
 
 UIRender::UIRender(Context& ctx, Renderpass& renderpass) : ctx(ctx) {
     
-    auto& io = ImGui::GetIO();
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    auto& io = ImGui::GetIO(); (void)io;
+    io.Fonts->AddFontDefault();
+    //io.Fonts->AddFontFromFileTTF("./resources/fonts/aniron.ttf", 50.0f, NULL, io.Fonts->GetGlyphRangesDefault());
+
+    io.IniFilename = nullptr;
+
     
     unsigned char* tex_pixels = NULL;
     int tex_w, tex_h;
@@ -182,6 +190,7 @@ void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t i) {
                                                            vk::Extent2D( (uint32_t)(clip_rect.z - clip_rect.x), (uint32_t)(clip_rect.w - clip_rect.y))));
 
                     // Draw
+                    OPTICK_GPU_EVENT("draw_ui_element");
                     commandBuffer.drawIndexed(pcmd->ElemCount, 1, idx_offset, vtx_offset, 0);
                 }
                 

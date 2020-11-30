@@ -12,6 +12,8 @@ void DebugSys::init() {
 }
 
 void DebugSys::tick() {
+
+    OPTICK_EVENT();
     
     InputC& input = reg.ctx<InputC>();
     if(input.on[Action::DEBUG]) {

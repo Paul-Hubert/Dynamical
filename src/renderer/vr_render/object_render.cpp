@@ -5,7 +5,8 @@
 #include "renderer/context.h"
 #include "renderer/vr_render/renderpass.h"
 #include "renderer/vr_render/view_ubo.h"
-#include "logic/components/renderablec.h"
+
+#include "logic/components/model_renderablec.h"
 #include "renderer/model/modelc.h"
 
 ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, std::vector<vk::DescriptorSetLayout> layouts) : reg(reg), ctx(ctx), renderpass(renderpass) {
@@ -19,7 +20,9 @@ void ObjectRender::render(vk::CommandBuffer command) {
 
     command.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
-    reg.view<RenderableC>().each([&](auto entity, RenderableC& renderable) {
+    reg.view<ModelRenderableC>().each([&](auto entity, ModelRenderableC& renderable) {
+        
+        OPTICK_GPU_EVENT("draw_model");
 
         ModelC& model = reg.get<ModelC>(renderable.model);
         if(!model.isReady(reg, entity)) return;
@@ -32,6 +35,7 @@ void ObjectRender::render(vk::CommandBuffer command) {
                 {part.position.buffer->buffer, part.normal.buffer->buffer},
                 {part.position.offset, part.normal.offset});
 
+            OPTICK_GPU_EVENT("draw_model_part");
             command.drawIndexed((uint32_t) (part.index.size / sizeof(uint16_t)), 1, 0, 0, 0);
 
         }

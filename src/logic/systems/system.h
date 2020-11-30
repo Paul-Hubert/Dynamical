@@ -5,6 +5,8 @@
 
 #include <iostream>
 
+#include "optick.h"
+
 class System {
 public:
     System(entt::registry& reg) : reg(reg) {};

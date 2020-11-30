@@ -49,16 +49,25 @@ private:
     ObjectRender object_render;
     UIRender ui_render;
 
-    uint32_t frame_index = 0;
-    std::vector<uint32_t> swapchain_image_indices;
-    bool ready = false;
-    
     vk::CommandPool commandPool;
-    std::array<vk::CommandBuffer, NUM_FRAMES> commandBuffers;
-    vk::Fence fence;
+    
+    std::vector<uint32_t> swapchain_image_indices;
 
-    tf::Taskflow taskflow;
-    std::future<void> future;
+    uint32_t frame_index = 0;
+    struct per_frame {
+        vk::CommandBuffer commandBuffer;
+        vk::Fence fence;
+    };
+    std::vector<per_frame> per_frame;
+
+    uint32_t swapchain_index = 0;
+    struct per_swapchain_image {
+        vk::Semaphore acquire_semaphore;
+        vk::Semaphore present_semaphore;
+        vk::CommandBuffer commandBuffer;
+        vk::Fence fence;
+    };
+    std::vector<per_swapchain_image> per_swapchain_image;
 
 };
 

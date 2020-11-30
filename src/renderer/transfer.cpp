@@ -21,6 +21,8 @@ void Transfer::Upload::reset(Context& ctx, vk::CommandPool pool) {
 
 void Transfer::flush() {
 
+    OPTICK_EVENT();
+
     for(auto it = uploads.begin(); it != uploads.end();) {
         Upload& upload = *it;
         vk::Result result = ctx.device->waitForFences({upload.fence}, VK_TRUE, 0);

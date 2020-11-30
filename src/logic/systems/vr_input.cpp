@@ -14,6 +14,8 @@ void VRInputSys::init() {
 
 void VRInputSys::tick() {
 
+    OPTICK_EVENT();
+
     Context& ctx = *reg.ctx<Context*>();
     InputC& input = reg.ctx<InputC>();
 
@@ -60,6 +62,10 @@ void VRInputSys::tick() {
         }
         event_buffer = { XR_TYPE_EVENT_DATA_BUFFER };
     }
+
+
+
+
 
 }
 

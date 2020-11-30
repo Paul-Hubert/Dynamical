@@ -19,6 +19,7 @@ std::unordered_map<SDL_Scancode, Action> actionMap = {
     {SDL_SCANCODE_LSHIFT, Action::DOWN},
     {SDL_SCANCODE_M, Action::MENU},
     {SDL_SCANCODE_K, Action::DEBUG},
+    {SDL_SCANCODE_L, Action::LAG},
     {SDL_SCANCODE_P, Action::MOUSE}
 };
 
@@ -48,6 +49,8 @@ void InputSys::init() {
 
 
 void InputSys::tick() {
+
+    OPTICK_EVENT();
     
     InputC& input = reg.ctx<InputC>();
     

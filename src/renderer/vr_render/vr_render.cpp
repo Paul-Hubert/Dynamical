@@ -13,18 +13,22 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <thread>
+
 VRRender::VRRender(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx), renderpass(ctx), ubo(ctx), material_manager(reg, ctx),
-object_render(reg, ctx, renderpass, std::vector<vk::DescriptorSetLayout>{ubo.descLayout}), ui_render(ctx, renderpass),
-swapchain_image_indices(ctx.vr.swapchains.size()) {
+object_render(reg, ctx, renderpass, std::vector<vk::DescriptorSetLayout>{ubo.descLayout}),
+ui_render(ctx, renderpass),
+swapchain_image_indices(ctx.vr.swapchains.size()),
+per_frame(ctx.vr.swapchains[0].images.size()) {
     
     commandPool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx.device.g_i));
 
-    auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, NUM_FRAMES));
+    auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, per_frame.size()));
 
-    for(int i = 0; i < NUM_FRAMES; i++) {
-        commandBuffers[i] = cmds[i];
+    for(int i = 0; i < per_frame.size(); i++) {
+        per_frame[i].commandBuffer = cmds[i];
+        per_frame[i].fence = ctx.device->createFence({});
     }
-    fence = ctx.device->createFence({});
 
 }
 
@@ -76,27 +80,41 @@ static glm::mat4 view_pose(XrPosef& pose) {
 
 void VRRender::record(vk::CommandBuffer command) {
 
-    command.begin(vk::CommandBufferBeginInfo({}, nullptr));
+    OPTICK_EVENT();
 
-    for(uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
+    command.begin(vk::CommandBufferBeginInfo({}, nullptr));
+    OPTICK_GPU_CONTEXT(command);
+    OPTICK_GPU_EVENT("draw");
+
+    for (uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
         auto& swapchain = ctx.vr.swapchains[v];
         uint32_t image_index = swapchain_image_indices[v];
 
         auto clearValues = std::vector<vk::ClearValue>{
                 vk::ClearValue(vk::ClearColorValue(std::array<float, 4> { 0.2f, 0.2f, 0.2f, 1.0f })),
-                vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0))};
+                vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0)) };
 
-        command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.views[v].framebuffers[image_index], vk::Rect2D({}, vk::Extent2D(swapchain.width, swapchain.height)), (uint32_t) clearValues.size(), clearValues.data()), vk::SubpassContents::eInline);
+        command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.views[v].framebuffers[image_index], vk::Rect2D({}, vk::Extent2D(swapchain.width, swapchain.height)), (uint32_t)clearValues.size(), clearValues.data()), vk::SubpassContents::eInline);
 
-        command.setViewport(0, vk::Viewport(0.f, 0.f, (float) swapchain.width, (float)swapchain.height, 0.f, 1.f));
+        command.setViewport(0, vk::Viewport(0.f, 0.f, (float)swapchain.width, (float)swapchain.height, 0.f, 1.f));
 
         command.setScissor(0, vk::Rect2D(vk::Offset2D(), vk::Extent2D(swapchain.width, swapchain.height)));
 
-        command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, object_render.layout, 0, {ubo.views[v].descSets[0]}, nullptr);
+        command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, object_render.layout, 0, { ubo.views[v].descSets[0] }, nullptr);
 
-        object_render.render(command);
+        {
 
-        ui_render.render(command, 0);
+            OPTICK_GPU_EVENT("draw_objects");
+            object_render.render(command);
+
+        }
+
+        {
+
+            OPTICK_GPU_EVENT("draw_ui");
+            ui_render.render(command, 0);
+
+        }
 
         command.endRenderPass();
 
@@ -109,6 +127,8 @@ void VRRender::record(vk::CommandBuffer command) {
 
 
 void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals) {
+
+    OPTICK_EVENT();
 
     if(!ctx.vr.rendering) {
         return;
@@ -129,49 +149,89 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
 
     // Pre record command buffer
 
-    frame_index = (frame_index + 1) % NUM_FRAMES;
+    frame_index = (frame_index + 1) % per_frame.size();
 
 
     // Record with swapchain images
 
     for(uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
-        auto& swapchain = ctx.vr.swapchains[v];
 
-        xrCheckResult(xrAcquireSwapchainImage(swapchain.handle, nullptr, &swapchain_image_indices[v]));
+        OPTICK_EVENT("acquire_swapchain");
+        xrCheckResult(xrAcquireSwapchainImage(ctx.vr.swapchains[v].handle, nullptr, &swapchain_image_indices[v]));
+
+    }
+    
+    for (uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
+
+        XrSwapchainImageWaitInfo wait_info = { XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
+        wait_info.timeout = XR_INFINITE_DURATION;
+
+        OPTICK_EVENT("wait_swapchain");
+        xrCheckResult(xrWaitSwapchainImage(ctx.vr.swapchains[v].handle, &wait_info));
 
     }
 
+    {
 
-    record(commandBuffers[frame_index]);
+        OPTICK_EVENT("wait_fence");
+        ctx.device->waitForFences({per_frame[frame_index].fence}, VK_TRUE, std::numeric_limits<uint64_t>::max());
+        ctx.device->resetFences({per_frame[frame_index].fence});
 
+    }
 
-    for(uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
+    record(per_frame[frame_index].commandBuffer);
 
-        XrSwapchainImageWaitInfo wait_info = {XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
-        wait_info.timeout = XR_INFINITE_DURATION;
-        xrCheckResult(xrWaitSwapchainImage(ctx.vr.swapchains[v].handle, &wait_info));
-
+    for (uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
+        OPTICK_EVENT("release_swapchain");
+        xrCheckResult(xrReleaseSwapchainImage(ctx.vr.swapchains[v].handle, nullptr));
     }
 
 
 
     // Begin Frame
 
-    XrFrameState frame_state = {XR_TYPE_FRAME_STATE};
-    xrCheckResult(xrWaitFrame(ctx.vr.session, nullptr, &frame_state));
+    XrFrameState frame_state = { XR_TYPE_FRAME_STATE };
+    {
+
+        OPTICK_EVENT("wait_frame");
+        xrCheckResult(xrWaitFrame(ctx.vr.session, nullptr, &frame_state));
+
+    }
     XrTime predicted_time = frame_state.predictedDisplayTime;
 
-    XrResult result = xrBeginFrame(ctx.vr.session, nullptr);
+    XrResult result;
+    {
+
+        OPTICK_EVENT("begin_frame");
+        result = xrBeginFrame(ctx.vr.session, nullptr);
+
+    }
 
     if(result == XR_FRAME_DISCARDED || result == XR_SESSION_NOT_FOCUSED || frame_state.shouldRender == XR_FALSE) {
+
         Util::log() << "frame discarded\n";
         XrFrameEndInfo end_info {XR_TYPE_FRAME_END_INFO};
         end_info.displayTime = predicted_time;
         end_info.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+
+        OPTICK_EVENT("end_frame_premature");
         xrCheckResult(xrEndFrame(ctx.vr.session, &end_info));
         return;
-    } else xrCheckResult(result);
 
+    } else {
+
+        xrCheckResult(result);
+
+    }
+
+    {
+
+        InputC& input = reg.ctx<InputC>();
+
+        OPTICK_EVENT("sleep");
+        if(input.on[Action::LAG]) std::this_thread::sleep_for(std::chrono::nanoseconds(7000000));
+
+    }
 
     // Get VR view matrices
 
@@ -182,50 +242,45 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
     locate_info.displayTime = predicted_time;
     locate_info.space = ctx.vr.space;
     std::vector<XrView> views(ctx.vr.swapchains.size(), {XR_TYPE_VIEW});
-    xrCheckResult(xrLocateViews(ctx.vr.session, &locate_info, &view_state, (uint32_t)views.size(), &view_count, views.data()));
+    {
 
+        OPTICK_EVENT("locate_views");
+        xrCheckResult(xrLocateViews(ctx.vr.session, &locate_info, &view_state, (uint32_t)views.size(), &view_count, views.data()));
 
+    }
+    
 
     // Update matrices at the very end
 
-    for(uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
+    for (uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
         auto& view = views[v];
 
+        OPTICK_EVENT("calculate_matrices");
         ubo.views[v].pointers[0]->view_projection = projection_fov(views[v].fov, 0.01f, 100.f) * view_pose(view.pose);
         ubo.views[v].pointers[0]->position = glm::vec4(view.pose.position.x, -view.pose.position.y, view.pose.position.z, 1.0f);
 
     }
 
 
-
-
     // Submit command buffer
 
-    auto stages = std::vector<vk::PipelineStageFlags> {vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTopOfPipe};
+    {
 
-    ctx.device.graphics.submit({vk::SubmitInfo(
-            0, nullptr, nullptr,
-            1, &commandBuffers[frame_index],
-            0, nullptr
-    )}, fence);
+        auto stages = std::vector<vk::PipelineStageFlags>{ vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTopOfPipe };
 
+        OPTICK_EVENT("submit");
+        ctx.device.graphics.submit({ vk::SubmitInfo(
+                0, nullptr, stages.data(),
+                1, &per_frame[frame_index].commandBuffer,
+                0, nullptr
+        ) }, per_frame[frame_index].fence);
 
-
-
-    // Wait on fence on separate thread to avoid wasting time but still present as soon as possible
-    
-    ctx.device->waitForFences(fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
-    ctx.device->resetFences(fence);
-
-
-
-    for(uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
-        xrCheckResult(xrReleaseSwapchainImage(ctx.vr.swapchains[v].handle, nullptr));
     }
 
 
 
     // Present
+
 
     std::vector<XrCompositionLayerProjectionView> proj_views(ctx.vr.swapchains.size());
 
@@ -253,7 +308,13 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
     end_info.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
     end_info.layerCount = 1;
     end_info.layers = &layer;
-    xrCheckResult(xrEndFrame(ctx.vr.session, &end_info));
+
+    {
+
+        OPTICK_EVENT("end_frame");
+        xrCheckResult(xrEndFrame(ctx.vr.session, &end_info));
+
+    }
 
 }
 
@@ -261,7 +322,9 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
 
 VRRender::~VRRender() {
 
-    ctx.device->destroy(fence);
+    for (int i = 0; i < per_frame.size(); i++) {
+        ctx.device->destroy(per_frame[i].fence);
+    }
     
     ctx.device->destroy(commandPool);
     

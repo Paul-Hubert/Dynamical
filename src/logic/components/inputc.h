@@ -21,6 +21,7 @@ enum Action : char {
     DEBUG,
     EXIT,
     MOUSE,
+    LAG,
     END_ENUM
 };
 

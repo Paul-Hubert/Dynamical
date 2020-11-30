@@ -27,6 +27,8 @@ void SystemSet::init() {
 }
 
 void SystemSet::tick() {
+
+    OPTICK_EVENT();
     
     for(System* sys : systems) {
         sys->tick();

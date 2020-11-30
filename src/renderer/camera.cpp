@@ -7,7 +7,6 @@
 
 #include "util/entt_util.h"
 
-#include "logic/components/positionc.h"
 #include "logic/components/camerac.h"
 #include "logic/components/vrcamerac.h"
 
@@ -22,7 +21,7 @@ void Camera::setup(int width, int height) {
 }
 
 void Camera::update() {
-    
+    /*
     auto player = reg.ctx<Util::Entity<"player"_hs>>();
     auto cam = reg.get<CameraC>(player);
     auto pos = reg.get<PositionC>(player).pos;
@@ -37,7 +36,7 @@ void Camera::update() {
     viewProjection = projection * view;
     
     position = pos;
-    
+    */
 }
 
 glm::mat4& Camera::getProjection() {

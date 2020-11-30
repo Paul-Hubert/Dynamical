@@ -8,6 +8,5 @@ namespace NAME {\
     entt::entity build(entt::registry& reg, __VA_ARGS__);\
 }
 
-
 #undef DEFINE_FACTORY
 #endif

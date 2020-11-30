@@ -4,6 +4,7 @@
 #include "renderer/context.h"
 #include "renderer/model/materialc.h"
 
+
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -66,6 +67,10 @@ entt::entity GLTFLoader::load(std::string path) {
 		materials.push_back(std::make_shared<MaterialC>(images[mat.pbrMetallicRoughness.baseColorTexture.index]));
 	}
 
+	model.mass = 10;
+
+	model.tivma = std::make_unique<btTriangleIndexVertexArray>();
+
 	for(auto& mesh : m.meshes) {
 		for(auto& primitive : mesh.primitives) {
 			if(primitive.mode != TINYGLTF_MODE_TRIANGLES) {
@@ -73,7 +78,55 @@ entt::entity GLTFLoader::load(std::string path) {
 				continue;
 			}
 
-			ModelC::Part part;
+
+			model.parts.emplace_back();
+			ModelC::Part& part = model.parts.back();
+
+			btIndexedMesh mesh;
+			{
+
+				auto& acc = m.accessors[primitive.indices];
+				auto& view = m.bufferViews[acc.bufferView];
+				auto& buffer = m.buffers[view.buffer];
+				part.index_data.resize(acc.count);
+				unsigned char* data = reinterpret_cast<unsigned char*>(buffer.data.data());
+				for (int i = 0; i < acc.count; i++) {
+					uint16_t* index = reinterpret_cast<uint16_t*>(data + acc.byteOffset + view.byteOffset + i * (acc.ByteStride(view)));
+					part.index_data[i] = *index;
+				}
+
+				mesh.m_numTriangles = acc.count / 3;
+				mesh.m_triangleIndexBase = (const unsigned char*) part.index_data.data();
+				mesh.m_triangleIndexStride = 3 * sizeof(int);
+
+			}
+
+			{
+
+				auto it = primitive.attributes.find("POSITION");
+				if (it == primitive.attributes.end())
+					Util::log(Util::warning) << "GLTFLoader : Position needed\n";
+				auto& acc = m.accessors[it->second];
+				auto& view = m.bufferViews[acc.bufferView];
+				auto& buffer = m.buffers[view.buffer];
+				part.vertex_data.resize(acc.count*3);
+				unsigned char* data = reinterpret_cast<unsigned char*>(buffer.data.data());
+				for (int i = 0; i < acc.count; i++) {
+					float* vertex = reinterpret_cast<float*>(data + acc.byteOffset + view.byteOffset + i * (acc.ByteStride(view)));
+					part.vertex_data[i * 3 + 0] = (*(vertex + 0));
+					part.vertex_data[i * 3 + 1] = (*(vertex + 1));
+					part.vertex_data[i * 3 + 2] = (*(vertex + 2));
+				}
+
+				mesh.m_numVertices = acc.count;
+				mesh.m_vertexBase = (const unsigned char*) part.vertex_data.data();
+				mesh.m_vertexStride = 3 * sizeof(btScalar);
+
+			}
+
+			model.tivma->addIndexedMesh(mesh);
+
+			
 			
 			part.material = materials[primitive.material];
 
@@ -100,10 +153,15 @@ entt::entity GLTFLoader::load(std::string path) {
 				makePart(m, it->second, part.uv, buffers, 2);
 			}
 
-			model.parts.push_back(part);
+			
+
 
 		}
 	}
+
+	btGImpactMeshShape* gimpact = new btGImpactMeshShape(model.tivma.get());
+	gimpact->updateBound();
+	model.shape = std::unique_ptr<btCollisionShape>(gimpact);
 
 	return model_entity;
 
