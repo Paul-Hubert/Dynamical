@@ -5,10 +5,9 @@
 
 #include "imgui.h"
 
-#include "renderer/num_frames.h"
 #include "util/util.h"
 
-UIRender::UIRender(Context& ctx, Renderpass& renderpass) : ctx(ctx) {
+UIRender::UIRender(Context& ctx, Renderpass& renderpass) : ctx(ctx), g_FramesDataBuffers(ctx.swap.num_frames) {
     
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -88,7 +87,7 @@ void UIRender::createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buffer
     
 }
 
-void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t i) {
+void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t index) {
 
     ImGui::Render();
     entt::monostate<"imgui_frame"_hs>{} = false;
@@ -101,7 +100,7 @@ void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t i) {
     if (fb_width <= 0 || fb_height <= 0 || draw_data->TotalVtxCount == 0)
         return;
 
-    FrameDataForRender* fd = &g_FramesDataBuffers[i];
+    FrameDataForRender* fd = &g_FramesDataBuffers[index];
 
     // Create the Vertex and Index buffers:
     size_t vertex_size = draw_data->TotalVtxCount * sizeof(ImDrawVert);

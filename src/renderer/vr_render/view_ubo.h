@@ -27,10 +27,12 @@ public:
     vk::DescriptorSetLayout descLayout;
 
     struct View {
-        std::vector<vk::DescriptorSet> descSets;
-
-        std::array<VmaBuffer, NUM_FRAMES> ubos;
-        std::array<UBO*, NUM_FRAMES> pointers;
+        struct PerFrame {
+            vk::DescriptorSet set;
+            VmaBuffer ubo;
+            UBO* pointer;
+        };
+        std::vector<PerFrame> per_frame;
     };
     std::vector<View> views;
 

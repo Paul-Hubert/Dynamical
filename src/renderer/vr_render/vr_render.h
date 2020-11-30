@@ -1,6 +1,8 @@
 #ifndef MAIN_RENDER_H
 #define MAIN_RENDER_H
 
+#include "renderer/vk.h"
+
 #include "renderpass.h"
 #include "object_render.h"
 #include "ui_render.h"

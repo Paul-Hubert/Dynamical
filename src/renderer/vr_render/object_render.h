@@ -16,13 +16,18 @@ class ViewUBO;
 class ObjectRender {
 public:
     ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, std::vector<vk::DescriptorSetLayout> layouts);
-    void render(vk::CommandBuffer command);
+    void render(vk::CommandBuffer command, uint32_t index);
     ~ObjectRender();
 
     void createPipeline(std::vector<vk::DescriptorSetLayout> layouts);
 
-    operator vk::Pipeline() { return pipeline; }
-    operator vk::PipelineLayout() { return layout; }
+    vk::DescriptorPool pool;
+    vk::DescriptorSetLayout set_layout;
+    struct per_frame {
+        vk::DescriptorSet set;
+        VmaBuffer buffer;
+    };
+    std::vector<per_frame> per_frame;
 
     vk::PipelineLayout layout;
     vk::Pipeline pipeline;

@@ -5,6 +5,7 @@
 
 #include <iostream>
 
+#include "vulkan/vulkan.h"
 #include "optick.h"
 
 class System {

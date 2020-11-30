@@ -6,8 +6,6 @@
 
 #include "imgui.h"
 
-#include "renderer/num_frames.h"
-
 #include <memory>
 
 #include "renderer/model/imagec.h"
@@ -33,7 +31,7 @@ public:
     
     void createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buffer_memory, vk::DeviceSize& p_buffer_size, size_t new_size,vk::BufferUsageFlagBits usage);
     
-    void render(vk::CommandBuffer commandBuffer, uint32_t i);
+    void render(vk::CommandBuffer commandBuffer, uint32_t index);
     
     vk::DescriptorPool descPool;
     vk::DescriptorSetLayout descLayout;
@@ -41,7 +39,7 @@ public:
     vk::PipelineLayout pipelineLayout;
     vk::Pipeline graphicsPipeline;
     
-    std::array<FrameDataForRender, NUM_FRAMES> g_FramesDataBuffers;
+    std::vector<FrameDataForRender> g_FramesDataBuffers;
     
     std::shared_ptr<ImageC> fontAtlas;
     vk::ImageView fontView;

@@ -9,14 +9,27 @@
 #include "logic/components/model_renderablec.h"
 #include "renderer/model/modelc.h"
 
-ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, std::vector<vk::DescriptorSetLayout> layouts) : reg(reg), ctx(ctx), renderpass(renderpass) {
+ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, std::vector<vk::DescriptorSetLayout> layouts) : reg(reg), ctx(ctx), renderpass(renderpass),
+per_frame(ctx.swap.num_frames) {
+
+    pool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, ctx.swap.num_frames, vk::DescriptorPoolSize(vk::DescriptorType::eUniformBufferDynamic, ctx.swap.num_frames)));
+
+    vk::DescriptorSetLayoutBinding binding(0, vk::DescriptorType::eUniformBufferDynamic, vk::ShaderStageFlagBits::eVertex, {});
+    set_layout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, binding));
+
+    layouts.push_back(set_layout);
+
+    for (int i = 0; i < per_frame.size(); i++) {
+
+    }
+
 
     createPipeline(layouts);
 
 }
 
 
-void ObjectRender::render(vk::CommandBuffer command) {
+void ObjectRender::render(vk::CommandBuffer command, uint32_t index) {
 
     command.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
@@ -50,6 +63,10 @@ ObjectRender::~ObjectRender() {
     ctx.device->destroy(pipeline);
 
     ctx.device->destroy(layout);
+
+    ctx.device->destroy(set_layout);
+
+    ctx.device->destroy(pool);
 
 }
 

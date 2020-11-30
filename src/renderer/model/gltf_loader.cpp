@@ -95,7 +95,7 @@ entt::entity GLTFLoader::load(std::string path) {
 					part.index_data[i] = *index;
 				}
 
-				mesh.m_numTriangles = acc.count / 3;
+				mesh.m_numTriangles = (int) (acc.count / 3);
 				mesh.m_triangleIndexBase = (const unsigned char*) part.index_data.data();
 				mesh.m_triangleIndexStride = 3 * sizeof(int);
 
@@ -118,7 +118,7 @@ entt::entity GLTFLoader::load(std::string path) {
 					part.vertex_data[i * 3 + 2] = (*(vertex + 2));
 				}
 
-				mesh.m_numVertices = acc.count;
+				mesh.m_numVertices = (int) acc.count;
 				mesh.m_vertexBase = (const unsigned char*) part.vertex_data.data();
 				mesh.m_vertexStride = 3 * sizeof(btScalar);
 

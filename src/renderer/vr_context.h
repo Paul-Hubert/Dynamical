@@ -37,11 +37,14 @@ public:
     bool rendering = false;
     XrSpace space = {};
 
+    uint32_t num_frames = 0;
+
     VkFormat swapchain_format = VK_FORMAT_R8G8B8A8_SRGB;
     struct swapchain {
         XrSwapchain handle;
         uint32_t width;
         uint32_t height;
+        uint32_t num_frames;
         struct image {
             VkImage image;
             VkImageView view;

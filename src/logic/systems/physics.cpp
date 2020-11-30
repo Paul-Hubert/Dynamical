@@ -19,7 +19,6 @@ world(&dispatcher, &overlappingPairCache, &solver, &collisionConfiguration)
 
 	//world.setGravity(btVector3(0, -10, 0));
 
-
 }
 
 void PhysicsSys::preinit() {

@@ -8,13 +8,11 @@
 
 ViewUBO::ViewUBO(Context& ctx) : views(ctx.vr.swapchains.size()), ctx(ctx) {
 
-    views.resize(ctx.vr.swapchains.size());
-
     {
         auto poolSizes = std::vector {
-            vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, (uint32_t) (NUM_FRAMES*views.size())),
+            vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, (uint32_t) (ctx.vr.num_frames * views.size())),
         };
-        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, (uint32_t) (NUM_FRAMES * views.size()), (uint32_t) poolSizes.size(), poolSizes.data()));
+        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, (uint32_t) (ctx.vr.num_frames * views.size()), (uint32_t) poolSizes.size(), poolSizes.data()));
     }
 
     {
@@ -26,28 +24,29 @@ ViewUBO::ViewUBO(Context& ctx) : views(ctx.vr.swapchains.size()), ctx(ctx) {
                 vk::DescriptorSetLayoutCreateInfo({}, (uint32_t) bindings.size(), bindings.data()));
     }
 
-    for(int i = 0; i<views.size(); i++){
-        auto& view = views[i];
+    for(int v = 0; v<views.size(); v++){
+        auto& view = views[v];
 
-        std::vector<vk::DescriptorSetLayout> layouts = Util::nTimes(NUM_FRAMES, descLayout);
-        view.descSets = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, NUM_FRAMES, layouts.data()));
-        
-        VmaAllocationCreateInfo allocInfo = {};
-        allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-        allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        
-        for(int i = 0; i < view.ubos.size(); i++) {
+        view.per_frame.resize(ctx.vr.swapchains[v].num_frames);
+        for (int i = 0; i < view.per_frame.size(); i++) {
+            auto& f = view.per_frame[i];
 
-            view.ubos[i] = VmaBuffer(ctx.device, &allocInfo, vk::BufferCreateInfo({}, sizeof(UBO), vk::BufferUsageFlagBits::eUniformBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+            f.set = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &descLayout))[0];
+        
+            VmaAllocationCreateInfo allocInfo = {};
+            allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+            allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+            f.ubo = VmaBuffer(ctx.device, &allocInfo, vk::BufferCreateInfo({}, sizeof(UBO), vk::BufferUsageFlagBits::eUniformBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
             
             VmaAllocationInfo inf;
-            vmaGetAllocationInfo(ctx.device, view.ubos[i].allocation, &inf);
-            view.pointers[i] = static_cast<UBO*> (inf.pMappedData);
+            vmaGetAllocationInfo(ctx.device, f.ubo.allocation, &inf);
+            f.pointer = static_cast<UBO*> (inf.pMappedData);
             
-            auto bufInfo = vk::DescriptorBufferInfo(view.ubos[i], 0, sizeof(UBO));
+            auto bufInfo = vk::DescriptorBufferInfo(f.ubo, 0, sizeof(UBO));
             
             ctx.device->updateDescriptorSets({
-                vk::WriteDescriptorSet(view.descSets[i], 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &bufInfo, nullptr)
+                vk::WriteDescriptorSet(f.set, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &bufInfo, nullptr)
             }, {});
             
         }

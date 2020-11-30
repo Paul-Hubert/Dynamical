@@ -23,7 +23,7 @@ per_frame(ctx.vr.swapchains[0].images.size()) {
     
     commandPool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx.device.g_i));
 
-    auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, per_frame.size()));
+    auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, (uint32_t) per_frame.size()));
 
     for(int i = 0; i < per_frame.size(); i++) {
         per_frame[i].commandBuffer = cmds[i];
@@ -100,19 +100,19 @@ void VRRender::record(vk::CommandBuffer command) {
 
         command.setScissor(0, vk::Rect2D(vk::Offset2D(), vk::Extent2D(swapchain.width, swapchain.height)));
 
-        command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, object_render.layout, 0, { ubo.views[v].descSets[0] }, nullptr);
+        command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, object_render.layout, 0, {ubo.views[v].per_frame[frame_index].set}, nullptr);
 
         {
 
             OPTICK_GPU_EVENT("draw_objects");
-            object_render.render(command);
+            object_render.render(command, frame_index);
 
         }
 
         {
 
             OPTICK_GPU_EVENT("draw_ui");
-            ui_render.render(command, 0);
+            ui_render.render(command, frame_index);
 
         }
 
@@ -181,11 +181,7 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
 
     record(per_frame[frame_index].commandBuffer);
 
-    for (uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
-        OPTICK_EVENT("release_swapchain");
-        xrCheckResult(xrReleaseSwapchainImage(ctx.vr.swapchains[v].handle, nullptr));
-    }
-
+    
 
 
     // Begin Frame
@@ -256,8 +252,8 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
         auto& view = views[v];
 
         OPTICK_EVENT("calculate_matrices");
-        ubo.views[v].pointers[0]->view_projection = projection_fov(views[v].fov, 0.01f, 100.f) * view_pose(view.pose);
-        ubo.views[v].pointers[0]->position = glm::vec4(view.pose.position.x, -view.pose.position.y, view.pose.position.z, 1.0f);
+        ubo.views[v].per_frame[swapchain_image_indices[v]].pointer->view_projection = projection_fov(views[v].fov, 0.01f, 100.f) * view_pose(view.pose);
+        ubo.views[v].per_frame[swapchain_image_indices[v]].pointer->position = glm::vec4(view.pose.position.x, -view.pose.position.y, view.pose.position.z, 1.0f);
 
     }
 
@@ -277,6 +273,11 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
 
     }
 
+
+    for (uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
+        OPTICK_EVENT("release_swapchain");
+        xrCheckResult(xrReleaseSwapchainImage(ctx.vr.swapchains[v].handle, nullptr));
+    }
 
 
     // Present

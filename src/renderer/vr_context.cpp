@@ -213,6 +213,8 @@ void VRContext::init() {
         uint32_t surface_count = 0;
         xrCheckResult(xrEnumerateSwapchainImages(swapchain.handle, 0, &surface_count, nullptr));
         swapchain.images.resize(surface_count);
+        swapchain.num_frames = surface_count;
+        num_frames = std::max(surface_count, num_frames);
 
         std::vector<XrSwapchainImageVulkanKHR> surface_images(surface_count, {XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR});
         xrCheckResult(xrEnumerateSwapchainImages(swapchain.handle, surface_count, &surface_count, reinterpret_cast<XrSwapchainImageBaseHeader*> (surface_images.data())));
