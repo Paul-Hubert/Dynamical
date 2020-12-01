@@ -28,9 +28,7 @@ enum Action : char {
 class InputC {
 public:
     std::bitset<Action::END_ENUM> on;
-    bool mouseFree = false;
     glm::ivec2 mousePos;
-    glm::ivec2 mouseDiff;
     glm::ivec2 mouseWheel;
     bool mouseLeft = false;
     bool mouseRight = false;

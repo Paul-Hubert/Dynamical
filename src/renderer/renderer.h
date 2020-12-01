@@ -1,7 +1,6 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include "camera.h"
 #include "vr_render/vr_render.h"
 
 #include "entt/entt.hpp"

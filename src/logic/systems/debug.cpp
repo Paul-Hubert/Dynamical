@@ -19,10 +19,8 @@ void DebugSys::tick() {
     if(input.on[Action::DEBUG]) {
         if(reg.try_ctx<ShowDebug>() == nullptr) {
             reg.set<ShowDebug>();
-            input.mouseFree = true;
         } else {
             reg.unset<ShowDebug>();
-            input.mouseFree = false;
         }
         input.on.set(Action::DEBUG, false);
     }

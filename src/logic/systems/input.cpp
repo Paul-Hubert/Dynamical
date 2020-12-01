@@ -26,23 +26,11 @@ std::unordered_map<SDL_Scancode, Action> actionMap = {
 void InputSys::preinit() {
     
     InputC& input = reg.set<InputC>();
-    input.mouseFree = false;
     
 }
 
 void InputSys::init() {
-    
-    InputC& input = reg.ctx<InputC>();
 
-    if (!input.mouseFree) {
-        Context* ctx = reg.ctx<Context*>();
-
-        SDL_ShowCursor(SDL_DISABLE);
-
-        int w, h;
-        SDL_GetWindowSize(ctx->win, &w, &h);
-        SDL_WarpMouseInWindow(ctx->win, w / 2, h / 2);
-    }
     
 }
 
@@ -77,10 +65,6 @@ void InputSys::tick() {
         } else if(e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESTORED) {
 
             input.window_showing = true;
-
-            int w, h;
-            SDL_GetWindowSize(ctx->win, &w, &h);
-            if(!input.mouseFree) SDL_WarpMouseInWindow(ctx->win, w / 2, h / 2);
 
         } else if(e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_MINIMIZED) {
 
@@ -123,26 +107,14 @@ void InputSys::tick() {
         }
         
     }
-
-    if(input.on[Action::MOUSE]) {
-        input.on.set(Action::MOUSE, false);
-        input.mouseFree = !input.mouseFree;
-        SDL_ShowCursor(input.mouseFree ? SDL_ENABLE : SDL_DISABLE);
-        int w, h;
-        SDL_GetWindowSize(ctx->win, &w, &h);
-        if(!input.mouseFree) SDL_WarpMouseInWindow(ctx->win, w / 2, h / 2);
-    }
     
     if (input.focused) {
+
         int x, y;
         SDL_GetMouseState(&x, &y);
         
-        int w, h;
-        SDL_GetWindowSize(ctx->win, &w, &h);
-        if(!input.mouseFree) SDL_WarpMouseInWindow(ctx->win, w / 2, h / 2);
-        
         input.mousePos = glm::ivec2(x, y);
-        input.mouseDiff = glm::ivec2(x - w / 2, y - h / 2);
+
     }
     
 }

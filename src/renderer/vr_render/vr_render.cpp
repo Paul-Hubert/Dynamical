@@ -1,7 +1,6 @@
 #include "vr_render.h"
 
 #include "renderer/context.h"
-#include "renderer/camera.h"
 #include "util/util.h"
 #include "logic/components/inputc.h"
 #include "renderer/num_frames.h"
