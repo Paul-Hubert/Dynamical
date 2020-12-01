@@ -9,8 +9,6 @@ include_directories("./3rdparty")
 
 file(GLOB_RECURSE sources ./src/main.cpp ./src/*.cpp ./src/*.h)
 
-
-
 add_executable(dynamical ${sources})
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

@@ -1,12 +1,13 @@
 #include "game.h"
 
 #include <iostream>
+#include <taskflow/taskflow.hpp>
 
 #include "renderer/renderer.h"
 #include "systems/physics.h"
 #include "systems/system_set.h"
 
-#include <taskflow/taskflow.hpp>
+#include "systems/system_list.h"
 
 #include "logic/components/playerc.h"
 #include "factories/factory_list.h"
@@ -25,11 +26,15 @@
 #include "optick.h"
 
 Game::Game(int argc, char** argv) {
+    registry = std::make_unique<entt::registry>();
+    entt::registry& reg = *registry;
     Settings& s = reg.set<Settings>(reg, argc, argv);
 }
 
 
 void Game::start() {
+
+    entt::registry& reg = *registry;
 
     Settings& s = reg.ctx<Settings>();
 
@@ -42,19 +47,21 @@ void Game::start() {
 
     renderer = std::make_unique<Renderer>(reg);
 
-    pre = std::make_unique<SystemSet>(reg);
-
     physics = std::make_unique<PhysicsSys>(reg);
 
-    post = std::make_unique<SystemSet>(reg);
+    pre_sets = std::make_unique<SystemSet>(reg);
+    update_sets = std::make_unique<SystemSet>(reg);
+    post_sets = std::make_unique<SystemSet>(reg);
 
+    pre_sets->add<VRPlayerControlSys>();
 
     // preinit
 
-    pre->preinit();
-    physics->preinit();
-    post->preinit();
     renderer->preinit();
+    physics->preinit();
+    pre_sets->preinit();
+    update_sets->preinit();
+    post_sets->preinit();
 
     tf::Executor& executor = reg.set<tf::Executor>();
 
@@ -64,12 +71,14 @@ void Game::start() {
     reg.emplace<PlayerC>(player);
     reg.set<Util::Entity<"player"_hs>>(player);
 
+
     // init
 
-    pre->init();
-    physics->init();
-    post->init();
     renderer->init();
+    physics->init();
+    pre_sets->init();
+    update_sets->init();
+    post_sets->init();
 
 
     // create basic model
@@ -110,11 +119,15 @@ void Game::start() {
             input.on.set(Action::EXIT, false);
         }
 
-        pre->tick();
+        pre_sets->tick();
 
         renderer->prepare();
 
+        update_sets->tick();
+
         physics->tick();
+
+        post_sets->tick();
 
         renderer->render();
         
@@ -124,12 +137,10 @@ void Game::start() {
 
 Game::~Game() {
     
-    post->finish();
-
+    post_sets->finish();
+    update_sets->finish();
+    pre_sets->finish();
     physics->finish();
-
-    pre->finish();
-
     renderer->finish();
 
 }

@@ -3,7 +3,7 @@
 #include "logic/components/inputc.h"
 
 #include "renderer/context/context.h"
-#include "util/util.h"
+#include "util/log.h"
 
 #include <iostream>
 
@@ -46,7 +46,6 @@ void Input::poll() {
 
         if(e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
 
-            Util::log(Util::trace) << "resize\n";
             input.on.set(Action::RESIZE);
             
         } else if(e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {

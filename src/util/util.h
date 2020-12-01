@@ -9,12 +9,6 @@ namespace Util {
     
     std::vector<char> readFile(char const* filename);
     
-    enum Level {trace, debug, info, warning, error, critical};
-    
-    std::ostream& log(Level l = Level::trace);
-    
-    
-    
     template<typename T>
     std::vector<T> nTimes(int n, T t) {
         std::vector<T> vec(n);

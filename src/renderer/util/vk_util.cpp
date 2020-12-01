@@ -1,6 +1,6 @@
 #include "vk_util.h"
 
-#include "util/util.h"
+#include "util/log.h"
 
 #define LOG_LEVEL VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
 #define XR_LOG_LEVEL XR_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
@@ -97,13 +97,13 @@ XRAPI_ATTR XrBool32 XRAPI_CALL debugCallback(XrDebugUtilsMessageSeverityFlagsEXT
 
 void vkCheckResult(VkResult result) {
     if(result != VK_SUCCESS) {
-        Util::log(Util::error) << "VK Error : " << result << "\n";
+        dy::log(dy::error) << "VK Error : " << result << "\n";
     }
 }
 
 void xrCheckResult(XrResult result) {
     if(result != XR_SUCCESS) {
-        Util::log(Util::error) << "XR Error : " << result << "\n";
+        dy::log(dy::error) << "XR Error : " << result << "\n";
     }
 }
 
@@ -123,7 +123,7 @@ std::vector<const char*> checkLayers(std::vector<const char*> layers, std::vecto
         }
 
         if(!layerFound) {
-            Util::log(Util::warning) << "Layer requested, but not available : " << layerName << "\n";
+            dy::log(dy::warning) << "Layer requested, but not available : " << layerName << "\n";
         }
     }
 
@@ -147,7 +147,7 @@ std::vector<const char*> checkExtensions(std::vector<const char*> extensions, st
         }
 
         if(!layerFound) {
-            Util::log(Util::warning) << "Instance Extension requested, but not available : " << extensionName << "\n";
+            dy::log(dy::warning) << "Instance Extension requested, but not available : " << extensionName << "\n";
         }
     }
 
@@ -171,7 +171,7 @@ std::vector<const char*> checkLayers(std::vector<const char*> layers, std::vecto
         }
 
         if(!layerFound) {
-            Util::log(Util::warning) << "OpenXR Layer requested, but not available : " << layerName << "\n";
+            dy::log(dy::warning) << "OpenXR Layer requested, but not available : " << layerName << "\n";
         }
     }
 
@@ -195,7 +195,7 @@ std::vector<const char*> checkExtensions(std::vector<const char*> extensions, st
         }
 
         if(!layerFound) {
-            Util::log(Util::warning) << "OpenXR Extension requested, but not available : " << extensionName << "\n";
+            dy::log(dy::warning) << "OpenXR Extension requested, but not available : " << extensionName << "\n";
         }
     }
 

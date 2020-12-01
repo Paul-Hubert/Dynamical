@@ -1,10 +1,5 @@
 #include "vr_render.h"
 
-#include "renderer/context/context.h"
-#include "util/util.h"
-#include "logic/components/inputc.h"
-#include "renderer/context/num_frames.h"
-
 #define GLM_FORCE_CTOR_INIT
 
 #include <glm/glm.hpp>
@@ -13,6 +8,14 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <thread>
+
+#include "util/log.h"
+
+#include "renderer/context/context.h"
+#include "renderer/context/num_frames.h"
+
+
+#include "logic/components/inputc.h"
 
 VRRender::VRRender(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx), renderpass(ctx), ubo(ctx), material_manager(reg, ctx),
 object_render(reg, ctx, renderpass, std::vector<vk::DescriptorSetLayout>{ubo.descLayout}),
@@ -206,7 +209,7 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
 
     if(result == XR_FRAME_DISCARDED || result == XR_SESSION_NOT_FOCUSED || frame_state.shouldRender == XR_FALSE) {
 
-        Util::log() << "frame discarded\n";
+        dy::log() << "frame discarded\n";
         XrFrameEndInfo end_info {XR_TYPE_FRAME_END_INFO};
         end_info.displayTime = predicted_time;
         end_info.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;

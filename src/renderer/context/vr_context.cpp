@@ -1,11 +1,12 @@
 #include "vr_context.h"
 
 #include <vector>
-#include "util/util.h"
 #include <cstring>
 #include <debugapi.h>
+
 #include "context.h"
 
+#include "util/log.h"
 #include "renderer/util/vk_util.h"
 
 const XrPosef  pose_identity = { {0,0,0,1}, {0,0,0} };
@@ -126,7 +127,7 @@ void VRContext::init() {
             }
         }
         if(!found) {
-            Util::log(Util::warning) << "Stage reference space is not supported by OpenXR Runtime, switching to Local\n";
+            dy::log(dy::warning) << "Stage reference space is not supported by OpenXR Runtime, switching to Local\n";
         }
 
         XrReferenceSpaceCreateInfo ref_space = {XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
@@ -151,7 +152,7 @@ void VRContext::init() {
             }
         }
         if(!found) {
-            Util::log(Util::warning) << "Required VkFormat is not supported by OpenXR Runtime, switching to : " << formats[0] << "\n";
+            dy::log(dy::warning) << "Required VkFormat is not supported by OpenXR Runtime, switching to : " << formats[0] << "\n";
             swapchain_format = static_cast<VkFormat> (formats[0]);
         }
     }
