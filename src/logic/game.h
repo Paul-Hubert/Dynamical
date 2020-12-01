@@ -5,28 +5,26 @@
 
 #include "entt/entt.hpp"
 
-#include "systems/ui.h"
-#include "renderer/renderer.h"
-
-#include "systems/settings.h"
-
 class SystemSet;
+class Renderer;
+class PhysicsSys;
 
 class Game {
 public:
     Game(int argc, char** argv);
-    void init();
     void start();
     ~Game();
 
-    Renderer renderer;
+    std::unique_ptr<Renderer> renderer;
 
     entt::registry reg;
     
-    SettingSys settings;
-    
-    std::unique_ptr<SystemSet> set;
-    
+    std::unique_ptr<SystemSet> pre;
+
+    std::unique_ptr<PhysicsSys> physics;
+
+    std::unique_ptr<SystemSet> post;
+
 };
 
 #endif

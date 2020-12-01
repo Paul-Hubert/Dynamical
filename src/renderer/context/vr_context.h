@@ -1,8 +1,8 @@
 #ifndef VR_CONTEXT_H
 #define VR_CONTEXT_H
 
-#include "vk.h"
-#include "vmapp.h"
+#include "renderer/util/vk.h"
+#include "renderer/util/vmapp.h"
 
 #define XR_USE_GRAPHICS_API_VULKAN
 #if defined(WIN32)

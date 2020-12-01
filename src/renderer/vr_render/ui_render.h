@@ -1,8 +1,8 @@
 #ifndef UI_RENDER_H
 #define UI_RENDER_H
 
-#include "renderer/vk.h"
-#include "renderer/vmapp.h"
+#include "renderer/util/vk.h"
+#include "renderer/util/vmapp.h"
 
 #include "imgui.h"
 

@@ -1,9 +1,9 @@
 #ifndef OBJECT_RENDER_H
 #define OBJECT_RENDER_H
 
-#include "renderer/vk.h"
+#include "renderer/util/vk.h"
 
-#include "renderer/vmapp.h"
+#include "renderer/util/vmapp.h"
 
 #include "glm/glm.hpp"
 
@@ -24,8 +24,8 @@ public:
     void updateBuffer(int i);
 
     struct Transform {
-        glm::mat3 mat;
-        glm::vec3 pos;
+        glm::mat4 mat;
+        glm::vec4 pos;
     };
 
     vk::DescriptorPool pool;

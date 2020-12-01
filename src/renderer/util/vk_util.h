@@ -1,8 +1,8 @@
 #ifndef VK_UTIL_H
 #define VK_UTIL_H
 
-#include <renderer/vk.h>
-#include <renderer/xr.h>
+#include <renderer/util/vk.h>
+#include <renderer/util/xr.h>
 
 #include <vector>
 

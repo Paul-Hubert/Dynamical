@@ -1,10 +1,10 @@
 #include "ui.h"
 
-#include "renderer/context.h"
+#include "context/context.h"
 
 #include "logic/components/inputc.h"
 
-void UISys::init() {
+UI::UI(entt::registry& reg) : reg(reg) {
 
     g_MouseCursors[ImGuiMouseCursor_Arrow] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
     g_MouseCursors[ImGuiMouseCursor_TextInput] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_IBEAM);
@@ -19,13 +19,13 @@ void UISys::init() {
 
 }
 
-void UISys::tick() {
+void UI::prepare() {
 
     OPTICK_EVENT();
     
     auto& input = reg.ctx<InputC>();
     
-    Context* ctx = reg.ctx<Context*>();
+    Context& ctx = *reg.ctx<Context*>();
     
     ImGuiIO& io = ImGui::GetIO();
 
@@ -37,7 +37,7 @@ void UISys::tick() {
         io.MousePos = ImVec2((float) input.mousePos.x, (float) input.mousePos.y);
 
     int w, h;
-    SDL_GetWindowSize(ctx->win, &w, &h);
+    SDL_GetWindowSize(ctx.win, &w, &h);
     io.DisplaySize = ImVec2((float)w, (float)h);
     
     static Uint64 frequency = SDL_GetPerformanceFrequency();
@@ -52,7 +52,13 @@ void UISys::tick() {
     
 }
 
-UISys::~UISys() {
+void UI::render() {
+
+
+
+}
+
+UI::~UI() {
     
     for (ImGuiMouseCursor cursor_n = 0; cursor_n < ImGuiMouseCursor_COUNT; cursor_n++)
         SDL_FreeCursor(g_MouseCursors[cursor_n]);

@@ -1,9 +1,9 @@
 #include "vr_render.h"
 
-#include "renderer/context.h"
+#include "renderer/context/context.h"
 #include "util/util.h"
 #include "logic/components/inputc.h"
-#include "renderer/num_frames.h"
+#include "renderer/context/num_frames.h"
 
 #define GLM_FORCE_CTOR_INIT
 
@@ -123,7 +123,9 @@ void VRRender::record(vk::CommandBuffer command) {
 
 }
 
-
+void VRRender::prepare() {
+    
+}
 
 void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals) {
 

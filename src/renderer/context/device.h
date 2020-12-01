@@ -1,7 +1,7 @@
 #ifndef DEVICE_H
 #define DEVICE_H
 
-#include "renderer/vk.h"
+#include "renderer/util/vk.h"
 #include "vk_mem_alloc.h"
 #include <mutex>
 

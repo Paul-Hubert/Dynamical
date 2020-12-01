@@ -1,8 +1,8 @@
 #ifndef RENDERPASS_H
 #define RENDERPASS_H
 
-#include "renderer/vk.h"
-#include "renderer/vmapp.h"
+#include "renderer/util/vk.h"
+#include "renderer/util/vmapp.h"
 
 class Context;
 

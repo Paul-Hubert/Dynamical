@@ -1,6 +1,6 @@
 #include "model_manager.h"
 
-#include "renderer/context.h"
+#include "renderer/context/context.h"
 #include "gltf_loader.h"
 
 ModelManager::ModelManager(entt::registry& reg) : reg(reg), gltf_loader(std::make_unique<GLTFLoader>(reg)) {

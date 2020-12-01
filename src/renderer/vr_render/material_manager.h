@@ -2,7 +2,7 @@
 #define MATERIAL_MANAGER_H
 
 #include "entt/entt.hpp"
-#include "renderer/vk.h"
+#include "renderer/util/vk.h"
 
 class Context;
 

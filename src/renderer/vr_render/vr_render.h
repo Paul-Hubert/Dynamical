@@ -1,7 +1,7 @@
 #ifndef MAIN_RENDER_H
 #define MAIN_RENDER_H
 
-#include "renderer/vk.h"
+#include "renderer/util/vk.h"
 
 #include "renderpass.h"
 #include "object_render.h"
@@ -11,11 +11,11 @@
 
 #include <taskflow/taskflow.hpp>
 
-#include "renderer/vmapp.h"
+#include "renderer/util/vmapp.h"
 
 #include "entt/entt.hpp"
 
-#include "renderer/num_frames.h"
+#include "renderer/context/num_frames.h"
 
 #define XR_USE_GRAPHICS_API_VULKAN
 #if defined(WIN32)
@@ -38,6 +38,7 @@ public:
     VRRender(entt::registry& reg, Context& ctx);
 
     void record(vk::CommandBuffer command);
+    void prepare();
     void render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals);
 
     ~VRRender();

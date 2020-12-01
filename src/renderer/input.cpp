@@ -1,8 +1,8 @@
-#include "system_list.h"
+#include "input.h"
 
 #include "logic/components/inputc.h"
 
-#include "renderer/context.h"
+#include "renderer/context/context.h"
 #include "util/util.h"
 
 #include <iostream>
@@ -23,20 +23,15 @@ std::unordered_map<SDL_Scancode, Action> actionMap = {
     {SDL_SCANCODE_P, Action::MOUSE}
 };
 
-void InputSys::preinit() {
+Input::Input(entt::registry& reg) : reg(reg) {
     
-    InputC& input = reg.set<InputC>();
-    
-}
-
-void InputSys::init() {
-
+    reg.set<InputC>();
     
 }
 
 
 
-void InputSys::tick() {
+void Input::poll() {
 
     OPTICK_EVENT();
     
@@ -44,7 +39,7 @@ void InputSys::tick() {
     
     input.mouseRight = input.mouseLeft = input.mouseMiddle = false;
     
-    Context* ctx = reg.ctx<Context*>();
+    Context& ctx = *reg.ctx<Context*>();
     
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
@@ -117,9 +112,4 @@ void InputSys::tick() {
 
     }
     
-}
-
-
-void InputSys::finish() {
-
 }

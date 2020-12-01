@@ -1,11 +1,11 @@
 #ifndef UBO_DESCRIPTOR_H
 #define UBO_DESCRIPTOR_H
 
-#include "renderer/vk.h"
+#include "renderer/util/vk.h"
 
-#include "renderer/vmapp.h"
+#include "renderer/util/vmapp.h"
 
-#include "renderer/num_frames.h"
+#include "renderer/context/num_frames.h"
 
 #include "glm/glm.hpp"
 

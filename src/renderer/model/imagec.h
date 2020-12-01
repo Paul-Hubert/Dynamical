@@ -1,7 +1,7 @@
 #ifndef TEXTUREC_H
 #define TEXTUREC_H
 
-#include "renderer/vmapp.h"
+#include "renderer/util/vmapp.h"
 
 class ImageC {
 public:

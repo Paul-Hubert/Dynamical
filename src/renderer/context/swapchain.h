@@ -1,7 +1,7 @@
 #ifndef SWAPCHAIN_H
 #define SWAPCHAIN_H
 
-#include "renderer/vk.h"
+#include "renderer/util/vk.h"
 
 #include "num_frames.h"
 

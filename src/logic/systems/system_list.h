@@ -16,14 +16,6 @@ public: \
     const char* name() override { return #NAME; }; \
 };
 
-DEFINE_SYSTEM(InputSys)
-
-DEFINE_SYSTEM(VRInputSys)
-
-DEFINE_SYSTEM(DebugSys)
-
-DEFINE_SYSTEM(PlayerControlSys)
-
 DEFINE_SYSTEM(VRPlayerControlSys)
 
 #undef DEFINE_SYSTEM

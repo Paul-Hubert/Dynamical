@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "renderer/vk.h"
+#include "renderer/util/vk.h"
 
 class MaterialC {
 public:

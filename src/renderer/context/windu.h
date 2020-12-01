@@ -2,7 +2,7 @@
 #define WINDU_H
 
 #include <sdl2/SDL.h>
-#include "renderer/vk.h"
+#include "renderer/util/vk.h"
 
 class Context;
 

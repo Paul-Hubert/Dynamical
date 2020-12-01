@@ -1,6 +1,6 @@
 #include "vmapp.h"
 
-#include "device.h"
+#include "renderer/context/device.h"
 
 VmaBuffer::VmaBuffer() : device(nullptr) {
     

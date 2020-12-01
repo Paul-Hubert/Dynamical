@@ -8,7 +8,7 @@
 #include <set>
 #include <string>
 
-#include "vk_util.h"
+#include "renderer/util/vk_util.h"
 
 bool checkDeviceExtensions(std::vector<const char*> extensionNames, std::vector<vk::ExtensionProperties> availableExtensions) {
 
@@ -155,12 +155,6 @@ Device::Device(Context& ctx) : ctx(ctx) {
     Device& device = *this;
     DEV_LOAD(vkSetDebugUtilsObjectNameEXT)
     this->vkSetDebugUtilsObjectNameEXT = vkSetDebugUtilsObjectNameEXT;
-    
-    if(isDedicated()) {
-        std::cout << "memory is dedicated" << std::endl;
-    } else {
-        std::cout << "memory is local" << std::endl;
-    }
     
 #endif
     

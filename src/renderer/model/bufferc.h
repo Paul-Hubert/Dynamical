@@ -1,7 +1,7 @@
 #ifndef BUFFERC_H
 #define BUFFERC_H
 
-#include "renderer/vmapp.h"
+#include "renderer/util/vmapp.h"
 
 class BufferC {
 public:

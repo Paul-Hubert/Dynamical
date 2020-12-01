@@ -2,14 +2,14 @@
 #define TRANSFER_H
 
 #include <array>
-#include <renderer/vk.h>
+#include "renderer/util/vk.h"
 
 #include <memory>
 
-#include "vmapp.h"
+#include "renderer/util/vmapp.h"
 
-#include "model/bufferc.h"
-#include "model/imagec.h"
+#include "renderer/model/bufferc.h"
+#include "renderer/model/imagec.h"
 
 class Context;
 

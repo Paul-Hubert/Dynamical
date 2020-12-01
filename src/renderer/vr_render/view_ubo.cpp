@@ -1,8 +1,8 @@
 #include "view_ubo.h"
 
-#include "renderer/context.h"
+#include "renderer/context/context.h"
 
-#include "renderer/num_frames.h"
+#include "renderer/context/num_frames.h"
 
 #include "util/util.h"
 

@@ -5,7 +5,7 @@
 #include "util/util.h"
 
 #include <sdl2/SDL_vulkan.h>
-#include "renderer/vk.h"
+#include "renderer/util/vk.h"
 #include "context.h"
 
 Windu::Windu(Context& ctx) : ctx(ctx) {

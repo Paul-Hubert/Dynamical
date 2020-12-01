@@ -16,17 +16,18 @@ layout(std140, set = 0, binding = 0) uniform Camera {
 } camera;
 
 struct PerModel {
-    mat3 basis;
-    vec3 position;
+    mat4 basis;
+    vec4 position;
 };
 layout(std140, set = 1, binding = 0) uniform Transform {
     PerModel per_model[100];
 } transform;
 
 void main() {
-//transform.per_model[gl_InstanceIndex].basis * a_pos + transform.per_model[gl_InstanceIndex].position
-    gl_Position = camera.viewproj * vec4(a_pos, 1.0);
-    v_position = a_pos;
+
+    v_position = mat3(transform.per_model[gl_InstanceIndex].basis) * a_pos + vec3(transform.per_model[gl_InstanceIndex].position);
+    v_position.y = -v_position.y;
     v_normal = a_normal;
+    gl_Position = camera.viewproj * vec4(v_position, 1.0);
     
 }

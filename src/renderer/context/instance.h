@@ -1,7 +1,7 @@
 #ifndef INSTANCE_H
 #define INSTANCE_H
 
-#include <renderer/vk.h>
+#include <renderer/util/vk.h>
 
 class Context;
 

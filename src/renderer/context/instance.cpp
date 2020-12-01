@@ -10,7 +10,7 @@
 
 #include "context.h"
 
-#include "vk_util.h"
+#include "renderer/util/vk_util.h"
 
 Instance::Instance(Context& ctx) : ctx(ctx) {
     

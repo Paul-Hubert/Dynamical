@@ -1,19 +1,14 @@
-#include "system_list.h"
+#include "vr_input.h"
 
-#include "renderer/context.h"
+#include "renderer/context/context.h"
 #include "logic/components/inputc.h"
 #include "util/util.h"
 
-void VRInputSys::preinit() {
+VRInput::VRInput(entt::registry& reg) : reg(reg) {
 
 }
 
-void VRInputSys::init() {
-
-
-}
-
-void VRInputSys::tick() {
+void VRInput::poll() {
 
     OPTICK_EVENT();
 
@@ -70,6 +65,7 @@ void VRInputSys::tick() {
 
 }
 
-void VRInputSys::finish() {
+void VRInput::update() {
+    
 
 }

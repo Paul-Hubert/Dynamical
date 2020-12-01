@@ -1,17 +1,21 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include "vr_render/vr_render.h"
-
 #include "entt/entt.hpp"
 
 class Context;
+class Input;
+class VRInput;
+class UI;
+class VRRender;
 
 class Renderer {
 public:
     Renderer(entt::registry& reg);
     void preinit();
     void init();
+    void update();
+    void prepare();
     void render();
     void finish();
     ~Renderer();
@@ -19,7 +23,10 @@ public:
 private:
     entt::registry& reg;
     std::unique_ptr<Context> ctx;
-    VRRender vr_render;
+    std::unique_ptr<Input> input;
+    std::unique_ptr<VRInput> vr_input;
+    std::unique_ptr<UI> ui;
+    std::unique_ptr<VRRender> vr_render;
 };
 
 #endif

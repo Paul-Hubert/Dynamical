@@ -6,7 +6,7 @@
 #include <debugapi.h>
 #include "context.h"
 
-#include "vk_util.h"
+#include "renderer/util/vk_util.h"
 
 const XrPosef  pose_identity = { {0,0,0,1}, {0,0,0} };
 
