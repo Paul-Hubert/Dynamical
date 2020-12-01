@@ -26,6 +26,7 @@ public:
     XrSession session = {};
     XrSpace space = {};
 
+    uint32_t num_views = 0;
     uint32_t num_frames = 0;
 
     VkFormat swapchain_format = VK_FORMAT_R8G8B8A8_SRGB;

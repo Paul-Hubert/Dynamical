@@ -215,6 +215,24 @@ void VRRender::prepare() {
         xrCheckResult(result);
 
     }
+
+    uint32_t view_count = ctx.vr.num_views;
+    XrViewState view_state = { XR_TYPE_VIEW_STATE };
+    XrViewLocateInfo locate_info = { XR_TYPE_VIEW_LOCATE_INFO };
+    locate_info.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+    locate_info.displayTime = vr_input.predicted_time;
+    locate_info.space = ctx.vr.space;
+    std::vector<XrView> views(view_count, { XR_TYPE_VIEW });
+    {
+
+        OPTICK_EVENT("locate_views");
+        xrCheckResult(xrLocateViews(ctx.vr.session, &locate_info, &view_state, (uint32_t)views.size(), &view_count, views.data()));
+
+    }
+
+    for(uint32_t v = 0; v < ctx.vr.num_views; v++) {
+        vr_input.per_view[v].pose = views[v].pose;
+    }
     
 }
 
@@ -240,13 +258,13 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
 
     // Get VR view matrices
 
-    uint32_t view_count = 0;
+    uint32_t view_count = ctx.vr.num_views;
     XrViewState view_state = {XR_TYPE_VIEW_STATE};
     XrViewLocateInfo locate_info = {XR_TYPE_VIEW_LOCATE_INFO};
     locate_info.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
     locate_info.displayTime = vr_input.predicted_time;
     locate_info.space = ctx.vr.space;
-    std::vector<XrView> views(ctx.vr.swapchains.size(), {XR_TYPE_VIEW});
+    std::vector<XrView> views(view_count, {XR_TYPE_VIEW});
     {
 
         OPTICK_EVENT("locate_views");
@@ -257,8 +275,9 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
      
     // Update matrices at the very end
 
-    for (uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
+    for (uint32_t v = 0; v < ctx.vr.num_views; v++) {
         auto& view = views[v];
+        vr_input.per_view[v].pose = view.pose;
 
         OPTICK_EVENT("calculate_matrices");
         ubo.views[v].per_frame[swapchain_image_indices[v]].pointer->view_projection = projection_fov(views[v].fov, 0.01f, 100.f) * view_pose(view.pose);
@@ -283,7 +302,7 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
     }
 
 
-    for (uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
+    for (uint32_t v = 0; v < ctx.vr.num_views; v++) {
         OPTICK_EVENT("release_swapchain");
         xrCheckResult(xrReleaseSwapchainImage(ctx.vr.swapchains[v].handle, nullptr));
     }
@@ -294,7 +313,7 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
 
     std::vector<XrCompositionLayerProjectionView> proj_views(ctx.vr.swapchains.size());
 
-    for(uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
+    for(uint32_t v = 0; v < ctx.vr.num_views; v++) {
         auto& view = views[v];
 
         proj_views[v] = {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW};

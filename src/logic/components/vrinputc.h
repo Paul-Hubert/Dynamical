@@ -8,6 +8,10 @@ public:
 	bool rendering = false;
 	XrSessionState session_state = XR_SESSION_STATE_UNKNOWN;
 	XrTime predicted_time;
+	struct View {
+		XrPosef pose;
+	};
+	View per_view[2];
 	struct Hand {
 		bool active = false;
 		XrPosef pose;

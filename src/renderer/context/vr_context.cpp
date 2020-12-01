@@ -179,7 +179,7 @@ void VRContext::init() {
 
         count = 0;
         xrCheckResult(xrEnumerateViewConfigurationViews(instance, system_id, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, &count, nullptr));
-
+        num_views = count;
         swapchains.resize(count);
         views.resize(count, {XR_TYPE_VIEW_CONFIGURATION_VIEW});
         xrCheckResult(xrEnumerateViewConfigurationViews(instance, system_id, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, count, &count, views.data()));
