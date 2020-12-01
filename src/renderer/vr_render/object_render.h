@@ -21,11 +21,20 @@ public:
 
     void createPipeline(std::vector<vk::DescriptorSetLayout> layouts);
 
+    void updateBuffer(int i);
+
+    struct Transform {
+        glm::mat3 mat;
+        glm::vec3 pos;
+    };
+
     vk::DescriptorPool pool;
     vk::DescriptorSetLayout set_layout;
     struct per_frame {
         vk::DescriptorSet set;
+        int capacity = 100;
         VmaBuffer buffer;
+        Transform* pointer;
     };
     std::vector<per_frame> per_frame;
 

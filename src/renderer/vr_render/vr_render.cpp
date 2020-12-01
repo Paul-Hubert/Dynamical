@@ -99,7 +99,7 @@ void VRRender::record(vk::CommandBuffer command) {
 
         command.setScissor(0, vk::Rect2D(vk::Offset2D(), vk::Extent2D(swapchain.width, swapchain.height)));
 
-        command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, object_render.layout, 0, {ubo.views[v].per_frame[frame_index].set}, nullptr);
+        command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, object_render.layout, 0, {ubo.views[v].per_frame[image_index].set}, nullptr);
 
         {
 
@@ -244,7 +244,7 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
 
     }
     
-
+     
     // Update matrices at the very end
 
     for (uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {

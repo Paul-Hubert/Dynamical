@@ -10,6 +10,7 @@ void VRInputSys::preinit() {
 
 void VRInputSys::init() {
 
+
 }
 
 void VRInputSys::tick() {

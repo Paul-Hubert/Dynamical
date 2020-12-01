@@ -7,22 +7,26 @@
 #include "renderer/vr_render/view_ubo.h"
 
 #include "logic/components/model_renderablec.h"
+#include "logic/components/transformc.h"
 #include "renderer/model/modelc.h"
 
 ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, std::vector<vk::DescriptorSetLayout> layouts) : reg(reg), ctx(ctx), renderpass(renderpass),
-per_frame(ctx.swap.num_frames) {
+per_frame(NUM_FRAMES) {
 
-    pool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, ctx.swap.num_frames, vk::DescriptorPoolSize(vk::DescriptorType::eUniformBufferDynamic, ctx.swap.num_frames)));
+    pool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, NUM_FRAMES, vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, NUM_FRAMES)));
 
-    vk::DescriptorSetLayoutBinding binding(0, vk::DescriptorType::eUniformBufferDynamic, vk::ShaderStageFlagBits::eVertex, {});
+    vk::DescriptorSetLayoutBinding binding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex, {});
     set_layout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, binding));
 
     layouts.push_back(set_layout);
 
     for (int i = 0; i < per_frame.size(); i++) {
 
-    }
+        per_frame[i].set = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(pool, 1, &set_layout))[0];
 
+        updateBuffer(i);
+
+    }
 
     createPipeline(layouts);
 
@@ -30,10 +34,22 @@ per_frame(ctx.swap.num_frames) {
 
 
 void ObjectRender::render(vk::CommandBuffer command, uint32_t index) {
+    auto& f = per_frame[index];
 
     command.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
-    reg.view<ModelRenderableC>().each([&](auto entity, ModelRenderableC& renderable) {
+    auto view = reg.view<ModelRenderableC>();
+
+    if (view.size() > f.capacity) {
+        f.capacity *= 2;
+        updateBuffer(index);
+    }
+
+    command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, 1, { f.set }, {});
+
+    int transform_index = 0;
+
+    reg.view<ModelRenderableC, TransformC>().each([&](auto entity, ModelRenderableC& renderable, TransformC& transform) {
         
         OPTICK_GPU_EVENT("draw_model");
 
@@ -48,12 +64,24 @@ void ObjectRender::render(vk::CommandBuffer command, uint32_t index) {
                 {part.position.buffer->buffer, part.normal.buffer->buffer},
                 {part.position.offset, part.normal.offset});
 
+            auto& basis = transform.transform.getBasis();
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 3; j++) {
+                    f.pointer[transform_index].mat[i][j] = basis[i][j];
+                }
+            }
+
+            auto& origin = transform.transform.getOrigin();
+            for (int i = 0; i < 3; i++) {
+                f.pointer[transform_index].pos[i] = origin[i];
+            }
+
             OPTICK_GPU_EVENT("draw_model_part");
-            command.drawIndexed((uint32_t) (part.index.size / sizeof(uint16_t)), 1, 0, 0, 0);
+            command.drawIndexed((uint32_t) (part.index.size / sizeof(uint16_t)), 1, 0, 0, transform_index);
+            transform_index++;
 
         }
         
-
     });
 
 }
@@ -70,6 +98,27 @@ ObjectRender::~ObjectRender() {
 
 }
 
+
+void ObjectRender::updateBuffer(int i) {
+    auto& f = per_frame[i];
+
+    VmaAllocationCreateInfo ainfo{};
+    ainfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+    ainfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    auto binfo = vk::BufferCreateInfo({}, sizeof(Transform) * f.capacity, vk::BufferUsageFlagBits::eUniformBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i);
+    f.buffer = VmaBuffer(ctx.device, &ainfo, binfo);
+
+    VmaAllocationInfo inf;
+    vmaGetAllocationInfo(ctx.device, f.buffer.allocation, &inf);
+    f.pointer = reinterpret_cast<Transform*>(inf.pMappedData);
+
+    auto bufInfo = vk::DescriptorBufferInfo(f.buffer, 0, sizeof(Transform) * f.capacity);
+
+    ctx.device->updateDescriptorSets({
+        vk::WriteDescriptorSet(f.set, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &bufInfo, nullptr)
+        }, {});
+
+}
 
 void ObjectRender::createPipeline(std::vector<vk::DescriptorSetLayout> layouts) {
 

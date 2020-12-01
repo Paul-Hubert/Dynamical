@@ -52,6 +52,7 @@ void Game::init() {
         entt::entity box = reg.create();
         auto& renderable = reg.emplace<ModelRenderableC>(box, box_model);
         auto& transform = reg.emplace<TransformC>(box);
+        transform.transform.setIdentity();
 
         ObjectC& box_object = reg.emplace<ObjectC>(box);
     
