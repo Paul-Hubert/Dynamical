@@ -14,8 +14,11 @@
 #include "renderer/context/context.h"
 #include "renderer/context/num_frames.h"
 
+#include "renderer/util/vk_util.h"
 
 #include "logic/components/inputc.h"
+
+#include "logic/components/vrinputc.h"
 
 VRRender::VRRender(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx), renderpass(ctx), ubo(ctx), material_manager(reg, ctx),
 object_render(reg, ctx, renderpass, std::vector<vk::DescriptorSetLayout>{ubo.descLayout}),
@@ -127,44 +130,32 @@ void VRRender::record(vk::CommandBuffer command) {
 }
 
 void VRRender::prepare() {
-    
-}
-
-void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals) {
 
     OPTICK_EVENT();
 
-    if(!ctx.vr.rendering) {
+    VRInputC& vr_input = reg.ctx<VRInputC>();
+
+    if (!vr_input.rendering) {
         return;
     }
-
+    
     material_manager.update();
-
 
     static float t = 0.f;
     t += 1.f / 60.f;
-
-    //std::vector<VkSemaphore> wait_semaphores;
-    //std::vector<VkSemaphore> signal_semaphores;
-
-    // uint32_t swapchain_index = ctx.swap.acquire(waitsems[window_index]);
-    // ctx->swap.present(signalsems[ctx->frame_index]);
-
-
-    // Pre record command buffer
 
     frame_index = (frame_index + 1) % per_frame.size();
 
 
     // Record with swapchain images
 
-    for(uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
+    for (uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
 
         OPTICK_EVENT("acquire_swapchain");
         xrCheckResult(xrAcquireSwapchainImage(ctx.vr.swapchains[v].handle, nullptr, &swapchain_image_indices[v]));
 
     }
-    
+
     for (uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
 
         XrSwapchainImageWaitInfo wait_info = { XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
@@ -178,14 +169,14 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
     {
 
         OPTICK_EVENT("wait_fence");
-        ctx.device->waitForFences({per_frame[frame_index].fence}, VK_TRUE, std::numeric_limits<uint64_t>::max());
-        ctx.device->resetFences({per_frame[frame_index].fence});
+        ctx.device->waitForFences({ per_frame[frame_index].fence }, VK_TRUE, std::numeric_limits<uint64_t>::max());
+        ctx.device->resetFences({ per_frame[frame_index].fence });
 
     }
 
     record(per_frame[frame_index].commandBuffer);
 
-    
+
 
 
     // Begin Frame
@@ -197,7 +188,7 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
         xrCheckResult(xrWaitFrame(ctx.vr.session, nullptr, &frame_state));
 
     }
-    XrTime predicted_time = frame_state.predictedDisplayTime;
+    vr_input.predicted_time = frame_state.predictedDisplayTime;
 
     XrResult result;
     {
@@ -207,22 +198,36 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
 
     }
 
-    if(result == XR_FRAME_DISCARDED || result == XR_SESSION_NOT_FOCUSED || frame_state.shouldRender == XR_FALSE) {
+    if (result == XR_FRAME_DISCARDED || result == XR_SESSION_NOT_FOCUSED || frame_state.shouldRender == XR_FALSE) {
 
         dy::log() << "frame discarded\n";
-        XrFrameEndInfo end_info {XR_TYPE_FRAME_END_INFO};
-        end_info.displayTime = predicted_time;
+        XrFrameEndInfo end_info{ XR_TYPE_FRAME_END_INFO };
+        end_info.displayTime = vr_input.predicted_time;
         end_info.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
 
         OPTICK_EVENT("end_frame_premature");
         xrCheckResult(xrEndFrame(ctx.vr.session, &end_info));
         return;
 
-    } else {
+    }
+    else {
 
         xrCheckResult(result);
 
     }
+    
+}
+
+void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals) {
+
+    OPTICK_EVENT();
+
+    VRInputC& vr_input = reg.ctx<VRInputC>();
+
+    if(!vr_input.rendering) {
+        return;
+    }
+
 
     {
 
@@ -239,7 +244,7 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
     XrViewState view_state = {XR_TYPE_VIEW_STATE};
     XrViewLocateInfo locate_info = {XR_TYPE_VIEW_LOCATE_INFO};
     locate_info.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-    locate_info.displayTime = predicted_time;
+    locate_info.displayTime = vr_input.predicted_time;
     locate_info.space = ctx.vr.space;
     std::vector<XrView> views(ctx.vr.swapchains.size(), {XR_TYPE_VIEW});
     {
@@ -309,7 +314,7 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
     XrCompositionLayerBaseHeader* layer = reinterpret_cast<XrCompositionLayerBaseHeader*> (&layer_proj);
 
     XrFrameEndInfo end_info{XR_TYPE_FRAME_END_INFO};
-    end_info.displayTime = predicted_time;
+    end_info.displayTime = vr_input.predicted_time;
     end_info.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
     end_info.layerCount = 1;
     end_info.layers = &layer;

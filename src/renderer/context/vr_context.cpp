@@ -9,8 +9,6 @@
 #include "util/log.h"
 #include "renderer/util/vk_util.h"
 
-const XrPosef  pose_identity = { {0,0,0,1}, {0,0,0} };
-
 VRContext::VRContext(Context &ctx) : ctx(ctx) {
 
     // Extensions and layers

@@ -3,12 +3,21 @@
 
 #include "entt/entt.hpp"
 
+#include "renderer/util/xr.h"
+
 class VRInput {
 public:
     VRInput(entt::registry& reg);
     void poll();
     void update();
 private:
+
+	XrActionSet actionSet;
+	XrAction poseAction;
+	XrAction selectAction;
+	XrPath handSubactionPath[2];
+	XrSpace handSpace[2];
+
     entt::registry& reg;
 };
 

@@ -4,20 +4,11 @@
 #include "renderer/util/vk.h"
 #include "renderer/util/vmapp.h"
 
-#define XR_USE_GRAPHICS_API_VULKAN
-#if defined(WIN32)
-#define XR_USE_PLATFORM_WIN32
-#include <Windows.h>
-#else
-#define XR_USE_PLATFORM_XLIB
-#endif
-
-#include <openxr/openxr.h>
-#include <openxr/openxr_platform.h>
+#include "renderer/util/xr.h"
 
 class Context;
 
-void xrCheckResult(XrResult result);
+const XrPosef pose_identity = { {0,0,0,1}, {0,0,0} };
 
 class VRContext {
 public:
@@ -33,8 +24,6 @@ public:
     XrSystemId system_id;
     XrEnvironmentBlendMode blend;
     XrSession session = {};
-    XrSessionState session_state = XR_SESSION_STATE_UNKNOWN;
-    bool rendering = false;
     XrSpace space = {};
 
     uint32_t num_frames = 0;

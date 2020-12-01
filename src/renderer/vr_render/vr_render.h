@@ -1,7 +1,9 @@
 #ifndef MAIN_RENDER_H
 #define MAIN_RENDER_H
 
-#include "renderer/util/vk.h"
+#include <vector>
+#include <taskflow/taskflow.hpp>
+#include <entt/entt.hpp>
 
 #include "renderpass.h"
 #include "object_render.h"
@@ -9,26 +11,10 @@
 #include "view_ubo.h"
 #include "material_manager.h"
 
-#include <taskflow/taskflow.hpp>
-
 #include "renderer/util/vmapp.h"
-
-#include "entt/entt.hpp"
-
 #include "renderer/context/num_frames.h"
 
-#define XR_USE_GRAPHICS_API_VULKAN
-#if defined(WIN32)
-#define XR_USE_PLATFORM_WIN32
-#include <Windows.h>
-#else
-#define XR_USE_PLATFORM_XLIB
-#endif
-
-#include <openxr/openxr.h>
-#include <openxr/openxr_platform.h>
-
-#include <vector>
+#include "renderer/util/xr.h"
 
 class Context;
 class Camera;
