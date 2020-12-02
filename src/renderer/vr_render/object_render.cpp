@@ -64,14 +64,14 @@ void ObjectRender::render(vk::CommandBuffer command, uint32_t index) {
                 {part.position.buffer->buffer, part.normal.buffer->buffer},
                 {part.position.offset, part.normal.offset});
 
-            auto& basis = transform.transform.getBasis();
+            auto& basis = transform.transform->getBasis();
             for (int i = 0; i < 3; i++) {
                 for (int j = 0; j < 3; j++) {
-                    f.pointer[transform_index].mat[i][j] = basis[i][j];
+                    f.pointer[transform_index].mat[i][j] = basis[i][j] * 0.1f;
                 }
             }
 
-            auto& origin = transform.transform.getOrigin();
+            auto& origin = transform.transform->getOrigin();
             for (int i = 0; i < 3; i++) {
                 f.pointer[transform_index].pos[i] = origin[i];
             }

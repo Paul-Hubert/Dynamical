@@ -24,8 +24,6 @@ public:
 
     std::unique_ptr<SystemSet> pre_sets;
 
-    std::unique_ptr<SystemSet> update_sets;
-
     std::unique_ptr<SystemSet> post_sets;
 
 };

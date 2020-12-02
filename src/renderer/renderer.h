@@ -14,7 +14,6 @@ public:
     Renderer(entt::registry& reg);
     void preinit();
     void init();
-    void update();
     void prepare();
     void render();
     void finish();

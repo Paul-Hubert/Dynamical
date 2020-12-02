@@ -20,6 +20,7 @@
 #include "logic/components/transformc.h"
 #include "logic/components/objectc.h"
 #include "logic/components/inputc.h"
+#include "logic/components/vrinputc.h"
 
 #include "renderer/model/model_manager.h"
 
@@ -50,7 +51,6 @@ void Game::start() {
     physics = std::make_unique<PhysicsSys>(reg);
 
     pre_sets = std::make_unique<SystemSet>(reg);
-    update_sets = std::make_unique<SystemSet>(reg);
     post_sets = std::make_unique<SystemSet>(reg);
 
     pre_sets->add<VRPlayerControlSys>();
@@ -60,7 +60,6 @@ void Game::start() {
     renderer->preinit();
     physics->preinit();
     pre_sets->preinit();
-    update_sets->preinit();
     post_sets->preinit();
 
     tf::Executor& executor = reg.set<tf::Executor>();
@@ -72,38 +71,39 @@ void Game::start() {
     reg.set<Util::Entity<"player"_hs>>(player);
 
 
+    manager.load("./resources/box.glb");
+
     // init
 
     renderer->init();
     physics->init();
     pre_sets->init();
-    update_sets->init();
     post_sets->init();
 
 
     // create basic model
     {
 
-        manager.load("./resources/box.glb");
         auto box_model = manager.get("./resources/box.glb");
 
         entt::entity box = reg.create();
         auto& renderable = reg.emplace<ModelRenderableC>(box, box_model);
         auto& transform = reg.emplace<TransformC>(box);
-        transform.transform.setIdentity();
-        transform.transform.setOrigin(btVector3(0., 1., 0.));
+        transform.transform->setIdentity();
+        transform.transform->setOrigin(btVector3(0., 2., 0.));
 
         ObjectC& box_object = reg.emplace<ObjectC>(box);
 
         auto& model = reg.get<ModelC>(box_model);
-        box_object.shape = model.shape.get();
-        box_object.rigid_body = std::make_unique<btRigidBody>(model.mass, static_cast<btMotionState*>(&transform), box_object.shape);
+        box_object.rigid_body = std::make_unique<btRigidBody>(model.mass, static_cast<btMotionState*>(transform.transform.get()), model.shape.get());
+        box_object.rigid_body->setDamping(0.1f, 0.1f);
 
         reg.ctx<btDiscreteDynamicsWorld*>()->addRigidBody(box_object.rigid_body.get());
 
     }
 
     InputC& input = reg.ctx<InputC>();
+    VRInputC& vr_input = reg.ctx<VRInputC>();
 
     // start loop
     
@@ -112,22 +112,22 @@ void Game::start() {
 
         OPTICK_FRAME("MainThread");
 
-        renderer->update();
+        XrTime last = vr_input.predicted_time;
+
+        renderer->prepare();
+
+        float dt = (float) ((vr_input.predicted_time - last) / 1000000000.);
 
         if (input.on[Action::EXIT]) {
             running = false;
             input.on.set(Action::EXIT, false);
         }
 
-        pre_sets->tick();
+        pre_sets->tick(dt);
 
-        renderer->prepare();
+        physics->tick(dt);
 
-        update_sets->tick();
-
-        physics->tick();
-
-        post_sets->tick();
+        post_sets->tick(dt);
 
         renderer->render();
         
@@ -138,7 +138,6 @@ void Game::start() {
 Game::~Game() {
     
     post_sets->finish();
-    update_sets->finish();
     pre_sets->finish();
     physics->finish();
     renderer->finish();

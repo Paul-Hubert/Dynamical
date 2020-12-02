@@ -18,12 +18,12 @@ void SystemSet::init() {
     
 }
 
-void SystemSet::tick() {
+void SystemSet::tick(float dt) {
 
     OPTICK_EVENT();
     
     for(std::unique_ptr<System>& sys : systems) {
-        sys->tick();
+        sys->tick(dt);
     }
     
 }

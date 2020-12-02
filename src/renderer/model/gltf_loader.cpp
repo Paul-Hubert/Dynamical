@@ -161,6 +161,7 @@ entt::entity GLTFLoader::load(std::string path) {
 	}
 
 	btGImpactMeshShape* gimpact = new btGImpactMeshShape(model.tivma.get());
+	gimpact->setLocalScaling(btVector3(0.1, 0.1, 0.1));
 	gimpact->updateBound();
 	model.shape = std::unique_ptr<btCollisionShape>(gimpact);
 

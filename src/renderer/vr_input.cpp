@@ -4,6 +4,7 @@
 #include "logic/components/inputc.h"
 #include "logic/components/vrinputc.h"
 #include "util/util.h"
+#include "util/log.h"
 
 #include "renderer/context/vr_context.h"
 
@@ -30,17 +31,11 @@ VRInput::VRInput(entt::registry& reg) : reg(reg) {
 	strcpy_s(action_info.localizedActionName, "Hand Pose");
 	xrCreateAction(actionSet, &action_info, &poseAction);
 
-	// Create an action for listening to the select action! This is primary trigger
-	// on controllers, and an airtap on HoloLens
 	action_info.actionType = XR_ACTION_TYPE_BOOLEAN_INPUT;
 	strcpy_s(action_info.actionName, "select");
 	strcpy_s(action_info.localizedActionName, "Select");
 	xrCreateAction(actionSet, &action_info, &selectAction);
 
-	// Bind the actions we just created to specific locations on the Khronos simple_controller
-	// definition! These are labeled as 'suggested' because they may be overridden by the runtime
-	// preferences. For example, if the runtime allows you to remap buttons, or provides input
-	// accessibility settings.
 	XrPath profile_path;
 	XrPath pose_path[2];
 	XrPath select_path[2];
@@ -60,7 +55,6 @@ VRInput::VRInput(entt::registry& reg) : reg(reg) {
 	suggested_binds.suggestedBindings = bindings.data();
 	xrSuggestInteractionProfileBindings(ctx.vr.instance, &suggested_binds);
 
-	// Create frames of reference for the pose actions
 	for (int32_t i = 0; i < 2; i++) {
 		XrActionSpaceCreateInfo action_space_info = { XR_TYPE_ACTION_SPACE_CREATE_INFO };
 		action_space_info.action = poseAction;
@@ -69,7 +63,6 @@ VRInput::VRInput(entt::registry& reg) : reg(reg) {
 		xrCreateActionSpace(ctx.vr.session, &action_space_info, &handSpace[i]);
 	}
 
-	// Attach the action set we just made to the session
 	XrSessionActionSetsAttachInfo attach_info = { XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO };
 	attach_info.countActionSets = 1;
 	attach_info.actionSets = &actionSet;
@@ -149,23 +142,14 @@ void VRInput::poll() {
 		XrActionStatePose pose_state = { XR_TYPE_ACTION_STATE_POSE };
 		get_info.action = poseAction;
 		xrGetActionStatePose(ctx.vr.session, &get_info, &pose_state);
-		vr_input.per_hand[hand].active = pose_state.isActive;
+		vr_input.hands[hand].active = pose_state.isActive;
 
 		// Events come with a timestamp
 		XrActionStateBoolean select_state = { XR_TYPE_ACTION_STATE_BOOLEAN };
 		get_info.action = selectAction;
 		xrGetActionStateBoolean(ctx.vr.session, &get_info, &select_state);
-		vr_input.per_hand[hand].action = select_state.currentState && select_state.changedSinceLastSync;
+		vr_input.hands[hand].action = select_state.currentState && select_state.changedSinceLastSync;
 
-		if (vr_input.per_hand[hand].action) {
-			XrSpaceLocation space_location = { XR_TYPE_SPACE_LOCATION };
-			XrResult res = xrLocateSpace(handSpace[hand], ctx.vr.space, select_state.lastChangeTime, &space_location);
-			if (XR_UNQUALIFIED_SUCCESS(res) &&
-				(space_location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
-				(space_location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
-				vr_input.per_hand[hand].pose = space_location.pose;
-			}
-		}
 	}
 
 }
@@ -179,15 +163,25 @@ void VRInput::update() {
 		return;
     
 	for (size_t hand = 0; hand < 2; hand++) {
-		if (!vr_input.per_hand[hand].active) {
+		if (!vr_input.hands[hand].active) {
 			continue;
 		}
-		XrSpaceLocation spaceRelation = { XR_TYPE_SPACE_LOCATION };
-		XrResult res = xrLocateSpace(handSpace[hand], ctx.vr.space, vr_input.predicted_time, &spaceRelation);
+		XrSpaceLocation space_location = { XR_TYPE_SPACE_LOCATION };
+		XrSpaceVelocity space_velocity = { XR_TYPE_SPACE_VELOCITY };
+		space_location.next = &space_velocity;
+		XrResult res = xrLocateSpace(handSpace[hand], ctx.vr.space, vr_input.predicted_time, &space_location);
 		if (XR_UNQUALIFIED_SUCCESS(res) &&
-			(spaceRelation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
-			(spaceRelation.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
-			vr_input.per_hand[hand].pose = spaceRelation.pose;
+			(space_location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
+			(space_location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0 &&
+			(space_velocity.velocityFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) != 0 &&
+			(space_velocity.velocityFlags & XR_SPACE_VELOCITY_ANGULAR_VALID_BIT) != 0) {
+			vr_input.hands[hand].position = glm::vec3(space_location.pose.position.x, space_location.pose.position.y, space_location.pose.position.z);
+			vr_input.hands[hand].rotation = glm::quat(space_location.pose.orientation.x, space_location.pose.orientation.y, space_location.pose.orientation.z, space_location.pose.orientation.w);
+			vr_input.hands[hand].linearVelocity = glm::vec3(space_velocity.linearVelocity.x, space_velocity.linearVelocity.y, space_velocity.linearVelocity.z);
+			vr_input.hands[hand].angularVelocity = glm::vec3(space_velocity.angularVelocity.x, space_velocity.angularVelocity.y, space_velocity.angularVelocity.z);
+		}
+		else {
+			vr_input.hands[hand].active = false;
 		}
 	}
 

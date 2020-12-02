@@ -25,7 +25,7 @@ layout(std140, set = 1, binding = 0) uniform Transform {
 
 void main() {
 
-    v_position = mat3(transform.per_model[gl_InstanceIndex].basis) * a_pos + vec3(transform.per_model[gl_InstanceIndex].position);
+    v_position =  a_pos * mat3(transform.per_model[gl_InstanceIndex].basis) + vec3(transform.per_model[gl_InstanceIndex].position);
     v_position.y = -v_position.y;
     v_normal = a_normal;
     gl_Position = camera.viewproj * vec4(v_position, 1.0);

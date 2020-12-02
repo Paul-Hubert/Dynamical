@@ -25,10 +25,10 @@ void Renderer::preinit() {
 }
 
 void Renderer::init() {
-    
+
 }
 
-void Renderer::update() {
+void Renderer::prepare() {
 
     OPTICK_EVENT();
 
@@ -37,12 +37,6 @@ void Renderer::update() {
     vr_input->poll();
 
     ui->prepare();
-
-}
-
-void Renderer::prepare() {
-
-    OPTICK_EVENT();
 
     vr_render->prepare();
 

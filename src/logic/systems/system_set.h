@@ -20,7 +20,7 @@ public:
     
     void init();
     
-    void tick();
+    void tick(float dt);
     
     void finish();
     

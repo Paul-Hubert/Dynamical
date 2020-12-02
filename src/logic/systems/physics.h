@@ -10,7 +10,7 @@ public:
     PhysicsSys(entt::registry& reg);
     void preinit() override;
     void init() override;
-    void tick() override;
+    void tick(float dt) override;
     ~PhysicsSys();
     const char* name() override {return "Physics";};
     

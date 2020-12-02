@@ -2,6 +2,8 @@
 #define VRINPUTC_H
 
 #include "renderer/util/xr.h"
+#include "glm/glm.hpp"
+#include "glm/gtx/quaternion.hpp"
 
 class VRInputC {
 public:
@@ -11,13 +13,17 @@ public:
 	struct View {
 		XrPosef pose;
 	};
-	View per_view[2];
+	View views[2];
 	struct Hand {
 		bool active = false;
-		XrPosef pose;
+		glm::vec3 position;
+		glm::quat rotation;
+		glm::vec3 linearVelocity;
+		glm::vec3 angularVelocity;
 		bool action = false;
+
 	};
-	Hand per_hand[2];
+	Hand hands[2];
 };
 
 #endif

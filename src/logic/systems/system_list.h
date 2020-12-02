@@ -11,7 +11,7 @@ public: \
     NAME(entt::registry& reg) : System(reg) {}; \
     void preinit() override; \
     void init() override; \
-    void tick() override; \
+    void tick(float dt) override; \
     void finish() override; \
     const char* name() override { return #NAME; }; \
 };

@@ -141,9 +141,6 @@ void VRRender::prepare() {
     
     material_manager.update();
 
-    static float t = 0.f;
-    t += 1.f / 60.f;
-
     frame_index = (frame_index + 1) % per_frame.size();
 
 
@@ -231,7 +228,7 @@ void VRRender::prepare() {
     }
 
     for(uint32_t v = 0; v < ctx.vr.num_views; v++) {
-        vr_input.per_view[v].pose = views[v].pose;
+        vr_input.views[v].pose = views[v].pose;
     }
     
 }
@@ -277,7 +274,7 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
 
     for (uint32_t v = 0; v < ctx.vr.num_views; v++) {
         auto& view = views[v];
-        vr_input.per_view[v].pose = view.pose;
+        vr_input.views[v].pose = view.pose;
 
         OPTICK_EVENT("calculate_matrices");
         ubo.views[v].per_frame[swapchain_image_indices[v]].pointer->view_projection = projection_fov(views[v].fov, 0.01f, 100.f) * view_pose(view.pose);

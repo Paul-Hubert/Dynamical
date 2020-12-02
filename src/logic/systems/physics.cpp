@@ -19,14 +19,14 @@ world(&dispatcher, &overlappingPairCache, &solver, &collisionConfiguration)
 
     btGImpactCollisionAlgorithm::registerAlgorithm(&dispatcher);
 
-	world.setGravity(btVector3(0, -1, 0));
+	world.setGravity(btVector3(0, -10, 0));
 
 	{
 		btCollisionShape* groundShape = new btBoxShape(btVector3(btScalar(50.), btScalar(1.), btScalar(50.)));
 
 		btTransform groundTransform;
 		groundTransform.setIdentity();
-		groundTransform.setOrigin(btVector3(0, -1.0, 0));
+		groundTransform.setOrigin(btVector3(0, 0, 0));
 
 		btScalar mass(0.);
 
@@ -49,11 +49,11 @@ void PhysicsSys::init() {
 
 }
 
-void PhysicsSys::tick() {
+void PhysicsSys::tick(float dt) {
 
     OPTICK_EVENT();
 
-    world.stepSimulation(1.f / 90.f, 1, 1.f/90.f);
+    world.stepSimulation(dt, 1, 1.f/90.f);
     
 }
 
