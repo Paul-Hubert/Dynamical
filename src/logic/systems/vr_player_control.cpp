@@ -16,6 +16,12 @@
 #include "renderer/model/model_manager.h"
 #include "logic/components/vrinputc.h"
 
+const float max_force = 10000;
+const float max_torque = 1000;
+
+#ifndef M_PI
+#define M_PI    3.14159265358979323846264338327950288   /**< pi */
+#endif
 
 void VRPlayerControlSys::preinit() {
 
@@ -35,7 +41,11 @@ void VRPlayerControlSys::init() {
 		auto& hand = reg.emplace<VRHandC>(entity);
 		hand.index = h;
 		for (int i = 0; i < 3; i++) {
-			hand.position_pids.emplace_back(3000, 0, 700, (float) (1./90.), -1000, 1000);
+			hand.position_pids.emplace_back(1700.f, 0.f, 500.f, (float) (1./90.), -max_force, max_force);
+		}
+		for (int i = 0; i < 3; i++) {
+			hand.rotation_pids.emplace_back(1.f, 0.f, 0.f, (float)(1. / 90.), -max_torque, max_torque);
+			hand.rotation_pids[i].setWrapped(0.f, (float) (2.f*M_PI));
 		}
 
 		auto box_model = reg.ctx<ModelManager>().get("./resources/box.glb");
@@ -47,8 +57,10 @@ void VRPlayerControlSys::init() {
 		ObjectC& box_object = reg.emplace<ObjectC>(entity);
 
 		auto& model = reg.get<ModelC>(box_model);
-		box_object.rigid_body = std::make_unique<btRigidBody>(model.mass, static_cast<btMotionState*>(transform.transform.get()), model.shape.get());
-		box_object.rigid_body->setDamping(0.01f, 0.01f);
+		btRigidBody::btRigidBodyConstructionInfo info(model.mass, static_cast<btMotionState*>(transform.transform.get()), model.shape.get(), model.local_inertia);
+		//info.m_friction = 0.01;
+		//info.m_linearDamping = 0.01;
+		box_object.rigid_body = std::make_unique<btRigidBody>(info);
 
 	}
 
@@ -100,7 +112,37 @@ void VRPlayerControlSys::tick(float dt) {
 
 		box.rigid_body->clearForces();
 		box.rigid_body->activate(true);
-		
+
+		/*{
+
+			glm::vec3 position(transform.transform->getOrigin().x(), transform.transform->getOrigin().y(), transform.transform->getOrigin().z());
+			glm::vec3 velocity(box.rigid_body->getLinearVelocity().x(), box.rigid_body->getLinearVelocity().y(), box.rigid_body->getLinearVelocity().z());
+			glm::vec3 load = (velocity - hand.last_velocity) * box.rigid_body->getMass() / hand.last_dt - hand.last_force;
+
+			hand.last_velocity = velocity;
+			hand.last_force = ((vr_input.hands[hand.index].position - position) / dt - hand.last_velocity) * box.rigid_body->getMass() / dt - load;
+			hand.last_dt = dt;
+
+			hand.last_force = glm::clamp(hand.last_force, glm::vec3(-max_force), glm::vec3(max_force));
+
+			glm::vec3 error = vr_input.hands[hand.index].position - position;
+
+			if (vr_input.hands[0].trigger > 0.1) {
+				hand.damping += 1;
+				dy::log() << "D : " << hand.damping << "\n";
+			} if (vr_input.hands[0].grip > 0.1) {
+				hand.damping -= 1;
+				dy::log() << "D : " << hand.damping << "\n";
+			}
+			hand.last_force *= 0.50f;// (error - hand.last_error) / dt;
+			hand.last_error = error;
+
+			//box.rigid_body->setLinearVelocity(btVector3(hand.last_velocity.x, hand.last_velocity.y, hand.last_velocity.z));
+
+			box.rigid_body->applyCentralForce(btVector3(hand.last_force.x, hand.last_force.y, hand.last_force.z));
+		}*/
+
+		// Position
 		{
 
 			float targets[3];
@@ -116,6 +158,7 @@ void VRPlayerControlSys::tick(float dt) {
 			float outputs[3];
 
 			for (int i = 0; i < 3; i++) {
+				/*
 				if (vr_input.hands[0].trigger > 0.1) {
 					hand.position_pids[i].i += 1;
 					dy::log() << "I : " << hand.position_pids[i].i << "\n";
@@ -129,14 +172,56 @@ void VRPlayerControlSys::tick(float dt) {
 					hand.position_pids[i].d -= 1;
 					dy::log() << "D : " << hand.position_pids[i].d << "\n";
 				}
+				*/
 				outputs[i] = hand.position_pids[i].tick(inputs[i], targets[i]);
-				//dy::log() << outputs[i] << "\n";
 			}
 
 			box.rigid_body->applyCentralForce(btVector3(outputs[0], outputs[1], outputs[2]));
 
 		}
 
+
+		// Rotation
+		{
+
+			glm::vec3 target = glm::eulerAngles(h.predictedRotation);
+
+			float targets[3];
+			targets[0] = target.x;
+			targets[1] = target.y;
+			targets[2] = target.z;
+
+			glm::vec3 current = glm::eulerAngles(glm::quat(transform.transform->getRotation().x(), transform.transform->getRotation().y(), transform.transform->getRotation().z(), transform.transform->getRotation().w()));
+
+			float inputs[3];
+			inputs[0] = current.x;
+			inputs[1] = current.y;
+			inputs[2] = current.z;
+
+			float outputs[3];
+
+			for (int i = 0; i < 3; i++) {
+				
+				if (vr_input.hands[0].trigger > 0.1) {
+					hand.rotation_pids[i].p += 1;
+					dy::log() << "P : " << hand.rotation_pids[i].p << "\n";
+				} if (vr_input.hands[0].grip > 0.1) {
+					hand.rotation_pids[i].p -= 1;
+					dy::log() << "P : " << hand.rotation_pids[i].p << "\n";
+				} if (vr_input.hands[1].trigger > 0.1) {
+					hand.rotation_pids[i].d += 1;
+					dy::log() << "D : " << hand.rotation_pids[i].d << "\n";
+				} if (vr_input.hands[1].grip > 0.1) {
+					hand.rotation_pids[i].d -= 1;
+					dy::log() << "D : " << hand.rotation_pids[i].d << "\n";
+				}
+				
+				outputs[i] = hand.rotation_pids[i].tick(inputs[i], targets[i]);
+			}
+
+			box.rigid_body->applyTorque(btVector3(outputs[0], outputs[1], outputs[2]));
+
+		}
 
 
 		

@@ -39,6 +39,7 @@ public:
 
 
 	btScalar mass;
+	btVector3 local_inertia;
 
 	std::unique_ptr<btTriangleIndexVertexArray> tivma = nullptr;
 
