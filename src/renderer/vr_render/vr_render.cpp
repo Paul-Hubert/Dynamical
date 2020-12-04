@@ -186,6 +186,7 @@ void VRRender::prepare() {
 
     }
     vr_input.predicted_time = frame_state.predictedDisplayTime;
+    vr_input.predicted_period = frame_state.predictedDisplayPeriod;
 
     XrResult result;
     {

@@ -4,6 +4,8 @@
 
 #include "util/log.h"
 
+#include "extra/PID/PID.h"
+
 #include "logic/components/vrhandc.h"
 
 #include "logic/components/playerc.h"
@@ -13,6 +15,7 @@
 #include "logic/components/objectc.h"
 #include "renderer/model/model_manager.h"
 #include "logic/components/vrinputc.h"
+
 
 void VRPlayerControlSys::preinit() {
 
@@ -31,6 +34,9 @@ void VRPlayerControlSys::init() {
 		auto entity = h == VRHandC::left ? player.left_hand : player.right_hand;
 		auto& hand = reg.emplace<VRHandC>(entity);
 		hand.index = h;
+		for (int i = 0; i < 3; i++) {
+			hand.position_pids.emplace_back(3000, 0, 700, (float) (1./90.), -1000, 1000);
+		}
 
 		auto box_model = reg.ctx<ModelManager>().get("./resources/box.glb");
 
@@ -67,69 +73,71 @@ void VRPlayerControlSys::tick(float dt) {
 			}
 			return;
 		}
+
+		auto& h = vr_input.hands[hand.index];
 		
 		if (!hand.active) {
 			hand.active = true;
 
-			transform.transform->setOrigin(btVector3(vr_input.hands[hand.index].position.x, vr_input.hands[hand.index].position.y, vr_input.hands[hand.index].position.z));
-			transform.transform->setRotation(btQuaternion(vr_input.hands[hand.index].rotation.x, vr_input.hands[hand.index].rotation.y, vr_input.hands[hand.index].rotation.z, vr_input.hands[hand.index].rotation.w));
-
-			hand.last_predicted_linear_velocity = vr_input.hands[hand.index].linearVelocity;
-			hand.last_predicted_angular_velocity = vr_input.hands[hand.index].angularVelocity;
-			hand.last_dt = dt;
+			transform.transform->setOrigin(btVector3(h.position.x, h.position.y, h.position.z));
+			transform.transform->setRotation(btQuaternion(h.rotation.x, h.rotation.y, h.rotation.z, h.rotation.w));
+			box.rigid_body->setWorldTransform(*transform.transform);
 
 			reg.ctx<btDiscreteDynamicsWorld*>()->addRigidBody(box.rigid_body.get());
+			box.rigid_body->setLinearVelocity(btVector3(0, 0, 0));
 			return;
 
 		}
 		
-
-		box.rigid_body->clearForces();
-		{
-
-			glm::vec3 current_position = glm::vec3(transform.transform->getOrigin().x(), transform.transform->getOrigin().y(), transform.transform->getOrigin().z());
-			glm::vec3 current_velocity = glm::vec3(box.rigid_body->getLinearVelocity().x(), box.rigid_body->getLinearVelocity().y(), box.rigid_body->getLinearVelocity().z());
-
-			hand.last_load = box.rigid_body->getMass() * (hand.last_predicted_linear_velocity - current_velocity) / hand.last_dt;
-			glm::vec3 force = 2.f * box.rigid_body->getMass() * ((vr_input.hands[hand.index].position - current_position) / dt - current_velocity) / dt - hand.last_load;
-
-			float f = glm::length(force);
-			const float max_force = 1000.f;
-			if (f > max_force) {
-				force = force * max_force / f;
-			}
-
-			hand.last_predicted_linear_velocity = force * box.rigid_body->getInvMass() * dt + current_velocity;
-
-			//dy::log() << "load : " << hand.last_load.x << " " << hand.last_load.y << " " << hand.last_load.z << "\n";
-			//dy::log() << "force : " << force.x << " " << force.y << " " << force.z << "\n";
-
-			box.rigid_body->applyCentralForce(btVector3(force.x, force.y, force.z));
+		
+		glm::vec3 position(transform.transform->getOrigin().x(), transform.transform->getOrigin().y(), transform.transform->getOrigin().z());
+		if (glm::distance(vr_input.hands[hand.index].position, position) > 1) {
+			transform.transform->setOrigin(btVector3(h.position.x, h.position.y, h.position.z));
+			transform.transform->setRotation(btQuaternion(h.rotation.x, h.rotation.y, h.rotation.z, h.rotation.w));
+			box.rigid_body->setWorldTransform(*transform.transform);
+			box.rigid_body->setLinearVelocity(btVector3(0,0,0));
 		}
 
-		/*{
+		box.rigid_body->clearForces();
+		box.rigid_body->activate(true);
+		
+		{
 
-			glm::vec3 current_rotation = glm::vec3(transform.transform->getOrigin().x(), transform.transform->getOrigin().y(), transform.transform->getOrigin().z());
-			glm::vec3 current_angular = glm::vec3(box.rigid_body->getLinearVelocity().x(), box.rigid_body->getLinearVelocity().y(), box.rigid_body->getLinearVelocity().z());
+			float targets[3];
+			targets[0] = h.predictedPosition.x;
+			targets[1] = h.predictedPosition.y;
+			targets[2] = h.predictedPosition.z;
 
-			hand.last_load = (hand.last_predicted_angular_velocity - current_angular) / hand.last_dt * box.rigid_body->getInvInertiaTensorWorld();
-			glm::vec3 torque = 2.f * box.rigid_body->getMass() * ((vr_input.hands[hand.index].position - current_position) / dt - current_velocity) / dt - hand.last_load;
+			float inputs[3];
+			inputs[0] = transform.transform->getOrigin().x();
+			inputs[1] = transform.transform->getOrigin().y();
+			inputs[2] = transform.transform->getOrigin().z();
 
-			float t = glm::length(torque);
-			const float max_torque = 1000.f;
-			if (f > max_torque) {
-				torque = torque * max_torque / t;
+			float outputs[3];
+
+			for (int i = 0; i < 3; i++) {
+				if (vr_input.hands[0].trigger > 0.1) {
+					hand.position_pids[i].i += 1;
+					dy::log() << "I : " << hand.position_pids[i].i << "\n";
+				} if (vr_input.hands[0].grip > 0.1) {
+					hand.position_pids[i].i -= 1;
+					dy::log() << "I : " << hand.position_pids[i].i << "\n";
+				} if (vr_input.hands[1].trigger > 0.1) {
+					hand.position_pids[i].d += 1;
+					dy::log() << "D : " << hand.position_pids[i].d << "\n";
+				} if (vr_input.hands[1].grip > 0.1) {
+					hand.position_pids[i].d -= 1;
+					dy::log() << "D : " << hand.position_pids[i].d << "\n";
+				}
+				outputs[i] = hand.position_pids[i].tick(inputs[i], targets[i]);
+				//dy::log() << outputs[i] << "\n";
 			}
 
-			hand.last_predicted_linear_velocity = torque * box.rigid_body->getInvMass() * dt + current_velocity;
+			box.rigid_body->applyCentralForce(btVector3(outputs[0], outputs[1], outputs[2]));
 
-			box.rigid_body->applyTorque(btVector3(torque.x, torque.y, torque.z));
-		}*/
+		}
 
 
-		hand.last_dt = dt;
-
-		
 
 		
 	});

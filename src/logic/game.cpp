@@ -112,11 +112,10 @@ void Game::start() {
 
         OPTICK_FRAME("MainThread");
 
-        XrTime last = vr_input.predicted_time;
-
         renderer->prepare();
 
-        float dt = (float) ((vr_input.predicted_time - last) / 1000000000.);
+        float dt = (float) ((vr_input.predicted_period) / 1000000000.);
+        //float dt = (float) (1. / 90.);
 
         if (input.on[Action::EXIT]) {
             running = false;

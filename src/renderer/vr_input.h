@@ -14,7 +14,8 @@ private:
 
 	XrActionSet actionSet;
 	XrAction poseAction;
-	XrAction selectAction;
+	XrAction triggerAction;
+	XrAction gripAction;
 	XrPath handSubactionPath[2];
 	XrSpace handSpace[2];
 

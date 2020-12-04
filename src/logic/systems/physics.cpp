@@ -19,7 +19,7 @@ world(&dispatcher, &overlappingPairCache, &solver, &collisionConfiguration)
 
     btGImpactCollisionAlgorithm::registerAlgorithm(&dispatcher);
 
-	world.setGravity(btVector3(0, -10, 0));
+	world.setGravity(btVector3(0, 0, 0));
 
 	{
 		btCollisionShape* groundShape = new btBoxShape(btVector3(btScalar(50.), btScalar(1.), btScalar(50.)));
@@ -34,7 +34,7 @@ world(&dispatcher, &overlappingPairCache, &solver, &collisionConfiguration)
 		btRigidBody* body = new btRigidBody(mass, myMotionState, groundShape);
 
 		//add the body to the dynamics world
-		world.addRigidBody(body);
+		//world.addRigidBody(body);
 	}
 
 }
@@ -53,7 +53,7 @@ void PhysicsSys::tick(float dt) {
 
     OPTICK_EVENT();
 
-    world.stepSimulation(dt, 1, 1.f/90.f);
+    world.stepSimulation(dt, 1, (float)(1. / 90.));
     
 }
 
