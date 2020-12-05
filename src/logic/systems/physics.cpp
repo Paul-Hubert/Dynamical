@@ -19,7 +19,7 @@ world(&dispatcher, &overlappingPairCache, &solver, &collisionConfiguration)
 
     btGImpactCollisionAlgorithm::registerAlgorithm(&dispatcher);
 
-	world.setGravity(btVector3(0, 0, 0));
+	world.setGravity(btVector3(0, -10, 0));
 
 	{
 		btCollisionShape* groundShape = new btBoxShape(btVector3(btScalar(50.), btScalar(1.), btScalar(50.)));
@@ -31,10 +31,13 @@ world(&dispatcher, &overlappingPairCache, &solver, &collisionConfiguration)
 		btScalar mass(0.);
 
 		btDefaultMotionState* myMotionState = new btDefaultMotionState(groundTransform);
-		btRigidBody* body = new btRigidBody(mass, myMotionState, groundShape);
+		btRigidBody::btRigidBodyConstructionInfo info(mass, myMotionState, groundShape);
+		info.m_friction = 0.5;
+
+		btRigidBody* body = new btRigidBody(info);
 
 		//add the body to the dynamics world
-		//world.addRigidBody(body);
+		world.addRigidBody(body);
 	}
 
 }

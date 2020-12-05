@@ -1,13 +1,13 @@
 #include "ui_render.h"
 
 #include "renderer/context/context.h"
-#include "renderpass.h"
+#include "renderer/vr_render/renderpass.h"
 
 #include "imgui.h"
 
 #include "util/util.h"
 
-UIRender::UIRender(Context& ctx, Renderpass& renderpass) : ctx(ctx), g_FramesDataBuffers(ctx.swap.num_frames) {
+UIRender::UIRender(Context& ctx, vk::RenderPass renderpass) : ctx(ctx), g_FramesDataBuffers(ctx.swap.num_frames) {
     
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();

@@ -3,21 +3,29 @@
 #include <iostream>
 #include "util/util.h"
 
-#include "context/context.h"
-#include "input.h"
-#include "vr_input.h"
-#include "ui.h"
-#include "vr_render/vr_render.h"
+#include "context/num_frames.h"
 
 #include "optick.h"
 
 Renderer::Renderer(entt::registry& reg) : reg(reg),
-ctx(std::make_unique<Context>(reg)),
-input(std::make_unique<Input>(reg)),
-vr_input(std::make_unique<VRInput>(reg)),
-ui(std::make_unique<UI>(reg)),
-vr_render(std::make_unique<VRRender>(reg, *ctx)) {
+ctx(reg),
+input(reg),
+vr_input(reg),
+ui(reg) {
     
+    auto bindings = std::vector{
+                vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1,
+                                               vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
+    };
+    view_layout = ctx.device->createDescriptorSetLayout(
+        vk::DescriptorSetLayoutCreateInfo({}, (uint32_t)bindings.size(), bindings.data()));
+
+    vr_render = std::make_unique<VRRender>(reg, ctx, view_layout);
+
+    object_render = std::make_unique<ObjectRender>(reg, ctx, vr_render->getRenderpass(), std::vector<vk::DescriptorSetLayout>{view_layout});
+
+    ui_render = std::make_unique<UIRender>(ctx, vr_render->getRenderpass());
+
 }
 
 void Renderer::preinit() {
@@ -32,15 +40,37 @@ void Renderer::prepare() {
 
     OPTICK_EVENT();
 
-    input->poll();
+    frame_index = (frame_index + 1) % NUM_FRAMES;
 
-    vr_input->poll();
+    input.poll();
 
-    ui->prepare();
+    vr_input.poll();
 
-    vr_render->prepare();
+    ui.prepare();
 
-    vr_input->update();
+
+    std::function<void(vk::CommandBuffer)> recorder = [&](vk::CommandBuffer command) {
+
+        {
+
+            OPTICK_GPU_EVENT("draw_objects");
+            object_render->render(command, frame_index);
+
+        }
+
+        {
+
+            OPTICK_GPU_EVENT("draw_ui");
+            ui_render->render(command, frame_index);
+
+        }
+
+    };
+
+
+    vr_render->prepare(frame_index, recorder, object_render->layout);
+
+    vr_input.update();
 
 }
 
@@ -48,17 +78,19 @@ void Renderer::render() {
     
     OPTICK_EVENT();
 
-    ctx->transfer.flush();
+    ctx.transfer.flush();
     
-    ui->render();
+    ui.render();
 
-    vr_render->render({}, {});
+    
+
+    vr_render->render(frame_index, {}, {});
 
 }
 
 void Renderer::finish() {
 
-    ctx->device->waitIdle();
+    ctx.device->waitIdle();
 
 }
 

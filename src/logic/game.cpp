@@ -95,8 +95,9 @@ void Game::start() {
         ObjectC& box_object = reg.emplace<ObjectC>(box);
 
         auto& model = reg.get<ModelC>(box_model);
-        box_object.rigid_body = std::make_unique<btRigidBody>(model.mass, static_cast<btMotionState*>(transform.transform.get()), model.shape.get());
-        box_object.rigid_body->setDamping(0.1f, 0.1f);
+        btRigidBody::btRigidBodyConstructionInfo info(model.mass, static_cast<btMotionState*>(transform.transform.get()), model.shape.get(), model.local_inertia);
+        info.m_friction = 0.5;
+        box_object.rigid_body = std::make_unique<btRigidBody>(info);
 
         reg.ctx<btDiscreteDynamicsWorld*>()->addRigidBody(box_object.rigid_body.get());
 

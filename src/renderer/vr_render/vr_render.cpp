@@ -17,22 +17,44 @@
 #include "renderer/util/vk_util.h"
 
 #include "logic/components/inputc.h"
-
 #include "logic/components/vrinputc.h"
 
-VRRender::VRRender(entt::registry& reg, Context& ctx) : reg(reg), ctx(ctx), renderpass(ctx), ubo(ctx), material_manager(reg, ctx),
-object_render(reg, ctx, renderpass, std::vector<vk::DescriptorSetLayout>{ubo.descLayout}),
-ui_render(ctx, renderpass),
+VRRender::VRRender(entt::registry& reg, Context& ctx, vk::DescriptorSetLayout set_layout) : reg(reg), ctx(ctx), renderpass(ctx),
 swapchain_image_indices(ctx.vr.swapchains.size()),
-per_frame(ctx.vr.swapchains[0].images.size()) {
+per_frame(NUM_FRAMES) {
     
     commandPool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx.device.g_i));
 
     auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, (uint32_t) per_frame.size()));
 
+    descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, per_frame.size() * ctx.vr.num_views, vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, per_frame.size() * ctx.vr.num_views)));
+
     for(int i = 0; i < per_frame.size(); i++) {
-        per_frame[i].commandBuffer = cmds[i];
-        per_frame[i].fence = ctx.device->createFence({});
+        auto& f = per_frame[i];
+        f.commandBuffer = cmds[i];
+        f.fence = ctx.device->createFence({});
+        f.ubos.resize(ctx.vr.num_views);
+        for (int v = 0; v < f.ubos.size(); v++) {
+            auto& u = f.ubos[v];
+            u.set = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descriptorPool, set_layout))[0];
+
+            VmaAllocationCreateInfo allocInfo = {};
+            allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+            allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+            u.ubo = VmaBuffer(ctx.device, &allocInfo, vk::BufferCreateInfo({}, sizeof(ViewUBO), vk::BufferUsageFlagBits::eUniformBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+
+            VmaAllocationInfo inf;
+            vmaGetAllocationInfo(ctx.device, u.ubo.allocation, &inf);
+            u.pointer = static_cast<ViewUBO*> (inf.pMappedData);
+
+            auto bufInfo = vk::DescriptorBufferInfo(u.ubo, 0, sizeof(ViewUBO));
+
+            ctx.device->updateDescriptorSets({
+                vk::WriteDescriptorSet(u.set, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &bufInfo, nullptr)
+                }, {});
+
+        }
     }
 
 }
@@ -83,7 +105,7 @@ static glm::mat4 view_pose(XrPosef& pose) {
 
 
 
-void VRRender::record(vk::CommandBuffer command) {
+void VRRender::record(uint32_t frame_index, vk::CommandBuffer command, std::function<void(vk::CommandBuffer)>& recorder, vk::PipelineLayout pipeline_layout) {
 
     OPTICK_EVENT();
 
@@ -105,21 +127,9 @@ void VRRender::record(vk::CommandBuffer command) {
 
         command.setScissor(0, vk::Rect2D(vk::Offset2D(), vk::Extent2D(swapchain.width, swapchain.height)));
 
-        command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, object_render.layout, 0, {ubo.views[v].per_frame[image_index].set}, nullptr);
-
-        {
-
-            OPTICK_GPU_EVENT("draw_objects");
-            object_render.render(command, frame_index);
-
-        }
-
-        {
-
-            OPTICK_GPU_EVENT("draw_ui");
-            ui_render.render(command, frame_index);
-
-        }
+        command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_layout, 0, { per_frame[frame_index].ubos[v].set }, nullptr);
+        
+        recorder(command);
 
         command.endRenderPass();
 
@@ -129,7 +139,7 @@ void VRRender::record(vk::CommandBuffer command) {
 
 }
 
-void VRRender::prepare() {
+void VRRender::prepare(uint32_t frame_index, std::function<void(vk::CommandBuffer)>& recorder, vk::PipelineLayout pipeline_layout) {
 
     OPTICK_EVENT();
 
@@ -138,10 +148,7 @@ void VRRender::prepare() {
     if (!vr_input.rendering) {
         return;
     }
-    
-    material_manager.update();
 
-    frame_index = (frame_index + 1) % per_frame.size();
 
 
     // Record with swapchain images
@@ -171,7 +178,7 @@ void VRRender::prepare() {
 
     }
 
-    record(per_frame[frame_index].commandBuffer);
+    record(frame_index, per_frame[frame_index].commandBuffer, recorder, pipeline_layout);
 
 
 
@@ -234,7 +241,7 @@ void VRRender::prepare() {
     
 }
 
-void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals) {
+void VRRender::render(uint32_t frame_index, std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals) {
 
     OPTICK_EVENT();
 
@@ -278,8 +285,8 @@ void VRRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphor
         vr_input.views[v].pose = view.pose;
 
         OPTICK_EVENT("calculate_matrices");
-        ubo.views[v].per_frame[swapchain_image_indices[v]].pointer->view_projection = projection_fov(views[v].fov, 0.01f, 100.f) * view_pose(view.pose);
-        ubo.views[v].per_frame[swapchain_image_indices[v]].pointer->position = glm::vec4(view.pose.position.x, -view.pose.position.y, view.pose.position.z, 1.0f);
+        per_frame[frame_index].ubos[v].pointer->view_projection = projection_fov(views[v].fov, 0.01f, 100.f) * view_pose(view.pose);
+        per_frame[frame_index].ubos[v].pointer->position = glm::vec4(view.pose.position.x, -view.pose.position.y, view.pose.position.z, 1.0f);
 
     }
 

@@ -58,7 +58,7 @@ void VRPlayerControlSys::init() {
 
 		auto& model = reg.get<ModelC>(box_model);
 		btRigidBody::btRigidBodyConstructionInfo info(model.mass, static_cast<btMotionState*>(transform.transform.get()), model.shape.get(), model.local_inertia);
-		//info.m_friction = 0.01;
+		info.m_friction = 0.5;
 		//info.m_linearDamping = 0.01;
 		box_object.rigid_body = std::make_unique<btRigidBody>(info);
 

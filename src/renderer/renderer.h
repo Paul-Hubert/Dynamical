@@ -3,11 +3,13 @@
 
 #include "entt/entt.hpp"
 
-class Context;
-class Input;
-class VRInput;
-class UI;
-class VRRender;
+#include "context/context.h"
+#include "input.h"
+#include "vr_input.h"
+#include "ui/ui.h"
+#include "vr_render/vr_render.h"
+#include "object/object_render.h"
+#include "ui/ui_render.h"
 
 class Renderer {
 public:
@@ -21,11 +23,16 @@ public:
     
 private:
     entt::registry& reg;
-    std::unique_ptr<Context> ctx;
-    std::unique_ptr<Input> input;
-    std::unique_ptr<VRInput> vr_input;
-    std::unique_ptr<UI> ui;
-    std::unique_ptr<VRRender> vr_render;
+    Context ctx;
+    Input input;
+    VRInput vr_input;
+    UI ui;
+    std::unique_ptr<VRRender>  vr_render;
+    std::unique_ptr<ObjectRender> object_render;
+    std::unique_ptr<UIRender> ui_render;
+
+    uint32_t frame_index = 0;
+    vk::DescriptorSetLayout view_layout;
 };
 
 #endif

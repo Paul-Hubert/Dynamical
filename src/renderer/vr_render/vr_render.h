@@ -1,31 +1,32 @@
-#ifndef MAIN_RENDER_H
-#define MAIN_RENDER_H
+#ifndef VR_RENDER_H
+#define VR_RENDER_H
 
 #include <vector>
 #include <taskflow/taskflow.hpp>
 #include <entt/entt.hpp>
 
 #include "renderpass.h"
-#include "object_render.h"
-#include "ui_render.h"
-#include "view_ubo.h"
-#include "material_manager.h"
 
 #include "renderer/util/vmapp.h"
 #include "renderer/context/num_frames.h"
 
 #include "renderer/util/xr.h"
+#include "renderer/view_ubo.h"
 
 class Context;
 class Camera;
 
 class VRRender {
 public:
-    VRRender(entt::registry& reg, Context& ctx);
+    VRRender(entt::registry& reg, Context& ctx, vk::DescriptorSetLayout set_layout);
 
-    void record(vk::CommandBuffer command);
-    void prepare();
-    void render(std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals);
+    void record(uint32_t frame_index, vk::CommandBuffer command, std::function<void(vk::CommandBuffer)>& recorder, vk::PipelineLayout pipeline_layout);
+    void prepare(uint32_t frame_index, std::function<void(vk::CommandBuffer)>& recorder, vk::PipelineLayout pipeline_layout);
+    void render(uint32_t frame_index, std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals);
+
+    vk::RenderPass getRenderpass() {
+        return renderpass;
+    }
 
     ~VRRender();
     
@@ -33,30 +34,25 @@ private:
     entt::registry& reg;
     Context& ctx;
     Renderpass renderpass;
-    ViewUBO ubo;
-    MaterialManager material_manager;
-    ObjectRender object_render;
-    UIRender ui_render;
 
     vk::CommandPool commandPool;
+
+    vk::DescriptorPool descriptorPool;
     
     std::vector<uint32_t> swapchain_image_indices;
 
-    uint32_t frame_index = 0;
     struct per_frame {
         vk::CommandBuffer commandBuffer;
         vk::Fence fence;
+        struct per_ubo {
+            vk::DescriptorSet set;
+            VmaBuffer ubo;
+            ViewUBO* pointer;
+        };
+        std::vector<per_ubo> ubos;
+
     };
     std::vector<per_frame> per_frame;
-
-    uint32_t swapchain_index = 0;
-    struct per_swapchain_image {
-        vk::Semaphore acquire_semaphore;
-        vk::Semaphore present_semaphore;
-        vk::CommandBuffer commandBuffer;
-        vk::Fence fence;
-    };
-    std::vector<per_swapchain_image> per_swapchain_image;
 
 };
 

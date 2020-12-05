@@ -3,14 +3,12 @@
 #include "util/util.h"
 
 #include "renderer/context/context.h"
-#include "renderer/vr_render/renderpass.h"
-#include "renderer/vr_render/view_ubo.h"
 
 #include "logic/components/model_renderablec.h"
 #include "logic/components/transformc.h"
 #include "renderer/model/modelc.h"
 
-ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, std::vector<vk::DescriptorSetLayout> layouts) : reg(reg), ctx(ctx), renderpass(renderpass),
+ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, vk::RenderPass renderpass, std::vector<vk::DescriptorSetLayout> layouts) : reg(reg), ctx(ctx),
 per_frame(NUM_FRAMES) {
 
     pool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, NUM_FRAMES, vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, NUM_FRAMES)));
@@ -28,7 +26,7 @@ per_frame(NUM_FRAMES) {
 
     }
 
-    createPipeline(layouts);
+    createPipeline(renderpass, layouts);
 
 }
 
@@ -120,7 +118,7 @@ void ObjectRender::updateBuffer(int i) {
 
 }
 
-void ObjectRender::createPipeline(std::vector<vk::DescriptorSetLayout> layouts) {
+void ObjectRender::createPipeline(vk::RenderPass renderpass, std::vector<vk::DescriptorSetLayout> layouts) {
 
     // PIPELINE INFO
 

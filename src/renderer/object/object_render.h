@@ -10,16 +10,14 @@
 #include "entt/entt.hpp"
 
 class Context;
-class Renderpass;
-class ViewUBO;
 
 class ObjectRender {
 public:
-    ObjectRender(entt::registry& reg, Context& ctx, Renderpass& renderpass, std::vector<vk::DescriptorSetLayout> layouts);
+    ObjectRender(entt::registry& reg, Context& ctx, vk::RenderPass renderpass, std::vector<vk::DescriptorSetLayout> layouts);
     void render(vk::CommandBuffer command, uint32_t index);
     ~ObjectRender();
 
-    void createPipeline(std::vector<vk::DescriptorSetLayout> layouts);
+    void createPipeline(vk::RenderPass renderpass, std::vector<vk::DescriptorSetLayout> layouts);
 
     void updateBuffer(int i);
 
@@ -44,7 +42,6 @@ public:
 private:
     entt::registry& reg;
     Context& ctx;
-    Renderpass& renderpass;
 
 };
 

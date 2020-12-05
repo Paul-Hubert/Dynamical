@@ -26,7 +26,7 @@ public:
 
 class UIRender {
 public:
-    UIRender(Context& ctx, Renderpass& renderpass);
+    UIRender(Context& ctx, vk::RenderPass renderpass);
     ~UIRender();
     
     void createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buffer_memory, vk::DeviceSize& p_buffer_size, size_t new_size,vk::BufferUsageFlagBits usage);
