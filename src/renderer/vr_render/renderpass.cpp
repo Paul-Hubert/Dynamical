@@ -13,7 +13,7 @@ Renderpass::Renderpass(Context& ctx) : views(ctx.vr.swapchains.size()), ctx(ctx)
             vk::AttachmentDescription({}, vk::Format(ctx.vr.swapchain_format), vk::SampleCountFlagBits::e1,
                                       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
                                       vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-                                      vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eColorAttachmentOptimal
+                                      vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal
             ),
             vk::AttachmentDescription({}, depthFormat, vk::SampleCountFlagBits::e1,
                                       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,

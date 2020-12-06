@@ -1,15 +1,15 @@
-#ifndef VR_RENDERPASS_H
-#define VR_RENDERPASS_H
+#ifndef CLASSIC_RENDERPASS_H
+#define CLASSIC_RENDERPASS_H
 
 #include "renderer/util/vk.h"
 #include "renderer/util/vmapp.h"
 
 class Context;
 
-class Renderpass {
+class ClRenderpass {
 public:
-    Renderpass(Context& ctx);
-    ~Renderpass();
+    ClRenderpass(Context& ctx);
+    ~ClRenderpass();
 
     operator vk::RenderPass() { return renderpass; }
     operator VkRenderPass() { return static_cast<VkRenderPass>(renderpass); }
@@ -18,15 +18,12 @@ public:
 
     vk::Format depthFormat;
 
-    struct View {
-        std::vector<VmaImage> depthImages;
-        std::vector<vk::ImageView> depthViews;
-        std::vector<vk::Framebuffer> framebuffers;
-
+    struct per_frame {
+        VmaImage depthImage;
+        vk::ImageView depthView;
+        vk::Framebuffer framebuffer;
     };
-    std::vector<View> views;
-
-
+    std::vector<per_frame> frames;
 
     
 private:

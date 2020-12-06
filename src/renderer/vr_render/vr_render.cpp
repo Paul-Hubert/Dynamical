@@ -132,7 +132,7 @@ void VRRender::record(uint32_t frame_index, vk::CommandBuffer command, std::func
         recorder(command);
 
         command.endRenderPass();
-
+        
     }
 
     command.end();
@@ -241,7 +241,7 @@ void VRRender::prepare(uint32_t frame_index, std::function<void(vk::CommandBuffe
     
 }
 
-void VRRender::render(uint32_t frame_index, std::vector<vk::Semaphore> waits, std::vector<vk::Semaphore> signals) {
+void VRRender::render(uint32_t frame_index) {
 
     OPTICK_EVENT();
 
@@ -286,7 +286,7 @@ void VRRender::render(uint32_t frame_index, std::vector<vk::Semaphore> waits, st
 
         OPTICK_EVENT("calculate_matrices");
         per_frame[frame_index].ubos[v].pointer->view_projection = projection_fov(views[v].fov, 0.01f, 100.f) * view_pose(view.pose);
-        per_frame[frame_index].ubos[v].pointer->position = glm::vec4(view.pose.position.x, -view.pose.position.y, view.pose.position.z, 1.0f);
+        per_frame[frame_index].ubos[v].pointer->position = glm::vec4(view.pose.position.x, view.pose.position.y, view.pose.position.z, 1.0f);
 
     }
 

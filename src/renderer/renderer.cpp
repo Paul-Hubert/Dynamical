@@ -22,6 +22,8 @@ ui(reg) {
 
     vr_render = std::make_unique<VRRender>(reg, ctx, view_layout);
 
+    classic_render = std::make_unique<ClassicRender>(reg, ctx, view_layout);
+
     object_render = std::make_unique<ObjectRender>(reg, ctx, vr_render->getRenderpass(), std::vector<vk::DescriptorSetLayout>{view_layout});
 
     ui_render = std::make_unique<UIRender>(ctx, vr_render->getRenderpass());
@@ -70,6 +72,8 @@ void Renderer::prepare() {
 
     vr_render->prepare(frame_index, recorder, object_render->layout);
 
+    classic_render->prepare(frame_index, recorder, object_render->layout);
+
     vr_input.update();
 
 }
@@ -84,7 +88,9 @@ void Renderer::render() {
 
     
 
-    vr_render->render(frame_index, {}, {});
+    vr_render->render(frame_index);
+
+    classic_render->render(frame_index);
 
 }
 
