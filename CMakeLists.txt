@@ -31,6 +31,9 @@ target_link_libraries(dynamical PRIVATE EnTT::EnTT)
 find_package(cereal CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE cereal)
 
+find_package(glm CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE glm)
+
 find_package(Taskflow CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE Taskflow::Taskflow)
 
