@@ -21,14 +21,15 @@ per_frame(NUM_FRAMES) {
 
     auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, (uint32_t)per_frame.size()));
 
-    descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, (uint32_t) (per_frame.size() * ctx.vr.num_views), vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, (uint32_t)(per_frame.size() * ctx.vr.num_views))));
+    vk::DescriptorPoolSize size(vk::DescriptorType::eUniformBuffer, (uint32_t)(per_frame.size() * ctx.vr.num_views));
+    descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo(vk::DescriptorPoolCreateFlags{}, (uint32_t) (per_frame.size() * ctx.vr.num_views), 1, &size));
 
     for (int i = 0; i < per_frame.size(); i++) {
         auto& f = per_frame[i];
         f.commandBuffer = cmds[i];
         f.fence = ctx.device->createFence({});
 
-        f.set = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descriptorPool, set_layout))[0];
+        f.set = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descriptorPool, 1, &set_layout))[0];
 
         VmaAllocationCreateInfo allocInfo = {};
         allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
@@ -46,8 +47,8 @@ per_frame(NUM_FRAMES) {
             vk::WriteDescriptorSet(f.set, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &bufInfo, nullptr)
             }, {});
 
-        f.acquireSemaphore = ctx.device->createSemaphore(vk::SemaphoreCreateInfo({}));
-        f.presentSemaphore = ctx.device->createSemaphore(vk::SemaphoreCreateInfo({}));
+        f.acquireSemaphore = ctx.device->createSemaphore(vk::SemaphoreCreateInfo(vk::SemaphoreCreateFlags{}));
+        f.presentSemaphore = ctx.device->createSemaphore(vk::SemaphoreCreateInfo(vk::SemaphoreCreateFlags{}));
 
     }
 

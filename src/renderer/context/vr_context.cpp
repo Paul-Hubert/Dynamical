@@ -1,8 +1,7 @@
 #include "vr_context.h"
 
 #include <vector>
-#include <cstring>
-#include <debugapi.h>
+#include <string>
 
 #include "context.h"
 
@@ -48,7 +47,7 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
     createInfo.enabledApiLayerCount = (uint32_t) layers.size();
     createInfo.enabledApiLayerNames = layers.data();
     createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
-    strcpy_s(createInfo.applicationInfo.applicationName, "Dynamical");
+    strcpy(createInfo.applicationInfo.applicationName, "Dynamical");
     
     xrCheckResult(xrCreateInstance(&createInfo, &instance));
 

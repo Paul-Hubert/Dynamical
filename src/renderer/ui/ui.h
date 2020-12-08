@@ -4,7 +4,7 @@
 #include "entt/entt.hpp"
 
 #include "imgui.h"
-#include <sdl2/SDL.h>
+#include <SDL.h>
 
 class UI {
 public:

@@ -10,8 +10,9 @@
 
 ObjectRender::ObjectRender(entt::registry& reg, Context& ctx, vk::RenderPass renderpass, std::vector<vk::DescriptorSetLayout> layouts) : reg(reg), ctx(ctx),
 per_frame(NUM_FRAMES) {
-
-    pool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, NUM_FRAMES, vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, NUM_FRAMES)));
+    
+    vk::DescriptorPoolSize size(vk::DescriptorType::eUniformBuffer, NUM_FRAMES);
+    pool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, NUM_FRAMES, 1, &size));
 
     vk::DescriptorSetLayoutBinding binding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex, {});
     set_layout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, binding));

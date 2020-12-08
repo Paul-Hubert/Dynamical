@@ -3,7 +3,7 @@
 
 #include <bitset>
 #include "glm/glm.hpp"
-#include "sdl2/SDL.h"
+#include <SDL.h>
 
 enum Action : char {
     FORWARD,

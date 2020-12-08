@@ -4,7 +4,7 @@
 #include "loader.inl"
 #include "num_frames.h"
 
-#include <sdl2/SDL_vulkan.h>
+#include <SDL_vulkan.h>
 #include <iostream>
 #include <time.h>
 

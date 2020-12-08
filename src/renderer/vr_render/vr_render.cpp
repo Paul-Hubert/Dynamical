@@ -27,7 +27,8 @@ per_frame(NUM_FRAMES) {
 
     auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, (uint32_t) per_frame.size()));
 
-    descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, per_frame.size() * ctx.vr.num_views, vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, per_frame.size() * ctx.vr.num_views)));
+    vk::DescriptorPoolSize size(vk::DescriptorType::eUniformBuffer, per_frame.size() * ctx.vr.num_views);
+    descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, per_frame.size() * ctx.vr.num_views, 1, &size));
 
     for(int i = 0; i < per_frame.size(); i++) {
         auto& f = per_frame[i];

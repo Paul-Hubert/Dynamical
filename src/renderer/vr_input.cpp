@@ -6,6 +6,8 @@
 #include "util/util.h"
 #include "util/log.h"
 
+#include <string>
+
 #include "renderer/util/vk_util.h"
 
 #include "renderer/context/vr_context.h"
@@ -17,8 +19,8 @@ VRInput::VRInput(entt::registry& reg) : reg(reg) {
 	Context& ctx = *reg.ctx<Context*>();
 
 	XrActionSetCreateInfo actionset_info { XR_TYPE_ACTION_SET_CREATE_INFO };
-	strcpy_s(actionset_info.actionSetName, "gameplay");
-	strcpy_s(actionset_info.localizedActionSetName, "Gameplay");
+	strcpy(actionset_info.actionSetName, "gameplay");
+	strcpy(actionset_info.localizedActionSetName, "Gameplay");
 	xrCheckResult(xrCreateActionSet(ctx.vr.instance, &actionset_info, &actionSet));
 
 	xrCheckResult(xrStringToPath(ctx.vr.instance, "/user/hand/left", &handSubactionPath[0]));
@@ -28,18 +30,18 @@ VRInput::VRInput(entt::registry& reg) : reg(reg) {
 	action_info.countSubactionPaths = 2;
 	action_info.subactionPaths = handSubactionPath;
 	action_info.actionType = XR_ACTION_TYPE_POSE_INPUT;
-	strcpy_s(action_info.actionName, "hand_pose");
-	strcpy_s(action_info.localizedActionName, "Hand Pose");
+	strcpy(action_info.actionName, "hand_pose");
+	strcpy(action_info.localizedActionName, "Hand Pose");
 	xrCheckResult(xrCreateAction(actionSet, &action_info, &poseAction));
 
 	action_info.actionType = XR_ACTION_TYPE_FLOAT_INPUT;
-	strcpy_s(action_info.actionName, "trigger");
-	strcpy_s(action_info.localizedActionName, "Trigger");
+	strcpy(action_info.actionName, "trigger");
+	strcpy(action_info.localizedActionName, "Trigger");
 	xrCheckResult(xrCreateAction(actionSet, &action_info, &triggerAction));
 
 	action_info.actionType = XR_ACTION_TYPE_FLOAT_INPUT;
-	strcpy_s(action_info.actionName, "grip");
-	strcpy_s(action_info.localizedActionName, "Grip");
+	strcpy(action_info.actionName, "grip");
+	strcpy(action_info.localizedActionName, "Grip");
 	xrCheckResult(xrCreateAction(actionSet, &action_info, &gripAction));
 
 	
