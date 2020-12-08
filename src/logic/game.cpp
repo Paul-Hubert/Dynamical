@@ -29,7 +29,7 @@
 Game::Game(int argc, char** argv) {
     registry = std::make_unique<entt::registry>();
     entt::registry& reg = *registry;
-    Settings& s = reg.set<Settings>(reg, argc, argv);
+    Settings& s = reg.set<Settings>(argc, argv);
 }
 
 
@@ -39,50 +39,42 @@ void Game::start() {
 
     Settings& s = reg.ctx<Settings>();
 
-    bool server = s.server_side;
-    bool client = s.client_side;
-    bool multiplayer = server || client;
-    bool singleplayer = !multiplayer;
-    bool user = client || singleplayer;
-
 
     renderer = std::make_unique<Renderer>(reg);
 
     physics = std::make_unique<PhysicsSys>(reg);
 
-    pre_sets = std::make_unique<SystemSet>(reg);
-    post_sets = std::make_unique<SystemSet>(reg);
+    set = std::make_unique<SystemSet>(reg);
 
-    pre_sets->add<VRPlayerControlSys>();
+    set->pre_add<VRPlayerControlSys>();
+
+
 
     // preinit
-
-    renderer->preinit();
-    physics->preinit();
-    pre_sets->preinit();
-    post_sets->preinit();
 
     tf::Executor& executor = reg.set<tf::Executor>();
 
     ModelManager& manager = reg.set<ModelManager>(reg);
 
-    auto player = reg.create();
-    reg.emplace<PlayerC>(player);
-    reg.set<Util::Entity<"player"_hs>>(player);
+    renderer->preinit();
 
+    physics->preinit();
 
-    manager.load("./resources/box.glb");
+    set->preinit();
+
 
     // init
 
     renderer->init();
-    physics->init();
-    pre_sets->init();
-    post_sets->init();
 
+    physics->init();
+
+    set->init();
 
     // create basic model
     {
+
+        manager.load("./resources/box.glb");
 
         auto box_model = manager.get("./resources/box.glb");
 
@@ -116,18 +108,17 @@ void Game::start() {
         renderer->prepare();
 
         float dt = (float) ((vr_input.predicted_period) / 1000000000.);
-        //float dt = (float) (1. / 90.);
 
         if (input.on[Action::EXIT]) {
             running = false;
             input.on.set(Action::EXIT, false);
         }
 
-        pre_sets->tick(dt);
+        set->pre_tick(dt);
 
         physics->tick(dt);
 
-        post_sets->tick(dt);
+        set->post_tick(dt);
 
         renderer->render();
         
@@ -137,8 +128,7 @@ void Game::start() {
 
 Game::~Game() {
     
-    post_sets->finish();
-    pre_sets->finish();
+    set->finish();
     physics->finish();
     renderer->finish();
 

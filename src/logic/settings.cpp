@@ -9,25 +9,32 @@
 #define DYNAMICAL_CONFIG_FILE "./config.json"
 #endif
 
-void Settings::synchronize(entt::registry& reg) {
+void Settings::load() {
     if(std::filesystem::exists(DYNAMICAL_CONFIG_FILE)) {
         std::ifstream is(DYNAMICAL_CONFIG_FILE);
         int i = is.get();
-        if(i == magic_number) {
+        if (i == magic_number) {
             cereal::JSONInputArchive in(is);
             serialize(in);
             return;
         }
     }
 
+    save();
+
+}
+
+void Settings::save() {
+
     std::ofstream os(DYNAMICAL_CONFIG_FILE);
     os.put(magic_number);
     cereal::JSONOutputArchive out(os);
     serialize(out);
+
 }
 
-Settings::Settings(entt::registry& reg, int argc, char** argv) : reg(reg) {
-    synchronize(reg);
+Settings::Settings(int argc, char** argv) {
+    load();
     argument_override(argc, argv);
 }
 

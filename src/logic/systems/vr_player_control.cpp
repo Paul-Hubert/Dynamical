@@ -25,6 +25,10 @@ const float max_torque = 100;
 
 void VRPlayerControlSys::preinit() {
 
+	auto player = reg.create();
+	reg.emplace<PlayerC>(player);
+	reg.set<Util::Entity<"player"_hs>>(player);
+
 }
 
 void VRPlayerControlSys::init() {
@@ -231,5 +235,14 @@ void VRPlayerControlSys::tick(float dt) {
 }
 
 void VRPlayerControlSys::finish() {
+
+	entt::entity player_entity = reg.ctx<Util::Entity<"player"_hs>>();
+	PlayerC& player = reg.get<PlayerC>(player_entity);
+	
+	reg.destroy(player.left_hand);
+	reg.destroy(player.right_hand);
+
+	reg.destroy(player_entity);
+	reg.unset<Util::Entity<"player"_hs>>();
 
 }
