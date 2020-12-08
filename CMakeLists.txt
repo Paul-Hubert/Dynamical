@@ -53,13 +53,8 @@ target_include_directories(dynamical PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 find_package(nlohmann_json CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE nlohmann_json nlohmann_json::nlohmann_json)
 
-
-set(OPTICK_INSTALL_TARGETS OFF)
-set(OPTICK_ENABLED ON)
-set(OPTICK_USE_VULKAN ON)
-
-add_subdirectory(3rdparty/optick)
-target_link_libraries(dynamical PRIVATE OptickCore)
+target_compile_definitions(dynamical PRIVATE OPTICK_ENABLE_GPU_D3D12=0)
+target_compile_definitions(dynamical PRIVATE OPTICK_ENABLE_GPU_VULKAN=1)
 
 # Copy resources to build
 file(

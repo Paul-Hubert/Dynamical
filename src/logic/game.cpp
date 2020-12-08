@@ -24,7 +24,7 @@
 
 #include "renderer/model/model_manager.h"
 
-#include "optick.h"
+#include "extra/optick/optick.h"
 
 Game::Game(int argc, char** argv) {
     registry = std::make_unique<entt::registry>();

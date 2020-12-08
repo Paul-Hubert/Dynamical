@@ -6,7 +6,7 @@
 #include <iostream>
 
 #include "vulkan/vulkan.h"
-#include "optick.h"
+#include "extra/optick/optick.h"
 
 class System {
 public:

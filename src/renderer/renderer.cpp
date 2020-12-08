@@ -5,7 +5,7 @@
 
 #include "context/num_frames.h"
 
-#include "optick.h"
+#include "extra/optick/optick.h"
 
 Renderer::Renderer(entt::registry& reg) : reg(reg),
 ctx(reg),

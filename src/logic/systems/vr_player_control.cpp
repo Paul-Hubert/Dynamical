@@ -16,8 +16,8 @@
 #include "renderer/model/model_manager.h"
 #include "logic/components/vrinputc.h"
 
-const float max_force = 10000;
-const float max_torque = 1000;
+const float max_force = 1000;
+const float max_torque = 100;
 
 #ifndef M_PI
 #define M_PI    3.14159265358979323846264338327950288   /**< pi */
@@ -44,7 +44,7 @@ void VRPlayerControlSys::init() {
 			hand.position_pids.emplace_back(1700.f, 0.f, 500.f, (float) (1./90.), -max_force, max_force);
 		}
 		for (int i = 0; i < 3; i++) {
-			hand.rotation_pids.emplace_back(0.001, 0.f, 0.f, (float)(1. / 90.), -max_torque, max_torque);
+			hand.rotation_pids.emplace_back(0.0f, 0.f, 0.f, (float)(1. / 90.), -max_torque, max_torque);
 			hand.rotation_pids[i].setWrapped(0.f, (float) (2.f*M_PI));
 		}
 
@@ -201,25 +201,25 @@ void VRPlayerControlSys::tick(float dt) {
 			float outputs[3];
 
 			for (int i = 0; i < 3; i++) {
-				/*
+				
 				if (vr_input.hands[0].trigger > 0.1) {
-					hand.rotation_pids[i].p += 1;
+					hand.rotation_pids[i].p += 0.001f;
 					dy::log() << "P : " << hand.rotation_pids[i].p << "\n";
 				} if (vr_input.hands[0].grip > 0.1) {
-					hand.rotation_pids[i].p -= 1;
+					hand.rotation_pids[i].p -= 0.001f;
 					dy::log() << "P : " << hand.rotation_pids[i].p << "\n";
 				} if (vr_input.hands[1].trigger > 0.1) {
-					hand.rotation_pids[i].d += 1;
+					hand.rotation_pids[i].d += 0.001f;
 					dy::log() << "D : " << hand.rotation_pids[i].d << "\n";
 				} if (vr_input.hands[1].grip > 0.1) {
-					hand.rotation_pids[i].d -= 1;
+					hand.rotation_pids[i].d -= 0.001f;
 					dy::log() << "D : " << hand.rotation_pids[i].d << "\n";
-				}*/
+				}
 				
 				outputs[i] = hand.rotation_pids[i].tick(inputs[i], targets[i]);
 			}
 
-			box.rigid_body->applyTorque(btVector3(outputs[0], 0,0));
+			box.rigid_body->applyTorque(btVector3(outputs[1], outputs[2], outputs[0]));
 
 		}
 
