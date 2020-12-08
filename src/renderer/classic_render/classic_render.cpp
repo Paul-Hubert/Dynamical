@@ -21,8 +21,8 @@ per_frame(NUM_FRAMES) {
 
     auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, (uint32_t)per_frame.size()));
 
-    vk::DescriptorPoolSize size(vk::DescriptorType::eUniformBuffer, (uint32_t)(per_frame.size() * ctx.vr.num_views));
-    descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo(vk::DescriptorPoolCreateFlags{}, (uint32_t) (per_frame.size() * ctx.vr.num_views), 1, &size));
+    vk::DescriptorPoolSize size(vk::DescriptorType::eUniformBuffer, (uint32_t) per_frame.size());
+    descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo(vk::DescriptorPoolCreateFlags{}, (uint32_t) per_frame.size(), 1, &size));
 
     for (int i = 0; i < per_frame.size(); i++) {
         auto& f = per_frame[i];
@@ -114,12 +114,6 @@ void ClassicRender::render(uint32_t frame_index) {
     auto& f = per_frame[frame_index];
 
     VRInputC& vr_input = reg.ctx<VRInputC>();
-
-    if (!vr_input.rendering) {
-        return;
-    }
-
-
 
     // Update matrices at the very end
     {

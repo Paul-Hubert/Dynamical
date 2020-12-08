@@ -8,7 +8,7 @@
 #include <iostream>
 #include <time.h>
 
-Swapchain::Swapchain(Context& ctx) : ctx(ctx) {
+Swapchain::Swapchain(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     
     INST_LOAD(vkGetPhysicalDeviceSurfaceCapabilitiesKHR)
     INST_LOAD(vkGetPhysicalDeviceSurfaceFormatsKHR)

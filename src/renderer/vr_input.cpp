@@ -11,9 +11,15 @@
 #include "renderer/util/vk_util.h"
 
 #include "renderer/context/vr_context.h"
+#include "logic/settings.h"
 
 VRInput::VRInput(entt::registry& reg) : reg(reg) {
 
+    auto& settings = reg.ctx<Settings>();
+    if(settings.vr_mode == 0) {
+        return;
+    }
+    
 	VRInputC& vr_input = reg.set<VRInputC>();
 
 	Context& ctx = *reg.ctx<Context*>();

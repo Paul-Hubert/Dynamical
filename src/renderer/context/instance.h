@@ -3,11 +3,13 @@
 
 #include <renderer/util/vk.h>
 
+#include <entt/entt.hpp>
+
 class Context;
 
 class Instance {
 public:
-    Instance(Context& ctx);
+    Instance(Context& ctx, entt::registry& reg);
     ~Instance();
     vk::Instance* operator->() {return &instance;}
     operator vk::Instance() { return instance; }
@@ -19,6 +21,8 @@ public:
 #endif
 private:
     Context& ctx;
+    entt::registry& reg;
+    
     vk::Instance instance;
     
     PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;

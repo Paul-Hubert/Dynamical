@@ -9,6 +9,7 @@
 #include <string>
 
 #include "renderer/util/vk_util.h"
+#include "logic/settings.h"
 
 bool checkDeviceExtensions(std::vector<const char*> extensionNames, std::vector<vk::ExtensionProperties> availableExtensions) {
 
@@ -31,7 +32,9 @@ bool checkDeviceExtensions(std::vector<const char*> extensionNames, std::vector<
 
 }
 
-Device::Device(Context& ctx) : ctx(ctx) {
+Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
+    
+    auto& settings = reg.ctx<Settings>();
     
     vk::PhysicalDeviceFeatures requiredFeatures = vk::PhysicalDeviceFeatures();
     //requiredFeatures.samplerAnisotropy = true;
@@ -41,7 +44,7 @@ Device::Device(Context& ctx) : ctx(ctx) {
     std::vector<const char*> extensions;
     extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
-    {
+    if(settings.vr_mode != 0) {
         uint32_t size = 0;
         PFN_xrGetVulkanDeviceExtensionsKHR xrGetVulkanDeviceExtensionsKHR = nullptr;
         xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanDeviceExtensionsKHR", (PFN_xrVoidFunction*)&xrGetVulkanDeviceExtensionsKHR));
@@ -66,15 +69,18 @@ Device::Device(Context& ctx) : ctx(ctx) {
     
     std::vector<vk::PhysicalDevice> p_devices = ctx.instance->enumeratePhysicalDevices();
 
+    
+    if(settings.vr_mode != 0) {
+        PFN_xrGetVulkanGraphicsDeviceKHR xrGetVulkanGraphicsDeviceKHR = nullptr;
+        xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanGraphicsDeviceKHR", (PFN_xrVoidFunction *)(&xrGetVulkanGraphicsDeviceKHR)));
 
-    PFN_xrGetVulkanGraphicsDeviceKHR xrGetVulkanGraphicsDeviceKHR = nullptr;
-    xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanGraphicsDeviceKHR", (PFN_xrVoidFunction *)(&xrGetVulkanGraphicsDeviceKHR)));
-
-    VkPhysicalDevice phy;
-    xrCheckResult(xrGetVulkanGraphicsDeviceKHR(ctx.vr.instance, ctx.vr.system_id, ctx.instance, &phy));
-
-    physical = phy;
-
+        VkPhysicalDevice phy;
+        xrCheckResult(xrGetVulkanGraphicsDeviceKHR(ctx.vr.instance, ctx.vr.system_id, ctx.instance, &phy));
+        
+        physical = phy;
+    } else {
+        physical = p_devices[0];
+    }
     
 
     extensions = checkExtensions(extensions, physical.enumerateDeviceExtensionProperties());

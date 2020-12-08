@@ -8,7 +8,7 @@
 #include "renderer/util/vk.h"
 #include "context.h"
 
-Windu::Windu(Context& ctx) : ctx(ctx) {
+Windu::Windu(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
     

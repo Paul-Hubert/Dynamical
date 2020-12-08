@@ -8,7 +8,14 @@
 #include "util/log.h"
 #include "renderer/util/vk_util.h"
 
-VRContext::VRContext(Context &ctx) : ctx(ctx) {
+#include "logic/settings.h"
+
+VRContext::VRContext(Context &ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
+    
+    auto& settings = reg.ctx<Settings>();
+    if(settings.vr_mode == 0) {
+        return;
+    }
 
     // Extensions and layers
 
@@ -52,8 +59,11 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
     xrCheckResult(xrCreateInstance(&createInfo, &instance));
 
 
-    if (instance == nullptr)
-        throw std::runtime_error("OpenXR instance could not be created\n");
+    if (instance == nullptr) {
+        dy::log(dy::warning) << "Could not initialize OpenXR device, disabling VR.\n";
+        settings.vr_mode = 0;
+        return;
+    }
 
 
     // Debug messenger
@@ -90,6 +100,11 @@ VRContext::VRContext(Context &ctx) : ctx(ctx) {
 }
 
 void VRContext::init() {
+    
+    auto& settings = reg.ctx<Settings>();
+    if(settings.vr_mode == 0) {
+        return;
+    }
 
     // Session
 
@@ -238,6 +253,11 @@ void VRContext::init() {
 
 
 void VRContext::finish() {
+    
+    auto& settings = reg.ctx<Settings>();
+    if(settings.vr_mode == 0) {
+        return;
+    }
 
     for(int i = 0; i<swapchains.size(); i++) {
         for(int j = 0; j<swapchains[i].images.size(); j++) {
@@ -254,6 +274,11 @@ void VRContext::finish() {
 
 VRContext::~VRContext() {
 
+    auto& settings = reg.ctx<Settings>();
+    if(settings.vr_mode == 0) {
+        return;
+    }
+    
 #ifndef NDEBUG
     PFN_xrDestroyDebugUtilsMessengerEXT ext_xrDestroyDebugUtilsMessengerEXT = nullptr;
     xrCheckResult(xrGetInstanceProcAddr(instance, "xrDestroyDebugUtilsMessengerEXT", (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT)));

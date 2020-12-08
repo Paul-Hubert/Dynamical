@@ -11,11 +11,13 @@
 #include "renderer/model/bufferc.h"
 #include "renderer/model/imagec.h"
 
+#include <entt/entt.hpp>
+
 class Context;
 
 class Transfer {
 public:
-    Transfer(Context& ctx);
+    Transfer(Context& ctx, entt::registry& reg);
     void flush();
     vk::CommandBuffer getCommandBuffer();
     
@@ -25,6 +27,7 @@ public:
     ~Transfer();
 private:
     Context& ctx;
+    entt::registry& reg;
     
     vk::CommandPool pool;
 

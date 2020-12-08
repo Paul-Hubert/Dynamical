@@ -6,12 +6,15 @@
 #include "context/num_frames.h"
 
 #include "extra/optick/optick.h"
+#include "logic/settings.h"
 
 Renderer::Renderer(entt::registry& reg) : reg(reg),
 ctx(reg),
 input(reg),
 vr_input(reg),
 ui(reg) {
+    
+    auto& settings = reg.ctx<Settings>();
     
     auto bindings = std::vector{
                 vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1,
@@ -24,7 +27,7 @@ ui(reg) {
 
     classic_render = std::make_unique<ClassicRender>(reg, ctx, view_layout);
 
-    object_render = std::make_unique<ObjectRender>(reg, ctx, vr_render->getRenderpass(), std::vector<vk::DescriptorSetLayout>{view_layout});
+    object_render = std::make_unique<ObjectRender>(reg, ctx, classic_render->getRenderpass(), std::vector<vk::DescriptorSetLayout>{view_layout});
 
     ui_render = std::make_unique<UIRender>(ctx, vr_render->getRenderpass());
 

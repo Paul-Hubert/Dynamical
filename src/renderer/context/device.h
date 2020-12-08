@@ -5,6 +5,8 @@
 #include "vk_mem_alloc.h"
 #include <mutex>
 
+#include <entt/entt.hpp>
+
 class Context;
 
 #ifndef NDEBUG
@@ -16,7 +18,7 @@ device->setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT(TYPE, (uint64
 
 class Device {
 public :
-    Device(Context& ctx);
+    Device(Context& ctx, entt::registry& reg);
     ~Device();
     
     vk::Device* operator->() {return &logical;}
@@ -43,6 +45,7 @@ public :
     
 private:
     Context& ctx;
+    entt::registry& reg;
 };
 
 #endif

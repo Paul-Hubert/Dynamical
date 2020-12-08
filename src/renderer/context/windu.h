@@ -4,11 +4,13 @@
 #include <SDL.h>
 #include "renderer/util/vk.h"
 
+#include <entt/entt.hpp>
+
 class Context;
 
 class Windu {
 public:
-    Windu(Context& ctx);
+    Windu(Context& ctx, entt::registry& reg);
     ~Windu();
     operator SDL_Window*() { return window; }
     operator vk::SurfaceKHR() { return surface; }
@@ -20,6 +22,7 @@ public:
     
 private:
     Context& ctx;
+    entt::registry& reg;
 
     int width;
     int height;

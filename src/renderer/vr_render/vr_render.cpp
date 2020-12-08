@@ -18,10 +18,16 @@
 
 #include "logic/components/inputc.h"
 #include "logic/components/vrinputc.h"
+#include "logic/settings.h"
 
 VRRender::VRRender(entt::registry& reg, Context& ctx, vk::DescriptorSetLayout set_layout) : reg(reg), ctx(ctx), renderpass(ctx),
 swapchain_image_indices(ctx.vr.swapchains.size()),
 per_frame(NUM_FRAMES) {
+    
+    auto& settings = reg.ctx<Settings>();
+    if(settings.vr_mode == 0) {
+        return;
+    }
     
     commandPool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx.device.g_i));
 
@@ -142,6 +148,11 @@ void VRRender::record(uint32_t frame_index, vk::CommandBuffer command, std::func
 
 void VRRender::prepare(uint32_t frame_index, std::function<void(vk::CommandBuffer)>& recorder, vk::PipelineLayout pipeline_layout) {
 
+    auto& settings = reg.ctx<Settings>();
+    if(settings.vr_mode == 0) {
+        return;
+    }
+    
     OPTICK_EVENT();
 
     VRInputC& vr_input = reg.ctx<VRInputC>();
@@ -244,6 +255,11 @@ void VRRender::prepare(uint32_t frame_index, std::function<void(vk::CommandBuffe
 
 void VRRender::render(uint32_t frame_index) {
 
+    auto& settings = reg.ctx<Settings>();
+    if(settings.vr_mode == 0) {
+        return;
+    }
+    
     OPTICK_EVENT();
 
     VRInputC& vr_input = reg.ctx<VRInputC>();
@@ -356,6 +372,11 @@ void VRRender::render(uint32_t frame_index) {
 
 
 VRRender::~VRRender() {
+    
+    auto& settings = reg.ctx<Settings>();
+    if(settings.vr_mode == 0) {
+        return;
+    }
 
     for (int i = 0; i < per_frame.size(); i++) {
         ctx.device->destroy(per_frame[i].fence);

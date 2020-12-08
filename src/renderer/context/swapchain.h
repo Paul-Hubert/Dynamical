@@ -5,11 +5,13 @@
 
 #include "num_frames.h"
 
+#include <entt/entt.hpp>
+
 class Context;
 
 class Swapchain {
 public :
-    Swapchain(Context& ctx);
+    Swapchain(Context& ctx, entt::registry& reg);
     void setup();
     void cleanup();
     ~Swapchain();
@@ -41,6 +43,7 @@ public :
     
 private :
     Context& ctx;
+    entt::registry& reg;
 
     vk::SurfaceFormatKHR chooseSwapSurfaceFormat(std::vector<vk::SurfaceFormatKHR> &formats, vk::Format wantedFormat, vk::ColorSpaceKHR wantedColorSpace);
     vk::PresentModeKHR chooseSwapPresentMode(std::vector<vk::PresentModeKHR> &presentModes, vk::PresentModeKHR wantedMode);

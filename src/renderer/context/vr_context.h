@@ -1,6 +1,8 @@
 #ifndef VR_CONTEXT_H
 #define VR_CONTEXT_H
 
+#include <entt/entt.hpp>
+
 #include "renderer/util/vk.h"
 #include "renderer/util/vmapp.h"
 
@@ -12,7 +14,7 @@ const XrPosef pose_identity = { {0,0,0,1}, {0,0,0} };
 
 class VRContext {
 public:
-    VRContext(Context& ctx);
+    VRContext(Context& ctx, entt::registry& reg);
     void init();
     void finish();
     ~VRContext();
@@ -45,6 +47,7 @@ public:
 
 private:
     Context& ctx;
+    entt::registry& reg;
 };
 
 #endif
