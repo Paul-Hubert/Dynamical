@@ -44,11 +44,12 @@ void VRPlayerControlSys::init() {
 		auto entity = h == VRHandC::left ? player.left_hand : player.right_hand;
 		auto& hand = reg.emplace<VRHandC>(entity);
 		hand.index = h;
+
 		for (int i = 0; i < 3; i++) {
 			hand.position_pids.emplace_back(1700.f, 0.f, 500.f, (float) (1./90.), -max_force, max_force);
 		}
 		for (int i = 0; i < 3; i++) {
-			hand.rotation_pids.emplace_back(0.0f, 0.f, 0.f, (float)(1. / 90.), -max_torque, max_torque);
+			hand.rotation_pids.emplace_back(0.f, 0.f, 0.f, (float)(1. / 90.), -max_torque, max_torque);
 			hand.rotation_pids[i].setWrapped(0.f, (float) (2.f*M_PI));
 		}
 

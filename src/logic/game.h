@@ -15,9 +15,9 @@ public:
     void start();
     ~Game();
 
-    std::unique_ptr<Renderer> renderer;
-
     std::unique_ptr<entt::registry> registry;
+
+    std::unique_ptr<Renderer> renderer;
 
     std::unique_ptr<PhysicsSys> physics;
 

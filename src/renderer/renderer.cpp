@@ -8,6 +8,8 @@
 #include "extra/optick/optick.h"
 #include "logic/settings.h"
 
+#include "renderer/model/modelc.h"
+
 Renderer::Renderer(entt::registry& reg) : reg(reg),
 ctx(reg),
 input(reg),
@@ -100,6 +102,8 @@ void Renderer::render() {
 void Renderer::finish() {
 
     ctx.device->waitIdle();
+
+    reg.clear<ModelC>();
 
 }
 

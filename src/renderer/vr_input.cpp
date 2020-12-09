@@ -15,12 +15,13 @@
 
 VRInput::VRInput(entt::registry& reg) : reg(reg) {
 
-    auto& settings = reg.ctx<Settings>();
-    if(settings.vr_mode == 0) {
-        return;
-    }
     
 	VRInputC& vr_input = reg.set<VRInputC>();
+
+	auto& settings = reg.ctx<Settings>();
+	if (settings.vr_mode == 0) {
+		return;
+	}
 
 	Context& ctx = *reg.ctx<Context*>();
 
@@ -112,6 +113,11 @@ VRInput::VRInput(entt::registry& reg) : reg(reg) {
 }
 
 void VRInput::poll() {
+
+	auto& settings = reg.ctx<Settings>();
+	if (settings.vr_mode == 0) {
+		return;
+	}
 
     OPTICK_EVENT();
 
@@ -232,6 +238,11 @@ void VRInput::poll() {
 }
 
 void VRInput::update() {
+
+	auto& settings = reg.ctx<Settings>();
+	if (settings.vr_mode == 0) {
+		return;
+	}
 
 	Context& ctx = *reg.ctx<Context*>();
 	VRInputC& vr_input = reg.ctx<VRInputC>();

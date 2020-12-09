@@ -69,8 +69,6 @@ void Game::start() {
 
     physics->init();
 
-    set->init();
-
     // create basic model
     {
 
@@ -94,6 +92,9 @@ void Game::start() {
         reg.ctx<btDiscreteDynamicsWorld*>()->addRigidBody(box_object.rigid_body.get());
 
     }
+
+    set->init();
+
 
     InputC& input = reg.ctx<InputC>();
     VRInputC& vr_input = reg.ctx<VRInputC>();

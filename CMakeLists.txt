@@ -15,7 +15,6 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(dynamical PRIVATE -Wall -Wextra -Wno-sign-compare -Wno-unused-variable -Wno-unused-parameter -Wno-class-memaccess -Wno-unused-but-set-variable -Wno-reorder -Wno-missing-field-initializers -Wno-unused-function -Wno-type-limits)
 endif()
 
-
 find_package(Vulkan REQUIRED)
 target_link_libraries(dynamical PRIVATE Vulkan::Vulkan)
 

@@ -47,8 +47,6 @@ void PhysicsSys::preinit() {
 }
 
 void PhysicsSys::init() {
-    
-	
 
 }
 
