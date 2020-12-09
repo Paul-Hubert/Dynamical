@@ -20,5 +20,7 @@ DEFINE_SYSTEM(VRPlayerControlSys)
 
 DEFINE_SYSTEM(SpectatorControlSys)
 
+DEFINE_SYSTEM(EditorControlSys)
+
 #undef DEFINE_SYSTEM
 #endif

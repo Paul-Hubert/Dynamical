@@ -48,7 +48,10 @@ void Game::start() {
 
     set->pre_add<VRPlayerControlSys>();
 
+    set->pre_add<EditorControlSys>();
+
     set->post_add<SpectatorControlSys>();
+
 
     // preinit
 
