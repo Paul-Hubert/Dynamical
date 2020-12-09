@@ -27,7 +27,7 @@ per_frame(NUM_FRAMES) {
     for (int i = 0; i < per_frame.size(); i++) {
         auto& f = per_frame[i];
         f.commandBuffer = cmds[i];
-        f.fence = ctx.device->createFence({});
+        f.fence = ctx.device->createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
 
         f.set = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descriptorPool, 1, &set_layout))[0];
 
