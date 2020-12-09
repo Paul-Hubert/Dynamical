@@ -18,5 +18,7 @@ public: \
 
 DEFINE_SYSTEM(VRPlayerControlSys)
 
+DEFINE_SYSTEM(SpectatorControlSys)
+
 #undef DEFINE_SYSTEM
 #endif

@@ -7,19 +7,19 @@
 
 #include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>
 
-PhysicsSys::PhysicsSys(entt::registry& reg) : System(reg),
-collisionConfiguration(),
-dispatcher(&collisionConfiguration),
-overlappingPairCache(),
-solver(),
-world(&dispatcher, &overlappingPairCache, &solver, &collisionConfiguration)
-{
+PhysicsSys::PhysicsSys(entt::registry& reg) : System(reg) {
 
-    reg.set<btDiscreteDynamicsWorld*>(&world);
+	collisionConfiguration = std::make_unique<btDefaultCollisionConfiguration>();
+	dispatcher = std::make_unique<btCollisionDispatcher>(collisionConfiguration.get());
+	overlappingPairCache = std::make_unique<btDbvtBroadphase>();
+	solver = std::make_unique<btSequentialImpulseConstraintSolver>();
+	world = std::make_unique<btDiscreteDynamicsWorld>(dispatcher.get(), overlappingPairCache.get(), solver.get(), collisionConfiguration.get());
 
-    btGImpactCollisionAlgorithm::registerAlgorithm(&dispatcher);
+    reg.set<btDiscreteDynamicsWorld*>(world.get());
 
-	world.setGravity(btVector3(0, -10, 0));
+    btGImpactCollisionAlgorithm::registerAlgorithm(dispatcher.get());
+
+	world->setGravity(btVector3(0, -10, 0));
 
 	{
 		btCollisionShape* groundShape = new btBoxShape(btVector3(btScalar(50.), btScalar(1.), btScalar(50.)));
@@ -37,7 +37,7 @@ world(&dispatcher, &overlappingPairCache, &solver, &collisionConfiguration)
 		btRigidBody* body = new btRigidBody(info);
 
 		//add the body to the dynamics world
-		world.addRigidBody(body);
+		world->addRigidBody(body);
 	}
 
 }
@@ -54,7 +54,7 @@ void PhysicsSys::tick(float dt) {
 
     OPTICK_EVENT();
 
-    world.stepSimulation(dt, 1, (float)(1. / 90.));
+    world->stepSimulation(dt, 1, (float)(1. / 90.));
     
 }
 

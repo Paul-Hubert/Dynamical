@@ -1,8 +1,6 @@
 #include "classic_render.h"
 
 #include <glm/glm.hpp>
-#include "glm/gtc/matrix_transform.hpp"
-#include <glm/gtx/quaternion.hpp>
 
 #include "util/log.h"
 
@@ -12,7 +10,7 @@
 #include "renderer/util/vk_util.h"
 
 #include "logic/components/inputc.h"
-#include "logic/components/vrinputc.h"
+#include "logic/components/camerac.h"
 
 ClassicRender::ClassicRender(entt::registry& reg, Context& ctx, vk::DescriptorSetLayout set_layout) : reg(reg), ctx(ctx), renderpass(ctx),
 per_frame(NUM_FRAMES) {
@@ -113,29 +111,11 @@ void ClassicRender::render(uint32_t frame_index) {
 
     auto& f = per_frame[frame_index];
 
-    VRInputC& vr_input = reg.ctx<VRInputC>();
-
-    // Update matrices at the very end
     {
-        OPTICK_EVENT("calculate_matrices");
+        CameraC& camera = reg.ctx<CameraC>();
 
-        auto& v = vr_input.views[0];
-
-        glm::mat4 projection = glm::perspective(90.f, (float)ctx.swap.extent.width / ctx.swap.extent.height, 0.1f, 100.f);
-
-        glm::quat quat = glm::quat(v.pose.orientation.w * -1.0f, v.pose.orientation.x,
-            v.pose.orientation.y * -1.0f, v.pose.orientation.z);
-        glm::mat4 rotation = glm::mat4_cast(quat);
-
-        glm::vec3 position =
-            glm::vec3(v.pose.position.x, -v.pose.position.y, v.pose.position.z);
-
-        glm::mat4 translation = glm::translate(glm::mat4(1.f), position);
-        glm::mat4 view = translation * rotation;
-
-        view = glm::inverse(view);
-        per_frame[frame_index].pointer->view_projection = projection * view;
-        per_frame[frame_index].pointer->position = glm::vec4(v.pose.position.x, v.pose.position.y, v.pose.position.z, 1.0f);
+        per_frame[frame_index].pointer->view_projection = camera.projection * glm::inverse(camera.view);
+        per_frame[frame_index].pointer->position = glm::vec4(camera.position, 1.0f);
     }
 
     // Submit command buffer

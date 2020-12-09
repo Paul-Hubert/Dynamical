@@ -26,7 +26,7 @@ public:
     bool client_side = false;
 
     int vr_mode = 1;
-    int spectator_mode = 1;
+    int spectator_mode = 2;
 
     template <class Archive>
     void serialize(Archive& ar) {

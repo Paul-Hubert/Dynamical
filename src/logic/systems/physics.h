@@ -3,6 +3,8 @@
 
 #include "system.h"
 
+#include <memory>
+
 #include "btBulletDynamicsCommon.h"
 
 class PhysicsSys : public System {
@@ -14,11 +16,11 @@ public:
     ~PhysicsSys();
     const char* name() override {return "Physics";};
     
-    btDefaultCollisionConfiguration collisionConfiguration;
-    btCollisionDispatcher dispatcher;
-    btDbvtBroadphase overlappingPairCache;
-    btSequentialImpulseConstraintSolver solver;
-    btDiscreteDynamicsWorld world;
+    std::unique_ptr<btDefaultCollisionConfiguration> collisionConfiguration;
+    std::unique_ptr<btCollisionDispatcher> dispatcher;
+    std::unique_ptr<btDbvtBroadphase> overlappingPairCache;
+    std::unique_ptr<btSequentialImpulseConstraintSolver> solver;
+    std::unique_ptr<btDiscreteDynamicsWorld> world;
 
 };
 
