@@ -5,19 +5,13 @@
 
 #include "cereal/archives/json.hpp"
 
-#ifndef DYNAMICAL_CONFIG_FILE
-#define DYNAMICAL_CONFIG_FILE "./config.json"
-#endif
+
 
 void Settings::load() {
     if(std::filesystem::exists(DYNAMICAL_CONFIG_FILE)) {
         std::ifstream is(DYNAMICAL_CONFIG_FILE);
-        int i = is.get();
-        if (i == magic_number) {
-            cereal::JSONInputArchive in(is);
-            serialize(in);
-            return;
-        }
+        cereal::JSONInputArchive in(is);
+        serialize(in);
     }
 
     save();
@@ -27,7 +21,7 @@ void Settings::load() {
 void Settings::save() {
 
     std::ofstream os(DYNAMICAL_CONFIG_FILE);
-    os.put(magic_number);
+
     cereal::JSONOutputArchive out(os);
     serialize(out);
 

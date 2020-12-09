@@ -16,7 +16,6 @@ public:
     void save();
     void load();
 
-    const static char magic_number = 3;
     int window_width = 0;
     int window_height = 0;
     bool fullscreen = true;
@@ -46,6 +45,12 @@ public:
 
     void argument_override(int argc, char** argv);
 
+private:
+    #ifndef DYNAMICAL_CONFIG_DIR
+        #define DYNAMICAL_CONFIG_DIR "./"
+    #endif
+    #define DYNAMICAL_CONFIG_MAGIC "3"
+    #define DYNAMICAL_CONFIG_FILE DYNAMICAL_CONFIG_DIR "config." DYNAMICAL_CONFIG_MAGIC ".json"
 };
 
 #endif
