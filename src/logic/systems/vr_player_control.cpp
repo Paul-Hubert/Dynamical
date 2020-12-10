@@ -53,7 +53,7 @@ void VRPlayerControlSys::init() {
 			hand.rotation_pids[i].setWrapped(0.f, (float) (2.f*M_PI));
 		}
 
-		auto box_model = reg.ctx<ModelManager>().get("./resources/box.glb");
+		auto box_model = reg.ctx<ModelManager>().get("./resources/gltf/box.glb");
 
 		auto& renderable = reg.emplace<ModelRenderableC>(entity, box_model);
 		auto& transform = reg.emplace<TransformC>(entity);
@@ -236,14 +236,5 @@ void VRPlayerControlSys::tick(float dt) {
 }
 
 void VRPlayerControlSys::finish() {
-
-	entt::entity player_entity = reg.ctx<Util::Entity<"player"_hs>>();
-	PlayerC& player = reg.get<PlayerC>(player_entity);
-	
-	reg.destroy(player.left_hand);
-	reg.destroy(player.right_hand);
-
-	reg.destroy(player_entity);
-	reg.unset<Util::Entity<"player"_hs>>();
 
 }

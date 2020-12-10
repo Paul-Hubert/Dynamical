@@ -10,4 +10,5 @@ CMakeSettings.json
 CMakeLists.txt.user
 *.autosave
 .idea/*
-extra/raycast/raycast_data.bin
+resources/collada
+resources/gltf

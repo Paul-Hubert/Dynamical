@@ -75,9 +75,9 @@ void Game::start() {
     // create basic model
     {
 
-        manager.load("./resources/box.glb");
+        manager.load("./resources/gltf/box.glb");
 
-        auto box_model = manager.get("./resources/box.glb");
+        auto box_model = manager.get("./resources/gltf/box.glb");
 
         entt::entity box = reg.create();
         auto& renderable = reg.emplace<ModelRenderableC>(box, box_model);
