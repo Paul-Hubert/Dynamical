@@ -2,11 +2,11 @@
 
 #include "util/log.h"
 
-PID::PID(float p, float i, float d, float dt, float lower_limit, float upper_limit) : p(p), i(i), d(d), dt(dt), lower_limit(lower_limit), upper_limit(upper_limit) {
+PID::PID(float p, float i, float d, float lower_limit, float upper_limit) : p(p), i(i), d(d), lower_limit(lower_limit), upper_limit(upper_limit) {
 
 }
 
-float PID::tick(float input, float target) {
+float PID::tick(float input, float target, float dt) {
 
     float error;
     if (wrapped)

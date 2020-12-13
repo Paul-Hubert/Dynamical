@@ -6,6 +6,9 @@
 
 #include "extra/PID/PID.h"
 
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/quaternion.hpp>
+
 #include "logic/components/vrhandc.h"
 
 #include "logic/components/playerc.h"
@@ -16,7 +19,7 @@
 #include "renderer/model/model_manager.h"
 #include "logic/components/vrinputc.h"
 
-const float max_force = 1000;
+const float max_force = 10000;
 const float max_torque = 100;
 
 #ifndef M_PI
@@ -46,11 +49,11 @@ void VRPlayerControlSys::init() {
 		hand.index = h;
 
 		for (int i = 0; i < 3; i++) {
-			hand.position_pids.emplace_back(1700.f, 0.f, 500.f, (float) (1./90.), -max_force, max_force);
+			hand.position_pids.emplace_back(1700.f, 0.f, 500.f, -max_force, max_force);
 		}
 		for (int i = 0; i < 3; i++) {
-			hand.rotation_pids.emplace_back(0.f, 0.f, 0.f, (float)(1. / 90.), -max_torque, max_torque);
-			hand.rotation_pids[i].setWrapped(0.f, (float) (2.f*M_PI));
+			hand.rotation_pids.emplace_back(0.f, 0.f, 0.f, -max_torque, max_torque);
+			hand.rotation_pids[i].setWrapped((float)(-M_PI), (float) (M_PI));
 		}
 
 		auto box_model = reg.ctx<ModelManager>().get("./resources/gltf/box.glb");
@@ -115,7 +118,6 @@ void VRPlayerControlSys::tick(float dt) {
 			box.rigid_body->setLinearVelocity(btVector3(0,0,0));
 		}
 
-		box.rigid_body->clearForces();
 		box.rigid_body->activate(true);
 
 		/*{
@@ -125,12 +127,10 @@ void VRPlayerControlSys::tick(float dt) {
 			glm::vec3 load = (velocity - hand.last_velocity) * box.rigid_body->getMass() / hand.last_dt - hand.last_force;
 
 			hand.last_velocity = velocity;
-			hand.last_force = ((vr_input.hands[hand.index].position - position) / dt - hand.last_velocity) * box.rigid_body->getMass() / dt - load;
+			hand.last_force = ((vr_input.hands[hand.index].predictedPosition - position) / dt - hand.last_velocity) * box.rigid_body->getMass() / dt - load;
 			hand.last_dt = dt;
 
 			hand.last_force = glm::clamp(hand.last_force, glm::vec3(-max_force), glm::vec3(max_force));
-
-			glm::vec3 error = vr_input.hands[hand.index].position - position;
 
 			if (vr_input.hands[0].trigger > 0.1) {
 				hand.damping += 1;
@@ -139,13 +139,15 @@ void VRPlayerControlSys::tick(float dt) {
 				hand.damping -= 1;
 				dy::log() << "D : " << hand.damping << "\n";
 			}
-			hand.last_force *= 0.50f;// (error - hand.last_error) / dt;
-			hand.last_error = error;
 
-			//box.rigid_body->setLinearVelocity(btVector3(hand.last_velocity.x, hand.last_velocity.y, hand.last_velocity.z));
+			glm::vec3 error = vr_input.hands[hand.index].predictedPosition - position;
+			hand.last_force += hand.damping * (error - hand.last_error) / dt;
+			hand.last_error = error;
+			hand.last_force = glm::clamp(hand.last_force, glm::vec3(-max_force), glm::vec3(max_force));
 
 			box.rigid_body->applyCentralForce(btVector3(hand.last_force.x, hand.last_force.y, hand.last_force.z));
 		}*/
+
 
 		// Position
 		{
@@ -163,7 +165,7 @@ void VRPlayerControlSys::tick(float dt) {
 			float outputs[3];
 
 			for (int i = 0; i < 3; i++) {
-				/*
+
 				if (vr_input.hands[0].trigger > 0.1) {
 					hand.position_pids[i].i += 1;
 					dy::log() << "I : " << hand.position_pids[i].i << "\n";
@@ -177,8 +179,8 @@ void VRPlayerControlSys::tick(float dt) {
 					hand.position_pids[i].d -= 1;
 					dy::log() << "D : " << hand.position_pids[i].d << "\n";
 				}
-				*/
-				outputs[i] = hand.position_pids[i].tick(inputs[i], targets[i]);
+
+				outputs[i] = hand.position_pids[i].tick(inputs[i], targets[i], dt);
 			}
 
 			box.rigid_body->applyCentralForce(btVector3(outputs[0], outputs[1], outputs[2]));
@@ -187,7 +189,7 @@ void VRPlayerControlSys::tick(float dt) {
 
 
 		// Rotation
-		{
+		/*{
 
 			glm::vec3 target = glm::eulerAngles(h.predictedRotation);
 
@@ -196,7 +198,8 @@ void VRPlayerControlSys::tick(float dt) {
 			targets[1] = target.y;
 			targets[2] = target.z;
 
-			glm::vec3 current = glm::eulerAngles(glm::quat(transform.transform->getRotation().x(), transform.transform->getRotation().y(), transform.transform->getRotation().z(), transform.transform->getRotation().w()));
+			glm::quat current_quat = glm::quat(transform.transform->getRotation().w(), transform.transform->getRotation().x(), transform.transform->getRotation().y(), transform.transform->getRotation().z());
+			glm::vec3 current = glm::eulerAngles(current_quat);
 
 			float inputs[3];
 			inputs[0] = current.x;
@@ -206,7 +209,7 @@ void VRPlayerControlSys::tick(float dt) {
 			float outputs[3];
 
 			for (int i = 0; i < 3; i++) {
-				
+
 				if (vr_input.hands[0].trigger > 0.1) {
 					hand.rotation_pids[i].p += 0.001f;
 					dy::log() << "P : " << hand.rotation_pids[i].p << "\n";
@@ -220,13 +223,26 @@ void VRPlayerControlSys::tick(float dt) {
 					hand.rotation_pids[i].d -= 0.001f;
 					dy::log() << "D : " << hand.rotation_pids[i].d << "\n";
 				}
-				
+
 				outputs[i] = hand.rotation_pids[i].tick(inputs[i], targets[i]);
 			}
 
-			box.rigid_body->applyTorque(btVector3(outputs[1], outputs[2], outputs[0]));
+			box.rigid_body->applyTorque(btVector3(0, outputs[1], 0));
 
-		}
+		}*/
+
+		/*{
+
+			glm::quat current = glm::quat(transform.transform->getRotation().w(), transform.transform->getRotation().x(), transform.transform->getRotation().y(), transform.transform->getRotation().z());
+			glm::quat target = h.predictedRotation;
+			
+			glm::quat q = target * glm::inverse(current);
+			glm::vec3 axis = glm::normalize(glm::axis(q));
+			glm::vec3 torque = axis * 0.1f;
+
+			box.rigid_body->applyTorque(btVector3(torque.x, torque.y, torque.z));
+
+		}*/
 
 
 		

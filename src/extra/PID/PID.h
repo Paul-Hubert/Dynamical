@@ -3,9 +3,9 @@
 
 class PID {
 public:
-	PID(float p, float i, float d, float dt, float lower_limit, float upper_limit);
+	PID(float p, float i, float d, float lower_limit, float upper_limit);
 
-	float tick(float input, float target);
+	float tick(float input, float target, float dt);
 
 	void setWrapped(float lower_limit, float upper_limit) {
 		this->wrapped = true;
@@ -16,7 +16,6 @@ public:
 	float p;
 	float i;
 	float d;
-	float dt;
 	float lower_limit;
 	float upper_limit;
 

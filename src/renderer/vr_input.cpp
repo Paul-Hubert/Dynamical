@@ -225,7 +225,7 @@ void VRInput::poll() {
 			(space_velocity.velocityFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) != 0 &&
 			(space_velocity.velocityFlags & XR_SPACE_VELOCITY_ANGULAR_VALID_BIT) != 0) {
 			vr_input.hands[hand].position = glm::vec3(space_location.pose.position.x, space_location.pose.position.y, space_location.pose.position.z);
-			vr_input.hands[hand].rotation = glm::quat(space_location.pose.orientation.x, space_location.pose.orientation.y, space_location.pose.orientation.z, space_location.pose.orientation.w);
+			vr_input.hands[hand].rotation = glm::quat(space_location.pose.orientation.w, space_location.pose.orientation.x, space_location.pose.orientation.y, space_location.pose.orientation.z);
 			vr_input.hands[hand].linearVelocity = glm::vec3(space_velocity.linearVelocity.x, space_velocity.linearVelocity.y, space_velocity.linearVelocity.z);
 			vr_input.hands[hand].angularVelocity = glm::vec3(space_velocity.angularVelocity.x, space_velocity.angularVelocity.y, space_velocity.angularVelocity.z);
 		} else {
@@ -264,7 +264,7 @@ void VRInput::update() {
 			(space_velocity.velocityFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT) != 0 &&
 			(space_velocity.velocityFlags & XR_SPACE_VELOCITY_ANGULAR_VALID_BIT) != 0) {
 			vr_input.hands[hand].predictedPosition = glm::vec3(space_location.pose.position.x, space_location.pose.position.y, space_location.pose.position.z);
-			vr_input.hands[hand].predictedRotation = glm::quat(space_location.pose.orientation.x, space_location.pose.orientation.y, space_location.pose.orientation.z, space_location.pose.orientation.w);
+			vr_input.hands[hand].predictedRotation = glm::quat(space_location.pose.orientation.w, space_location.pose.orientation.x, space_location.pose.orientation.y, space_location.pose.orientation.z);
 			vr_input.hands[hand].predictedLinearVelocity = glm::vec3(space_velocity.linearVelocity.x, space_velocity.linearVelocity.y, space_velocity.linearVelocity.z);
 			vr_input.hands[hand].predictedAngularVelocity = glm::vec3(space_velocity.angularVelocity.x, space_velocity.angularVelocity.y, space_velocity.angularVelocity.z);
 		} else {

@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include "renderer/context/context.h"
 
@@ -30,7 +31,7 @@ void SpectatorControlSys::tick(float dt) {
 
         auto& v = vr_input.views[0];
 
-        camera.projection = glm::perspective(90.f, (float) ctx.swap.extent.width / ctx.swap.extent.height, 0.1f, 100.f);
+        camera.projection = glm::perspective(90.f, (float) ctx.swap.extent.width / ctx.swap.extent.height, 0.01f, 100.f);
 
         glm::quat quat = glm::quat(v.pose.orientation.w * -1.0f, v.pose.orientation.x,
             v.pose.orientation.y * -1.0f, v.pose.orientation.z);
@@ -41,6 +42,7 @@ void SpectatorControlSys::tick(float dt) {
 
         glm::mat4 translation = glm::translate(glm::mat4(1.f), camera.position);
         camera.view = translation * rotation;
+
     }
 
 }
