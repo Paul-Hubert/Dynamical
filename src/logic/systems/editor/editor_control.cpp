@@ -10,8 +10,10 @@
 #include "logic/components/inputc.h"
 #include "logic/settings.h"
 
-void EditorControlSys::preinit() {
+#include "logic/components/editor_contextc.h"
 
+void EditorControlSys::preinit() {
+    reg.set<EditorContextC>();
 }
 
 void EditorControlSys::init() {
@@ -22,19 +24,20 @@ void EditorControlSys::tick(float dt) {
 
     auto& s = reg.ctx<Settings>();
 
-    if (s.spectator_mode == 3) {
+    if (s.spectator_mode != 3) return;
 
-        InputC& input = reg.ctx<InputC>();
-        Context& ctx = *reg.ctx<Context*>();
-        CameraC& camera = reg.ctx<CameraC>();
+    EditorContextC& ctx = reg.ctx<EditorContextC>();
 
-        camera.projection = glm::perspective(90.f, (float)ctx.swap.extent.width / ctx.swap.extent.height, 0.1f, 100.f);
+    InputC& input = reg.ctx<InputC>();
+    CameraC& camera = reg.ctx<CameraC>();
 
-        camera.position = glm::vec3();
+    Context& context = *reg.ctx<Context*>();
+    camera.projection = glm::perspective(90.f, (float)context.swap.extent.width / context.swap.extent.height, 0.1f, 100.f);
 
-        camera.view = glm::translate(glm::mat4(1.f), camera.position);
+    camera.position = glm::vec3();
 
-    }
+    camera.view = glm::translate(glm::mat4(1.f), camera.position);
+
 
 }
 
