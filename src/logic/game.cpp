@@ -107,7 +107,7 @@ void Game::start() {
     bool running = true;
     while(running) {
 
-        OPTICK_FRAME("MainThread");
+        OPTICK_FRAME("Main");
 
         renderer->prepare();
 
