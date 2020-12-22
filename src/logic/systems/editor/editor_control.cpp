@@ -1,4 +1,4 @@
-#include "logic/systems/system_list.h"
+#include "editor_control.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -10,10 +10,8 @@
 #include "logic/components/inputc.h"
 #include "logic/settings.h"
 
-#include "logic/components/editor_contextc.h"
-
 void EditorControlSys::preinit() {
-    reg.set<EditorContextC>();
+
 }
 
 void EditorControlSys::init() {
@@ -25,8 +23,6 @@ void EditorControlSys::tick(float dt) {
     auto& s = reg.ctx<Settings>();
 
     if (s.spectator_mode != 3) return;
-
-    EditorContextC& ctx = reg.ctx<EditorContextC>();
 
     InputC& input = reg.ctx<InputC>();
     CameraC& camera = reg.ctx<CameraC>();

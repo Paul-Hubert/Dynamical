@@ -9,7 +9,6 @@
 
 #include "systems/system_list.h"
 
-#include "logic/components/playerc.h"
 #include "factories/factory_list.h"
 
 #include "util/entt_util.h"
@@ -21,6 +20,9 @@
 #include "logic/components/objectc.h"
 #include "logic/components/inputc.h"
 #include "logic/components/vrinputc.h"
+#include "logic/components/playerc.h"
+
+#include "logic/systems/editor/editor_control.h"
 
 #include "renderer/model/model_manager.h"
 
