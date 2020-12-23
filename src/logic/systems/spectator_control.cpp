@@ -37,7 +37,7 @@ void SpectatorControlSys::tick(float dt) {
         glm::quat quat = glm::quat(v.pose.orientation.w * -1.0f, v.pose.orientation.x,
             v.pose.orientation.y * -1.0f, v.pose.orientation.z);
         glm::mat4 rotation = glm::mat4_cast(quat);
-        glm::extractEulerAngleXYZ(rotation, camera.pitch, camera.yaw, camera.roll);
+        glm::extractEulerAngleZXY(rotation, camera.yaw, camera.pitch, camera.roll);
 
         camera.position =
             glm::vec3(v.pose.position.x, -v.pose.position.y, v.pose.position.z);

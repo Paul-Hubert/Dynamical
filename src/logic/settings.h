@@ -28,8 +28,8 @@ public:
     int vr_mode = 1;
     int spectator_mode = 2;
 
-    float editor_speed = 10;
-    float editor_sensitivity = 1;
+    float editor_speed = 0.0005f;
+    float editor_sensitivity = 0.5f;
 
     template <class Archive>
     void serialize(Archive& ar) {

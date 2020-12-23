@@ -60,45 +60,39 @@ void EditorControlSys::tick(float dt) {
     }
 
 
-    camera.yaw -= input.mouseRelPos.x * settings.editor_sensitivity * glm::pi<float>() / context.win.getWidth();
+    camera.yaw += input.mouseRelPos.x * settings.editor_sensitivity * glm::pi<float>() / context.win.getWidth();
     //Wrap
     if(camera.yaw > glm::pi<float>()*2) {
         camera.yaw -= glm::pi<float>()*2;
     }
 
-    glm::mat4 rotation = glm::eulerAngleXYZ(camera.pitch, camera.yaw, camera.roll);
-
     glm::vec4 diff = glm::vec4(0,0,0,1);
-
-    bool is_y = false;
+    float z = 0;
 
     if(input.on[Action::FORWARD]) {
-        diff.z = 1;
+        diff.y = -1;
     } if(input.on[Action::BACKWARD]) {
-        diff.z = -1;
+        diff.y = 1;
     } if(input.on[Action::LEFT]) {
         diff.x = -1;
     } if(input.on[Action::RIGHT]) {
         diff.x = 1;
     } if(input.on[Action::UP]) {
-        diff.y = 1;
-        is_y = true;
+        z = 1;
     } if(input.on[Action::DOWN]) {
-        diff.y = -1;
-       is_y = true;
+        z = -1;
     }
 
-    const float speed = 10;
+    diff *= settings.editor_speed;
+    z *= settings.editor_speed;
 
-    diff *= speed * dt;
+    glm::mat4 rotation = glm::eulerAngleZX(camera.yaw, camera.pitch);
+    diff = rotation * diff;
 
-    if(!is_y) {
-        diff = rotation * diff;
-    }
 
     camera.position.x += diff.x;
     camera.position.y += diff.y;
-    camera.position.z += diff.z;
+    camera.position.z += z;
 
     glm::mat4 translation = glm::translate(glm::mat4(1.f), camera.position);
     camera.view = translation * rotation;
