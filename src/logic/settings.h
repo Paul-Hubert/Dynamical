@@ -28,6 +28,9 @@ public:
     int vr_mode = 1;
     int spectator_mode = 2;
 
+    float editor_speed = 10;
+    float editor_sensitivity = 1;
+
     template <class Archive>
     void serialize(Archive& ar) {
         ar(
@@ -39,7 +42,9 @@ public:
             CEREAL_NVP(server_side),
             CEREAL_NVP(client_side),
             CEREAL_NVP(vr_mode),
-            CEREAL_NVP(spectator_mode)
+            CEREAL_NVP(spectator_mode),
+            CEREAL_NVP(editor_speed),
+            CEREAL_NVP(editor_sensitivity)
         );
     }
 
@@ -49,7 +54,7 @@ private:
     #ifndef DYNAMICAL_CONFIG_DIR
         #define DYNAMICAL_CONFIG_DIR "./"
     #endif
-    #define DYNAMICAL_CONFIG_MAGIC "3"
+    #define DYNAMICAL_CONFIG_MAGIC "4"
     #define DYNAMICAL_CONFIG_FILE DYNAMICAL_CONFIG_DIR "config." DYNAMICAL_CONFIG_MAGIC ".json"
 };
 

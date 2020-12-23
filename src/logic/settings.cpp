@@ -6,7 +6,6 @@
 #include "cereal/archives/json.hpp"
 
 
-
 void Settings::load() {
     if(std::filesystem::exists(DYNAMICAL_CONFIG_FILE)) {
         std::ifstream is(DYNAMICAL_CONFIG_FILE);

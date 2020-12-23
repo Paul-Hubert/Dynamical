@@ -34,11 +34,10 @@ void UI::prepare() {
     io.MouseDown[2] = input.mouseMiddle || input.on[Action::TERTIARY];
 
     if(input.focused)
-        io.MousePos = ImVec2((float) input.mousePos.x, (float) input.mousePos.y);
+        io.MousePos = ImVec2((float) input.mouseAbsPos.x, (float) input.mouseAbsPos.y);
 
-    int w, h;
-    SDL_GetWindowSize(ctx.win, &w, &h);
-    io.DisplaySize = ImVec2((float)w, (float)h);
+
+    io.DisplaySize = ImVec2((float)ctx.win.getWidth(), (float)ctx.win.getHeight());
     
     static Uint64 frequency = SDL_GetPerformanceFrequency();
     Uint64 current_time = SDL_GetPerformanceCounter();

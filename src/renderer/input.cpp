@@ -91,24 +91,25 @@ void Input::poll() {
                     break;
             }
             
-        } if(e.type == SDL_MOUSEWHEEL) {
+        } else if(e.type == SDL_MOUSEWHEEL) {
             
             if (e.wheel.x > 0) input.mouseWheel.x += 1;
             else if (e.wheel.x < 0) input.mouseWheel.x -= 1;
             if (e.wheel.y > 0) input.mouseWheel.y += 1;
             else if (e.wheel.y < 0) input.mouseWheel.y -= 1;
             
+        } else if(e.type == SDL_MOUSEMOTION) {
+            input.mouseAbsPos = glm::ivec2(e.motion.x, e.motion.y);
+
+            //Handle relative mouse position, with a deadzone of 2 (movement equal or less than 2 is ignored)
+            glm::ivec2 relative = glm::ivec2(e.motion.xrel, e.motion.yrel);
+            if(abs(relative.x) <= 2) relative.x = 0;
+            if(abs(relative.y) <= 2) relative.y = 0;
+
+            input.mouseRelPos = relative;
+
         }
         
     }
-    
-    if (input.focused) {
 
-        int x, y;
-        SDL_GetMouseState(&x, &y);
-        
-        input.mousePos = glm::ivec2(x, y);
-
-    }
-    
 }
