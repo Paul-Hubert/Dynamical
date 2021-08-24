@@ -50,6 +50,8 @@ public:
     vk::DeviceSize size;
     vk::DeviceSize offset;
     vk::DeviceMemory memory;
+
+    bool ready = false;
     
 private:
     Device* device;
@@ -100,6 +102,8 @@ public:
     vk::DeviceMemory memory;
 
     vk::Format format;
+
+    bool ready = false;
     
 private:
     Device* device;

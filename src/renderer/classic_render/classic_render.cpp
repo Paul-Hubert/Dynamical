@@ -10,7 +10,6 @@
 #include "renderer/util/vk_util.h"
 
 #include "logic/components/inputc.h"
-#include "logic/components/camerac.h"
 
 ClassicRender::ClassicRender(entt::registry& reg, Context& ctx, vk::DescriptorSetLayout set_layout) : reg(reg), ctx(ctx), renderpass(ctx),
 per_frame(NUM_FRAMES) {
@@ -89,7 +88,7 @@ void ClassicRender::prepare(uint32_t frame_index, std::function<void(vk::Command
 
     command.setScissor(0, vk::Rect2D(vk::Offset2D(), vk::Extent2D(ctx.swap.extent.width, ctx.swap.extent.height)));
 
-    command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_layout, 0, { per_frame[frame_index].set }, nullptr);
+    //command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_layout, 0, { per_frame[frame_index].set }, nullptr);
 
     recorder(command);
 
@@ -112,10 +111,8 @@ void ClassicRender::render(uint32_t frame_index) {
     auto& f = per_frame[frame_index];
 
     {
-        CameraC& camera = reg.ctx<CameraC>();
-
-        per_frame[frame_index].pointer->view_projection = camera.projection * glm::inverse(camera.view);
-        per_frame[frame_index].pointer->position = glm::vec4(camera.position, 1.0f);
+        per_frame[frame_index].pointer->position = glm::vec2(0.0, 0.0);
+        per_frame[frame_index].pointer->size = glm::vec2(1.0, 1.0);
     }
 
     // Submit command buffer

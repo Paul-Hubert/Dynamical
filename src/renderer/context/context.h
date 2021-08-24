@@ -6,7 +6,6 @@
 #include "device.h"
 #include "transfer.h"
 #include "swapchain.h"
-#include "vr_context.h"
 
 #include "logic/systems/system.h"
 
@@ -19,7 +18,6 @@ public:
     Context(entt::registry& reg);
     ~Context();
 
-    VRContext vr;
     Windu win;
     Instance instance;
     Device device;

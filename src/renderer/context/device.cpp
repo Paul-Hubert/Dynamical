@@ -11,6 +11,8 @@
 #include "renderer/util/vk_util.h"
 #include "logic/settings.h"
 
+VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+
 bool checkDeviceExtensions(std::vector<const char*> extensionNames, std::vector<vk::ExtensionProperties> availableExtensions) {
 
     for(const char* extensionName : extensionNames) {
@@ -42,50 +44,14 @@ Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     // HERE : enable needed features (if present in 'features')
 
     std::vector<const char*> extensions;
+
     extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
-    if(settings.vr_mode != 0) {
-        uint32_t size = 0;
-        PFN_xrGetVulkanDeviceExtensionsKHR xrGetVulkanDeviceExtensionsKHR = nullptr;
-        xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanDeviceExtensionsKHR", (PFN_xrVoidFunction*)&xrGetVulkanDeviceExtensionsKHR));
-
-        xrCheckResult(xrGetVulkanDeviceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, 0, &size, nullptr));
-
-        char* buf = (char*)malloc(size * sizeof(char));
-        xrCheckResult(xrGetVulkanDeviceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, size, &size, buf));
-        if(buf[0] != '\0') extensions.push_back(buf);
-        for(int i = 0; buf[i] != '\0'; i++) {
-            if(buf[i] == ' ') {
-                buf[i] = '\0';
-                extensions.push_back(&buf[i + 1]);
-            }
-        }
-    }
-
-
-
-
-
-    
     std::vector<vk::PhysicalDevice> p_devices = ctx.instance->enumeratePhysicalDevices();
 
-    
-    if(settings.vr_mode != 0) {
-        PFN_xrGetVulkanGraphicsDeviceKHR xrGetVulkanGraphicsDeviceKHR = nullptr;
-        xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanGraphicsDeviceKHR", (PFN_xrVoidFunction *)(&xrGetVulkanGraphicsDeviceKHR)));
-
-        VkPhysicalDevice phy;
-        xrCheckResult(xrGetVulkanGraphicsDeviceKHR(ctx.vr.instance, ctx.vr.system_id, ctx.instance, &phy));
-        
-        physical = phy;
-    } else {
-        physical = p_devices[0];
-    }
-    
+    physical = p_devices[0];
 
     extensions = checkExtensions(extensions, physical.enumerateDeviceExtensionProperties());
-
-
     
     // Prepare queue choice data : GRAPHICS / COMPUTE / TRANSFER
     uint32_t countF = 0;
@@ -146,23 +112,14 @@ Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
         throw std::runtime_error("Could not get transfer queue family");
     }
     
-    /*
-    for(const auto &ext : extensions) {
-        if(strcmp(VK_EXT_DEBUG_MARKER_EXTENSION_NAME, ext.extensionName) == 0) requiredExtensions.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
-    }*/
-    
     // Create Device
     
     logical = physical.createDevice(vk::DeviceCreateInfo({}, countF, pqinfo.data(), 0, nullptr, (uint32_t) extensions.size(), extensions.data(), &requiredFeatures));
     
-    
-#ifndef NDEBUG
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(logical);
     
     Device& device = *this;
-    DEV_LOAD(vkSetDebugUtilsObjectNameEXT)
-    this->vkSetDebugUtilsObjectNameEXT = vkSetDebugUtilsObjectNameEXT;
     
-#endif
     
     SET_NAME(vk::ObjectType::eDevice, (VkDevice) logical, main)
     

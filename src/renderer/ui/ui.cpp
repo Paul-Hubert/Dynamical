@@ -45,16 +45,16 @@ void UI::prepare() {
     io.DeltaTime = g_Time > 0 ? (float)((double)(current_time - g_Time) / frequency) : (float)(1.0f / 60.0f);
     g_Time = current_time;
 
-    if(entt::monostate<"imgui_frame"_hs>{}) ImGui::Render();
+    //if(entt::monostate<"imgui_frame"_hs>{}) 
 
     ImGui::NewFrame();
-    entt::monostate<"imgui_frame"_hs>{} = true;
+    //entt::monostate<"imgui_frame"_hs>{} = true;
     
 }
 
 void UI::render() {
 
-
+    ImGui::Render();
 
 }
 

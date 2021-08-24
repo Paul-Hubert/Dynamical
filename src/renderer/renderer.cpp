@@ -8,12 +8,9 @@
 #include "extra/optick/optick.h"
 #include "logic/settings.h"
 
-#include "renderer/model/modelc.h"
-
 Renderer::Renderer(entt::registry& reg) : reg(reg),
 ctx(reg),
 input(reg),
-vr_input(reg),
 ui(reg) {
     
     auto& settings = reg.ctx<Settings>();
@@ -25,13 +22,9 @@ ui(reg) {
     view_layout = ctx.device->createDescriptorSetLayout(
         vk::DescriptorSetLayoutCreateInfo({}, (uint32_t)bindings.size(), bindings.data()));
 
-    vr_render = std::make_unique<VRRender>(reg, ctx, view_layout);
-
     classic_render = std::make_unique<ClassicRender>(reg, ctx, view_layout);
 
-    object_render = std::make_unique<ObjectRender>(reg, ctx, classic_render->getRenderpass(), std::vector<vk::DescriptorSetLayout>{view_layout});
-
-    ui_render = std::make_unique<UIRender>(ctx, vr_render->getRenderpass());
+    ui_render = std::make_unique<UIRender>(ctx, classic_render->getRenderpass());
 
 }
 
@@ -51,19 +44,20 @@ void Renderer::prepare() {
 
     input.poll();
 
-    vr_input.poll();
-
     ui.prepare();
 
 
+    
+
+}
+
+void Renderer::render() {
+    
+    OPTICK_EVENT();
+    
+    ui.render();
+    
     std::function<void(vk::CommandBuffer)> recorder = [&](vk::CommandBuffer command) {
-
-        {
-
-            OPTICK_GPU_EVENT("draw_objects");
-            object_render->render(command, frame_index);
-
-        }
 
         {
 
@@ -74,26 +68,9 @@ void Renderer::prepare() {
 
     };
 
-
-    vr_render->prepare(frame_index, recorder, object_render->layout);
-
-    classic_render->prepare(frame_index, recorder, object_render->layout);
-
-    vr_input.update();
-
-}
-
-void Renderer::render() {
+    classic_render->prepare(frame_index, recorder, ui_render->pipelineLayout);
     
-    OPTICK_EVENT();
-
     ctx.transfer.flush();
-    
-    ui.render();
-
-    
-
-    vr_render->render(frame_index);
 
     classic_render->render(frame_index);
 
@@ -102,8 +79,6 @@ void Renderer::render() {
 void Renderer::finish() {
 
     ctx.device->waitIdle();
-
-    reg.clear<ModelC>();
 
 }
 

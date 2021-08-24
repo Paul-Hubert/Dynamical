@@ -8,8 +8,6 @@
 
 #include <memory>
 
-#include "renderer/model/imagec.h"
-
 class Context;
 class Renderpass;
 
@@ -41,7 +39,7 @@ public:
     
     std::vector<FrameDataForRender> g_FramesDataBuffers;
     
-    std::shared_ptr<ImageC> fontAtlas;
+    std::shared_ptr<VmaImage> fontAtlas;
     vk::ImageView fontView;
     vk::Sampler fontSampler;
     

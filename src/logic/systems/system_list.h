@@ -16,9 +16,5 @@ public: \
     const char* name() override { return #NAME; }; \
 };
 
-DEFINE_SYSTEM(VRPlayerControlSys)
-
-DEFINE_SYSTEM(SpectatorControlSys)
-
 #undef DEFINE_SYSTEM
 #endif

@@ -25,7 +25,7 @@ Swapchain::Swapchain(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     presentModes.resize(num);
     vkGetPhysicalDeviceSurfacePresentModesKHR(static_cast<VkPhysicalDevice> (ctx.device), ctx.win.surface, &num, reinterpret_cast<VkPresentModeKHR*> (presentModes.data()));
     
-    vk::SurfaceFormatKHR surfaceformat = chooseSwapSurfaceFormat(formats, vk::Format(ctx.vr.swapchain_format), vk::ColorSpaceKHR::eSrgbNonlinear);
+    vk::SurfaceFormatKHR surfaceformat = chooseSwapSurfaceFormat(formats, vk::Format::eB8G8R8A8Srgb, vk::ColorSpaceKHR::eSrgbNonlinear);
     presentMode = chooseSwapPresentMode(presentModes, vk::PresentModeKHR::eImmediate);
     extent = chooseSwapExtent(capabilities);
     format = surfaceformat.format;
@@ -83,11 +83,6 @@ void Swapchain::setup() {
         
     }
     
-    DEV_LOAD(vkAcquireNextImageKHR)
-    this->vkAcquireNextImageKHR = vkAcquireNextImageKHR;
-    DEV_LOAD(vkQueuePresentKHR)
-    this->vkQueuePresentKHR = vkQueuePresentKHR;
-    
 }
 
 void Swapchain::cleanup() {
@@ -115,7 +110,7 @@ Swapchain::~Swapchain() {
 
 uint32_t Swapchain::acquire(vk::Semaphore signal) {
     
-    auto resultvalue = ctx.device->acquireNextImageKHR(swapchain, std::numeric_limits<uint64_t>::max(), signal, nullptr, *this);
+    auto resultvalue = ctx.device->acquireNextImageKHR(swapchain, std::numeric_limits<uint64_t>::max(), signal, nullptr);
     current = resultvalue.value;
     
     if(resultvalue.result == vk::Result::eSuboptimalKHR) {
@@ -129,7 +124,7 @@ uint32_t Swapchain::acquire(vk::Semaphore signal) {
 void Swapchain::present(vk::Semaphore wait) {
     
     // This will display the image
-    auto result = ctx.device.graphics.presentKHR(vk::PresentInfoKHR((wait ? 1 : 0), &wait, 1, &swapchain, &current), *this);
+    auto result = ctx.device.graphics.presentKHR(vk::PresentInfoKHR((wait ? 1 : 0), &wait, 1, &swapchain, &current));
     
     if(result == vk::Result::eSuboptimalKHR) {
         throw vk::OutOfDateKHRError("Suboptimal swapchain");

@@ -6,8 +6,6 @@
 #include <iostream>
 #include <util/util.h>
 
-#include "vr_context.h"
-
 #include "context.h"
 
 #include "renderer/util/vk_util.h"
@@ -16,6 +14,10 @@
 Instance::Instance(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     
     auto& settings = reg.ctx<Settings>();
+    
+    vk::DynamicLoader dl;
+    PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
     
     uint32_t extensionCount;
     SDL_Vulkan_GetInstanceExtensions(ctx.win, &extensionCount, nullptr);
@@ -30,47 +32,18 @@ Instance::Instance(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
 #endif
 
     layers = checkLayers(layers, vk::enumerateInstanceLayerProperties());
-
+    
     extensions = checkExtensions(extensions, vk::enumerateInstanceExtensionProperties());
 
     uint32_t version = VK_MAKE_VERSION(1,1,0);
-    
-    if(settings.vr_mode != 0) {
-        uint32_t size = 0;
-        PFN_xrGetVulkanInstanceExtensionsKHR xrGetVulkanInstanceExtensionsKHR = nullptr;
-        xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanInstanceExtensionsKHR", (PFN_xrVoidFunction*)&xrGetVulkanInstanceExtensionsKHR));
-
-        xrCheckResult(xrGetVulkanInstanceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, 0, &size, nullptr));
-
-        char* buf = (char*)malloc(size * sizeof(char));
-        xrCheckResult(xrGetVulkanInstanceExtensionsKHR(ctx.vr.instance, ctx.vr.system_id, size, &size, buf));
-
-        if(buf[0] != '\0') extensions.push_back(buf);
-        for(int i = 0; buf[i] != '\0'; i++) {
-            if(buf[i] == ' ') {
-                buf[i] = '\0';
-                extensions.push_back(&buf[i + 1]);
-            }
-        }
-        
-        
-        PFN_xrGetVulkanGraphicsRequirementsKHR xrGetVulkanGraphicsRequirementsKHR = nullptr;
-        xrCheckResult(xrGetInstanceProcAddr(ctx.vr.instance, "xrGetVulkanGraphicsRequirementsKHR", (PFN_xrVoidFunction *)(&xrGetVulkanGraphicsRequirementsKHR)));
-
-        XrGraphicsRequirementsVulkanKHR requirement = { XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN_KHR };
-        xrCheckResult(xrGetVulkanGraphicsRequirementsKHR(ctx.vr.instance, ctx.vr.system_id, &requirement));
-
-        
-        version = VK_MAKE_VERSION(std::min(std::max(VK_VERSION_MAJOR(version), (uint32_t) (XR_VERSION_MAJOR(requirement.minApiVersionSupported))), (uint32_t) (XR_VERSION_MAJOR(requirement.maxApiVersionSupported))),
-                                std::min(std::max(VK_VERSION_MINOR(version), (uint32_t) (XR_VERSION_MINOR(requirement.minApiVersionSupported))), (uint32_t) (XR_VERSION_MINOR(requirement.maxApiVersionSupported))),
-                                std::min(std::max(VK_VERSION_PATCH(version), (uint32_t) (XR_VERSION_PATCH(requirement.minApiVersionSupported))), (uint32_t) (XR_VERSION_PATCH(requirement.maxApiVersionSupported))));
-    }
 
     vk::ApplicationInfo appInfo("Test", VK_MAKE_VERSION(1, 0, 0), "Dynamical", VK_MAKE_VERSION(1, 0, 0), version);
 
 
     instance = vk::createInstance(vk::InstanceCreateInfo({}, &appInfo, (uint32_t) layers.size(), layers.data(), (uint32_t) extensions.size(), extensions.data()));
-
+    
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
+    
     Instance &instance = *this;
 
 #ifndef NDEBUG
