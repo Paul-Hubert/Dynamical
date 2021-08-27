@@ -4,10 +4,8 @@
 #include "entt/entt.hpp"
 
 #include "context/context.h"
-#include "input.h"
 #include "ui/ui.h"
 #include "classic_render/classic_render.h"
-#include "ui/ui_render.h"
 
 class Renderer {
 public:
@@ -22,13 +20,13 @@ public:
 private:
     entt::registry& reg;
     Context ctx;
-    Input input;
     UI ui;
-    std::unique_ptr<ClassicRender>  classic_render;
-    std::unique_ptr<UIRender> ui_render;
-
-    uint32_t frame_index = 0;
-    vk::DescriptorSetLayout view_layout;
+    
+    struct per_frame {
+        vk::Semaphore transfer_semaphore;
+    };
+    std::vector<per_frame> per_frame;
+    
 };
 
 #endif

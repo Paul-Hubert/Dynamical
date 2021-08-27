@@ -12,7 +12,7 @@ class System {
 public:
     System(entt::registry& reg) : reg(reg) {};
     virtual void preinit() {}
-    virtual void init() = 0;
+    virtual void init() {};
     virtual void tick(float dt) = 0;
     void operator()(float dt) {
         tick(dt);

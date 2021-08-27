@@ -1,10 +1,14 @@
-#ifndef UI_RENDER_H
-#define UI_RENDER_H
+#ifndef UI_RENDER_SYS_H
+#define UI_RENDER_SYS_H
 
 #include "renderer/util/vk.h"
 #include "renderer/util/vmapp.h"
 
 #include "imgui.h"
+
+#include "system.h"
+
+#include <entt/entt.hpp>
 
 #include <memory>
 
@@ -22,14 +26,20 @@ public:
     vk::Buffer        indexBuffer;
 };
 
-class UIRender {
+class UIRenderSys : public System {
 public:
-    UIRender(Context& ctx, vk::RenderPass renderpass);
-    ~UIRender();
+    UIRenderSys(entt::registry& reg);
+    ~UIRenderSys() override;
+    
+    const char* name() override {
+        return "UIRender";
+    }
+
+    void init() override;
+    void tick(float dt) override;
     
     void createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buffer_memory, vk::DeviceSize& p_buffer_size, size_t new_size,vk::BufferUsageFlagBits usage);
     
-    void render(vk::CommandBuffer commandBuffer, uint32_t index);
     
     vk::DescriptorPool descPool;
     vk::DescriptorSetLayout descLayout;
@@ -45,10 +55,9 @@ public:
     
 private:
     
-    Context& ctx;
-    
     void initPipeline(vk::RenderPass);
     
 };
 
 #endif
+

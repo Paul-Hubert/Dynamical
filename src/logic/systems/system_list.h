@@ -16,5 +16,7 @@ public: \
     const char* name() override { return #NAME; }; \
 };
 
+DEFINE_SYSTEM(CameraSys)
+
 #undef DEFINE_SYSTEM
 #endif

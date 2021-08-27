@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <taskflow/taskflow.hpp>
+#include "extra/optick/optick.h"
 
 #include "renderer/renderer.h"
 #include "systems/system_set.h"
@@ -16,9 +17,15 @@
 
 #include "logic/components/inputc.h"
 
-#include "logic/systems/uisys.h"
+#include "logic/systems/input.h"
 
-#include "extra/optick/optick.h"
+#include "logic/systems/ui.h"
+
+#include "logic/systems/map_render.h"
+#include "logic/systems/ui_render.h"
+
+
+#include "logic/map/map_manager.h"
 
 Game::Game(int argc, char** argv) {
     registry = std::make_unique<entt::registry>();
@@ -33,12 +40,22 @@ void Game::start() {
 
     Settings& s = reg.ctx<Settings>();
 
-
     renderer = std::make_unique<Renderer>(reg);
 
     set = std::make_unique<SystemSet>(reg);
 
+    set->pre_add<InputSys>();
+    set->pre_add<CameraSys>();
+    
     set->pre_add<UISys>();
+    
+    
+    set->post_add<MapRenderSys>();
+    set->post_add<UIRenderSys>();
+    
+    
+    reg.set<MapManager>(reg);
+    
 
     // preinit
 

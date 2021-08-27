@@ -5,18 +5,19 @@
 #include "imgui.h"
 
 #include "util/util.h"
+#include "util/log.h"
 
-UIRender::UIRender(Context& ctx, vk::RenderPass renderpass) : ctx(ctx), g_FramesDataBuffers(ctx.swap.num_frames) {
+UIRenderSys::UIRenderSys(entt::registry& reg) : System(reg) {
     
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
+    Context& ctx = *reg.ctx<Context*>();
+    
+    g_FramesDataBuffers.resize(ctx.swap.num_frames);
+    
     auto& io = ImGui::GetIO(); (void)io;
     io.Fonts->AddFontDefault();
     //io.Fonts->AddFontFromFileTTF("./resources/fonts/aniron.ttf", 50.0f, NULL, io.Fonts->GetGlyphRangesDefault());
 
     io.IniFilename = nullptr;
-
     
     unsigned char* tex_pixels = NULL;
     int tex_w, tex_h;
@@ -62,11 +63,20 @@ UIRender::UIRender(Context& ctx, vk::RenderPass renderpass) : ctx(ctx), g_Frames
         ctx.device->updateDescriptorSets({vk::WriteDescriptorSet(descSet, 0, 0, 1, vk::DescriptorType::eCombinedImageSampler, &info, 0, 0)}, {});
     }
 
-    initPipeline(renderpass);
+    initPipeline(ctx.classic_render.renderpass);
     
 }
 
-void UIRender::createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buffer_memory, vk::DeviceSize& p_buffer_size, size_t new_size, vk::BufferUsageFlagBits usage) {
+void UIRenderSys::init() {
+    
+    Context& ctx = *reg.ctx<Context*>();
+    
+    
+}
+
+void UIRenderSys::createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buffer_memory, vk::DeviceSize& p_buffer_size, size_t new_size, vk::BufferUsageFlagBits usage) {
+    
+    Context& ctx = *reg.ctx<Context*>();
     
     if (buffer)
         ctx.device->destroyBuffer(buffer);
@@ -86,10 +96,11 @@ void UIRender::createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buffer
     
 }
 
-void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t index) {
+void UIRenderSys::tick(float dt) {
+    
+    Context& ctx = *reg.ctx<Context*>();
 
     ImGui::Render();
-    entt::monostate<"imgui_frame"_hs>{} = false;
     
     ImDrawData* draw_data = ImGui::GetDrawData();
     
@@ -99,7 +110,7 @@ void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t index) {
     if (fb_width <= 0 || fb_height <= 0 || draw_data->TotalVtxCount == 0)
         return;
 
-    FrameDataForRender* fd = &g_FramesDataBuffers[index];
+    FrameDataForRender* fd = &g_FramesDataBuffers[ctx.swap.current];
 
     // Create the Vertex and Index buffers:
     size_t vertex_size = draw_data->TotalVtxCount * sizeof(ImDrawVert);
@@ -130,15 +141,14 @@ void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t index) {
     
     
     
-    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
+    ctx.classic_render.command.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
     
-    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, {descSet}, {});
+    ctx.classic_render.command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, {descSet}, {});
     
-    
-    commandBuffer.bindVertexBuffers(0, {fd->vertexBuffer}, {0});
-    commandBuffer.bindIndexBuffer(fd->indexBuffer, 0, vk::IndexType::eUint16);
+    ctx.classic_render.command.bindVertexBuffers(0, {fd->vertexBuffer}, {0});
+    ctx.classic_render.command.bindIndexBuffer(fd->indexBuffer, 0, vk::IndexType::eUint16);
 
-    commandBuffer.setViewport(0, vk::Viewport(0, 0, (float)fb_width, (float)fb_height, 0.0f, 1.0f));
+    ctx.classic_render.command.setViewport(0, vk::Viewport(0, 0, (float)fb_width, (float)fb_height, 0.0f, 1.0f));
     
 
     // Setup scale and translation:
@@ -149,7 +159,7 @@ void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t index) {
     scale[1] = 2.0f / draw_data->DisplaySize.y;
     scale[2] = -1.0f - draw_data->DisplayPos.x * scale[0];
     scale[3] = -1.0f - draw_data->DisplayPos.y * scale[1];
-    commandBuffer.pushConstants(pipelineLayout, vk::ShaderStageFlagBits::eVertex, sizeof(float) * 0, sizeof(float) * 4, scale);
+    ctx.classic_render.command.pushConstants(pipelineLayout, vk::ShaderStageFlagBits::eVertex, sizeof(float) * 0, sizeof(float) * 4, scale);
     
 
     // Will project scissor/clipping rectangles into framebuffer space
@@ -172,7 +182,7 @@ void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t index) {
             else
             {
                 if(pcmd->TextureId != NULL) {
-                    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, {*static_cast<vk::DescriptorSet*>(pcmd->TextureId)}, {});
+                    ctx.classic_render.command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, {*static_cast<vk::DescriptorSet*>(pcmd->TextureId)}, {});
                 }
                 // Project scissor/clipping rectangles into framebuffer space
                 ImVec4 clip_rect;
@@ -184,16 +194,16 @@ void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t index) {
                 if (clip_rect.x < fb_width && clip_rect.y < fb_height && clip_rect.z >= 0.0f && clip_rect.w >= 0.0f)
                 {
                     // Apply scissor/clipping rectangle
-                    commandBuffer.setScissor(0, vk::Rect2D(vk::Offset2D( (int32_t)(clip_rect.x), (int32_t)(clip_rect.y) ),
+                    ctx.classic_render.command.setScissor(0, vk::Rect2D(vk::Offset2D( (int32_t)(clip_rect.x), (int32_t)(clip_rect.y) ),
                                                            vk::Extent2D( (uint32_t)(clip_rect.z - clip_rect.x), (uint32_t)(clip_rect.w - clip_rect.y))));
 
                     // Draw
                     OPTICK_GPU_EVENT("draw_ui_element");
-                    commandBuffer.drawIndexed(pcmd->ElemCount, 1, idx_offset, vtx_offset, 0);
+                    ctx.classic_render.command.drawIndexed(pcmd->ElemCount, 1, idx_offset, vtx_offset, 0);
                 }
                 
                 if(pcmd->TextureId != NULL) {
-                    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, {descSet}, {});
+                    ctx.classic_render.command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, {descSet}, {});
                 }
                 
             }
@@ -204,7 +214,9 @@ void UIRender::render(vk::CommandBuffer commandBuffer, uint32_t index) {
     
 }
 
-void UIRender::initPipeline(vk::RenderPass renderpass) {
+void UIRenderSys::initPipeline(vk::RenderPass renderpass) {
+    
+    Context& ctx = *reg.ctx<Context*>();
     
     // PIPELINE INFO
     
@@ -368,9 +380,9 @@ void UIRender::initPipeline(vk::RenderPass renderpass) {
     
 }
 
-UIRender::~UIRender() {
+UIRenderSys::~UIRenderSys() {
     
-    // Free/Destroy ce qui est créé dans init();
+    Context& ctx = *reg.ctx<Context*>();
     
     ctx.device->destroy(descPool);
     
@@ -392,3 +404,4 @@ UIRender::~UIRender() {
     ctx.device->destroy(pipelineLayout);
     
 }
+

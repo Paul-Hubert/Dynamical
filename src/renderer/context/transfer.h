@@ -15,13 +15,17 @@ class Context;
 class Transfer {
 public:
     Transfer(Context& ctx, entt::registry& reg);
-    void flush();
+    bool flush(vk::Semaphore semaphore = nullptr);
     vk::CommandBuffer getCommandBuffer();
     
     std::shared_ptr<VmaImage> createImage(const void* data, size_t real_size, vk::ImageCreateInfo info, vk::ImageLayout layout);
     std::shared_ptr<VmaBuffer> createBuffer(const void* data, vk::BufferCreateInfo info);
     
+    void check();
+    
     ~Transfer();
+    
+    
 private:
     Context& ctx;
     entt::registry& reg;
@@ -42,6 +46,7 @@ private:
     Upload current;
     
     bool empty = true;
+    
     
 };
 

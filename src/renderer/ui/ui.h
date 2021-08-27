@@ -10,7 +10,6 @@ class UI {
 public:
     UI(entt::registry& reg);
     void prepare();
-    void render();
     ~UI();
 private:
     entt::registry& reg;

@@ -87,7 +87,7 @@ class QuadTree {
     
 public:
     
-    QuadTree() {
+    QuadTree(T null_value) {
         root = std::make_unique<Node>((int) std::pow(2, 0));
     }
     

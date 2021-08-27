@@ -6,6 +6,7 @@
 #include "device.h"
 #include "transfer.h"
 #include "swapchain.h"
+#include "renderer/classic_render/classic_render.h"
 
 #include "logic/systems/system.h"
 
@@ -23,6 +24,9 @@ public:
     Device device;
     Transfer transfer;
     Swapchain swap;
+    ClassicRender classic_render;
+    
+    uint32_t frame_index;
 
 };
 

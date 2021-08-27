@@ -21,12 +21,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     if(messageSeverity < LOG_LEVEL)
         return VK_FALSE;
 
-    if(pCallbackData->messageIdNumber == 0x6bbb14
-        || pCallbackData->messageIdNumber == 0xe92b452d
-        || pCallbackData->messageIdNumber == 0x4dae5635
-        || pCallbackData->messageIdNumber == 0x71500fba)
-        return VK_FALSE;
-
     /*
     if(messageType == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) {
         std::cerr << "    General ";

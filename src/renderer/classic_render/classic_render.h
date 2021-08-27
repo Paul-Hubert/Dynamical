@@ -14,10 +14,10 @@ class Camera;
 
 class ClassicRender {
 public:
-    ClassicRender(entt::registry& reg, Context& ctx, vk::DescriptorSetLayout set_layout);
+    ClassicRender(Context& ctx, entt::registry& reg);
 
-    void prepare(uint32_t frame_index, std::function<void(vk::CommandBuffer)>& recorder, vk::PipelineLayout pipeline_layout);
-    void render(uint32_t frame_index);
+    void prepare();
+    void render(vk::Semaphore semaphore = nullptr);
 
     vk::RenderPass getRenderpass() {
         return renderpass;
@@ -25,15 +25,13 @@ public:
 
     ~ClassicRender();
 
-private:
-    entt::registry& reg;
-    Context& ctx;
+
     ClRenderpass renderpass;
-
-    vk::CommandPool commandPool;
-
-    vk::DescriptorPool descriptorPool;
-
+    
+    vk::DescriptorSetLayout view_layout;
+    
+    vk::CommandBuffer command;
+    
     struct per_frame {
         vk::CommandBuffer commandBuffer;
         vk::Fence fence;
@@ -44,6 +42,17 @@ private:
         vk::Semaphore presentSemaphore;
     };
     std::vector<per_frame> per_frame;
+    
+private:
+    entt::registry& reg;
+    Context& ctx;
+
+    vk::CommandPool commandPool;
+
+    vk::DescriptorPool descriptorPool;
+
+    
+    
 
 };
 

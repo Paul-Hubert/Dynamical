@@ -23,7 +23,7 @@ std::unordered_map<SDL_Scancode, Action> actionMap = {
     {SDL_SCANCODE_P, Action::MOUSE}
 };
 
-Input::Input(entt::registry& reg) : reg(reg) {
+InputSys::InputSys(entt::registry& reg) : System(reg) {
     
     reg.set<InputC>();
     
@@ -31,13 +31,14 @@ Input::Input(entt::registry& reg) : reg(reg) {
 
 
 
-void Input::poll() {
+void InputSys::tick(float dt) {
 
     OPTICK_EVENT();
     
     InputC& input = reg.ctx<InputC>();
     
     input.mouseRight = input.mouseLeft = input.mouseMiddle = false;
+    input.mouseWheel = glm::ivec2(0,0);
     
     Context& ctx = *reg.ctx<Context*>();
     
@@ -93,10 +94,14 @@ void Input::poll() {
             
         } if(e.type == SDL_MOUSEWHEEL) {
             
+            input.mouseWheel.x = e.wheel.x;
+            input.mouseWheel.y = e.wheel.y;
+            /*
             if (e.wheel.x > 0) input.mouseWheel.x += 1;
             else if (e.wheel.x < 0) input.mouseWheel.x -= 1;
             if (e.wheel.y > 0) input.mouseWheel.y += 1;
             else if (e.wheel.y < 0) input.mouseWheel.y -= 1;
+            */
             
         }
         
@@ -110,5 +115,9 @@ void Input::poll() {
         input.mousePos = glm::ivec2(x, y);
 
     }
+    
+}
+
+InputSys::~InputSys() {
     
 }

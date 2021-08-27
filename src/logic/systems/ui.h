@@ -5,6 +5,9 @@
 
 #include "entt/entt.hpp"
 
+#include "imgui.h"
+#include <SDL.h>
+
 class UISys : public System
 {
 public:
@@ -17,12 +20,6 @@ public:
     }
 
     void tick(float dt) override;
-
-    void init() override;
-
-    void preinit() override;
-
-    void finish() override;
 
 };
 

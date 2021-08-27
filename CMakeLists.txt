@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 project(dynamical)
 
 include_directories("./src")
-include_directories("./3rdparty")
+include_directories("./lib")
 
 file(GLOB_RECURSE sources ./src/main.cpp ./src/*.cpp ./src/*.h)
 
@@ -54,6 +54,11 @@ target_include_directories(dynamical PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 
 find_package(nlohmann_json CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE nlohmann_json nlohmann_json::nlohmann_json)
+
+set(FASTNOISE2_NOISETOOL OFF)
+add_subdirectory(lib/FastNoise2)
+target_link_libraries(dynamical PRIVATE FastNoise)
+target_include_directories(dynamical PRIVATE "lib/FastNoise2/include/")
 
 target_compile_definitions(dynamical PRIVATE OPTICK_ENABLE_GPU_D3D12=0)
 target_compile_definitions(dynamical PRIVATE OPTICK_ENABLE_GPU_VULKAN=1)

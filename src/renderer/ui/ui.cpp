@@ -16,6 +16,10 @@ UI::UI(entt::registry& reg) : reg(reg) {
     g_MouseCursors[ImGuiMouseCursor_Hand] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
 
     entt::monostate<"imgui_frame"_hs>{} = false;
+    
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
 
 }
 
@@ -52,11 +56,6 @@ void UI::prepare() {
     
 }
 
-void UI::render() {
-
-    ImGui::Render();
-
-}
 
 UI::~UI() {
     
