@@ -5,8 +5,6 @@
 
 #include "tile.h"
 
-
-
 class Chunk {
 public:
     constexpr static int size = 32;
@@ -20,6 +18,7 @@ public:
         return tiles[pos.x][pos.y];
     }
     
+    std::vector<entt::entity> objects;
     
 };
 

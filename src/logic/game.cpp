@@ -22,6 +22,7 @@
 #include "logic/systems/ui.h"
 
 #include "logic/systems/map_render.h"
+#include "logic/systems/object_render.h"
 #include "logic/systems/ui_render.h"
 
 
@@ -51,6 +52,7 @@ void Game::start() {
     
     
     set->post_add<MapRenderSys>();
+    set->post_add<ObjectRenderSys>();
     set->post_add<UIRenderSys>();
     
     
@@ -71,7 +73,6 @@ void Game::start() {
     renderer->init();
 
     set->init();
-
 
     InputC& input = reg.ctx<InputC>();
 

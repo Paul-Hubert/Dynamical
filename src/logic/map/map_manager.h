@@ -16,16 +16,16 @@ class MapManager {
 public:
     MapManager(entt::registry& reg);
     Chunk* getChunk(glm::ivec2 pos) const;
-    Tile* getTile(glm::ivec2 pos) const;
+    Tile* getTile(glm::vec2 pos) const;
     Chunk* generateChunk(glm::ivec2 pos);
     void generateTile(glm::ivec2 pos, Chunk& chunk, Tile& tile);
     
-    glm::ivec2 getChunkPos(glm::ivec2 pos) const {
-        return floor(glm::vec2(pos) / (float) Chunk::size);
+    glm::ivec2 getChunkPos(glm::vec2 pos) const {
+        return floor(pos / (float) Chunk::size);
     }
 
-    glm::ivec2 getTilePos(glm::ivec2 pos) const {
-        return pos - getChunkPos(pos);
+    glm::ivec2 getTilePos(glm::vec2 pos) const {
+        return floor(pos) - getChunkPos(pos);
     }
     
     glm::ivec2 floor(glm::vec2 pos) const {

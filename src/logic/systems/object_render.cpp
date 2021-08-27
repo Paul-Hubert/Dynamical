@@ -1,4 +1,4 @@
-#include "map_render.h"
+#include "object_render.h"
 
 #include "renderer/context/context.h"
 
@@ -7,34 +7,37 @@
 
 #include "util/util.h"
 #include "util/log.h"
-
-#include "logic/map/tile.h"
-#include "logic/map/chunk.h"
 #include "logic/map/map_manager.h"
 
 #include "logic/components/camerac.h"
+#include "logic/components/renderablec.h"
+#include "logic/components/positionc.h"
 
-constexpr int max_chunks = 1000;
-constexpr int max_stored_chunks = 5000;
+constexpr int max_objects = 5000;
 
-struct Header {
-    glm::vec4 colors[Tile::Type::max];
-    glm::ivec2 corner_indices;
-    int chunk_length;
-    int chunk_indices[max_chunks];
+struct RenderObject {
+    glm::vec4 box;
+    glm::vec4 color;
 };
 
-struct RenderChunk {
-    int tiles[Chunk::size*Chunk::size];
-};
-
-MapRenderSys::MapRenderSys(entt::registry& reg) : System(reg) {
+ObjectRenderSys::ObjectRenderSys(entt::registry& reg) : System(reg) {
     
     Context& ctx = *reg.ctx<Context*>();
     
     per_frame.resize(NUM_FRAMES);
     
-    stored_chunks.resize(max_stored_chunks);
+    {
+        auto poolSizes = std::vector {
+            vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, NUM_FRAMES),
+        };
+        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, NUM_FRAMES, (uint32_t) poolSizes.size(), poolSizes.data()));
+        
+        auto bindings = std::vector {
+            vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
+        };
+        descLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, (uint32_t) bindings.size(), bindings.data()));
+        
+    }
     
     for(int i = 0; i< per_frame.size(); i++) {
         auto& f = per_frame[i];
@@ -42,39 +45,17 @@ MapRenderSys::MapRenderSys(entt::registry& reg) : System(reg) {
         VmaAllocationCreateInfo info {};
         info.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
         info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        f.stagingBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(Header) + max_chunks * sizeof(RenderChunk), vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive));
+        f.uniformBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(RenderObject) * max_objects, vk::BufferUsageFlagBits::eUniformBuffer, vk::SharingMode::eExclusive));
         
         VmaAllocationInfo inf;
-        vmaGetAllocationInfo(ctx.device, f.stagingBuffer.allocation, &inf);
+        vmaGetAllocationInfo(ctx.device, f.uniformBuffer.allocation, &inf);
         
-        f.stagingPointer = inf.pMappedData;
-    }
-    
-    {
+        f.uniformPointer = inf.pMappedData;
         
-        VmaAllocationCreateInfo info {};
-        info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-        storageBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(Header) + max_stored_chunks * sizeof(RenderChunk), vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive));
+        f.descSet = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &descLayout))[0];
         
-    }
-    
-    {
-        auto poolSizes = std::vector {
-            vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 1),
-        };
-        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, 1, (uint32_t) poolSizes.size(), poolSizes.data()));
-    }
-    
-    {
-        auto bindings = std::vector {
-            vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eFragment)
-        };
-        descLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, (uint32_t) bindings.size(), bindings.data()));
-        
-        descSet = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &descLayout))[0];
-        
-        auto info = vk::DescriptorBufferInfo(storageBuffer, 0, storageBuffer.size);
-        auto write = vk::WriteDescriptorSet(descSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &info, nullptr);
+        auto bufferInfo = vk::DescriptorBufferInfo(f.uniformBuffer, 0, f.uniformBuffer.size);
+        auto write = vk::WriteDescriptorSet(f.descSet, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &bufferInfo, nullptr);
         ctx.device->updateDescriptorSets(1, &write, 0, nullptr);
         
     }
@@ -83,7 +64,7 @@ MapRenderSys::MapRenderSys(entt::registry& reg) : System(reg) {
     
 }
 
-void MapRenderSys::tick(float dt) {
+void ObjectRenderSys::tick(float dt) {
     
     Context& ctx = *reg.ctx<Context*>();
     
@@ -91,23 +72,8 @@ void MapRenderSys::tick(float dt) {
     
     auto transfer = ctx.transfer.getCommandBuffer();
     
-    std::vector<vk::BufferCopy> regions;
-    
-    auto header = reinterpret_cast<Header*> (f.stagingPointer);
-    
-    memset(header, 0, sizeof(Header));
-    
-    header->colors[Tile::nothing] = glm::vec4(0,0,0,0);
-    header->colors[Tile::dirt] = glm::vec4(0.6078,0.4627,0.3255,1);
-    header->colors[Tile::grass] = glm::vec4(0.3373,0.4902,0.2745,1);
-    header->colors[Tile::stone] = glm::vec4(0.6118,0.6353,0.7216,1);
-    header->colors[Tile::sand] = glm::vec4(0.761,0.698,0.502,1);
-    header->colors[Tile::water] = glm::vec4(0.451,0.7137,0.9961,1);
-    
-    regions.push_back(vk::BufferCopy(0, 0, sizeof(Header)));
-    
-    int staging_counter = 0;
-    
+    auto buffer = reinterpret_cast<RenderObject*> (f.uniformPointer);
+    int objectCounter = 0;
     
     auto& map = reg.ctx<MapManager>();
     auto& camera = reg.ctx<CameraC>();
@@ -115,110 +81,70 @@ void MapRenderSys::tick(float dt) {
     auto corner_pos = map.getChunkPos(camera.corner)-1;
     auto end_pos = map.getChunkPos(camera.corner + camera.size)+1;
     
-    header->corner_indices = corner_pos;
-    header->chunk_length = end_pos.y - corner_pos.y + 1;
-    int chunk_indices_counter = 0;
-    
     for(int x = corner_pos.x; x <= end_pos.x; x++) {
         for(int y = corner_pos.y; y <= end_pos.y; y++) {
             
             auto pos = glm::ivec2(x, y);
             
-            bool stored = false;
-            for(int i = 0; i<stored_chunks.size(); i++) {
-                if(stored_chunks[i].stored && stored_chunks[i].position == pos) {
-                    stored = true;
-                    header->chunk_indices[chunk_indices_counter] = i;
-                    chunk_indices_counter++;
-                    stored_chunks[i].used = true;
-                    break;
-                }
-            }
+            Chunk* chunk = map.getChunk(pos);
+            if(chunk == nullptr) continue;
             
-            
-            
-            if(!stored) {
-                
-                int index;
-                
-                if(stored_chunks.size() >= max_stored_chunks) {
-                    auto& sc = stored_chunks[storage_counter];
-                    while(
-                        sc.stored
-                        && (sc.used
-                        || (sc.position.x >= corner_pos.x && sc.position.x <= end_pos.x
-                        && sc.position.y >= corner_pos.y && sc.position.y <= end_pos.y))
-                    ) {
-                        storage_counter = (storage_counter+1)%max_stored_chunks;
-                        sc = stored_chunks[storage_counter];
-                    }
-                    index = storage_counter;
-                    storage_counter = (storage_counter+1)%max_stored_chunks;
-                } else {
-                    index = stored_chunks.size();
-                    stored_chunks.push_back(StoredChunk{pos});
-                    storage_counter = (storage_counter+1)%max_stored_chunks;
-                }
-                
-                Chunk* chunk = map.getChunk(pos);
-                if(chunk == nullptr) chunk = map.generateChunk(pos);
-                
-                RenderChunk* rchunk = reinterpret_cast<RenderChunk*>(header+1);
-                
-                for(int i = 0; i<Chunk::size; i++) {
-                    for(int j = 0; j<Chunk::size; j++) {
-                        rchunk[staging_counter].tiles[i * Chunk::size + j] = chunk->tiles[i][j].terrain;
+            for(auto entity : chunk->objects) {
+                if(reg.has<RenderableC>(entity)) {
+                    auto& position = reg.get<PositionC>(entity);
+                    auto& renderable = reg.get<RenderableC>(entity);
+                    buffer[objectCounter].box.x = position.position.x;
+                    buffer[objectCounter].box.y = position.position.y;
+                    buffer[objectCounter].box.z = renderable.size.x;
+                    buffer[objectCounter].box.w = renderable.size.y;
+                    buffer[objectCounter].color = renderable.color;
+                    
+                    objectCounter++;
+                    if(objectCounter >= max_objects) {
+                        dy::log(dy::Level::warning) << "too many objects\n";
+                        x = end_pos.x + 1;
+                        y = end_pos.y + 1;
+                        break;
                     }
                 }
-                
-                regions.push_back(vk::BufferCopy(sizeof(Header) + staging_counter * sizeof(RenderChunk), sizeof(Header) + index * sizeof(RenderChunk), sizeof(RenderChunk)));
-                
-                header->chunk_indices[chunk_indices_counter] = index;
-                chunk_indices_counter++;
-                
-                
-                stored_chunks[index].position = pos;
-                stored_chunks[index].used = true;
-                stored_chunks[index].stored = true;
-                
-                staging_counter++;
-                
-            }
-            
-            if(chunk_indices_counter >= max_chunks) {
-                dy::log(dy::Level::warning) << "too many chunks\n";
-                x = end_pos.x + 1;
-                y = end_pos.y + 1;
-                break;
             }
             
         }
     }
     
-    for(int i = 0; i<stored_chunks.size(); i++) {
-        stored_chunks[i].used = false;
+    
+    /*
+    auto view = reg.view<RenderableC, PositionC>();
+    for(auto entity : view) {
+        auto& position = view.get<PositionC>(entity);
+        auto& renderable = view.get<RenderableC>(entity);
+        buffer[objectCounter].box.x = position.position.x;
+        buffer[objectCounter].box.y = position.position.y;
+        buffer[objectCounter].box.z = renderable.size.x;
+        buffer[objectCounter].box.w = renderable.size.y;
+        buffer[objectCounter].color = renderable.color;
+        
+        objectCounter++;
     }
-    
-    transfer.copyBuffer(f.stagingBuffer, storageBuffer, regions);
-    
+    */
     
     ctx.classic_render.command.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
     
-    ctx.classic_render.command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, { ctx.classic_render.per_frame[ctx.frame_index].set, descSet}, nullptr);
+    ctx.classic_render.command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, { ctx.classic_render.per_frame[ctx.frame_index].set, f.descSet}, nullptr);
     
-    ctx.classic_render.command.draw(3, 1, 0, 0);
+    ctx.classic_render.command.draw(6, objectCounter, 0, 0);
     
     
 }
 
-void MapRenderSys::initPipeline(vk::RenderPass renderpass) {
+void ObjectRenderSys::initPipeline(vk::RenderPass renderpass) {
     
     Context& ctx = *reg.ctx<Context*>();
     
     // PIPELINE INFO
     
-    auto vertShaderCode = Util::readFile("./resources/shaders/maprender.vert.glsl.spv");
-    auto fragShaderCode = Util::readFile("./resources/shaders/maprender.frag.glsl.spv");
+    auto vertShaderCode = Util::readFile("./resources/shaders/objectrender.vert.glsl.spv");
+    auto fragShaderCode = Util::readFile("./resources/shaders/objectrender.frag.glsl.spv");
     
     VkShaderModuleCreateInfo moduleInfo = {};
     moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -237,21 +163,11 @@ void MapRenderSys::initPipeline(vk::RenderPass renderpass) {
     vertShaderStageInfo.module = vertShaderModule;
     vertShaderStageInfo.pName = "main";
     
-    auto specEntries = std::vector {
-        vk::SpecializationMapEntry(0, 0, sizeof(int)),
-        vk::SpecializationMapEntry(1, sizeof(int), sizeof(int)),
-        vk::SpecializationMapEntry(2, 2 * sizeof(int), sizeof(int))
-    };
-    
-    auto specValues = std::vector<int> {Chunk::size, Tile::Type::max, max_chunks};
-    auto specInfo = vk::SpecializationInfo(specEntries.size(), specEntries.data(), specValues.size() * sizeof(int), specValues.data());
-
     VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
     fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
     fragShaderStageInfo.module = fragShaderModule;
     fragShaderStageInfo.pName = "main";
-    fragShaderStageInfo.pSpecializationInfo = reinterpret_cast<VkSpecializationInfo*> (&specInfo);
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
     
@@ -378,7 +294,7 @@ void MapRenderSys::initPipeline(vk::RenderPass renderpass) {
     
 }
 
-MapRenderSys::~MapRenderSys() {
+ObjectRenderSys::~ObjectRenderSys() {
     
     Context& ctx = *reg.ctx<Context*>();
     
@@ -391,5 +307,6 @@ MapRenderSys::~MapRenderSys() {
     ctx.device->destroy(pipelineLayout);
     
 }
+
 
 
