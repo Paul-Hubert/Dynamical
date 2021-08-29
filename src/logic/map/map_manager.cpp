@@ -2,14 +2,15 @@
 
 #include "util/log.h"
 
-#include "FastNoise/FastNoise.h"
-
 #include <cstdlib>
 
-#include "logic/components/renderablec.h"
-#include "logic/components/positionc.h"
+#include <queue>
 
-MapManager::MapManager(entt::registry& reg) : reg(reg) {
+#include "logic/components/positionc.h"
+#include "logic/components/inputc.h"
+#include "logic/components/camerac.h"
+
+MapManager::MapManager(entt::registry& reg) : reg(reg), map(), generator(reg) {
     
 }
 
@@ -27,54 +28,11 @@ Chunk* MapManager::generateChunk(glm::ivec2 pos) {
         return getChunk(pos);
     }
     map[pos] = std::make_unique<Chunk>();
-    
-    auto fnSimplex = FastNoise::New<FastNoise::Simplex>();
-    auto fnFractal = FastNoise::New<FastNoise::FractalFBm>();
-
-    fnFractal->SetSource( fnSimplex );
-    fnFractal->SetOctaveCount( 10 );
-    
-    std::vector<float> noiseOutput(Chunk::size * Chunk::size);
-
-    fnFractal->GenUniformGrid2D(noiseOutput.data(), pos.x * Chunk::size, pos.y * Chunk::size, Chunk::size, Chunk::size, 0.02f, 1337);
-    
     Chunk* chunk = map[pos].get();
-    for(int i = 0; i<Chunk::size; i++) {
-        for(int j = 0; j<Chunk::size; j++) {
-            glm::vec2 position = pos*Chunk::size + glm::ivec2(i,j);
-            
-            Tile& tile = chunk->get(glm::ivec2(i,j));
-            
-            float noise = noiseOutput[j * Chunk::size + i];
-            
-            float level = noise * 20 + 5;
-            
-            if(level < 0) tile.terrain = Tile::water;
-            else if(level > 0 && level < 3) tile.terrain = Tile::sand;
-            else if(level > 3 && level < 15) tile.terrain = Tile::grass;
-            else if(level > 15) tile.terrain = Tile::stone;
-            
-            if(tile.terrain == Tile::grass) {
-                if((float) std::rand() / (RAND_MAX + 1u)< 0.03) {
-                    auto entity = reg.create();
-                    auto& pos = reg.emplace<PositionC>(entity);
-                    pos.position = position + glm::vec2((float) std::rand() / (RAND_MAX + 1u), (float) std::rand() / (RAND_MAX + 1u)) - 0.5f;
-                    auto& renderable = reg.emplace<RenderableC>(entity);
-                    renderable.size = glm::vec2(1,1);
-                    renderable.color = glm::vec4(0.03,0.47,0.19,1.0);
-                    chunk->objects.push_back(entity);
-                }
-            }
-            
-        }
-    }
+    
+    generator.generateChunk(*chunk, pos);
+    
     return chunk;
-}
-
-void MapManager::generateTile(glm::ivec2 pos, Chunk& chunk, Tile& tile) {
-    
-
-    
 }
 
 Tile* MapManager::getTile(glm::vec2 pos) const {
@@ -83,6 +41,127 @@ Tile* MapManager::getTile(glm::vec2 pos) const {
     if(chunk == nullptr) return nullptr;
     return &chunk->get(getTilePos(pos));
 }
+
+void MapManager::insert(entt::entity entity, glm::vec2 position) {
+    Chunk* chunk = getChunk(getChunkPos(position));
+    if(chunk == nullptr) {
+        dy::log(dy::Level::critical) << "Chunk not generated\n";
+        return;
+    }
+    reg.emplace<PositionC>(entity, position);
+    chunk->addObject(entity);
+}
+
+void MapManager::move(entt::entity entity, glm::vec2 position) {
+    auto& pos = reg.get<PositionC>(entity);
+    if(getChunkPos(position) != getChunkPos(pos)) {
+        Chunk* old_chunk = getChunk(getChunkPos(pos));
+        if(old_chunk == nullptr) {
+            dy::log(dy::Level::critical) << "Chunk not generated\n";
+            return;
+        }
+        old_chunk->removeObject(entity);
+        Chunk* new_chunk = getChunk(getChunkPos(position));
+        if(new_chunk == nullptr) {
+            dy::log(dy::Level::critical) << "Chunk not generated\n";
+            return;
+        }
+        new_chunk->addObject(entity);
+    }
+    pos = position;
+    
+}
+
+void MapManager::remove(entt::entity entity) {
+    auto& pos = reg.get<PositionC>(entity);
+    Chunk* old_chunk = getChunk(getChunkPos(pos));
+    if(old_chunk == nullptr) {
+        dy::log(dy::Level::critical) << "Chunk not generated\n";
+        return;
+    }
+    old_chunk->removeObject(entity);
+}
+
+glm::vec2 MapManager::getMousePosition() const {
+    
+    auto& input = reg.ctx<InputC>();
+    auto& cam = reg.ctx<CameraC>();
+    
+    return cam.corner + cam.size * glm::vec2(input.mousePos) / glm::vec2(input.screenSize);
+    
+}
+
+struct Distance {
+    Distance(glm::vec2 pos, float distance) : pos(pos), distance(distance) {}
+    Distance() {
+        distance = std::numeric_limits<float>::max();
+    }
+    glm::vec2 pos;
+    float distance;
+    
+};
+
+inline bool operator> (const Distance a, const Distance b) {
+    return a.distance > b.distance;
+}
+
+std::vector<glm::vec2> MapManager::pathfind(glm::vec2 start, std::function<bool(glm::vec2)> predicate) const {
+    
+    start = floor(start);
+    
+    std::priority_queue<Distance, std::vector<Distance>, std::greater<Distance>> queue;
+    
+    std::unordered_map<glm::vec2, Distance> predecessor;
+    
+    queue.emplace(start, 0);
+    predecessor[start] = Distance(start, 0);
+    
+    int iteration = 0;
+    
+    while(!queue.empty()) {
+        
+        Distance min = queue.top();
+        queue.pop();
+        
+        if(predicate(min.pos)) {
+            std::vector<glm::vec2> path;
+            glm::vec2 p = min.pos;
+            while(p != start) {
+                path.push_back(p);
+                p = predecessor[p].pos;
+            }
+            return path;
+        }
+        
+        for(int i = -1; i<=1; i++) {
+            for(int j = -1; j<=1; j++) {
+                if(!(i == 0 && j == 0)) {
+                    glm::vec2 adj = min.pos + glm::vec2(i, j);
+
+                    Chunk* chunk = getChunk(getChunkPos(adj));
+                    Tile* tile = getTile(adj);
+                    if(tile == nullptr || Tile::terrain_speed.at(tile->terrain) == 0.0) {
+                        continue;
+                    }
+                    
+                    float weight = glm::distance(min.pos, adj) / Tile::terrain_speed.at(tile->terrain);
+                    
+                    
+                    if(predecessor.count(adj) == 0 || predecessor[adj].distance > min.distance + weight) {
+                        predecessor[adj] = Distance(min.pos, min.distance + weight);
+                        queue.emplace(adj, min.distance + weight);
+                    }
+                    
+                }
+            }
+        }
+        
+    }
+    
+    std::vector<glm::vec2> path;
+    return path;
+}
+
 
 
 MapManager::~MapManager() {

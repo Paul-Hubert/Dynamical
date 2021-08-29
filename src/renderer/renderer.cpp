@@ -10,7 +10,6 @@
 
 Renderer::Renderer(entt::registry& reg) : reg(reg),
 ctx(reg),
-ui(reg),
 per_frame(NUM_FRAMES) {
     
     auto& settings = reg.ctx<Settings>();
@@ -36,8 +35,6 @@ void Renderer::prepare() {
     ctx.frame_index = (ctx.frame_index + 1) % NUM_FRAMES;
     
     auto& f = per_frame[ctx.frame_index];
-
-    ui.prepare();
 
     ctx.classic_render.prepare();
 

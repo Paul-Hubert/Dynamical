@@ -5,8 +5,6 @@
 
 class Tile {
 public:
-    constexpr static float size = 0.5f;
-    entt::entity entity = entt::null;
     
     enum Type : int {
         nothing,
@@ -19,9 +17,18 @@ public:
         max
     };
     
-    Type terrain = dirt;
-    Type over = nothing;
+    const inline static std::unordered_map<Type, float> terrain_speed = {
+        {nothing, 0.0},
+        {dirt, 1.0},
+        {grass, 1.0},
+        {stone, 0.0},
+        {sand, 0.6},
+        {water, 0.0},
+        {shallow_water, 0.4}
+    };
     
+    Type terrain = dirt;
+    float level = 0;
     
 };
 

@@ -4,7 +4,6 @@
 #include "entt/entt.hpp"
 
 #include "context/context.h"
-#include "ui/ui.h"
 #include "classic_render/classic_render.h"
 
 class Renderer {
@@ -20,7 +19,6 @@ public:
 private:
     entt::registry& reg;
     Context ctx;
-    UI ui;
     
     struct per_frame {
         vk::Semaphore transfer_semaphore;

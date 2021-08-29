@@ -20,6 +20,10 @@ public:
     }
 
     void tick(float dt) override;
+    
+private:
+    SDL_Cursor* g_MouseCursors[ImGuiMouseCursor_COUNT] = {0};
+    Uint64 g_Time = 0;
 
 };
 

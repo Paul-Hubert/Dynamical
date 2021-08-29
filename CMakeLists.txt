@@ -24,9 +24,6 @@ target_link_libraries(dynamical PRIVATE SDL2::SDL2 SDL2::SDL2main)
 find_package(imgui CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE imgui::imgui)
 
-find_package(EnTT CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE EnTT::EnTT)
-
 find_package(cereal CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE cereal)
 

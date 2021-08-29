@@ -17,6 +17,10 @@ public: \
 };
 
 DEFINE_SYSTEM(CameraSys)
+DEFINE_SYSTEM(TimeSys)
+DEFINE_SYSTEM(DevMenuSys)
+DEFINE_SYSTEM(ChunkGenerationSys)
+DEFINE_SYSTEM(PatherSys)
 
 #undef DEFINE_SYSTEM
 #endif

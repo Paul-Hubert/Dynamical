@@ -14,8 +14,8 @@
 
 #include "logic/components/camerac.h"
 
-constexpr int max_chunks = 1000;
-constexpr int max_stored_chunks = 5000;
+constexpr int max_chunks = 5000;
+constexpr int max_stored_chunks = 20000;
 
 struct Header {
     glm::vec4 colors[Tile::Type::max];
@@ -167,7 +167,7 @@ void MapRenderSys::tick(float dt) {
                 
                 for(int i = 0; i<Chunk::size; i++) {
                     for(int j = 0; j<Chunk::size; j++) {
-                        rchunk[staging_counter].tiles[i * Chunk::size + j] = chunk->tiles[i][j].terrain;
+                        rchunk[staging_counter].tiles[i * Chunk::size + j] = chunk->get(glm::vec2(i,j)).terrain;
                     }
                 }
                 

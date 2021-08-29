@@ -6,7 +6,7 @@ layout(location = 0) out vec4 outColor;
 
 layout (constant_id = 0) const int CHUNK_SIZE = 32;
 layout (constant_id = 1) const int NUM_TYPES = 7;
-layout (constant_id = 2) const int MAX_CHUNKS = 1000;
+layout (constant_id = 2) const int MAX_CHUNKS = 5000;
 
 layout(set = 0, binding = 0) uniform Camera {
     vec2 position;

@@ -3,9 +3,12 @@
 
 #include <glm/glm.hpp>
 
-class PositionC {
+class PositionC : public glm::vec2 {
 public:
-    glm::vec2 position;
+    PositionC(glm::vec2 pos) {
+        x = pos.x;
+        y = pos.y;
+    }
 };
 
 #endif

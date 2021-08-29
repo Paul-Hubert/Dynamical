@@ -3,13 +3,14 @@
 
 #include <entt/entt.hpp>
 
+#include <unordered_set>
+
 #include "tile.h"
 
 class Chunk {
 public:
     constexpr static int size = 32;
     
-    Tile tiles[size][size];
     const Tile& get(glm::ivec2 pos) const {
         return tiles[pos.x][pos.y];
     }
@@ -18,7 +19,21 @@ public:
         return tiles[pos.x][pos.y];
     }
     
-    std::vector<entt::entity> objects;
+    void addObject(entt::entity entity) {
+        objects.insert(entity);
+    }
+    
+    void removeObject(entt::entity entity) {
+        objects.erase(entity);
+    }
+    
+    const std::unordered_set<entt::entity>& getObjects() {
+        return objects;
+    }
+    
+private:
+    Tile tiles[size][size];
+    std::unordered_set<entt::entity> objects;
     
 };
 

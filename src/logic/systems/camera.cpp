@@ -29,9 +29,9 @@ void CameraSys::tick(float dt) {
     
     auto& camera = reg.ctx<CameraC>();
     
-    camera.size.x *= 1 - 0.05 * input.mouseWheel.y;
+    camera.size.x *= 1 - 0.1 * input.mouseWheel.y;
     
-    int speed = 5 * camera.size.x / 100;
+    float speed = 20.0 * camera.size.x / 100.0;
     
     if(input.on[Action::FORWARD]) {
         camera.center.y -= speed * dt;

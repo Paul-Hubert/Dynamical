@@ -21,9 +21,13 @@
 
 #include "logic/systems/ui.h"
 
+#include "logic/systems/selection.h"
+
 #include "logic/systems/map_render.h"
 #include "logic/systems/object_render.h"
 #include "logic/systems/ui_render.h"
+
+#include "logic/ai/ai.h"
 
 
 #include "logic/map/map_manager.h"
@@ -46,9 +50,14 @@ void Game::start() {
     set = std::make_unique<SystemSet>(reg);
 
     set->pre_add<InputSys>();
-    set->pre_add<CameraSys>();
-    
     set->pre_add<UISys>();
+    set->pre_add<CameraSys>();
+    set->pre_add<TimeSys>();
+    set->pre_add<DevMenuSys>();
+    set->pre_add<SelectionSys>();
+    set->pre_add<PatherSys>();
+    
+    set->pre_add<AISys>();
     
     
     set->post_add<MapRenderSys>();

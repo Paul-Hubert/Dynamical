@@ -28,12 +28,12 @@ ObjectRenderSys::ObjectRenderSys(entt::registry& reg) : System(reg) {
     
     {
         auto poolSizes = std::vector {
-            vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, NUM_FRAMES),
+            vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, NUM_FRAMES),
         };
         descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, NUM_FRAMES, (uint32_t) poolSizes.size(), poolSizes.data()));
         
         auto bindings = std::vector {
-            vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
+            vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
         };
         descLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, (uint32_t) bindings.size(), bindings.data()));
         
@@ -45,7 +45,7 @@ ObjectRenderSys::ObjectRenderSys(entt::registry& reg) : System(reg) {
         VmaAllocationCreateInfo info {};
         info.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
         info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        f.uniformBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(RenderObject) * max_objects, vk::BufferUsageFlagBits::eUniformBuffer, vk::SharingMode::eExclusive));
+        f.uniformBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(RenderObject) * max_objects, vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive));
         
         VmaAllocationInfo inf;
         vmaGetAllocationInfo(ctx.device, f.uniformBuffer.allocation, &inf);
@@ -55,7 +55,7 @@ ObjectRenderSys::ObjectRenderSys(entt::registry& reg) : System(reg) {
         f.descSet = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &descLayout))[0];
         
         auto bufferInfo = vk::DescriptorBufferInfo(f.uniformBuffer, 0, f.uniformBuffer.size);
-        auto write = vk::WriteDescriptorSet(f.descSet, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &bufferInfo, nullptr);
+        auto write = vk::WriteDescriptorSet(f.descSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &bufferInfo, nullptr);
         ctx.device->updateDescriptorSets(1, &write, 0, nullptr);
         
     }
@@ -89,22 +89,22 @@ void ObjectRenderSys::tick(float dt) {
             Chunk* chunk = map.getChunk(pos);
             if(chunk == nullptr) continue;
             
-            for(auto entity : chunk->objects) {
-                if(reg.has<RenderableC>(entity)) {
+            for(auto entity : chunk->getObjects()) {
+                if(reg.all_of<RenderableC>(entity)) {
                     auto& position = reg.get<PositionC>(entity);
                     auto& renderable = reg.get<RenderableC>(entity);
-                    buffer[objectCounter].box.x = position.position.x;
-                    buffer[objectCounter].box.y = position.position.y;
+                    buffer[objectCounter].box.x = position.x;
+                    buffer[objectCounter].box.y = position.y;
                     buffer[objectCounter].box.z = renderable.size.x;
                     buffer[objectCounter].box.w = renderable.size.y;
                     buffer[objectCounter].color = renderable.color;
                     
                     objectCounter++;
                     if(objectCounter >= max_objects) {
-                        dy::log(dy::Level::warning) << "too many objects\n";
+                        //dy::log(dy::Level::warning) << "too many objects\n";
                         x = end_pos.x + 1;
                         y = end_pos.y + 1;
-                        break;
+                        return;
                     }
                 }
             }

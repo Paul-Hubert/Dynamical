@@ -14,13 +14,9 @@ std::unordered_map<SDL_Scancode, Action> actionMap = {
     {SDL_SCANCODE_S, Action::BACKWARD},
     {SDL_SCANCODE_A, Action::LEFT},
     {SDL_SCANCODE_D, Action::RIGHT},
-    {SDL_SCANCODE_LCTRL, Action::SPRINT},
-    {SDL_SCANCODE_SPACE, Action::UP},
-    {SDL_SCANCODE_LSHIFT, Action::DOWN},
+    {SDL_SCANCODE_SPACE, Action::PAUSE},
     {SDL_SCANCODE_M, Action::MENU},
-    {SDL_SCANCODE_K, Action::DEBUG},
-    {SDL_SCANCODE_L, Action::LAG},
-    {SDL_SCANCODE_P, Action::MOUSE}
+    {SDL_SCANCODE_K, Action::DEBUG}
 };
 
 InputSys::InputSys(entt::registry& reg) : System(reg) {
@@ -37,7 +33,7 @@ void InputSys::tick(float dt) {
     
     InputC& input = reg.ctx<InputC>();
     
-    input.mouseRight = input.mouseLeft = input.mouseMiddle = false;
+    input.leftClick = input.rightClick = input.middleClick = false;
     input.mouseWheel = glm::ivec2(0,0);
     
     Context& ctx = *reg.ctx<Context*>();
@@ -79,16 +75,16 @@ void InputSys::tick(float dt) {
             
             switch(e.button.button) {
                 case SDL_BUTTON_LEFT:
-                    input.on.set(Action::PRIMARY, e.type == SDL_MOUSEBUTTONDOWN);
-                    if(e.type == SDL_MOUSEBUTTONDOWN) input.mouseLeft = true;
+                    input.mouseLeft = input.leftDown = e.type == SDL_MOUSEBUTTONDOWN;
+                    if(e.type == SDL_MOUSEBUTTONDOWN) input.leftClick = true;
                     break;
                 case SDL_BUTTON_RIGHT:
-                    input.on.set(Action::SECONDARY, e.type == SDL_MOUSEBUTTONDOWN);
-                    if(e.type == SDL_MOUSEBUTTONDOWN) input.mouseRight = true;
+                    input.mouseRight = input.rightDown = e.type == SDL_MOUSEBUTTONDOWN;
+                    if(e.type == SDL_MOUSEBUTTONDOWN) input.rightClick = true;
                     break;
                 case SDL_BUTTON_MIDDLE:
-                    input.on.set(Action::TERTIARY, e.type == SDL_MOUSEBUTTONDOWN);
-                    if(e.type == SDL_MOUSEBUTTONDOWN) input.mouseMiddle = true;
+                    input.mouseMiddle = input.middleDown = e.type == SDL_MOUSEBUTTONDOWN;
+                    if(e.type == SDL_MOUSEBUTTONDOWN) input.middleClick = true;
                     break;
             }
             
@@ -106,6 +102,10 @@ void InputSys::tick(float dt) {
         }
         
     }
+    
+    int w, h;
+    SDL_GetWindowSize(ctx.win, &w, &h);
+    input.screenSize = glm::ivec2(w, h);
     
     if (input.focused) {
 

@@ -19,7 +19,7 @@ struct Object {
 
 const int MAX_OBJECTS = 5000;
 
-layout(std140, set = 1, binding = 0) uniform Objects {
+layout(std430, set = 1, binding = 0) readonly buffer Objects {
     Object objects[MAX_OBJECTS];
 };
 
@@ -34,7 +34,7 @@ const vec2 vertices[6] = vec2[] (
 
 void main() {
     v_uv = vertices[gl_VertexIndex];
-    vec2 pos = objects[gl_InstanceIndex].box.xy + v_uv * objects[gl_InstanceIndex].box.zw - position;
+    vec2 pos = objects[gl_InstanceIndex].box.xy + (v_uv - 0.5) * objects[gl_InstanceIndex].box.zw - position;
     gl_Position = vec4(pos / size * 2.f - 1.f, 0.5f, 1.0f);
     v_color = objects[gl_InstanceIndex].color;
 }
