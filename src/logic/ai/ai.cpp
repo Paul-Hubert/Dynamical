@@ -15,7 +15,7 @@ void AISys::tick(float dt) {
     
     auto view = reg.view<AIC, const PositionC>();
     
-    view.each([&](const auto entity, const auto& ai, const auto position) {
+    view.each([&](const auto entity, auto& ai, const auto position) {
         
         if(!reg.all_of<PathC>(entity)) {
             

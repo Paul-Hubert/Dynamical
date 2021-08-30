@@ -41,9 +41,13 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
             else if(level > 15) tile.terrain = Tile::stone;
             
             if(tile.terrain == Tile::grass) {
+                auto plant_pos = position + glm::vec2((float) std::rand() / (RAND_MAX + 1u), (float) std::rand() / (RAND_MAX + 1u));
                 if((float) std::rand() / (RAND_MAX + 1u)< 0.03) {
-                    auto tree_pos = position + glm::vec2((float) std::rand() / (RAND_MAX + 1u), (float) std::rand() / (RAND_MAX + 1u));
-                    auto entity = dy::buildTree(reg, tree_pos);
+                    auto entity = dy::buildTree(reg, plant_pos);
+                    tile.object = entity;
+                } else if((float) std::rand() / (RAND_MAX + 1u)< 0.001) {
+                    auto entity = dy::buildBerryBush(reg, plant_pos);
+                    tile.object = entity;
                 }
             }
             

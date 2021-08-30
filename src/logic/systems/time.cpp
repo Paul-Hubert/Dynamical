@@ -24,11 +24,14 @@ void TimeSys::tick(float dt) {
         input.on[Action::PAUSE] = false;
     }
     
+    static ImVec2 size = ImVec2(500, 100);
+    ImGui::SetNextWindowPos(ImVec2(input.screenSize.x - size.x, 0));
     static bool open = true;
-    if(ImGui::Begin("Time", &open, ImGuiWindowFlags_NoResize)) {// ImGuiWindowFlags_NoTitleBar
+    if(ImGui::Begin("Time", &open, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {// ImGuiWindowFlags_NoTitleBar
+        size = ImGui::GetWindowSize();
         
         Date date(time.current);
-        ImGui::Text("Time : %lu of %s, %lu  %lu:%lu:%lu", date.days, Date::names_of_months[date.months], date.years, date.hours, date.minutes, date.seconds);
+        ImGui::Text("Time : %lu of %s, %lu  %lu:%lu:%lu", date.days+1, Date::names_of_months[date.months], date.years, date.hours, date.minutes, date.seconds);
         
         int mode = time.speed_modifier;
         ImGui::Text("Speed : "); ImGui::SameLine();
@@ -39,6 +42,9 @@ void TimeSys::tick(float dt) {
         time.speed_modifier = mode;
         
         if(time.speed_modifier > 0) time.last_speed_modifier = time.speed_modifier;
+        
+        
+        
         
     }
     ImGui::End();

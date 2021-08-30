@@ -33,17 +33,17 @@ void PatherSys::tick(float dt) {
                 reg.remove<PathC>(entity);
                 break;
             }
-            glm::vec2 next_pos = path.tiles.back();
+            glm::vec2 next_pos = path.tiles.back() + 0.5f;
             glm::vec2 diff = next_pos - pos;
             float dist = glm::length(diff);
-            float speed = 1.0 / Tile::terrain_speed.at(map.getTile(next_pos)->terrain);
+            float speed = Tile::terrain_speed.at(map.getTile(next_pos)->terrain);
             float weighted_dist = dist / speed;
             if(base_distance > weighted_dist) {
                 base_distance -= weighted_dist;
                 pos = next_pos;
                 path.tiles.pop_back();
             } else {
-                pos += diff / dist * base_distance / speed;
+                pos += diff / dist * base_distance * speed;
                 break;
             }
         }

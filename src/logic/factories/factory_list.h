@@ -12,7 +12,11 @@ namespace dy {
 
 DEFINE_FACTORY(Object, glm::vec2 position, glm::vec2 size, glm::vec4 color)
 
+DEFINE_FACTORY(Plant, glm::vec2 position, glm::vec2 size, glm::vec4 color, int type)
+
 DEFINE_FACTORY(Tree, glm::vec2 position)
+
+DEFINE_FACTORY(BerryBush, glm::vec2 position)
 
 DEFINE_FACTORY(Animal, glm::vec2 position, glm::vec4 color)
 

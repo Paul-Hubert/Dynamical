@@ -29,6 +29,7 @@ public:
     
     Type terrain = dirt;
     float level = 0;
+    entt::entity object;
     
 };
 

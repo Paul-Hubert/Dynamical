@@ -19,11 +19,13 @@ void DevMenuSys::tick(float dt) {
     
     auto& input = reg.ctx<InputC>();
     
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
     static bool open = true;
     if(ImGui::Begin("Object Creator", &open)) {
         static int option = 0;
         ImGui::RadioButton("Nothing", &option, 0);
         ImGui::RadioButton("Tree", &option, 1);
+        ImGui::RadioButton("Berry Bush", &option, 3);
         ImGui::RadioButton("Human", &option, 2);
         if(option > 0) {
             if(input.leftClick) {
@@ -34,6 +36,8 @@ void DevMenuSys::tick(float dt) {
                     dy::buildTree(reg, pos);
                 } else if(option == 2) {
                     dy::buildHuman(reg, pos, glm::vec4(0.7059, 0.4549, 0.2314, 1.0));
+                } else if(option == 3) {
+                    dy::buildBerryBush(reg, pos);
                 }
                 
             }
