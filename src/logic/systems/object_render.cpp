@@ -97,7 +97,7 @@ void ObjectRenderSys::tick(float dt) {
                     buffer[objectCounter].box.y = position.y;
                     buffer[objectCounter].box.z = renderable.size.x;
                     buffer[objectCounter].box.w = renderable.size.y;
-                    buffer[objectCounter].color = renderable.color;
+                    buffer[objectCounter].color = renderable.color.rgba;
                     
                     objectCounter++;
                     if(objectCounter >= max_objects) {

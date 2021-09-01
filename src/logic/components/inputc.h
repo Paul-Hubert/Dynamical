@@ -5,21 +5,22 @@
 #include "glm/glm.hpp"
 #include <SDL.h>
 
-enum Action : char {
-    FORWARD,
-    BACKWARD,
-    LEFT,
-    RIGHT,
-    PAUSE,
-    RESIZE,
-    MENU,
-    DEBUG,
-    EXIT,
-    END_ENUM
-};
-
 class InputC {
 public:
+    
+    enum Action : char {
+        FORWARD,
+        BACKWARD,
+        LEFT,
+        RIGHT,
+        PAUSE,
+        RESIZE,
+        MENU,
+        DEBUG,
+        EXIT,
+        END_ENUM
+    };
+    
     std::bitset<Action::END_ENUM> on;
     glm::ivec2 mousePos;
     glm::ivec2 mouseWheel;

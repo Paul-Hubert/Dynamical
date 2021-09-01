@@ -1,8 +1,15 @@
 #include "ai.h"
 
+#include "util/log.h"
+
 #include "aic.h"
-#include "logic/components/positionc.h"
+#include "actions/wander_action.h"
+#include "actions/eat_action.h"
+
 #include <logic/map/map_manager.h>
+
+#include <logic/components/basic_needs.h>
+#include "logic/components/positionc.h"
 #include <logic/components/pathc.h>
 
 AISys::AISys(entt::registry& reg) : System(reg) {
@@ -11,30 +18,34 @@ AISys::AISys(entt::registry& reg) : System(reg) {
 
 void AISys::tick(float dt) {
     
-    const auto& map = reg.ctx<const MapManager>();
-    
     auto view = reg.view<AIC, const PositionC>();
     
     view.each([&](const auto entity, auto& ai, const auto position) {
         
-        if(!reg.all_of<PathC>(entity)) {
-            
-            const int area = 20;
-            glm::vec2 target;
-            Tile* tile;
-            do {
-                target = position + glm::vec2(rand()%area - area/2, rand()%area - area/2);
-                tile = map.getTile(target);
-            } while(tile == nullptr || Tile::terrain_speed.at(tile->terrain) == 0);
-            
-            reg.emplace<PathC>(entity, map.pathfind(position, [&](glm::vec2 pos) {
-                return map.floor(target) == map.floor(pos);
-            }));
-            
+        if(!ai.action || ai.action->interruptible) {
+            decide(entity, ai);
         }
         
+        ai.action->act(position);
         
     });
+    
+}
+
+void AISys::decide(entt::entity entity, AIC& ai) {
+    
+    float max_score;
+    std::unique_ptr<Action> max_action;
+    
+    testAction<WanderAction>(entity, max_score, max_action);
+    
+    if(reg.all_of<BasicNeeds>(entity)) {
+        testAction<EatAction>(entity, max_score, max_action);
+    }
+    
+    if(max_score > ai.score) {
+        ai.action = std::move(max_action);
+    }
     
 }
 

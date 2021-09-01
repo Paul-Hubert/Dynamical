@@ -21,6 +21,7 @@ DEFINE_SYSTEM(TimeSys)
 DEFINE_SYSTEM(DevMenuSys)
 DEFINE_SYSTEM(ChunkGenerationSys)
 DEFINE_SYSTEM(PatherSys)
+DEFINE_SYSTEM(BasicNeedsSys)
 
 #undef DEFINE_SYSTEM
 #endif

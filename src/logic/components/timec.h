@@ -51,7 +51,7 @@ public:
     uint64_t speed = 60; // in seconds per real second
     uint64_t speed_modifier = 1;
     uint64_t last_speed_modifier = speed_modifier;
-    uint64_t dt = 0;
+    uint64_t dt = 0; // in seconds
     
 };
 

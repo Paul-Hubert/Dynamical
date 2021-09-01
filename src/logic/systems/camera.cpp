@@ -33,13 +33,13 @@ void CameraSys::tick(float dt) {
     
     float speed = 20.0 * camera.size.x / 100.0;
     
-    if(input.on[Action::FORWARD]) {
+    if(input.on[InputC::FORWARD]) {
         camera.center.y -= speed * dt;
-    } if(input.on[Action::BACKWARD]) {
+    } if(input.on[InputC::BACKWARD]) {
         camera.center.y += speed * dt;
-    } if(input.on[Action::LEFT]) {
+    } if(input.on[InputC::LEFT]) {
         camera.center.x -= speed * dt;
-    } if(input.on[Action::RIGHT]) {
+    } if(input.on[InputC::RIGHT]) {
         camera.center.x += speed * dt;
     }
     

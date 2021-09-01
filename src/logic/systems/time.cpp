@@ -18,10 +18,10 @@ void TimeSys::tick(float dt) {
     auto& time = reg.ctx<TimeC>();
     
     auto& input = reg.ctx<InputC>();
-    if(input.on[Action::PAUSE]) {
+    if(input.on[InputC::PAUSE]) {
         if(time.speed_modifier == 0) time.speed_modifier = time.last_speed_modifier;
         else time.speed_modifier = 0;
-        input.on[Action::PAUSE] = false;
+        input.on[InputC::PAUSE] = false;
     }
     
     static ImVec2 size = ImVec2(500, 100);

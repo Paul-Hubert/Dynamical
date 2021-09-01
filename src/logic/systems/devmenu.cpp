@@ -26,6 +26,7 @@ void DevMenuSys::tick(float dt) {
         ImGui::RadioButton("Nothing", &option, 0);
         ImGui::RadioButton("Tree", &option, 1);
         ImGui::RadioButton("Berry Bush", &option, 3);
+        ImGui::RadioButton("Bunny", &option, 4);
         ImGui::RadioButton("Human", &option, 2);
         if(option > 0) {
             if(input.leftClick) {
@@ -35,9 +36,11 @@ void DevMenuSys::tick(float dt) {
                 if(option == 1) {
                     dy::buildTree(reg, pos);
                 } else if(option == 2) {
-                    dy::buildHuman(reg, pos, glm::vec4(0.7059, 0.4549, 0.2314, 1.0));
+                    dy::buildHuman(reg, pos, Color(0.7059, 0.4549, 0.2314, 1.0));
                 } else if(option == 3) {
                     dy::buildBerryBush(reg, pos);
+                }else if(option == 4) {
+                    dy::buildBunny(reg, pos);
                 }
                 
             }

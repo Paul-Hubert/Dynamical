@@ -56,6 +56,7 @@ void Game::start() {
     set->pre_add<DevMenuSys>();
     set->pre_add<SelectionSys>();
     set->pre_add<PatherSys>();
+    set->pre_add<BasicNeedsSys>();
     
     set->pre_add<AISys>();
     
@@ -96,9 +97,9 @@ void Game::start() {
 
         float dt = (float) (1. / 60.);
 
-        if (input.on[Action::EXIT]) {
+        if (input.on[InputC::EXIT]) {
             running = false;
-            input.on.set(Action::EXIT, false);
+            input.on.set(InputC::EXIT, false);
         }
 
         set->pre_tick(dt);

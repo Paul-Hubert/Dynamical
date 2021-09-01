@@ -3,7 +3,7 @@
 
 class BasicNeeds {
 public:
-    
+    float hunger = 0;
 };
 
 #endif

@@ -4,10 +4,12 @@
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
 
+#include "util/color.h"
+
 class SelectionC {
 public:
     entt::entity entity = entt::null;
-    glm::vec4 color;
+    Color color;
 };
 
 #endif

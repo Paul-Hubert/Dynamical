@@ -2,6 +2,7 @@
 #define AISYS_H
 
 #include "logic/systems/system.h"
+#include "aic.h"
 
 class AISys : public System {
 public:
@@ -11,6 +12,16 @@ public:
         return "AI";
     }
     void tick(float dt) override;
+private:
+    void decide(entt::entity entity, AIC& ai);
+    template<typename T>
+    void testAction(entt::entity entity, float& max_score, std::unique_ptr<Action>& max_action) {
+        float score = T::getScore(reg, entity);
+        if(score > max_score) {
+            max_score = score;
+            max_action = std::make_unique<T>(reg, entity);
+        }
+    }
 };
 
 #endif

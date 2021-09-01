@@ -65,7 +65,7 @@ void SelectionSys::select(entt::entity entity) {
     
     auto& renderable = reg.get<RenderableC>(selection.entity);
     selection.color = renderable.color;
-    renderable.color = glm::vec4(0.2,0.2,0.2,1.0);
+    renderable.color = Color(0.2,0.2,0.2,1.0);
     
 }
 

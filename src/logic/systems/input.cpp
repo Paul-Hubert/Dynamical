@@ -9,14 +9,14 @@
 
 #include <unordered_map>
 
-std::unordered_map<SDL_Scancode, Action> actionMap = {
-    {SDL_SCANCODE_W, Action::FORWARD},
-    {SDL_SCANCODE_S, Action::BACKWARD},
-    {SDL_SCANCODE_A, Action::LEFT},
-    {SDL_SCANCODE_D, Action::RIGHT},
-    {SDL_SCANCODE_SPACE, Action::PAUSE},
-    {SDL_SCANCODE_M, Action::MENU},
-    {SDL_SCANCODE_K, Action::DEBUG}
+std::unordered_map<SDL_Scancode, InputC::Action> actionMap = {
+    {SDL_SCANCODE_W, InputC::FORWARD},
+    {SDL_SCANCODE_S, InputC::BACKWARD},
+    {SDL_SCANCODE_A, InputC::LEFT},
+    {SDL_SCANCODE_D, InputC::RIGHT},
+    {SDL_SCANCODE_SPACE, InputC::PAUSE},
+    {SDL_SCANCODE_M, InputC::MENU},
+    {SDL_SCANCODE_K, InputC::DEBUG}
 };
 
 InputSys::InputSys(entt::registry& reg) : System(reg) {
@@ -43,7 +43,7 @@ void InputSys::tick(float dt) {
 
         if(e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
 
-            input.on.set(Action::RESIZE);
+            input.on.set(InputC::RESIZE);
             
         } else if(e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
 
@@ -63,7 +63,7 @@ void InputSys::tick(float dt) {
 
         } else if(e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.scancode == SDL_SCANCODE_ESCAPE)) {
             
-            input.on.set(Action::EXIT);
+            input.on.set(InputC::EXIT);
             
         } else if(e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
             
