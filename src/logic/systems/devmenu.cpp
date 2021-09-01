@@ -21,7 +21,7 @@ void DevMenuSys::tick(float dt) {
     
     auto& input = reg.ctx<Input>();
     
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
     static bool open = true;
     if(ImGui::Begin("Object Creator", &open)) {
         static int option = 0;

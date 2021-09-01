@@ -26,27 +26,24 @@ void TimeSys::tick(float dt) {
         input.on[Input::PAUSE] = false;
     }
     
-    static ImVec2 size = ImVec2(500, 100);
-    ImGui::SetNextWindowPos(ImVec2(input.screenSize.x - size.x, 0));
     static bool open = true;
-    if(ImGui::Begin("Time", &open, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {// ImGuiWindowFlags_NoTitleBar
-        size = ImGui::GetWindowSize();
+    if(ImGui::Begin("Time", &open, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {// ImGuiWindowFlags_NoTitleBar
+        ImVec2 size = ImGui::GetWindowSize();
+        ImGui::SetWindowPos(ImVec2(input.screenSize.x - size.x, 0));
         
         Date date(time.current);
-        ImGui::Text("Time : %lu of %s, %lu  %lu:%lu:%lu", date.days+1, Date::names_of_months[date.months], date.years, date.hours, date.minutes, date.seconds);
+        ImGui::Text("Time : %lu of %s, %lu %lu:%lu:%lu", date.days+1, Date::names_of_months[date.months], date.years, date.hours, date.minutes, date.seconds);
         
         int mode = time.speed_modifier;
         ImGui::Text("Speed : "); ImGui::SameLine();
         ImGui::RadioButton("0", &mode, 0); ImGui::SameLine();
         ImGui::RadioButton("1", &mode, 1); ImGui::SameLine();
         ImGui::RadioButton("2", &mode, 3); ImGui::SameLine();
-        ImGui::RadioButton("3", &mode, 10);
+        ImGui::RadioButton("3", &mode, 10); ImGui::SameLine();
+        ImGui::RadioButton("4", &mode, 50);
         time.speed_modifier = mode;
         
         if(time.speed_modifier > 0) time.last_speed_modifier = time.speed_modifier;
-        
-        
-        
         
     }
     ImGui::End();
