@@ -10,6 +10,8 @@
 
 #include <entt/entt.hpp>
 
+namespace dy {
+
 class Context;
 
 class Transfer {
@@ -49,5 +51,7 @@ private:
     
     
 };
+
+}
 
 #endif

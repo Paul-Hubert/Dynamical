@@ -9,6 +9,8 @@
 
 #include "renderer/view_ubo.h"
 
+namespace dy {
+
 class Context;
 class Camera;
 
@@ -51,9 +53,8 @@ private:
 
     vk::DescriptorPool descriptorPool;
 
-    
-    
-
 };
+
+}
 
 #endif

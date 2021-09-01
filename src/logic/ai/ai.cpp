@@ -9,8 +9,10 @@
 #include <logic/map/map_manager.h>
 
 #include <logic/components/basic_needs.h>
-#include "logic/components/positionc.h"
-#include <logic/components/pathc.h>
+#include "logic/components/position.h"
+#include <logic/components/path.h>
+
+using namespace dy;
 
 AISys::AISys(entt::registry& reg) : System(reg) {
     
@@ -18,7 +20,7 @@ AISys::AISys(entt::registry& reg) : System(reg) {
 
 void AISys::tick(float dt) {
     
-    auto view = reg.view<AIC, const PositionC>();
+    auto view = reg.view<AIC, const Position>();
     
     view.each([&](const auto entity, auto& ai, const auto position) {
         

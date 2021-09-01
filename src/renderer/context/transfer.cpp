@@ -6,6 +6,8 @@
 
 #include <limits>
 
+using namespace dy;
+
 Transfer::Transfer(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     
     pool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eTransient, ctx.device.t_i));

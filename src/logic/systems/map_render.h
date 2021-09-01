@@ -14,6 +14,8 @@
 
 #include <memory>
 
+namespace dy {
+
 class Context;
 class Renderpass;
 
@@ -55,6 +57,8 @@ private:
     VmaBuffer storageBuffer;
     
 };
+
+}
 
 #endif
 

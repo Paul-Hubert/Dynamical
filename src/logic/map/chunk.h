@@ -7,6 +7,8 @@
 
 #include "tile.h"
 
+namespace dy {
+    
 class Chunk {
 public:
     constexpr static int size = 32;
@@ -36,5 +38,7 @@ private:
     std::unordered_set<entt::entity> objects;
     
 };
+
+}
 
 #endif

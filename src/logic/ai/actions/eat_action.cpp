@@ -4,23 +4,25 @@
 
 #include "util/log.h"
 
-#include "logic/components/pathc.h"
+#include "logic/components/path.h"
 #include "logic/components/basic_needs.h"
 #include <logic/components/plant.h>
+
+using namespace dy;
 
 float EatAction::getScore(entt::registry& reg, entt::entity entity) {
     float hunger = reg.get<BasicNeeds>(entity).hunger;
     return hunger > 5 ? hunger : 0;
 }
 
-void EatAction::act(const PositionC position) {
+void EatAction::act(const Position position) {
     
     interruptible = false;
     
     if(phase == 0) {
     
-        if(reg.all_of<PathC>(entity)) {
-            reg.remove<PathC>(entity);
+        if(reg.all_of<Path>(entity)) {
+            reg.remove<Path>(entity);
         }
         
         findFood(position);
@@ -29,7 +31,7 @@ void EatAction::act(const PositionC position) {
         
     } else if(phase == 1) {
         
-        if(!reg.all_of<PathC>(entity)) {
+        if(!reg.all_of<Path>(entity)) {
             
             reg.get<BasicNeeds>(entity).hunger = 0;
             interruptible = true;
@@ -41,11 +43,11 @@ void EatAction::act(const PositionC position) {
     
 }
 
-void EatAction::findFood(const PositionC position) {
+void EatAction::findFood(const Position position) {
     
     const auto& map = reg.ctx<const MapManager>();
     
-    reg.emplace<PathC>(entity, map.pathfind(position, [&](glm::vec2 pos) {
+    reg.emplace<Path>(entity, map.pathfind(position, [&](glm::vec2 pos) {
         auto object = map.getTile(pos)->object;
         return object != entt::null && reg.all_of<Plant>(object) && reg.get<Plant>(object).type == Plant::berry_bush;
     }));

@@ -8,6 +8,8 @@
 #include "imgui.h"
 #include <SDL.h>
 
+namespace dy {
+
 class UISys : public System
 {
 public:
@@ -26,5 +28,7 @@ private:
     Uint64 g_Time = 0;
 
 };
+
+}
 
 #endif // UISYS_H

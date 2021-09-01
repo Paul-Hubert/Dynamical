@@ -14,6 +14,8 @@
 
 #include <memory>
 
+namespace dy {
+    
 class Context;
 class Renderpass;
 
@@ -45,6 +47,8 @@ private:
     std::vector<per_frame> per_frame;
     
 };
+
+}
 
 #endif
 

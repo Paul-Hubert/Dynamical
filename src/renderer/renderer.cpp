@@ -8,6 +8,8 @@
 #include "extra/optick/optick.h"
 #include "logic/settings.h"
 
+using namespace dy;
+
 Renderer::Renderer(entt::registry& reg) : reg(reg),
 ctx(reg),
 per_frame(NUM_FRAMES) {

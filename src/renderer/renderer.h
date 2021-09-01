@@ -6,6 +6,8 @@
 #include "context/context.h"
 #include "classic_render/classic_render.h"
 
+namespace dy {
+    
 class Renderer {
 public:
     Renderer(entt::registry& reg);
@@ -26,5 +28,7 @@ private:
     std::vector<per_frame> per_frame;
     
 };
+
+}
 
 #endif

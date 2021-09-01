@@ -12,6 +12,8 @@
 
 #include <memory>
 
+namespace dy {
+
 class Context;
 class Renderpass;
 
@@ -58,6 +60,8 @@ private:
     void initPipeline(vk::RenderPass);
     
 };
+
+}
 
 #endif
 

@@ -2,10 +2,11 @@
 
 #include <taskflow/taskflow.hpp>
 
-#include "logic/components/camerac.h"
+#include "logic/components/camera.h"
 
 #include "logic/map/map_manager.h"
 
+using namespace dy;
 
 void ChunkGenerationSys::preinit() {
     
@@ -17,7 +18,7 @@ void ChunkGenerationSys::init() {
 
 void ChunkGenerationSys::tick(float dt) { // to be parallelized
     auto& map = reg.ctx<MapManager>();
-    auto& camera = reg.ctx<CameraC>();
+    auto& camera = reg.ctx<Camera>();
     
     auto corner_pos = map.getChunkPos(camera.corner)-2;
     auto end_pos = map.getChunkPos(camera.corner + camera.size)+2;

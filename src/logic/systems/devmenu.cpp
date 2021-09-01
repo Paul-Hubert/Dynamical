@@ -1,11 +1,13 @@
 #include "system_list.h"
 
-#include "logic/components/inputc.h"
+#include "logic/components/input.h"
 #include <logic/map/map_manager.h>
 
 #include "logic/factories/factory_list.h"
 
 #include <imgui.h>
+
+using namespace dy;
 
 void DevMenuSys::preinit() {
     
@@ -17,7 +19,7 @@ void DevMenuSys::init() {
 
 void DevMenuSys::tick(float dt) {
     
-    auto& input = reg.ctx<InputC>();
+    auto& input = reg.ctx<Input>();
     
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     static bool open = true;

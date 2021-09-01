@@ -7,6 +7,8 @@
 #include "util/util.h"
 #include "util/log.h"
 
+using namespace dy;
+
 UIRenderSys::UIRenderSys(entt::registry& reg) : System(reg) {
     
     Context& ctx = *reg.ctx<Context*>();
@@ -220,8 +222,8 @@ void UIRenderSys::initPipeline(vk::RenderPass renderpass) {
     
     // PIPELINE INFO
     
-    auto vertShaderCode = Util::readFile("./resources/shaders/uirender.vert.glsl.spv");
-    auto fragShaderCode = Util::readFile("./resources/shaders/uirender.frag.glsl.spv");
+    auto vertShaderCode = dy::readFile("./resources/shaders/uirender.vert.glsl.spv");
+    auto fragShaderCode = dy::readFile("./resources/shaders/uirender.frag.glsl.spv");
     
     VkShaderModuleCreateInfo moduleInfo = {};
     moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

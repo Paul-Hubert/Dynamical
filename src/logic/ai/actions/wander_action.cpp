@@ -2,17 +2,19 @@
 
 #include "logic/map/map_manager.h"
 
-#include "logic/components/pathc.h"
+#include "logic/components/path.h"
+
+using namespace dy;
 
 float WanderAction::getScore(entt::registry& reg, entt::entity entity) {
     return 1;
 }
 
-void WanderAction::act(const PositionC position) {
+void WanderAction::act(const Position position) {
     
     const auto& map = reg.ctx<const MapManager>();
     
-    if(!reg.all_of<PathC>(entity)) {
+    if(!reg.all_of<Path>(entity)) {
         
         const int area = 20;
         glm::vec2 target;
@@ -22,7 +24,7 @@ void WanderAction::act(const PositionC position) {
             tile = map.getTile(target);
         } while(tile == nullptr || Tile::terrain_speed.at(tile->terrain) == 0);
         
-        reg.emplace<PathC>(entity, map.pathfind(position, [&](glm::vec2 pos) {
+        reg.emplace<Path>(entity, map.pathfind(position, [&](glm::vec2 pos) {
             return map.floor(target) == map.floor(pos);
         }));
         

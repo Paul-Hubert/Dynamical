@@ -4,6 +4,8 @@
 #include "logic/systems/system.h"
 #include "aic.h"
 
+namespace dy {
+
 class AISys : public System {
 public:
     AISys(entt::registry& reg);
@@ -23,5 +25,7 @@ private:
         }
     }
 };
+
+}
 
 #endif

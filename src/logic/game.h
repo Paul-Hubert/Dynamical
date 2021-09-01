@@ -5,6 +5,8 @@
 
 #include "entt/entt.hpp"
 
+namespace dy {
+
 class SystemSet;
 class Renderer;
 
@@ -21,5 +23,7 @@ public:
     std::unique_ptr<SystemSet> set;
 
 };
+
+}
 
 #endif

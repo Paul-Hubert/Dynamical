@@ -1,11 +1,13 @@
-#ifndef INPUTC_H
-#define INPUTC_H
+#ifndef INPUT_H
+#define INPUT_H
 
 #include <bitset>
 #include "glm/glm.hpp"
 #include <SDL.h>
 
-class InputC {
+namespace dy {
+
+class Input {
 public:
     
     enum Action : char {
@@ -38,8 +40,10 @@ public:
     bool rightClick = false;
     bool middleClick = false;
     
-	bool focused = false;
-	bool window_showing = true;
+    bool focused = false;
+    bool window_showing = true;
 };
+
+}
 
 #endif

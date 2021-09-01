@@ -7,6 +7,8 @@
 
 #include <entt/entt.hpp>
 
+namespace dy {
+
 class Context;
 
 #ifndef NDEBUG
@@ -45,5 +47,7 @@ private:
     Context& ctx;
     entt::registry& reg;
 };
+
+}
 
 #endif

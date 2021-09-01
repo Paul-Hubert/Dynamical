@@ -9,8 +9,10 @@
 
 #include "renderer/util/vk_util.h"
 
-#include "logic/components/inputc.h"
-#include "logic/components/camerac.h"
+#include "logic/components/input.h"
+#include "logic/components/camera.h"
+
+using namespace dy;
 
 ClassicRender::ClassicRender(Context& ctx, entt::registry& reg) : reg(reg), ctx(ctx), renderpass(ctx),
 per_frame(NUM_FRAMES) {
@@ -78,7 +80,7 @@ void ClassicRender::prepare() {
     }
     
     {
-        auto& camera = reg.ctx<CameraC>();
+        auto& camera = reg.ctx<Camera>();
 
         f.pointer->position = camera.corner;
         f.pointer->size = camera.size;
@@ -127,7 +129,7 @@ void ClassicRender::render(vk::Semaphore semaphore) {
     
 
     {
-        auto& camera = reg.ctx<CameraC>();
+        auto& camera = reg.ctx<Camera>();
         
         f.pointer->position = camera.corner;
         f.pointer->size = camera.size;

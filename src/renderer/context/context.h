@@ -14,6 +14,8 @@
 
 #include <memory>
 
+namespace dy {
+
 class Context {
 public:
     Context(entt::registry& reg);
@@ -29,5 +31,7 @@ public:
     uint32_t frame_index;
 
 };
+
+}
 
 #endif

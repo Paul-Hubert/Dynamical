@@ -2,17 +2,19 @@
 
 #include <math.h>
 
-#include "logic/components/camerac.h"
+#include "logic/components/camera.h"
 #include "renderer/context/context.h"
-#include "logic/components/inputc.h"
+#include "logic/components/input.h"
 
 #include "util/log.h"
+
+using namespace dy;
 
 void CameraSys::preinit() {
     
     auto& ctx = *reg.ctx<Context*>();
     
-    auto& camera = reg.set<CameraC>();
+    auto& camera = reg.set<Camera>();
     camera.center = glm::ivec2(0,0);
     camera.corner = camera.center - camera.size / 2.f;
     camera.size.x = 100.0f;
@@ -25,21 +27,21 @@ void CameraSys::init() {
 
 void CameraSys::tick(float dt) {
     
-    auto& input = reg.ctx<InputC>();
+    auto& input = reg.ctx<Input>();
     
-    auto& camera = reg.ctx<CameraC>();
+    auto& camera = reg.ctx<Camera>();
     
     camera.size.x *= 1 - 0.1 * input.mouseWheel.y;
     
     float speed = 20.0 * camera.size.x / 100.0;
     
-    if(input.on[InputC::FORWARD]) {
+    if(input.on[Input::FORWARD]) {
         camera.center.y -= speed * dt;
-    } if(input.on[InputC::BACKWARD]) {
+    } if(input.on[Input::BACKWARD]) {
         camera.center.y += speed * dt;
-    } if(input.on[InputC::LEFT]) {
+    } if(input.on[Input::LEFT]) {
         camera.center.x -= speed * dt;
-    } if(input.on[InputC::RIGHT]) {
+    } if(input.on[Input::RIGHT]) {
         camera.center.x += speed * dt;
     }
     

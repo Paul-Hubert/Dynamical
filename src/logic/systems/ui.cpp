@@ -6,7 +6,9 @@
 
 #include "renderer/context/context.h"
 
-#include "logic/components/inputc.h"
+#include "logic/components/input.h"
+
+using namespace dy;
 
 UISys::UISys(entt::registry& reg) : System(reg) {
     
@@ -29,7 +31,7 @@ void UISys::tick(float dt) {
     
     OPTICK_EVENT();
     
-    auto& input = reg.ctx<InputC>();
+    auto& input = reg.ctx<Input>();
     
     ImGuiIO& io = ImGui::GetIO();
 

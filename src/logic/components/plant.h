@@ -1,6 +1,8 @@
 #ifndef PLANT_H
 #define PLANT_H
 
+namespace dy {
+    
 class Plant {
 public:
     enum Type : int {
@@ -14,5 +16,7 @@ public:
     float plant_growth = 0;
     float harvest_growth = 0;
 };
+
+}
 
 #endif

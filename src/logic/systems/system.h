@@ -8,6 +8,8 @@
 #include "vulkan/vulkan.h"
 #include "extra/optick/optick.h"
 
+namespace dy {
+    
 class System {
 public:
     System(entt::registry& reg) : reg(reg) {};
@@ -23,5 +25,7 @@ public:
     
     entt::registry& reg;
 };
+
+}
 
 #endif

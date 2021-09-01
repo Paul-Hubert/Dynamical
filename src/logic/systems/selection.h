@@ -3,6 +3,8 @@
 
 #include "system.h"
 
+namespace dy {
+    
 class SelectionSys : public System {
 public:
     SelectionSys(entt::registry& reg) : System(reg) {};
@@ -13,5 +15,7 @@ private:
     void select(entt::entity entity);
     void unselect();
 };
+
+}
 
 #endif

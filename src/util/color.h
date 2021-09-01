@@ -4,6 +4,8 @@
 #include "glm/glm.hpp"
 #include <stdio.h>
 
+namespace dy {
+
 class Color {
 public:
     Color() {}
@@ -16,5 +18,7 @@ public:
     }
     glm::vec4 rgba;
 };
+
+}
 
 #endif

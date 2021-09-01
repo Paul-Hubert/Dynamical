@@ -14,6 +14,8 @@
 
 #include "map_generator.h"
 
+namespace dy {
+    
 class MapManager {
 public:
     MapManager(entt::registry& reg);
@@ -48,5 +50,7 @@ private:
     std::unordered_map<glm::vec2, std::unique_ptr<Chunk>> map;
     MapGenerator generator;
 };
+
+}
 
 #endif

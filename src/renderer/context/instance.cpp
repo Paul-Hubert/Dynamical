@@ -11,6 +11,8 @@
 #include "renderer/util/vk_util.h"
 #include "logic/settings.h"
 
+using namespace dy;
+
 Instance::Instance(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     
     auto& settings = reg.ctx<Settings>();

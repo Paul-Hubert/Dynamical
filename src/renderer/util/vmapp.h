@@ -6,6 +6,8 @@
 
 #include <iostream>
 
+namespace dy {
+
 class Device;
 
 class VmaBuffer {
@@ -109,20 +111,19 @@ private:
     Device* device;
 };
 
-namespace dy {
     
-    inline VmaBuffer make_buffer(Device& device, VmaAllocationCreateInfo* allocInfo, const vk::BufferCreateInfo& bufferInfo) {
-        return VmaBuffer(device, allocInfo, bufferInfo);
-    }
+inline VmaBuffer make_buffer(Device& device, VmaAllocationCreateInfo* allocInfo, const vk::BufferCreateInfo& bufferInfo) {
+    return VmaBuffer(device, allocInfo, bufferInfo);
+}
+
+inline VmaImage make_image(Device& device, VmaAllocationCreateInfo* allocInfo, const vk::ImageCreateInfo& imageInfo) {
+    return VmaImage(device, allocInfo, imageInfo);
+}
+
+inline VmaBuffer make_buffer_not_vma(Device& device, VmaAllocationCreateInfo*, const vk::BufferCreateInfo& bufferInfo) {
+    return VmaBuffer(device, bufferInfo);
+}
     
-    inline VmaImage make_image(Device& device, VmaAllocationCreateInfo* allocInfo, const vk::ImageCreateInfo& imageInfo) {
-        return VmaImage(device, allocInfo, imageInfo);
-    }
-    
-    inline VmaBuffer make_buffer_not_vma(Device& device, VmaAllocationCreateInfo*, const vk::BufferCreateInfo& bufferInfo) {
-        return VmaBuffer(device, bufferInfo);
-    }
-    
-};
+}
 
 #endif

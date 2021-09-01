@@ -1,7 +1,9 @@
 #include "system_list.h"
 
-#include "logic/components/timec.h"
+#include "logic/components/time.h"
 #include "logic/components/basic_needs.h"
+
+using namespace dy;
 
 void BasicNeedsSys::preinit() {
     
@@ -13,7 +15,7 @@ void BasicNeedsSys::init() {
 
 void BasicNeedsSys::tick(float dt) {
     
-    auto& time = reg.ctx<TimeC>();
+    auto& time = reg.ctx<Time>();
     
     auto view = reg.view<BasicNeeds>();
     

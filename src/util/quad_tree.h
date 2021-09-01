@@ -7,6 +7,8 @@
 
 #include <cmath>
 
+namespace dy {
+
 template <typename T>
 class QuadTree {
     
@@ -151,5 +153,7 @@ private:
     int z0 = 0;
 
 };
+
+}
 
 #endif

@@ -7,9 +7,11 @@
 
 #ifndef NDEBUG
 
-bool debugOutput = true;
+using namespace dy;
 
-VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+bool dy::debugOutput = true;
+
+VKAPI_ATTR VkBool32 VKAPI_CALL dy::debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageType,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
@@ -54,7 +56,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
 
 
-XRAPI_ATTR XrBool32 XRAPI_CALL debugCallback(XrDebugUtilsMessageSeverityFlagsEXT messageSeverity, XrDebugUtilsMessageTypeFlagsEXT messageType, const XrDebugUtilsMessengerCallbackDataEXT* msg, void* user_data) {
+XRAPI_ATTR XrBool32 XRAPI_CALL dy::debugCallback(XrDebugUtilsMessageSeverityFlagsEXT messageSeverity, XrDebugUtilsMessageTypeFlagsEXT messageType, const XrDebugUtilsMessengerCallbackDataEXT* msg, void* user_data) {
 
     if(messageSeverity < XR_LOG_LEVEL) return XR_FALSE;
 
@@ -89,19 +91,19 @@ XRAPI_ATTR XrBool32 XRAPI_CALL debugCallback(XrDebugUtilsMessageSeverityFlagsEXT
 
 #endif
 
-void vkCheckResult(VkResult result) {
+void dy::vkCheckResult(VkResult result) {
     if(result != VK_SUCCESS) {
         dy::log(dy::error) << "VK Error : " << result << "\n";
     }
 }
 
-void xrCheckResult(XrResult result) {
+void dy::xrCheckResult(XrResult result) {
     if(result != XR_SUCCESS) {
         dy::log(dy::error) << "XR Error : " << result << "\n";
     }
 }
 
-std::vector<const char*> checkLayers(std::vector<const char*> layers, std::vector<vk::LayerProperties> availableLayers) {
+std::vector<const char*> dy::checkLayers(std::vector<const char*> layers, std::vector<vk::LayerProperties> availableLayers) {
 
     std::vector<const char*> out_layers;
 
@@ -125,7 +127,7 @@ std::vector<const char*> checkLayers(std::vector<const char*> layers, std::vecto
 
 }
 
-std::vector<const char*> checkExtensions(std::vector<const char*> extensions, std::vector<vk::ExtensionProperties> availableExtensions) {
+std::vector<const char*> dy::checkExtensions(std::vector<const char*> extensions, std::vector<vk::ExtensionProperties> availableExtensions) {
 
     std::vector<const char*> out_extensions;
 
@@ -149,7 +151,7 @@ std::vector<const char*> checkExtensions(std::vector<const char*> extensions, st
 
 }
 
-std::vector<const char*> checkLayers(std::vector<const char*> layers, std::vector<XrApiLayerProperties> availableLayers) {
+std::vector<const char*> dy::checkLayers(std::vector<const char*> layers, std::vector<XrApiLayerProperties> availableLayers) {
 
     std::vector<const char*> out_layers;
 
@@ -173,7 +175,7 @@ std::vector<const char*> checkLayers(std::vector<const char*> layers, std::vecto
 
 }
 
-std::vector<const char*> checkExtensions(std::vector<const char*> extensions, std::vector<XrExtensionProperties> availableExtensions) {
+std::vector<const char*> dy::checkExtensions(std::vector<const char*> extensions, std::vector<XrExtensionProperties> availableExtensions) {
 
     std::vector<const char*> out_extensions;
 

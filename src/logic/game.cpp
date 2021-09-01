@@ -15,7 +15,7 @@
 
 #include "settings.h"
 
-#include "logic/components/inputc.h"
+#include "logic/components/input.h"
 
 #include "logic/systems/input.h"
 
@@ -29,8 +29,9 @@
 
 #include "logic/ai/ai.h"
 
-
 #include "logic/map/map_manager.h"
+
+using namespace dy;
 
 Game::Game(int argc, char** argv) {
     registry = std::make_unique<entt::registry>();
@@ -84,7 +85,7 @@ void Game::start() {
 
     set->init();
 
-    InputC& input = reg.ctx<InputC>();
+    Input& input = reg.ctx<Input>();
 
     // start loop
     
@@ -97,9 +98,9 @@ void Game::start() {
 
         float dt = (float) (1. / 60.);
 
-        if (input.on[InputC::EXIT]) {
+        if (input.on[Input::EXIT]) {
             running = false;
-            input.on.set(InputC::EXIT, false);
+            input.on.set(Input::EXIT, false);
         }
 
         set->pre_tick(dt);

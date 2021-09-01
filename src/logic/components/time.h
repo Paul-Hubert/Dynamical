@@ -1,8 +1,10 @@
-#ifndef TIMEC_H
-#define TIMEC_H
+#ifndef TIME_H
+#define TIME_H
 
 #include <bits/stdint-uintn.h>
 
+namespace dy {
+    
 class Date {
 public:
     Date(uint64_t time) {
@@ -45,7 +47,7 @@ public:
     
 };
 
-class TimeC {
+class Time {
 public:
     uint64_t current = 0; // in seconds from start
     uint64_t speed = 60; // in seconds per real second
@@ -54,5 +56,7 @@ public:
     uint64_t dt = 0; // in seconds
     
 };
+
+}
 
 #endif

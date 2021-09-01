@@ -3,9 +3,13 @@
 
 #include <entt/entt.hpp>
 
+namespace dy {
+    
 class Inventory {
 public:
     std::vector<entt::entity> items;
 };
+
+}
 
 #endif

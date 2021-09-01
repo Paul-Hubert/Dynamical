@@ -3,6 +3,8 @@
 
 #include <entt/entt.hpp>
 
+namespace dy {
+
 class Tile {
 public:
     
@@ -32,5 +34,7 @@ public:
     entt::entity object = entt::null;
     
 };
+
+}
 
 #endif

@@ -1,9 +1,9 @@
 #include "selection.h"
 
-#include "logic/components/inputc.h"
-#include "logic/components/positionc.h"
-#include "logic/components/selectionc.h"
-#include "logic/components/renderablec.h"
+#include "logic/components/input.h"
+#include "logic/components/position.h"
+#include "logic/components/selection.h"
+#include "logic/components/renderable.h"
 
 #include "util/log.h"
 
@@ -11,15 +11,17 @@
 
 #include <imgui.h>
 
+using namespace dy;
+
 void SelectionSys::preinit() {
-    reg.set<SelectionC>();
+    reg.set<Selection>();
 }
 
 void SelectionSys::tick(float dt) {
     
-    auto& selection = reg.ctx<SelectionC>();
+    auto& selection = reg.ctx<Selection>();
     
-    auto& input = reg.ctx<InputC>();
+    auto& input = reg.ctx<Input>();
     
     if(input.leftClick) {
         auto& map = reg.ctx<MapManager>();
@@ -32,10 +34,10 @@ void SelectionSys::tick(float dt) {
         
         bool selected = false;
         for(auto entity : chunk->getObjects()) {
-            if(reg.all_of<RenderableC>(entity)) {
+            if(reg.all_of<Renderable>(entity)) {
                 
-                auto& position = reg.get<PositionC>(entity);
-                auto& renderable = reg.get<RenderableC>(entity);
+                auto& position = reg.get<Position>(entity);
+                auto& renderable = reg.get<Renderable>(entity);
                 
                 if(pos.x >= position.x - renderable.size.x/2 && position.x + renderable.size.x/2 >= pos.x && pos.y >= position.y - renderable.size.y/2 && position.y + renderable.size.y/2 >= pos.y) {
                 
@@ -60,19 +62,19 @@ void SelectionSys::tick(float dt) {
 }
 
 void SelectionSys::select(entt::entity entity) {
-    auto& selection = reg.ctx<SelectionC>();
+    auto& selection = reg.ctx<Selection>();
     selection.entity = entity;
     
-    auto& renderable = reg.get<RenderableC>(selection.entity);
+    auto& renderable = reg.get<Renderable>(selection.entity);
     selection.color = renderable.color;
     renderable.color = Color(0.2,0.2,0.2,1.0);
     
 }
 
 void SelectionSys::unselect() {
-    auto& selection = reg.ctx<SelectionC>();
+    auto& selection = reg.ctx<Selection>();
     if(selection.entity != entt::null) {
-        reg.get<RenderableC>(selection.entity).color = selection.color;
+        reg.get<Renderable>(selection.entity).color = selection.color;
     }
 }
 

@@ -1,12 +1,14 @@
 #include "system_list.h"
 
-#include "logic/components/timec.h"
-#include "logic/components/inputc.h"
+#include "logic/components/time.h"
+#include "logic/components/input.h"
 
 #include <imgui.h>
 
+using namespace dy;
+
 void TimeSys::preinit() {
-    reg.set<TimeC>();
+    reg.set<Time>();
 }
 
 void TimeSys::init() {
@@ -15,13 +17,13 @@ void TimeSys::init() {
 
 void TimeSys::tick(float dt) {
     
-    auto& time = reg.ctx<TimeC>();
+    auto& time = reg.ctx<Time>();
     
-    auto& input = reg.ctx<InputC>();
-    if(input.on[InputC::PAUSE]) {
+    auto& input = reg.ctx<Input>();
+    if(input.on[Input::PAUSE]) {
         if(time.speed_modifier == 0) time.speed_modifier = time.last_speed_modifier;
         else time.speed_modifier = 0;
-        input.on[InputC::PAUSE] = false;
+        input.on[Input::PAUSE] = false;
     }
     
     static ImVec2 size = ImVec2(500, 100);

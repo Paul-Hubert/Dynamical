@@ -6,9 +6,11 @@
 
 #include <queue>
 
-#include "logic/components/positionc.h"
-#include "logic/components/inputc.h"
-#include "logic/components/camerac.h"
+#include "logic/components/position.h"
+#include "logic/components/input.h"
+#include "logic/components/camera.h"
+
+using namespace dy;
 
 MapManager::MapManager(entt::registry& reg) : reg(reg), map(), generator(reg) {
     
@@ -48,12 +50,12 @@ void MapManager::insert(entt::entity entity, glm::vec2 position) {
         dy::log(dy::Level::critical) << "Chunk not generated\n";
         return;
     }
-    reg.emplace<PositionC>(entity, position);
+    reg.emplace<Position>(entity, position);
     chunk->addObject(entity);
 }
 
 void MapManager::move(entt::entity entity, glm::vec2 position) {
-    auto& pos = reg.get<PositionC>(entity);
+    auto& pos = reg.get<Position>(entity);
     if(getChunkPos(position) != getChunkPos(pos)) {
         Chunk* old_chunk = getChunk(getChunkPos(pos));
         if(old_chunk == nullptr) {
@@ -73,7 +75,7 @@ void MapManager::move(entt::entity entity, glm::vec2 position) {
 }
 
 void MapManager::remove(entt::entity entity) {
-    auto& pos = reg.get<PositionC>(entity);
+    auto& pos = reg.get<Position>(entity);
     Chunk* old_chunk = getChunk(getChunkPos(pos));
     if(old_chunk == nullptr) {
         dy::log(dy::Level::critical) << "Chunk not generated\n";
@@ -84,8 +86,8 @@ void MapManager::remove(entt::entity entity) {
 
 glm::vec2 MapManager::getMousePosition() const {
     
-    auto& input = reg.ctx<InputC>();
-    auto& cam = reg.ctx<CameraC>();
+    auto& input = reg.ctx<Input>();
+    auto& cam = reg.ctx<Camera>();
     
     return cam.corner + cam.size * glm::vec2(input.mousePos) / glm::vec2(input.screenSize);
     

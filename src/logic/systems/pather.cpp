@@ -1,10 +1,12 @@
 #include "system_list.h"
 
-#include "logic/components/pathc.h"
-#include "logic/components/positionc.h"
-#include "logic/components/timec.h"
+#include "logic/components/path.h"
+#include "logic/components/position.h"
+#include "logic/components/time.h"
 
 #include "logic/map/map_manager.h"
+
+using namespace dy;
 
 constexpr float base_speed = 1.0 / 60.; // tiles per second
 
@@ -19,18 +21,18 @@ void PatherSys::init() {
 void PatherSys::tick(float dt) {
     
     auto& map = reg.ctx<MapManager>();
-    auto& time = reg.ctx<TimeC>();
+    auto& time = reg.ctx<Time>();
     
-    auto view = reg.view<PathC, PositionC>();
+    auto view = reg.view<Path, Position>();
     
     for(auto entity : view) {
-        auto& path = view.get<PathC>(entity);
-        glm::vec2 pos = view.get<PositionC>(entity);
+        auto& path = view.get<Path>(entity);
+        glm::vec2 pos = view.get<Position>(entity);
         
         float base_distance = base_speed * time.dt;
         while(base_distance > 0) {
             if(path.tiles.empty()) {
-                reg.remove<PathC>(entity);
+                reg.remove<Path>(entity);
                 break;
             }
             glm::vec2 next_pos = path.tiles.back() + 0.5f;

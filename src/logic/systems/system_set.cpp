@@ -2,6 +2,8 @@
 
 #include "util/util.h"
 
+using namespace dy;
+
 void SystemSet::preinit() {
 
     for(std::unique_ptr<System>& sys : pre_systems) {

@@ -9,6 +9,8 @@
 
 #include <sstream>
 
+namespace dy {
+
 class Settings {
 public:
     Settings(int argc, char** argv);
@@ -52,5 +54,7 @@ private:
     #define DYNAMICAL_CONFIG_MAGIC "3"
     #define DYNAMICAL_CONFIG_FILE DYNAMICAL_CONFIG_DIR "config." DYNAMICAL_CONFIG_MAGIC ".json"
 };
+
+}
 
 #endif

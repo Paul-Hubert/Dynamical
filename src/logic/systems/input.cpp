@@ -1,6 +1,6 @@
 #include "input.h"
 
-#include "logic/components/inputc.h"
+#include "logic/components/input.h"
 
 #include "renderer/context/context.h"
 #include "util/log.h"
@@ -9,19 +9,21 @@
 
 #include <unordered_map>
 
-std::unordered_map<SDL_Scancode, InputC::Action> actionMap = {
-    {SDL_SCANCODE_W, InputC::FORWARD},
-    {SDL_SCANCODE_S, InputC::BACKWARD},
-    {SDL_SCANCODE_A, InputC::LEFT},
-    {SDL_SCANCODE_D, InputC::RIGHT},
-    {SDL_SCANCODE_SPACE, InputC::PAUSE},
-    {SDL_SCANCODE_M, InputC::MENU},
-    {SDL_SCANCODE_K, InputC::DEBUG}
+using namespace dy;
+
+std::unordered_map<SDL_Scancode, Input::Action> actionMap = {
+    {SDL_SCANCODE_W, Input::FORWARD},
+    {SDL_SCANCODE_S, Input::BACKWARD},
+    {SDL_SCANCODE_A, Input::LEFT},
+    {SDL_SCANCODE_D, Input::RIGHT},
+    {SDL_SCANCODE_SPACE, Input::PAUSE},
+    {SDL_SCANCODE_M, Input::MENU},
+    {SDL_SCANCODE_K, Input::DEBUG}
 };
 
 InputSys::InputSys(entt::registry& reg) : System(reg) {
     
-    reg.set<InputC>();
+    reg.set<Input>();
     
 }
 
@@ -31,7 +33,7 @@ void InputSys::tick(float dt) {
 
     OPTICK_EVENT();
     
-    InputC& input = reg.ctx<InputC>();
+    Input& input = reg.ctx<Input>();
     
     input.leftClick = input.rightClick = input.middleClick = false;
     input.mouseWheel = glm::ivec2(0,0);
@@ -43,7 +45,7 @@ void InputSys::tick(float dt) {
 
         if(e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
 
-            input.on.set(InputC::RESIZE);
+            input.on.set(Input::RESIZE);
             
         } else if(e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
 
@@ -63,7 +65,7 @@ void InputSys::tick(float dt) {
 
         } else if(e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.scancode == SDL_SCANCODE_ESCAPE)) {
             
-            input.on.set(InputC::EXIT);
+            input.on.set(Input::EXIT);
             
         } else if(e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
             

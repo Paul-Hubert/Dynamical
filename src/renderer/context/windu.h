@@ -6,6 +6,8 @@
 
 #include <entt/entt.hpp>
 
+namespace dy {
+
 class Context;
 
 class Windu {
@@ -28,5 +30,7 @@ private:
     int height;
     SDL_Window* window;
 };
+
+}
    
 #endif

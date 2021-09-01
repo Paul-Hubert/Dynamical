@@ -1,7 +1,7 @@
 #include "factory_list.h"
 
-#include "logic/components/positionc.h"
-#include "logic/components/renderablec.h"
+#include "logic/components/position.h"
+#include "logic/components/renderable.h"
 #include "logic/components/human.h"
 #include "logic/components/basic_needs.h"
 #include "logic/components/plant.h"
@@ -9,9 +9,11 @@
 
 #include "logic/map/map_manager.h"
 
+using namespace dy;
+
 entt::entity dy::buildObject(entt::registry& reg, glm::vec2 position, glm::vec2 size, Color color) {
     auto entity = reg.create();
-    auto& renderable = reg.emplace<RenderableC>(entity);
+    auto& renderable = reg.emplace<Renderable>(entity);
     renderable.size = size;
     renderable.color = color;
     auto& map = reg.ctx<MapManager>();

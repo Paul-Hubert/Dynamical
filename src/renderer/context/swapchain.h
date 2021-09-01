@@ -7,6 +7,8 @@
 
 #include <entt/entt.hpp>
 
+namespace dy {
+    
 class Context;
 
 class Swapchain {
@@ -50,6 +52,8 @@ private :
     uint64_t last = 0;
     double frametime = 0.0, count = 0.0;
 };
+
+}
 
 #endif
 

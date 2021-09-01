@@ -4,6 +4,8 @@
 #include "renderer/util/vk.h"
 #include "renderer/util/vmapp.h"
 
+namespace dy {
+
 class Context;
 
 class ClRenderpass {
@@ -30,5 +32,7 @@ private:
     Context& ctx;
     
 };
+
+}
 
 #endif

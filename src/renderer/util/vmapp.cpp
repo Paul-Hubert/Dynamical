@@ -2,6 +2,8 @@
 
 #include "renderer/context/device.h"
 
+using namespace dy;
+
 VmaBuffer::VmaBuffer() : device(nullptr) {
     
 }

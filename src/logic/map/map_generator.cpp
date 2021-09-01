@@ -4,7 +4,9 @@
 
 #include "logic/factories/factory_list.h"
 
-#include "logic/components/positionc.h"
+#include "logic/components/position.h"
+
+using namespace dy;
 
 MapGenerator::MapGenerator(entt::registry& reg) : reg(reg) {
     

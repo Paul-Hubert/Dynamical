@@ -9,9 +9,11 @@
 #include "util/log.h"
 #include "logic/map/map_manager.h"
 
-#include "logic/components/camerac.h"
-#include "logic/components/renderablec.h"
-#include "logic/components/positionc.h"
+using namespace dy;
+
+#include "logic/components/camera.h"
+#include "logic/components/renderable.h"
+#include "logic/components/position.h"
 
 constexpr int max_objects = 5000;
 
@@ -76,7 +78,7 @@ void ObjectRenderSys::tick(float dt) {
     int objectCounter = 0;
     
     auto& map = reg.ctx<MapManager>();
-    auto& camera = reg.ctx<CameraC>();
+    auto& camera = reg.ctx<Camera>();
     
     auto corner_pos = map.getChunkPos(camera.corner)-1;
     auto end_pos = map.getChunkPos(camera.corner + camera.size)+1;
@@ -90,9 +92,9 @@ void ObjectRenderSys::tick(float dt) {
             if(chunk == nullptr) continue;
             
             for(auto entity : chunk->getObjects()) {
-                if(reg.all_of<RenderableC>(entity)) {
-                    auto& position = reg.get<PositionC>(entity);
-                    auto& renderable = reg.get<RenderableC>(entity);
+                if(reg.all_of<Renderable>(entity)) {
+                    auto& position = reg.get<Position>(entity);
+                    auto& renderable = reg.get<Renderable>(entity);
                     buffer[objectCounter].box.x = position.x;
                     buffer[objectCounter].box.y = position.y;
                     buffer[objectCounter].box.z = renderable.size.x;
@@ -143,8 +145,8 @@ void ObjectRenderSys::initPipeline(vk::RenderPass renderpass) {
     
     // PIPELINE INFO
     
-    auto vertShaderCode = Util::readFile("./resources/shaders/objectrender.vert.glsl.spv");
-    auto fragShaderCode = Util::readFile("./resources/shaders/objectrender.frag.glsl.spv");
+    auto vertShaderCode = dy::readFile("./resources/shaders/objectrender.vert.glsl.spv");
+    auto fragShaderCode = dy::readFile("./resources/shaders/objectrender.frag.glsl.spv");
     
     VkShaderModuleCreateInfo moduleInfo = {};
     moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

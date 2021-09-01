@@ -3,7 +3,9 @@
 #include <iostream>
 #include <fstream>
 
-std::vector<char> Util::readFile(const char* filename) {
+using namespace dy;
+
+std::vector<char> dy::readFile(const char* filename) {
 	
 	std::ifstream file(filename, std::ios::binary | std::ios::ate);
 

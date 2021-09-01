@@ -6,6 +6,8 @@
 
 #include "chunk.h"
 
+namespace dy {
+    
 class MapGenerator {
 public:
     MapGenerator(entt::registry& reg);
@@ -13,5 +15,7 @@ public:
 private:
     entt::registry& reg;
 };
+
+}
 
 #endif

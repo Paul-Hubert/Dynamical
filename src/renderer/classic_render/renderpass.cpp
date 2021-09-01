@@ -2,6 +2,8 @@
 
 #include "renderer/context/context.h"
 
+using namespace dy;
+
 ClRenderpass::ClRenderpass(Context& ctx) : frames(ctx.swap.num_frames), ctx(ctx) {
     
     depthFormat = ctx.swap.findSupportedFormat(

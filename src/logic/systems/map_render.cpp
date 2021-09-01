@@ -12,7 +12,9 @@
 #include "logic/map/chunk.h"
 #include "logic/map/map_manager.h"
 
-#include "logic/components/camerac.h"
+#include "logic/components/camera.h"
+
+using namespace dy;
 
 constexpr int max_chunks = 5000;
 constexpr int max_stored_chunks = 20000;
@@ -110,7 +112,7 @@ void MapRenderSys::tick(float dt) {
     
     
     auto& map = reg.ctx<MapManager>();
-    auto& camera = reg.ctx<CameraC>();
+    auto& camera = reg.ctx<Camera>();
     
     auto corner_pos = map.getChunkPos(camera.corner)-1;
     auto end_pos = map.getChunkPos(camera.corner + camera.size)+1;
@@ -217,8 +219,8 @@ void MapRenderSys::initPipeline(vk::RenderPass renderpass) {
     
     // PIPELINE INFO
     
-    auto vertShaderCode = Util::readFile("./resources/shaders/maprender.vert.glsl.spv");
-    auto fragShaderCode = Util::readFile("./resources/shaders/maprender.frag.glsl.spv");
+    auto vertShaderCode = dy::readFile("./resources/shaders/maprender.vert.glsl.spv");
+    auto fragShaderCode = dy::readFile("./resources/shaders/maprender.frag.glsl.spv");
     
     VkShaderModuleCreateInfo moduleInfo = {};
     moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
