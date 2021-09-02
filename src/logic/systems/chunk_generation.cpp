@@ -17,6 +17,9 @@ void ChunkGenerationSys::init() {
 }
 
 void ChunkGenerationSys::tick(float dt) { // to be parallelized
+    
+    OPTICK_EVENT();
+    
     auto& map = reg.ctx<MapManager>();
     auto& camera = reg.ctx<Camera>();
     

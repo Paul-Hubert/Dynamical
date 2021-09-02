@@ -34,6 +34,8 @@ void main() {
     
     ivec2 indices = real_indices - corner_indices;
     
+    if(indices.x * chunk_length + indices.y >= MAX_CHUNKS) discard;
+    
     ivec2 tile_space = ipos - real_indices * CHUNK_SIZE;
     
     int chunk_index = chunk_indices[indices.x * chunk_length + indices.y];

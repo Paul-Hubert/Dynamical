@@ -5,6 +5,7 @@
 #include "logic/factories/factory_list.h"
 
 #include "logic/components/position.h"
+#include <extra/optick/optick.h>
 
 using namespace dy;
 
@@ -13,6 +14,8 @@ MapGenerator::MapGenerator(entt::registry& reg) : reg(reg) {
 }
 
 void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
+    
+    OPTICK_EVENT();
     
     auto fnSimplex = FastNoise::New<FastNoise::Simplex>();
     auto fnFractal = FastNoise::New<FastNoise::FractalFBm>();

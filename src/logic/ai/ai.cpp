@@ -20,6 +20,8 @@ AISys::AISys(entt::registry& reg) : System(reg) {
 
 void AISys::tick(float dt) {
     
+    OPTICK_EVENT();
+    
     auto view = reg.view<AIC, const Position>();
     
     view.each([&](const auto entity, auto& ai, const auto position) {
@@ -36,7 +38,9 @@ void AISys::tick(float dt) {
 
 void AISys::decide(entt::entity entity, AIC& ai) {
     
-    float max_score;
+    OPTICK_EVENT();
+    
+    float max_score = 0;
     std::unique_ptr<Action> max_action;
     
     testAction<WanderAction>(entity, max_score, max_action);

@@ -1,5 +1,7 @@
 #include "eat_action.h"
 
+#include <extra/optick/optick.h>
+
 #include "logic/map/map_manager.h"
 
 #include "util/log.h"
@@ -16,6 +18,8 @@ float EatAction::getScore(entt::registry& reg, entt::entity entity) {
 }
 
 void EatAction::act(const Position position) {
+    
+    OPTICK_EVENT();
     
     interruptible = false;
     
@@ -48,6 +52,7 @@ void EatAction::findFood(const Position position) {
     const auto& map = reg.ctx<const MapManager>();
     
     reg.emplace<Path>(entity, map.pathfind(position, [&](glm::vec2 pos) {
+        
         auto object = map.getTile(pos)->object;
         return object != entt::null && reg.all_of<Plant>(object) && reg.get<Plant>(object).type == Plant::berry_bush;
     }));

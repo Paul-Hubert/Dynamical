@@ -1,5 +1,7 @@
 #include "wander_action.h"
 
+#include <extra/optick/optick.h>
+
 #include "logic/map/map_manager.h"
 
 #include "logic/components/path.h"
@@ -11,6 +13,8 @@ float WanderAction::getScore(entt::registry& reg, entt::entity entity) {
 }
 
 void WanderAction::act(const Position position) {
+    
+    OPTICK_EVENT();
     
     const auto& map = reg.ctx<const MapManager>();
     
@@ -24,9 +28,13 @@ void WanderAction::act(const Position position) {
             tile = map.getTile(target);
         } while(tile == nullptr || Tile::terrain_speed.at(tile->terrain) == 0);
         
+        double angle = (double) rand() / (RAND_MAX) * 2 * M_PI;
+        
+        glm::vec2 direction = glm::vec2(sin(angle), cos(angle));
+        
         reg.emplace<Path>(entity, map.pathfind(position, [&](glm::vec2 pos) {
-            return map.floor(target) == map.floor(pos);
-        }));
+            return glm::dot(direction, pos - position) > 5;
+        }, 1000));
         
     }
 }

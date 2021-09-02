@@ -39,9 +39,8 @@ Game::Game(int argc, char** argv) {
     Settings& s = reg.set<Settings>(argc, argv);
 }
 
-
 void Game::start() {
-
+    
     entt::registry& reg = *registry;
 
     Settings& s = reg.ctx<Settings>();

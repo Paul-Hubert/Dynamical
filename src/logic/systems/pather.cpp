@@ -20,6 +20,8 @@ void PatherSys::init() {
 
 void PatherSys::tick(float dt) {
     
+    OPTICK_EVENT();
+    
     auto& map = reg.ctx<MapManager>();
     auto& time = reg.ctx<Time>();
     

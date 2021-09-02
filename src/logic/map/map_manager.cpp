@@ -9,6 +9,7 @@
 #include "logic/components/position.h"
 #include "logic/components/input.h"
 #include "logic/components/camera.h"
+#include <extra/optick/optick.h>
 
 using namespace dy;
 
@@ -107,7 +108,9 @@ inline bool operator> (const Distance a, const Distance b) {
     return a.distance > b.distance;
 }
 
-std::vector<glm::vec2> MapManager::pathfind(glm::vec2 start, std::function<bool(glm::vec2)> predicate) const {
+std::vector<glm::vec2> MapManager::pathfind(glm::vec2 start, std::function<bool(glm::vec2)> predicate, int iteration_limit) const {
+    
+    OPTICK_EVENT();
     
     start = floor(start);
     
@@ -134,6 +137,10 @@ std::vector<glm::vec2> MapManager::pathfind(glm::vec2 start, std::function<bool(
             }
             return path;
         }
+        
+        
+        iteration++;
+        if(iteration > iteration_limit) break;
         
         for(int i = -1; i<=1; i++) {
             for(int j = -1; j<=1; j++) {

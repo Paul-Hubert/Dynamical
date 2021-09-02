@@ -100,6 +100,8 @@ void UIRenderSys::createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buf
 
 void UIRenderSys::tick(float dt) {
     
+    OPTICK_EVENT();
+    
     Context& ctx = *reg.ctx<Context*>();
 
     ImGui::Render();

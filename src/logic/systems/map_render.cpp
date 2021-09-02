@@ -87,6 +87,8 @@ MapRenderSys::MapRenderSys(entt::registry& reg) : System(reg) {
 
 void MapRenderSys::tick(float dt) {
     
+    OPTICK_EVENT();
+    
     Context& ctx = *reg.ctx<Context*>();
     
     auto& f = per_frame[ctx.frame_index];
@@ -123,6 +125,8 @@ void MapRenderSys::tick(float dt) {
     
     for(int x = corner_pos.x; x <= end_pos.x; x++) {
         for(int y = corner_pos.y; y <= end_pos.y; y++) {
+            
+            OPTICK_EVENT("MapRenderSys::tick::chunk");
             
             auto pos = glm::ivec2(x, y);
             

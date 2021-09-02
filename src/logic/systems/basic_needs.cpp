@@ -15,6 +15,8 @@ void BasicNeedsSys::init() {
 
 void BasicNeedsSys::tick(float dt) {
     
+    OPTICK_EVENT();
+    
     auto& time = reg.ctx<Time>();
     
     auto view = reg.view<BasicNeeds>();

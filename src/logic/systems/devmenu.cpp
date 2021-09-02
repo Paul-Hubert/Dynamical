@@ -19,6 +19,8 @@ void DevMenuSys::init() {
 
 void DevMenuSys::tick(float dt) {
     
+    OPTICK_EVENT();
+    
     auto& input = reg.ctx<Input>();
     
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);

@@ -15,7 +15,7 @@ using namespace dy;
 #include "logic/components/renderable.h"
 #include "logic/components/position.h"
 
-constexpr int max_objects = 5000;
+constexpr int max_objects = 20000;
 
 struct RenderObject {
     glm::vec4 box;
@@ -68,6 +68,8 @@ ObjectRenderSys::ObjectRenderSys(entt::registry& reg) : System(reg) {
 
 void ObjectRenderSys::tick(float dt) {
     
+    OPTICK_EVENT();
+    
     Context& ctx = *reg.ctx<Context*>();
     
     auto& f = per_frame[ctx.frame_index];
@@ -85,6 +87,8 @@ void ObjectRenderSys::tick(float dt) {
     
     for(int x = corner_pos.x; x <= end_pos.x; x++) {
         for(int y = corner_pos.y; y <= end_pos.y; y++) {
+            
+            OPTICK_EVENT("ObjectRenderSys::tick::chunk");
             
             auto pos = glm::ivec2(x, y);
             

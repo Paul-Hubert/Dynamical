@@ -17,6 +17,8 @@ void TimeSys::init() {
 
 void TimeSys::tick(float dt) {
     
+    OPTICK_EVENT();
+    
     auto& time = reg.ctx<Time>();
     
     auto& input = reg.ctx<Input>();

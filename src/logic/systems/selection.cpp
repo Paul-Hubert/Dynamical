@@ -19,6 +19,8 @@ void SelectionSys::preinit() {
 
 void SelectionSys::tick(float dt) {
     
+    OPTICK_EVENT();
+    
     auto& selection = reg.ctx<Selection>();
     
     auto& input = reg.ctx<Input>();
