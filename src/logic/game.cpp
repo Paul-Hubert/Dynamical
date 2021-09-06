@@ -63,6 +63,8 @@ void Game::start() {
     
     set->pre_add<AISys>();
     
+    set->pre_add<ActionBarSys>();
+    
     set->post_add<MapRenderSys>();
     set->post_add<ObjectRenderSys>();
     set->post_add<UIRenderSys>();

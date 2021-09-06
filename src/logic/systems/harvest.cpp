@@ -6,6 +6,7 @@
 #include <logic/components/plant.h>
 #include <logic/components/item.h>
 #include <logic/components/harvested.h>
+#include <logic/components/action_bar.h>
 
 using namespace entt::literals;
 
@@ -23,11 +24,17 @@ void HarvestSys::tick(float dt) {
     
     OPTICK_EVENT();
     
+    constexpr time_t duration = 10 * Time::minute;
+    
     auto& time = reg.ctx<Time>();
     
     auto view = reg.view<Harvest>();
     view.each([&](const auto entity, auto& harvest) {
-        if(time.current > harvest.start + 10 * Time::minute) {
+        if(!reg.all_of<ActionBar>(entity)) {
+            reg.emplace<ActionBar>(entity, harvest.start, harvest.start + duration);
+        }
+        
+        if(time.current > harvest.start + duration) {
             auto& storage = reg.get<Storage>(entity);
             auto& plant = reg.get<Plant>(harvest.plant);
             
@@ -35,7 +42,7 @@ void HarvestSys::tick(float dt) {
             
             reg.emplace<Harvested>(harvest.plant, time.current + Time::day);
             reg.remove<Harvest>(entity);
-            
+            reg.remove<ActionBar>(entity);
         }
     });
     

@@ -90,7 +90,7 @@ glm::vec2 MapManager::getMousePosition() const {
     auto& input = reg.ctx<Input>();
     auto& cam = reg.ctx<Camera>();
     
-    return cam.corner + cam.size * glm::vec2(input.mousePos) / glm::vec2(input.screenSize);
+    return cam.fromScreenSpace(input.mousePos, input.screenSize);
     
 }
 
