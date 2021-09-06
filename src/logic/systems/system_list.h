@@ -24,6 +24,8 @@ DEFINE_SYSTEM(DevMenuSys)
 DEFINE_SYSTEM(ChunkGenerationSys)
 DEFINE_SYSTEM(PatherSys)
 DEFINE_SYSTEM(BasicNeedsSys)
+DEFINE_SYSTEM(HarvestSys)
+DEFINE_SYSTEM(EatSys)
 
 }
 

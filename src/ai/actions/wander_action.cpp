@@ -8,13 +8,16 @@
 
 using namespace dy;
 
-float WanderAction::getScore(entt::registry& reg, entt::entity entity) {
-    return 1;
+std::unique_ptr<Action> WanderAction::deploy(std::unique_ptr<Action> self) {
+    
+    return self;
 }
 
-void WanderAction::act(const Position position) {
+std::unique_ptr<Action> WanderAction::act(std::unique_ptr<Action> self) {
     
     OPTICK_EVENT();
+    
+    auto position = reg.get<Position>(entity);
     
     const auto& map = reg.ctx<const MapManager>();
     
@@ -37,4 +40,7 @@ void WanderAction::act(const Position position) {
         }, 1000));
         
     }
+    
+    return self;
+    
 }

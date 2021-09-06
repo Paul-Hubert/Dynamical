@@ -4,6 +4,8 @@
 #include "logic/systems/system.h"
 #include "aic.h"
 
+#include "behaviors/behavior.h"
+
 namespace dy {
 
 class AISys : public System {
@@ -17,11 +19,11 @@ public:
 private:
     void decide(entt::entity entity, AIC& ai);
     template<typename T>
-    void testAction(entt::entity entity, float& max_score, std::unique_ptr<Action>& max_action) {
+    void testBehavior(entt::entity entity, float& max_score, std::unique_ptr<Behavior>& max_behavior) {
         float score = T::getScore(reg, entity);
         if(score > max_score) {
             max_score = score;
-            max_action = std::make_unique<T>(reg, entity);
+            max_behavior = std::make_unique<T>(reg, entity);
         }
     }
 };

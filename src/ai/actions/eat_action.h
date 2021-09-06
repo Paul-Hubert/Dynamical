@@ -3,17 +3,20 @@
 
 #include "action.h"
 
+#include <logic/components/item.h>
+
 namespace dy {
 
 class EatAction : public Action {
 public:
     EatAction(entt::registry& reg, entt::entity entity) : Action(reg, entity) {}
-    static float getScore(entt::registry& reg, entt::entity entity);
-    void act(const Position position) override;
+    std::unique_ptr<Action> deploy(std::unique_ptr<Action> self);
+    std::unique_ptr<Action> act(std::unique_ptr<Action> self) override;
 private:
-    void findFood(const Position position);
-    
+    void find();
     int phase = 0;
+    Item::ID food = Item::null;
+    
 };
 
 }

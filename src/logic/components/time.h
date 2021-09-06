@@ -5,9 +5,11 @@
 
 namespace dy {
     
+typedef uint64_t time_t;
+    
 class Date {
 public:
-    Date(uint64_t time) {
+    Date(time_t time) {
         seconds = time;
         
         minutes = seconds/seconds_in_a_minute;
@@ -26,17 +28,17 @@ public:
         months -= years*months_in_a_year;
         
     }
-    uint64_t seconds;
-    const static uint64_t seconds_in_a_minute = 60;
-    uint64_t minutes;
-    const static uint64_t minutes_in_an_hour = 60;
-    uint64_t hours;
-    const static uint64_t hours_in_a_day = 24;
-    uint64_t days;
-    const static uint64_t days_in_a_month = 28;
-    uint64_t months;
-    const static uint64_t months_in_a_year = 4;
-    uint64_t years;
+    time_t seconds;
+    constexpr static time_t seconds_in_a_minute = 60;
+    time_t minutes;
+    constexpr static time_t minutes_in_an_hour = 60;
+    time_t hours;
+    constexpr static time_t hours_in_a_day = 24;
+    time_t days;
+    constexpr static time_t days_in_a_month = 28;
+    time_t months;
+    constexpr static time_t months_in_a_year = 4;
+    time_t years;
     
     inline constexpr static const char* names_of_months[] = {
         "Spring",
@@ -49,11 +51,17 @@ public:
 
 class Time {
 public:
-    uint64_t current = 0; // in seconds from start
-    uint64_t speed = 60; // in seconds per real second
-    uint64_t speed_modifier = 1;
-    uint64_t last_speed_modifier = speed_modifier;
-    uint64_t dt = 0; // in seconds
+    time_t current = 0; // in seconds from start
+    time_t speed = 60; // in seconds per real second
+    time_t speed_modifier = 1;
+    time_t last_speed_modifier = speed_modifier;
+    time_t dt = 0; // in seconds
+    
+    constexpr static time_t minute = Date::seconds_in_a_minute;
+    constexpr static time_t hour = minute * Date::minutes_in_an_hour;
+    constexpr static time_t day = hour * Date::hours_in_a_day;
+    constexpr static time_t month = day * Date::days_in_a_month;
+    constexpr static time_t year = month * Date::months_in_a_year;
     
 };
 

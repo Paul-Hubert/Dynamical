@@ -2,7 +2,7 @@
 #define PLANT_H
 
 namespace dy {
-    
+
 class Plant {
 public:
     enum Type : int {
@@ -13,8 +13,7 @@ public:
         
     }
     Type type;
-    float plant_growth = 0;
-    float harvest_growth = 0;
+    
 };
 
 }

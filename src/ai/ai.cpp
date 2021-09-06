@@ -3,13 +3,14 @@
 #include "util/log.h"
 
 #include "aic.h"
-#include "actions/wander_action.h"
-#include "actions/eat_action.h"
+
+#include "behaviors/eat_behavior.h"
+#include "behaviors/wander_behavior.h"
 
 #include <logic/map/map_manager.h>
 
 #include <logic/components/basic_needs.h>
-#include "logic/components/position.h"
+#include <logic/components/position.h>
 #include <logic/components/path.h>
 
 using namespace dy;
@@ -22,15 +23,15 @@ void AISys::tick(float dt) {
     
     OPTICK_EVENT();
     
-    auto view = reg.view<AIC, const Position>();
+    auto view = reg.view<AIC>();
     
-    view.each([&](const auto entity, auto& ai, const auto position) {
+    view.each([&](const auto entity, auto& ai) {
         
         if(!ai.action || ai.action->interruptible) {
             decide(entity, ai);
         }
         
-        ai.action->act(position);
+        ai.action = ai.action->act(std::move(ai.action));
         
     });
     
@@ -41,16 +42,17 @@ void AISys::decide(entt::entity entity, AIC& ai) {
     OPTICK_EVENT();
     
     float max_score = 0;
-    std::unique_ptr<Action> max_action;
+    std::unique_ptr<Behavior> max_behavior;
     
-    testAction<WanderAction>(entity, max_score, max_action);
-    
+    testBehavior<WanderBehavior>(entity, max_score, max_behavior);
+
     if(reg.all_of<BasicNeeds>(entity)) {
-        testAction<EatAction>(entity, max_score, max_action);
+        testBehavior<EatBehavior>(entity, max_score, max_behavior);
     }
-    
-    if(max_score > ai.score) {
-        ai.action = std::move(max_action);
+
+    if(max_score > ai.score || ai.action == nullptr) {
+        ai.score = max_score;
+        ai.action = max_behavior->action();
     }
     
 }

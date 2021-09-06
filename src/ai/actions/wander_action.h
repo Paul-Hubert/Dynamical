@@ -8,8 +8,8 @@ namespace dy {
 class WanderAction : public Action {
 public:
     WanderAction(entt::registry& reg, entt::entity entity) : Action(reg, entity) {interruptible = true;}
-    static float getScore(entt::registry& reg, entt::entity entity);
-    void act(const Position position) override;
+    std::unique_ptr<Action> deploy(std::unique_ptr<Action> self);
+    std::unique_ptr<Action> act(std::unique_ptr<Action> self) override;
 };
 
 }

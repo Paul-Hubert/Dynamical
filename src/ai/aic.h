@@ -1,7 +1,7 @@
 #ifndef AIC_H
 #define AIC_H
 
-#include "actions/action.h"
+#include "behaviors/behavior.h"
 
 namespace dy {
 

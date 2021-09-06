@@ -27,7 +27,7 @@
 #include "logic/systems/object_render.h"
 #include "logic/systems/ui_render.h"
 
-#include "logic/ai/ai.h"
+#include "ai/ai.h"
 
 #include "logic/map/map_manager.h"
 
@@ -55,11 +55,13 @@ void Game::start() {
     set->pre_add<TimeSys>();
     set->pre_add<DevMenuSys>();
     set->pre_add<SelectionSys>();
+    
     set->pre_add<PatherSys>();
     set->pre_add<BasicNeedsSys>();
+    set->pre_add<HarvestSys>();
+    set->pre_add<EatSys>();
     
     set->pre_add<AISys>();
-    
     
     set->post_add<MapRenderSys>();
     set->post_add<ObjectRenderSys>();
