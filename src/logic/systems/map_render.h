@@ -12,6 +12,8 @@
 
 #include <glm/glm.hpp>
 
+#include "logic/map/chunk.h"
+
 #include <memory>
 
 namespace dy {
@@ -50,6 +52,7 @@ private:
         glm::ivec2 position; // in chunk space
         bool used = false;
         bool stored = false;
+        Chunk* chunk;
     };
     std::vector<StoredChunk> stored_chunks;
     int storage_counter = 0;

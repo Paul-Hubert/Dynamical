@@ -7,11 +7,65 @@
 #include "logic/components/position.h"
 #include <extra/optick/optick.h>
 
+#include "map_manager.h"
+
+#include "util/log.h"
+
 using namespace dy;
 
-MapGenerator::MapGenerator(entt::registry& reg) : reg(reg) {
+MapGenerator::MapGenerator(entt::registry& reg, MapManager& map) : reg(reg), map(map) {
     
 }
+
+void MapGenerator::generateRiver(glm::vec2 pos) {
+    
+    Tile* tile = map.getTile(pos);
+    
+    tile->terrain = Tile::shallow_water;
+    
+    map.getChunk(map.getChunkPos(pos))->setUpdated();
+
+    Tile* lowest_tile = nullptr;
+    glm::vec2 lowest_pos;
+    float lowest_level = 100000;
+    
+    for(int x = -1; x<=1; x++) {
+        for(int y = -1; y<=1; y++) {
+            if(abs(x) + abs(y) != 1) continue;
+            glm::vec2 pos2 = pos + glm::vec2(x, y);
+            
+            Tile* tile2 = map.getTile(pos2);
+            
+            if(!tile2) {
+                map.generateChunk(map.getChunkPos(pos2));
+                tile2 = map.getTile(pos2);
+            }
+
+            if(tile2->terrain == Tile::shallow_water) {
+                continue;
+            }
+            
+            if(tile2->level <= lowest_level) {
+                lowest_level = tile2->level;
+                lowest_pos = pos2;
+                lowest_tile = tile2;
+            }
+            
+        }
+    }
+    
+    if(lowest_tile == nullptr || lowest_tile->terrain == Tile::water) {
+        return;
+    }
+    
+    generateRiver(lowest_pos);
+    
+}
+
+float MapGenerator::frand() {
+    return (float) std::rand() / (RAND_MAX + 1u);
+}
+
 
 void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
     
@@ -25,7 +79,7 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
     
     std::vector<float> noiseOutput(Chunk::size * Chunk::size);
 
-    fnFractal->GenUniformGrid2D(noiseOutput.data(), pos.x * Chunk::size, pos.y * Chunk::size, Chunk::size, Chunk::size, 0.003f, 1337);
+    fnFractal->GenUniformGrid2D(noiseOutput.data(), pos.x * Chunk::size, pos.y * Chunk::size, Chunk::size, Chunk::size, 0.003f, 1338);
     
     for(int i = 0; i<Chunk::size; i++) {
         for(int j = 0; j<Chunk::size; j++) {
@@ -46,11 +100,11 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
             else if(level > 15) tile.terrain = Tile::stone;
             
             if(tile.terrain == Tile::grass) {
-                auto plant_pos = position + glm::vec2((float) std::rand() / (RAND_MAX + 1u), (float) std::rand() / (RAND_MAX + 1u));
-                if((float) std::rand() / (RAND_MAX + 1u)< 0.03) {
+                auto plant_pos = position + glm::vec2(frand(), frand());
+                if(frand()< 0.03) {
                     auto entity = dy::buildTree(reg, plant_pos);
                     tile.object = entity;
-                } else if((float) std::rand() / (RAND_MAX + 1u)< 0.001) {
+                } else if(frand()< 0.001) {
                     auto entity = dy::buildBerryBush(reg, plant_pos);
                     tile.object = entity;
                 }
@@ -58,5 +112,20 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
             
         }
     }
+
+    for(int i = 0; i<Chunk::size; i++) {
+        for(int j = 0; j<Chunk::size; j++) {
+            glm::vec2 position = pos*Chunk::size + glm::ivec2(i,j);
+
+            Tile& tile = chunk.get(glm::ivec2(i,j));
+
+            if(tile.level > 15 && frand()< 0.0003) {
+                generateRiver(position);
+            }
+
+        }
+    }
+
+
     
 }

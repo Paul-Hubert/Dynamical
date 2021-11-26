@@ -11,7 +11,7 @@ namespace dy {
     
 class Chunk {
 public:
-    constexpr static int size = 32;
+    constexpr static int size = 64;
     
     const Tile& get(glm::ivec2 pos) const {
         return tiles[pos.x][pos.y];
@@ -33,9 +33,19 @@ public:
         return objects;
     }
     
+    void setUpdated() {
+        updated = true;
+    }
+    
+    bool isUpdated() {
+        return updated;
+    }
+    
 private:
     Tile tiles[size][size];
     std::unordered_set<entt::entity> objects;
+    
+    bool updated = false;
     
 };
 

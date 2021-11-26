@@ -13,7 +13,7 @@
 
 using namespace dy;
 
-MapManager::MapManager(entt::registry& reg) : reg(reg), map(), generator(reg) {
+MapManager::MapManager(entt::registry& reg) : reg(reg), map(), generator(reg, *this) {
     
 }
 
@@ -27,7 +27,6 @@ Chunk* MapManager::getChunk(glm::ivec2 pos) const {
 
 Chunk* MapManager::generateChunk(glm::ivec2 pos) {
     if(getChunk(pos) != nullptr) {
-        dy::log(dy::warning) << "double chunk generation\n";
         return getChunk(pos);
     }
     map[pos] = std::make_unique<Chunk>();

@@ -56,6 +56,8 @@ void Game::start() {
     set->pre_add<DevMenuSys>();
     set->pre_add<SelectionSys>();
     
+    set->pre_add<ChunkGenerationSys>();
+    
     set->pre_add<PatherSys>();
     set->pre_add<BasicNeedsSys>();
     set->pre_add<HarvestSys>();

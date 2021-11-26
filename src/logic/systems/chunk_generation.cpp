@@ -6,6 +6,8 @@
 
 #include "logic/map/map_manager.h"
 
+#include <util/log.h>
+
 using namespace dy;
 
 void ChunkGenerationSys::preinit() {
@@ -30,12 +32,24 @@ void ChunkGenerationSys::tick(float dt) { // to be parallelized
         for(int y = corner_pos.y; y <= end_pos.y; y++) {
             
             auto pos = glm::ivec2(x, y);
-            
-            map.generateChunk(map.getChunkPos(pos));
+            map.generateChunk(pos);
             
         }
     }
     
+    /*
+    tf::Executor& ex = reg.ctx<tf::Executor>();
+    
+    tf::Taskflow tf;
+    
+    //dy::log() << chunks.size() << "\n";
+    
+    tf::Task chunk_gen = tf.for_each(chunks.begin(), chunks.end(), [&](glm::ivec2 pos){
+        
+    });
+    
+    ex.run(tf).wait();
+    */
     
 }
 

@@ -6,14 +6,21 @@
 
 #include "chunk.h"
 
+
 namespace dy {
+
+class MapManager;
     
 class MapGenerator {
 public:
-    MapGenerator(entt::registry& reg);
+    MapGenerator(entt::registry& reg, MapManager& map);
     void generateChunk(Chunk& chunk, glm::ivec2 pos);
+    void generateRiver(glm::vec2 pos);
 private:
     entt::registry& reg;
+    MapManager& map;
+    
+    float frand();
 };
 
 }

@@ -7,6 +7,7 @@
 
 #include "util/util.h"
 #include "util/log.h"
+#include "util/color.h"
 
 #include "logic/map/tile.h"
 #include "logic/map/chunk.h"
@@ -106,8 +107,9 @@ void MapRenderSys::tick(float dt) {
     header->colors[Tile::grass] = glm::vec4(0.3373,0.4902,0.2745,1);
     header->colors[Tile::stone] = glm::vec4(0.6118,0.6353,0.7216,1);
     header->colors[Tile::sand] = glm::vec4(0.761,0.698,0.502,1);
-    header->colors[Tile::water] = glm::vec4(0.451,0.7137,0.9961,1);
-    
+    header->colors[Tile::shallow_water] = Color("74ccf4").rgba;
+    header->colors[Tile::water] = Color("2389da").rgba;
+
     regions.push_back(vk::BufferCopy(0, 0, sizeof(Header)));
     
     int staging_counter = 0;
@@ -132,11 +134,16 @@ void MapRenderSys::tick(float dt) {
             
             bool stored = false;
             for(int i = 0; i<stored_chunks.size(); i++) {
-                if(stored_chunks[i].stored && stored_chunks[i].position == pos) {
+                auto& sc = stored_chunks[i];
+                if(sc.stored && sc.position == pos) {
+                    if(sc.chunk->isUpdated()) {
+                        sc.stored = false;
+                        break;
+                    }
                     stored = true;
                     header->chunk_indices[chunk_indices_counter] = i;
                     chunk_indices_counter++;
-                    stored_chunks[i].used = true;
+                    sc.used = true;
                     break;
                 }
             }
@@ -186,13 +193,14 @@ void MapRenderSys::tick(float dt) {
                 stored_chunks[index].position = pos;
                 stored_chunks[index].used = true;
                 stored_chunks[index].stored = true;
+                stored_chunks[index].chunk = chunk;
                 
                 staging_counter++;
                 
             }
             
             if(chunk_indices_counter >= max_chunks) {
-                dy::log(dy::Level::warning) << "too many chunks\n";
+                log(Level::warning) << "too many chunks\n";
                 x = end_pos.x + 1;
                 y = end_pos.y + 1;
                 break;

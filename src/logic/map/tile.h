@@ -29,7 +29,7 @@ public:
         {shallow_water, 0.4}
     };
     
-    Type terrain = dirt;
+    Type terrain = nothing;
     float level = 0;
     entt::entity object = entt::null;
     
