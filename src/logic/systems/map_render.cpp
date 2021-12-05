@@ -200,7 +200,7 @@ void MapRenderSys::tick(float dt) {
             }
             
             if(chunk_indices_counter >= max_chunks) {
-                log(Level::warning) << "too many chunks\n";
+                //log(Level::warning) << "too many chunks\n";
                 x = end_pos.x + 1;
                 y = end_pos.y + 1;
                 break;

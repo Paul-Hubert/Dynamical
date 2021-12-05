@@ -21,10 +21,11 @@ public:
     MapManager(entt::registry& reg);
     MapManager(const MapManager&) = delete;
     Chunk* getChunk(glm::ivec2 pos) const;
+    Chunk* getTileChunk(glm::vec2 pos) const;
     Tile* getTile(glm::vec2 pos) const;
     Chunk* generateChunk(glm::ivec2 pos);
     
-    std::vector<glm::vec2> pathfind(glm::vec2 start, std::function<bool(glm::vec2)> predicate, int iteration_limit = std::numeric_limits<int>::max()) const;
+    const std::vector<glm::vec2> pathfind(glm::vec2 start, std::function<bool(glm::vec2)> predicate, int iteration_limit = std::numeric_limits<int>::max()) const;
     
     void insert(entt::entity entity, glm::vec2 position);
     void move(entt::entity entity, glm::vec2 position);

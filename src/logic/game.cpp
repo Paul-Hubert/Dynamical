@@ -26,6 +26,7 @@
 #include "logic/systems/map_render.h"
 #include "logic/systems/object_render.h"
 #include "logic/systems/ui_render.h"
+#include "logic/systems/water_flow.h"
 
 #include "ai/ai.h"
 
@@ -57,6 +58,7 @@ void Game::start() {
     set->pre_add<SelectionSys>();
     
     set->pre_add<ChunkGenerationSys>();
+    set->pre_add<WaterFlowSys>();
     
     set->pre_add<PatherSys>();
     set->pre_add<BasicNeedsSys>();

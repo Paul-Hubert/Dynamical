@@ -19,7 +19,7 @@ std::unique_ptr<Action> WanderAction::act(std::unique_ptr<Action> self) {
     
     auto position = reg.get<Position>(entity);
     
-    const auto& map = reg.ctx<const MapManager>();
+    auto& map = reg.ctx<MapManager>();
     
     if(!reg.all_of<Path>(entity)) {
         

@@ -71,12 +71,12 @@ std::unique_ptr<Action> HarvestAction::act(std::unique_ptr<Action> self) {
 
 void HarvestAction::find() {
     
-    const auto& map = reg.ctx<const MapManager>();
+    auto& map = reg.ctx<MapManager>();
     
-    const auto position = reg.get<Position>(entity);
+    auto position = reg.get<Position>(entity);
     
     reg.emplace<Path>(entity, map.pathfind(position, [&](glm::vec2 pos) {
-        const auto object = map.getTile(pos)->object;
+        auto object = map.getTile(pos)->object;
         if(object != entt::null && reg.all_of<Plant>(object) && reg.get<Plant>(object).type == plant && !reg.all_of<entt::tag<"reserved"_hs>>(object) && !reg.all_of<Harvested>(object)) {
             target = object;
             return true;

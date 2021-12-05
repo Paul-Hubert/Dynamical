@@ -25,12 +25,21 @@ Chunk* MapManager::getChunk(glm::ivec2 pos) const {
     }
 }
 
+Chunk* MapManager::getTileChunk(glm::vec2 pos) const {
+    try {
+        return map.at(pos).get();
+    } catch(std::out_of_range&) {
+        return nullptr;
+    }
+}
+
 Chunk* MapManager::generateChunk(glm::ivec2 pos) {
     if(getChunk(pos) != nullptr) {
         return getChunk(pos);
     }
     map[pos] = std::make_unique<Chunk>();
     Chunk* chunk = map[pos].get();
+
     
     generator.generateChunk(*chunk, pos);
     
@@ -71,7 +80,6 @@ void MapManager::move(entt::entity entity, glm::vec2 position) {
         new_chunk->addObject(entity);
     }
     pos = position;
-    
 }
 
 void MapManager::remove(entt::entity entity) {
@@ -107,7 +115,7 @@ inline bool operator> (const Distance a, const Distance b) {
     return a.distance > b.distance;
 }
 
-std::vector<glm::vec2> MapManager::pathfind(glm::vec2 start, std::function<bool(glm::vec2)> predicate, int iteration_limit) const {
+const std::vector<glm::vec2> MapManager::pathfind(glm::vec2 start, std::function<bool(glm::vec2)> predicate, int iteration_limit) const {
     
     OPTICK_EVENT();
     
