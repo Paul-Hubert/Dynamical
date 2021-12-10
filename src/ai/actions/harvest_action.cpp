@@ -7,7 +7,7 @@
 #include "util/log.h"
 
 #include "logic/components/path.h"
-#include <logic/components/plant.h>
+#include <logic/components/object.h>
 #include <logic/components/storage.h>
 #include <logic/components/harvest.h>
 #include <logic/components/harvested.h>
@@ -16,7 +16,7 @@ using namespace entt::literals;
 
 using namespace dy;
 
-std::unique_ptr<Action> HarvestAction::deploy(std::unique_ptr<Action> self, Plant::Type plant) {
+std::unique_ptr<Action> HarvestAction::deploy(std::unique_ptr<Action> self, Object::Identifier plant) {
     
     this->plant = plant;
     
@@ -77,7 +77,7 @@ void HarvestAction::find() {
     
     reg.emplace<Path>(entity, map.pathfind(position, [&](glm::vec2 pos) {
         auto object = map.getTile(pos)->object;
-        if(object != entt::null && reg.all_of<Plant>(object) && reg.get<Plant>(object).type == plant && !reg.all_of<entt::tag<"reserved"_hs>>(object) && !reg.all_of<Harvested>(object)) {
+        if(object != entt::null && reg.all_of<Object>(object) && reg.get<Object>(object).id == plant && !reg.all_of<entt::tag<"reserved"_hs>>(object) && !reg.all_of<Harvested>(object)) {
             target = object;
             return true;
         }

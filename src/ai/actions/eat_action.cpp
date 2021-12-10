@@ -23,7 +23,7 @@ std::unique_ptr<Action> EatAction::deploy(std::unique_ptr<Action> self) {
     
     link(harvester.get(), std::move(self));
     
-    return harvester->deploy(std::move(harvester), Plant::berry_bush);
+    return harvester->deploy(std::move(harvester), Object::berry_bush);
     
 }
 

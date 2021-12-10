@@ -14,6 +14,8 @@ public:
         auto& map = reg.ctx<MapManager>();
         Tile* tile = map.getTile(pos);
         queue.emplace(pos, tile->level);
+        set.emplace(pos);
+        start_level = tile->level;
     }
     struct PriorityElement {
         PriorityElement(glm::vec2 pos, float level) : pos(pos), level(level) {}
@@ -25,6 +27,8 @@ public:
     };
 
     std::priority_queue<PriorityElement, std::vector<PriorityElement>> queue;
+    std::unordered_set<glm::vec2> set;
+    float start_level = 0;
 };
 
 inline bool operator < (const WaterFlow::PriorityElement a, const WaterFlow::PriorityElement b) {

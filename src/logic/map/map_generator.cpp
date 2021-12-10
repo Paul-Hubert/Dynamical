@@ -127,7 +127,7 @@ void MapGenerator::generateRiver(glm::vec2 pos, Tile* tile) {
 }
 
 float MapGenerator::frand() {
-    return (float) std::rand() / (RAND_MAX + 1u);
+    return (double) std::rand() / (RAND_MAX + 1u);
 }
 
 
@@ -139,11 +139,11 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
     auto fnFractal = FastNoise::New<FastNoise::FractalFBm>();
 
     fnFractal->SetSource(fnSimplex);
-    fnFractal->SetOctaveCount(10);
+    fnFractal->SetOctaveCount(8);
     
     std::vector<float> noiseOutput(Chunk::size * Chunk::size);
 
-    fnFractal->GenUniformGrid2D(noiseOutput.data(), pos.x * Chunk::size, pos.y * Chunk::size, Chunk::size, Chunk::size, 0.001f, 1338);
+    fnFractal->GenUniformGrid2D(noiseOutput.data(), pos.x * Chunk::size, pos.y * Chunk::size, Chunk::size, Chunk::size, 0.001f, 1342);
     
     for(int i = 0; i<Chunk::size; i++) {
         for(int j = 0; j<Chunk::size; j++) {
@@ -166,11 +166,9 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
             if(tile.terrain == Tile::grass) {
                 auto plant_pos = position + glm::vec2(frand(), frand());
                 if(frand()< 0.03) {
-                    auto entity = dy::buildTree(reg, plant_pos);
-                    tile.object = entity;
+                    tile.object = dy::buildTree(reg, plant_pos);
                 } else if(frand()< 0.001) {
-                    auto entity = dy::buildBerryBush(reg, plant_pos);
-                    tile.object = entity;
+                    tile.object = dy::buildBerryBush(reg, plant_pos);
                 }
             }
             
@@ -183,7 +181,7 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
 
             Tile& tile = chunk.get(glm::ivec2(i,j));
 
-            if(tile.level > 15 && frand()< 0.0003) {
+            if(tile.level > 15 && frand()< 0.0001) {
                 auto entity = reg.create();
                 reg.emplace<WaterFlow>(entity, reg, position);
                 //fillRiver(position, &tile);

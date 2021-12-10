@@ -89,7 +89,13 @@ void MapManager::remove(entt::entity entity) {
         dy::log(dy::Level::critical) << "Chunk not generated\n";
         return;
     }
+    reg.remove<Position>(entity);
     old_chunk->removeObject(entity);
+
+    Tile* tile = getTile(pos);
+    if(tile->object == entity) {
+        tile->object = entt::null;
+    }
 }
 
 glm::vec2 MapManager::getMousePosition() const {

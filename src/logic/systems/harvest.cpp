@@ -3,7 +3,7 @@
 #include <logic/components/harvest.h>
 #include <logic/components/storage.h>
 #include <logic/components/time.h>
-#include <logic/components/plant.h>
+#include <logic/components/object.h>
 #include <logic/components/item.h>
 #include <logic/components/harvested.h>
 #include <logic/components/action_bar.h>
@@ -36,7 +36,7 @@ void HarvestSys::tick(float dt) {
         
         if(time.current > harvest.start + duration) {
             auto& storage = reg.get<Storage>(entity);
-            auto& plant = reg.get<Plant>(harvest.plant);
+            auto& object = reg.get<Object>(harvest.plant);
             
             storage.add(Item(Item::berry, 20));
             
