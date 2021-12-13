@@ -18,7 +18,7 @@ void floodWater(entt::registry& reg, MapManager& map, glm::vec2 pos, Tile* tile)
     map.getChunk(map.getChunkPos(pos))->setUpdated();
 }
 
-bool fillNeighbours(entt::registry& reg, MapManager& map, entt::entity entity, WaterFlow& flow, glm::vec2 pos) {
+bool fillNeighbours(entt::registry& reg, MapManager& map, WaterFlow& flow, glm::vec2 pos) {
 
     for(int x = -1; x<=1; x++) {
         for(int y = -1; y<=1; y++) {
@@ -36,9 +36,7 @@ bool fillNeighbours(entt::registry& reg, MapManager& map, entt::entity entity, W
                 tile = map.getTile(adj);
             }
 
-            if(tile->terrain == Tile::shallow_water) continue;
             if(tile->terrain == Tile::water) {
-                reg.destroy(entity);
                 return false;
             }
 
@@ -104,19 +102,22 @@ bool fillWater(entt::registry& reg, MapManager& map, entt::entity entity, WaterF
     }
 
     if(flooded.empty()) {
-        reg.destroy(entity);
         return false;
     }
+
+    bool ret = true;
 
     for(int i = 0; i<flooded.size(); i++) {
 
         auto pos = flooded[i];
 
-        if(!fillNeighbours(reg, map, entity, flow, pos)) return false;
+        if(!fillNeighbours(reg, map, flow, pos)) {
+            ret = false;
+        }
 
     }
 
-    return true;
+    return ret;
 
 }
 
@@ -132,9 +133,16 @@ void WaterFlowSys::tick(float dt) {
 
         const auto iterations = 1;
 
+        bool ret = true;
+
         for(int i = 0; i<iterations&&reg.valid(entity); i++) {
-            if(!fillWater(reg, map, entity, flow)) break;
+            if(!fillWater(reg, map, entity, flow)) {
+                ret = false;
+            }
         }
+
+        if(!ret) reg.destroy(entity);
+
 
 
     }

@@ -33,8 +33,8 @@ public:
         return objects;
     }
     
-    void setUpdated() {
-        updated = true;
+    void setUpdated(bool updated = true) {
+        this->updated = updated;
     }
     
     bool isUpdated() {

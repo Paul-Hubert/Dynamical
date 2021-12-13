@@ -6,7 +6,7 @@ layout(location = 0) out vec4 outColor;
 
 layout (constant_id = 0) const int CHUNK_SIZE = 32;
 layout (constant_id = 1) const int NUM_TYPES = 7;
-layout (constant_id = 2) const int MAX_CHUNKS = 5000;
+layout (constant_id = 2) const int MAX_CHUNKS = 10000;
 
 layout(set = 0, binding = 0) uniform Camera {
     vec2 position;
@@ -30,13 +30,13 @@ int getType(vec2 pos) {
     ivec2 ipos = ifloor(pos);
 
     ivec2 real_indices = ifloor(pos / CHUNK_SIZE);
-    
+
     ivec2 indices = real_indices - corner_indices;
-    
-    if(indices.x * chunk_length + indices.y >= MAX_CHUNKS) return 0;
-    
+
+    if(indices.x * chunk_length + indices.y >= MAX_CHUNKS) return -1;
+
     ivec2 tile_space = ipos - real_indices * CHUNK_SIZE;
-    
+
     int chunk_index = chunk_indices[indices.x * chunk_length + indices.y];
     
     int type = tiles[chunk_index * CHUNK_SIZE * CHUNK_SIZE + tile_space.x * CHUNK_SIZE + tile_space.y];
@@ -82,10 +82,17 @@ void main() {
     vec4 color = colors[type];
     
     outColor = color;
-    
-    //outColor = mix(colors[type], colors[dadj], 0.5);
-    //outColor.r = abs(sin(ipos.x + ipos.y));
-    
+
+    ivec2 real_indices = ifloor(pos / CHUNK_SIZE);
+
+    ivec2 indices = real_indices - corner_indices;
+
+    ivec2 tile_space = ipos - real_indices * CHUNK_SIZE;
+
+    int chunk_index = chunk_indices[indices.x * chunk_length + indices.y];
+
+    //outColor.rgb = vec3(float(chunk_index) / 100.0);
+
     outColor.a = 1.0;
     
 }

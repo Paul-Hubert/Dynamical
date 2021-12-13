@@ -17,8 +17,8 @@
 
 using namespace dy;
 
-constexpr int max_chunks = 5000;
-constexpr int max_stored_chunks = 20000;
+constexpr int max_chunks = 10000;
+constexpr int max_stored_chunks = 50000;
 
 struct Header {
     glm::vec4 colors[Tile::Type::max];
@@ -196,11 +196,13 @@ void MapRenderSys::tick(float dt) {
                 stored_chunks[index].chunk = chunk;
                 
                 staging_counter++;
-                
+
+                chunk->setUpdated(false);
+
             }
             
             if(chunk_indices_counter >= max_chunks) {
-                //log(Level::warning) << "too many chunks\n";
+                log(Level::warning) << "too many chunks\n";
                 x = end_pos.x + 1;
                 y = end_pos.y + 1;
                 break;

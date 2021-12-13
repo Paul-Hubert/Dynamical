@@ -139,11 +139,11 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
     auto fnFractal = FastNoise::New<FastNoise::FractalFBm>();
 
     fnFractal->SetSource(fnSimplex);
-    fnFractal->SetOctaveCount(8);
+    fnFractal->SetOctaveCount(20);
     
     std::vector<float> noiseOutput(Chunk::size * Chunk::size);
 
-    fnFractal->GenUniformGrid2D(noiseOutput.data(), pos.x * Chunk::size, pos.y * Chunk::size, Chunk::size, Chunk::size, 0.001f, 1342);
+    fnFractal->GenUniformGrid2D(noiseOutput.data(), pos.x * Chunk::size, pos.y * Chunk::size, Chunk::size, Chunk::size, 0.0006f, 1346);
     
     for(int i = 0; i<Chunk::size; i++) {
         for(int j = 0; j<Chunk::size; j++) {
@@ -153,15 +153,15 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
             
             float noise = noiseOutput[j * Chunk::size + i];
             
-            float level = noise * 20 + 5;
+            float level = noise * 20;
             
             tile.level = level;
             
             tile.terrain = Tile::nothing;
             if(level < 0) tile.terrain = Tile::water;
-            else if(level > 0 && level < 3) tile.terrain = Tile::sand;
-            else if(level > 3 && level < 15) tile.terrain = Tile::grass;
-            else if(level > 15) tile.terrain = Tile::stone;
+            else if(level >= 0 && level < 1) tile.terrain = Tile::sand;
+            else if(level >= 1 && level < 10) tile.terrain = Tile::grass;
+            else if(level >= 10) tile.terrain = Tile::stone;
             
             if(tile.terrain == Tile::grass) {
                 auto plant_pos = position + glm::vec2(frand(), frand());
@@ -181,7 +181,7 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
 
             Tile& tile = chunk.get(glm::ivec2(i,j));
 
-            if(tile.level > 15 && frand()< 0.0001) {
+            if(tile.level > 10 && frand()< 0.00007) {
                 auto entity = reg.create();
                 reg.emplace<WaterFlow>(entity, reg, position);
                 //fillRiver(position, &tile);
