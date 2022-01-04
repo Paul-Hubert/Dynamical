@@ -7,6 +7,8 @@
 
 #include <cmath>
 
+namespace dy {
+
 template <typename T>
 class QuadTree {
     
@@ -87,7 +89,7 @@ class QuadTree {
     
 public:
     
-    QuadTree() {
+    QuadTree(T null_value) {
         root = std::make_unique<Node>((int) std::pow(2, 0));
     }
     
@@ -151,5 +153,7 @@ private:
     int z0 = 0;
 
 };
+
+}
 
 #endif

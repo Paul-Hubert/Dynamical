@@ -5,9 +5,10 @@
 
 #include "entt/entt.hpp"
 
+namespace dy {
+
 class SystemSet;
 class Renderer;
-class PhysicsSys;
 
 class Game {
 public:
@@ -19,10 +20,10 @@ public:
 
     std::unique_ptr<Renderer> renderer;
 
-    std::unique_ptr<PhysicsSys> physics;
-
     std::unique_ptr<SystemSet> set;
 
 };
+
+}
 
 #endif

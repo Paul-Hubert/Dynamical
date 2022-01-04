@@ -1,5 +1,7 @@
 #include "log.h"
 
+using namespace dy;
+
 std::ostream& dy::log(dy::Level l) {
     switch (l) {
     case trace:

@@ -8,30 +8,17 @@
 #include "extra/optick/optick.h"
 #include "logic/settings.h"
 
-#include "renderer/model/modelc.h"
+using namespace dy;
 
 Renderer::Renderer(entt::registry& reg) : reg(reg),
 ctx(reg),
-input(reg),
-vr_input(reg),
-ui(reg) {
+per_frame(NUM_FRAMES) {
     
     auto& settings = reg.ctx<Settings>();
     
-    auto bindings = std::vector{
-                vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1,
-                                               vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
-    };
-    view_layout = ctx.device->createDescriptorSetLayout(
-        vk::DescriptorSetLayoutCreateInfo({}, (uint32_t)bindings.size(), bindings.data()));
-
-    vr_render = std::make_unique<VRRender>(reg, ctx, view_layout);
-
-    classic_render = std::make_unique<ClassicRender>(reg, ctx, view_layout);
-
-    object_render = std::make_unique<ObjectRender>(reg, ctx, classic_render->getRenderpass(), std::vector<vk::DescriptorSetLayout>{view_layout});
-
-    ui_render = std::make_unique<UIRender>(ctx, vr_render->getRenderpass());
+    for(int i = 0; i<NUM_FRAMES; i++) {
+        per_frame[i].transfer_semaphore = ctx.device->createSemaphore(vk::SemaphoreCreateInfo());
+    }
 
 }
 
@@ -47,55 +34,26 @@ void Renderer::prepare() {
 
     OPTICK_EVENT();
 
-    frame_index = (frame_index + 1) % NUM_FRAMES;
+    ctx.frame_index = (ctx.frame_index + 1) % NUM_FRAMES;
+    
+    auto& f = per_frame[ctx.frame_index];
 
-    input.poll();
-
-    vr_input.poll();
-
-    ui.prepare();
-
-
-    std::function<void(vk::CommandBuffer)> recorder = [&](vk::CommandBuffer command) {
-
-        {
-
-            OPTICK_GPU_EVENT("draw_objects");
-            object_render->render(command, frame_index);
-
-        }
-
-        {
-
-            OPTICK_GPU_EVENT("draw_ui");
-            ui_render->render(command, frame_index);
-
-        }
-
-    };
-
-
-    vr_render->prepare(frame_index, recorder, object_render->layout);
-
-    classic_render->prepare(frame_index, recorder, object_render->layout);
-
-    vr_input.update();
+    ctx.classic_render.prepare();
 
 }
 
 void Renderer::render() {
     
     OPTICK_EVENT();
-
-    ctx.transfer.flush();
     
-    ui.render();
-
+    auto& f = per_frame[ctx.frame_index];
     
-
-    vr_render->render(frame_index);
-
-    classic_render->render(frame_index);
+    vk::Semaphore s = f.transfer_semaphore;
+    if(!ctx.transfer.flush(s)) {
+        s = nullptr;
+    }
+    
+    ctx.classic_render.render(s);
 
 }
 
@@ -103,10 +61,12 @@ void Renderer::finish() {
 
     ctx.device->waitIdle();
 
-    reg.clear<ModelC>();
-
 }
 
 Renderer::~Renderer() {
+    
+    for(int i = 0; i<NUM_FRAMES; i++) {
+        ctx.device->destroy(per_frame[i].transfer_semaphore);
+    }
     
 }

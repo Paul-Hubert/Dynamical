@@ -2,9 +2,9 @@
 
 #include <iostream>
 #include <taskflow/taskflow.hpp>
+#include "extra/optick/optick.h"
 
 #include "renderer/renderer.h"
-#include "systems/physics.h"
 #include "systems/system_set.h"
 
 #include "systems/system_list.h"
@@ -15,18 +15,24 @@
 
 #include "settings.h"
 
-#include "logic/components/model_renderablec.h"
-#include "logic/components/transformc.h"
-#include "logic/components/objectc.h"
-#include "logic/components/inputc.h"
-#include "logic/components/vrinputc.h"
-#include "logic/components/playerc.h"
+#include "logic/components/input.h"
 
-#include "logic/systems/editor/editor_control.h"
+#include "logic/systems/input.h"
 
-#include "renderer/model/model_manager.h"
+#include "logic/systems/ui.h"
 
-#include "extra/optick/optick.h"
+#include "logic/systems/selection.h"
+
+#include "logic/systems/map_render.h"
+#include "logic/systems/object_render.h"
+#include "logic/systems/ui_render.h"
+#include "logic/systems/water_flow.h"
+
+#include "ai/ai.h"
+
+#include "logic/map/map_manager.h"
+
+using namespace dy;
 
 Game::Game(int argc, char** argv) {
     registry = std::make_unique<entt::registry>();
@@ -34,36 +40,48 @@ Game::Game(int argc, char** argv) {
     Settings& s = reg.set<Settings>(argc, argv);
 }
 
-
 void Game::start() {
-
+    
     entt::registry& reg = *registry;
 
     Settings& s = reg.ctx<Settings>();
 
-
     renderer = std::make_unique<Renderer>(reg);
-
-    physics = std::make_unique<PhysicsSys>(reg);
 
     set = std::make_unique<SystemSet>(reg);
 
-    set->pre_add<VRPlayerControlSys>();
-
-    set->pre_add<EditorControlSys>();
-
-    set->post_add<SpectatorControlSys>();
-
+    set->pre_add<InputSys>();
+    set->pre_add<UISys>();
+    set->pre_add<CameraSys>();
+    set->pre_add<TimeSys>();
+    set->pre_add<DevMenuSys>();
+    set->pre_add<SelectionSys>();
+    
+    set->pre_add<ChunkGenerationSys>();
+    set->pre_add<WaterFlowSys>();
+    
+    set->pre_add<PatherSys>();
+    set->pre_add<BasicNeedsSys>();
+    set->pre_add<HarvestSys>();
+    set->pre_add<EatSys>();
+    
+    set->pre_add<AISys>();
+    
+    set->pre_add<ActionBarSys>();
+    
+    set->post_add<MapRenderSys>();
+    set->post_add<ObjectRenderSys>();
+    set->post_add<UIRenderSys>();
+    
+    
+    reg.set<MapManager>(reg);
+    
 
     // preinit
 
     tf::Executor& executor = reg.set<tf::Executor>();
 
-    ModelManager& manager = reg.set<ModelManager>(reg);
-
     renderer->preinit();
-
-    physics->preinit();
 
     set->preinit();
 
@@ -72,37 +90,9 @@ void Game::start() {
 
     renderer->init();
 
-    physics->init();
-
-    // create basic model
-    {
-
-        manager.load("./resources/gltf/box.glb");
-
-        auto box_model = manager.get("./resources/gltf/box.glb");
-
-        entt::entity box = reg.create();
-        auto& renderable = reg.emplace<ModelRenderableC>(box, box_model);
-        auto& transform = reg.emplace<TransformC>(box);
-        transform.transform->setIdentity();
-        transform.transform->setOrigin(btVector3(0., 2., 0.));
-
-        ObjectC& box_object = reg.emplace<ObjectC>(box);
-
-        auto& model = reg.get<ModelC>(box_model);
-        btRigidBody::btRigidBodyConstructionInfo info(model.mass, static_cast<btMotionState*>(transform.transform.get()), model.shape.get(), model.local_inertia);
-        info.m_friction = 0.5;
-        box_object.rigid_body = std::make_unique<btRigidBody>(info);
-
-        reg.ctx<btDiscreteDynamicsWorld*>()->addRigidBody(box_object.rigid_body.get());
-
-    }
-
     set->init();
 
-
-    InputC& input = reg.ctx<InputC>();
-    VRInputC& vr_input = reg.ctx<VRInputC>();
+    Input& input = reg.ctx<Input>();
 
     // start loop
     
@@ -113,16 +103,14 @@ void Game::start() {
 
         renderer->prepare();
 
-        float dt = (float) ((vr_input.predicted_period) / 1000000000.);
+        float dt = (float) (1. / 60.);
 
-        if (input.on[Action::EXIT]) {
+        if (input.on[Input::EXIT]) {
             running = false;
-            input.on.set(Action::EXIT, false);
+            input.on.set(Input::EXIT, false);
         }
 
         set->pre_tick(dt);
-
-        physics->tick(dt);
 
         set->post_tick(dt);
 
@@ -135,7 +123,6 @@ void Game::start() {
 Game::~Game() {
     
     set->finish();
-    physics->finish();
     renderer->finish();
 
 }

@@ -16,9 +16,19 @@ public: \
     const char* name() override { return #NAME; }; \
 };
 
-DEFINE_SYSTEM(VRPlayerControlSys)
+namespace dy {
 
-DEFINE_SYSTEM(SpectatorControlSys)
+DEFINE_SYSTEM(CameraSys)
+DEFINE_SYSTEM(TimeSys)
+DEFINE_SYSTEM(DevMenuSys)
+DEFINE_SYSTEM(ChunkGenerationSys)
+DEFINE_SYSTEM(PatherSys)
+DEFINE_SYSTEM(BasicNeedsSys)
+DEFINE_SYSTEM(HarvestSys)
+DEFINE_SYSTEM(EatSys)
+DEFINE_SYSTEM(ActionBarSys)
+
+}
 
 #undef DEFINE_SYSTEM
 #endif

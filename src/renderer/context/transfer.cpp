@@ -4,6 +4,10 @@
 
 #include "util/util.h"
 
+#include <limits>
+
+using namespace dy;
+
 Transfer::Transfer(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     
     pool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eTransient, ctx.device.t_i));
@@ -19,10 +23,37 @@ void Transfer::Upload::reset(Context& ctx, vk::CommandPool pool) {
     command = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(pool, vk::CommandBufferLevel::ePrimary, 1))[0];
 }
 
-void Transfer::flush() {
+bool Transfer::flush(vk::Semaphore semaphore) {
 
     OPTICK_EVENT();
 
+    check();
+    
+    if(!empty) {
+        
+        current.command.end();
+        
+        std::vector<vk::Semaphore> semaphores;
+        if(semaphore) {
+            semaphores.push_back(semaphore);
+        }
+        ctx.device.transfer.submit(vk::SubmitInfo(0, nullptr, nullptr, 1, &current.command, semaphores.size(), semaphores.data()), current.fence);
+        
+        uploads.push_back(std::move(current));
+        current.reset(ctx, pool);
+        
+        current.command.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+        
+        empty = true;
+        
+        return true;
+    }
+    return false;
+    
+}
+
+void Transfer::check() {
+    
     for(auto it = uploads.begin(); it != uploads.end();) {
         Upload& upload = *it;
         vk::Result result = ctx.device->waitForFences({upload.fence}, VK_TRUE, 0);
@@ -46,24 +77,10 @@ void Transfer::flush() {
         }
     }
     
-    if(!empty) {
-        
-        current.command.end();
-        
-        ctx.device.transfer.submit(vk::SubmitInfo(0, nullptr, nullptr, 1, &current.command, 0, nullptr), current.fence);
-        
-        uploads.push_back(std::move(current));
-        current.reset(ctx, pool);
-        
-        current.command.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-        
-        empty = true;
-        
-    }
-    
 }
 
-std::shared_ptr<ImageC> Transfer::createImage(const void* data, size_t real_size, vk::ImageCreateInfo info, vk::ImageLayout layout) {
+
+std::shared_ptr<VmaImage> Transfer::createImage(const void* data, size_t real_size, vk::ImageCreateInfo info, vk::ImageLayout layout) {
     
     VmaAllocationCreateInfo ainfo{};
     ainfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
@@ -81,7 +98,7 @@ std::shared_ptr<ImageC> Transfer::createImage(const void* data, size_t real_size
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
-    std::shared_ptr<ImageC> image = std::make_shared<ImageC>(ctx.device, &alloc_info, info);
+    std::shared_ptr<VmaImage> image = std::make_shared<VmaImage>(ctx.device, &alloc_info, info);
 
     
     current.command.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eTransfer, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ImageMemoryBarrier(
@@ -106,7 +123,7 @@ std::shared_ptr<ImageC> Transfer::createImage(const void* data, size_t real_size
 }
 
 
-std::shared_ptr<BufferC> Transfer::createBuffer(const void* data, vk::BufferCreateInfo info) {
+std::shared_ptr<VmaBuffer> Transfer::createBuffer(const void* data, vk::BufferCreateInfo info) {
     
     if(ctx.device.isDedicated()) {
 
@@ -126,9 +143,9 @@ std::shared_ptr<BufferC> Transfer::createBuffer(const void* data, vk::BufferCrea
         VmaAllocationCreateInfo alloc_info{};
         alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
         info.usage |= vk::BufferUsageFlagBits::eTransferDst;
-        std::shared_ptr<BufferC> buffer = std::make_shared<BufferC>(ctx.device, &alloc_info, info);
+        std::shared_ptr<VmaBuffer> buffer = std::make_shared<VmaBuffer>(ctx.device, &alloc_info, info);
 
-        current.command.copyBuffer(stage, buffer->buffer, {vk::BufferCopy(0, 0, buffer->buffer.size)});
+        current.command.copyBuffer(stage, buffer->buffer, {vk::BufferCopy(0, 0, buffer->size)});
 
         current.uploaded_buffers.push_back(buffer);
 
@@ -150,7 +167,7 @@ std::shared_ptr<BufferC> Transfer::createBuffer(const void* data, vk::BufferCrea
 
         memcpy(inf.pMappedData, data, info.size);
 
-        auto b = std::make_shared<BufferC>(std::move(buffer));
+        auto b = std::make_shared<VmaBuffer>(std::move(buffer));
         b->ready = true;
         return b;
         
@@ -164,7 +181,12 @@ vk::CommandBuffer Transfer::getCommandBuffer() {
 }
 
 Transfer::~Transfer() {
-  
+    
+    check();
+    
+    ctx.device->destroy(current.fence);
+    ctx.device->freeCommandBuffers(pool, {current.command});
+    
     ctx.device->destroy(pool);
     
 }

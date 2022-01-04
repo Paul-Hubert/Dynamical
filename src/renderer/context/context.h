@@ -6,7 +6,7 @@
 #include "device.h"
 #include "transfer.h"
 #include "swapchain.h"
-#include "vr_context.h"
+#include "renderer/classic_render/classic_render.h"
 
 #include "logic/systems/system.h"
 
@@ -14,18 +14,24 @@
 
 #include <memory>
 
+namespace dy {
+
 class Context {
 public:
     Context(entt::registry& reg);
     ~Context();
 
-    VRContext vr;
     Windu win;
     Instance instance;
     Device device;
     Transfer transfer;
     Swapchain swap;
+    ClassicRender classic_render;
+    
+    uint32_t frame_index;
 
 };
+
+}
 
 #endif

@@ -1,1 +1,1 @@
-cereal entt glm imgui sdl2[vulkan] taskflow stb vulkan vulkan-memory-allocator openxr-loader[vulkan] bullet3[multithreading] tinygltf nlohmann-json
+cereal entt glm imgui sdl2[vulkan] taskflow stb vulkan vulkan-memory-allocator

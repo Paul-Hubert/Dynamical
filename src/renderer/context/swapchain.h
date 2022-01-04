@@ -7,6 +7,8 @@
 
 #include <entt/entt.hpp>
 
+namespace dy {
+    
 class Context;
 
 class Swapchain {
@@ -38,8 +40,6 @@ public :
 
     uint32_t current = 1000;
     
-    PFN_vkAcquireNextImageKHR vkAcquireNextImageKHR;
-    PFN_vkQueuePresentKHR vkQueuePresentKHR;
     
 private :
     Context& ctx;
@@ -52,6 +52,8 @@ private :
     uint64_t last = 0;
     double frametime = 0.0, count = 0.0;
 };
+
+}
 
 #endif
 

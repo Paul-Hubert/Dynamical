@@ -9,12 +9,22 @@
 
 #include "renderer/util/vk_util.h"
 
-#include "logic/components/inputc.h"
-#include "logic/components/camerac.h"
+#include "logic/components/input.h"
+#include "logic/components/camera.h"
 
-ClassicRender::ClassicRender(entt::registry& reg, Context& ctx, vk::DescriptorSetLayout set_layout) : reg(reg), ctx(ctx), renderpass(ctx),
+using namespace dy;
+
+ClassicRender::ClassicRender(Context& ctx, entt::registry& reg) : reg(reg), ctx(ctx), renderpass(ctx),
 per_frame(NUM_FRAMES) {
-
+    
+    auto bindings = std::vector{
+                vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1,
+                                               vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
+    };
+    view_layout = ctx.device->createDescriptorSetLayout(
+        vk::DescriptorSetLayoutCreateInfo({}, (uint32_t)bindings.size(), bindings.data()));
+    
+    
     commandPool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx.device.g_i));
 
     auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, (uint32_t)per_frame.size()));
@@ -27,7 +37,7 @@ per_frame(NUM_FRAMES) {
         f.commandBuffer = cmds[i];
         f.fence = ctx.device->createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
 
-        f.set = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descriptorPool, 1, &set_layout))[0];
+        f.set = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descriptorPool, 1, &view_layout))[0];
 
         VmaAllocationCreateInfo allocInfo = {};
         allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
@@ -55,24 +65,32 @@ per_frame(NUM_FRAMES) {
 
 
 
-void ClassicRender::prepare(uint32_t frame_index, std::function<void(vk::CommandBuffer)>& recorder, vk::PipelineLayout pipeline_layout) {
+void ClassicRender::prepare() {
 
     OPTICK_EVENT();
+    
+    auto& f = per_frame[ctx.frame_index];
 
     {
 
         OPTICK_EVENT("wait_fence");
-        ctx.device->waitForFences({ per_frame[frame_index].fence }, VK_TRUE, std::numeric_limits<uint64_t>::max());
-        ctx.device->resetFences({ per_frame[frame_index].fence });
+        ctx.device->waitForFences({ f.fence }, VK_TRUE, std::numeric_limits<uint64_t>::max());
+        ctx.device->resetFences({ f.fence });
 
     }
+    
+    {
+        auto& camera = reg.ctx<Camera>();
 
-    auto& f = per_frame[frame_index];
+        f.pointer->position = camera.corner;
+        f.pointer->size = camera.size;
+    }
+    
+    
+    ctx.swap.current = ctx.swap.acquire(f.acquireSemaphore);
 
-    uint32_t image_index = ctx.swap.acquire(f.acquireSemaphore);
-
-    auto command = f.commandBuffer;
-
+    command = f.commandBuffer;
+    
     // Record with swapchain images
 
     command.begin(vk::CommandBufferBeginInfo({}, nullptr));
@@ -83,57 +101,67 @@ void ClassicRender::prepare(uint32_t frame_index, std::function<void(vk::Command
             vk::ClearValue(vk::ClearColorValue(std::array<float, 4> { 0.2f, 0.2f, 0.2f, 1.0f })),
             vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0)) };
 
-    command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.frames[image_index].framebuffer, vk::Rect2D({}, vk::Extent2D(ctx.swap.extent.width, ctx.swap.extent.height)), (uint32_t)clearValues.size(), clearValues.data()), vk::SubpassContents::eInline);
+    command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.frames[ctx.swap.current].framebuffer, vk::Rect2D({}, vk::Extent2D(ctx.swap.extent.width, ctx.swap.extent.height)), (uint32_t)clearValues.size(), clearValues.data()), vk::SubpassContents::eInline);
 
     command.setViewport(0, vk::Viewport(0.f, 0.f, (float)ctx.swap.extent.width, (float)ctx.swap.extent.height, 0.f, 1.f));
 
     command.setScissor(0, vk::Rect2D(vk::Offset2D(), vk::Extent2D(ctx.swap.extent.width, ctx.swap.extent.height)));
 
-    command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_layout, 0, { per_frame[frame_index].set }, nullptr);
 
-    recorder(command);
+}
 
+void ClassicRender::render(vk::Semaphore semaphore) {
+
+    OPTICK_EVENT();
+    
+    auto& f = per_frame[ctx.frame_index];
+
+    auto command = f.commandBuffer;
+    
     command.endRenderPass();
 
     command.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eTopOfPipe, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ImageMemoryBarrier(
         vk::AccessFlagBits::eColorAttachmentWrite, {}, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
-        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, ctx.swap.images[image_index], vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
+        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, ctx.swap.images[ctx.swap.current], vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
     ));
 
     command.end();
-
-
-}
-
-void ClassicRender::render(uint32_t frame_index) {
-
-    OPTICK_EVENT();
-
-    auto& f = per_frame[frame_index];
+    
 
     {
-        CameraC& camera = reg.ctx<CameraC>();
-
-        per_frame[frame_index].pointer->view_projection = camera.projection * glm::inverse(camera.view);
-        per_frame[frame_index].pointer->position = glm::vec4(camera.position, 1.0f);
+        auto& camera = reg.ctx<Camera>();
+        
+        f.pointer->position = camera.corner;
+        f.pointer->size = camera.size;
     }
 
     // Submit command buffer
 
     {
 
-        auto stages = std::vector<vk::PipelineStageFlags>{ vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTopOfPipe };
-
+        
+        
+        std::vector<vk::Semaphore> semaphores;
+        auto stages = std::vector<vk::PipelineStageFlags>();
+        
+        semaphores.push_back(f.acquireSemaphore);
+        stages.push_back(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+        
+        if(semaphore) {
+            semaphores.push_back(semaphore);
+            stages.push_back(vk::PipelineStageFlagBits::eTopOfPipe);
+        }
+        
         OPTICK_EVENT("submit");
         ctx.device.graphics.submit({ vk::SubmitInfo(
-                1, &per_frame[frame_index].acquireSemaphore, stages.data(),
-                1, &per_frame[frame_index].commandBuffer,
-                1, &per_frame[frame_index].presentSemaphore
-        ) }, per_frame[frame_index].fence);
+                semaphores.size(), semaphores.data(), stages.data(),
+                1, &command,
+                1, &f.presentSemaphore
+        ) }, f.fence);
 
     }
 
-    ctx.swap.present(per_frame[frame_index].presentSemaphore);
+    ctx.swap.present(f.presentSemaphore);
 
 }
 
@@ -143,8 +171,13 @@ ClassicRender::~ClassicRender() {
 
     for (int i = 0; i < per_frame.size(); i++) {
         ctx.device->destroy(per_frame[i].fence);
+        ctx.device->destroy(per_frame[i].acquireSemaphore);
+        ctx.device->destroy(per_frame[i].presentSemaphore);
     }
 
     ctx.device->destroy(commandPool);
+    ctx.device->destroy(descriptorPool);
+    ctx.device->destroy(view_layout);
+    
 
 }

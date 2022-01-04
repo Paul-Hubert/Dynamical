@@ -7,11 +7,13 @@
 
 #include <entt/entt.hpp>
 
+namespace dy {
+
 class Context;
 
 #ifndef NDEBUG
 #define SET_NAME(TYPE, HANDLE, STR) \
-device->setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT(TYPE, (uint64_t) HANDLE, #STR), device);
+ctx.device->setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT(TYPE, (uint64_t) HANDLE, #STR));
 #else
 #define SET_NAME(TYPE, HANDLE, STR)
 #endif
@@ -41,11 +43,11 @@ public :
     vk::Device logical;
     VmaAllocator allocator;
     
-    PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT;
-    
 private:
     Context& ctx;
     entt::registry& reg;
 };
+
+}
 
 #endif

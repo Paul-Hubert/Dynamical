@@ -5,7 +5,7 @@
 
 #include "cereal/archives/json.hpp"
 
-
+using namespace dy;
 
 void Settings::load() {
     if(std::filesystem::exists(DYNAMICAL_CONFIG_FILE)) {

@@ -8,23 +8,26 @@
 
 #include "renderer/util/vmapp.h"
 
-#include "renderer/model/bufferc.h"
-#include "renderer/model/imagec.h"
-
 #include <entt/entt.hpp>
+
+namespace dy {
 
 class Context;
 
 class Transfer {
 public:
     Transfer(Context& ctx, entt::registry& reg);
-    void flush();
+    bool flush(vk::Semaphore semaphore = nullptr);
     vk::CommandBuffer getCommandBuffer();
     
-    std::shared_ptr<ImageC> createImage(const void* data, size_t real_size, vk::ImageCreateInfo info, vk::ImageLayout layout);
-    std::shared_ptr<BufferC> createBuffer(const void* data, vk::BufferCreateInfo info);
+    std::shared_ptr<VmaImage> createImage(const void* data, size_t real_size, vk::ImageCreateInfo info, vk::ImageLayout layout);
+    std::shared_ptr<VmaBuffer> createBuffer(const void* data, vk::BufferCreateInfo info);
+    
+    void check();
     
     ~Transfer();
+    
+    
 private:
     Context& ctx;
     entt::registry& reg;
@@ -37,8 +40,8 @@ private:
         vk::Fence fence;
         std::vector<VmaBuffer> stagingBuffers;
 
-        std::vector<std::shared_ptr<BufferC>> uploaded_buffers;
-        std::vector<std::shared_ptr<ImageC>> uploaded_images;
+        std::vector<std::shared_ptr<VmaBuffer>> uploaded_buffers;
+        std::vector<std::shared_ptr<VmaImage>> uploaded_images;
     };
 
     std::vector<Upload> uploads;
@@ -46,6 +49,9 @@ private:
     
     bool empty = true;
     
+    
 };
+
+}
 
 #endif

@@ -7,6 +7,8 @@
 #include "system.h"
 #include "entt/entt.hpp"
 
+namespace dy {
+    
 class SystemSet {
 public:
     SystemSet(entt::registry& reg) : reg(reg) {}
@@ -37,5 +39,7 @@ private:
     std::vector<std::unique_ptr<System>> post_systems;
     
 };
+
+}
 
 #endif

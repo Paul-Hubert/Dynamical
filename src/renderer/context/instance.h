@@ -5,6 +5,8 @@
 
 #include <entt/entt.hpp>
 
+namespace dy {
+
 class Context;
 
 class Instance {
@@ -27,5 +29,7 @@ private:
     
     PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
 };
+
+}
 
 #endif

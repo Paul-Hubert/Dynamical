@@ -7,9 +7,9 @@
 
 namespace dy {
 
-    enum Level { trace, debug, info, warning, error, critical };
+enum Level { trace, debug, info, warning, error, critical };
 
-    std::ostream& log(Level l = Level::trace);
+std::ostream& log(Level l = Level::trace);
 
 }
 

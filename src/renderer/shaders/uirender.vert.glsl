@@ -21,5 +21,5 @@ void main() {
     v_color = a_color;
     v_uv = a_uv;
 
-    gl_Position.y = -gl_Position.y;
+    //gl_Position.y = -gl_Position.y;
 }

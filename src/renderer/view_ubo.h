@@ -3,11 +3,15 @@
 
 #include "glm/glm.hpp"
 
+namespace dy {
+
 struct ViewUBO {
 
-    glm::mat4 view_projection;
-    glm::vec4 position;
+    glm::vec2 position;
+    glm::vec2 size;
     
 };
+
+}
 
 #endif

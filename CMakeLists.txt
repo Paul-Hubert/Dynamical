@@ -4,12 +4,17 @@ set(CMAKE_CXX_STANDARD 17)
 
 project(dynamical)
 
+set(FASTNOISE2_NOISETOOL OFF CACHE BOOL "Build Noise Tool" FORCE)
+add_subdirectory(lib/FastNoise2)
+
 include_directories("./src")
-include_directories("./3rdparty")
+include_directories("./lib")
 
 file(GLOB_RECURSE sources ./src/main.cpp ./src/*.cpp ./src/*.h)
 
 add_executable(dynamical ${sources})
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ./)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(dynamical PRIVATE -Wall -Wextra -Wno-sign-compare -Wno-unused-variable -Wno-unused-parameter -Wno-class-memaccess -Wno-unused-but-set-variable -Wno-reorder -Wno-missing-field-initializers -Wno-unused-function -Wno-type-limits)
@@ -23,9 +28,6 @@ target_link_libraries(dynamical PRIVATE SDL2::SDL2 SDL2::SDL2main)
 
 find_package(imgui CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE imgui::imgui)
-
-find_package(EnTT CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE EnTT::EnTT)
 
 find_package(cereal CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE cereal)
@@ -54,6 +56,9 @@ target_include_directories(dynamical PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 
 find_package(nlohmann_json CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE nlohmann_json nlohmann_json::nlohmann_json)
+
+target_link_libraries(dynamical PRIVATE FastNoise)
+target_include_directories(dynamical PRIVATE "lib/FastNoise2/include/")
 
 target_compile_definitions(dynamical PRIVATE OPTICK_ENABLE_GPU_D3D12=0)
 target_compile_definitions(dynamical PRIVATE OPTICK_ENABLE_GPU_VULKAN=1)
