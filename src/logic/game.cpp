@@ -23,6 +23,7 @@
 
 #include "logic/systems/selection.h"
 
+#include "logic/systems/map_upload.h"
 #include "logic/systems/map_render.h"
 #include "logic/systems/object_render.h"
 #include "logic/systems/ui_render.h"
@@ -68,7 +69,8 @@ void Game::start() {
     set->pre_add<AISys>();
     
     set->pre_add<ActionBarSys>();
-    
+
+    set->post_add<MapUploadSys>();
     set->post_add<MapRenderSys>();
     set->post_add<ObjectRenderSys>();
     set->post_add<UIRenderSys>();

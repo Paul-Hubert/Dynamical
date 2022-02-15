@@ -5,6 +5,8 @@
 #include <mutex>
 #include <iostream>
 
+#include "renderer/context/num_frames.h"
+
 namespace dy {
     
 std::vector<char> readFile(char const* filename);
@@ -124,6 +126,20 @@ private:
 inline float lerp(float a, float b, float r) {
     return a * (1.f - r) + b * r;
 }
+
+class Context;
+
+template<typename T>
+class PerFrame {
+public:
+    template<typename... Args>
+    PerFrame(Args&&... args) : frames(std::forward<Args>(args)...) {}
+    PerFrame() {}
+
+    T& get(uint32_t index) {frames.get(index);}
+private:
+    std::array<T, NUM_FRAMES> frames;
+};
 
 };
 
