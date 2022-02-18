@@ -1,6 +1,6 @@
 #version 450
 
-layout(location = 0) in vec2 v_uv;
+layout(location = 0) in vec2 v_pos;
 
 layout(location = 0) out vec4 outColor;
 
@@ -9,6 +9,8 @@ layout(constant_id = 1) const int NUM_TYPES = 7;
 layout(constant_id = 2) const int MAX_CHUNKS = 10000;
 
 layout(set = 0, binding = 0) uniform Camera {
+    mat4 projection;
+    mat4 view;
     vec2 position;
     vec2 size;
 };
@@ -55,7 +57,7 @@ float rand(vec2 co){
 
 void main() {
     
-    vec2 pos = position + v_uv * size;
+    vec2 pos = v_pos;
     ivec2 ipos = ifloor(pos);
     
     int type = getType(pos);

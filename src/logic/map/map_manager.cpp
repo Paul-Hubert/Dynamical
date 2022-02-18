@@ -59,12 +59,14 @@ void MapManager::insert(entt::entity entity, glm::vec2 position) {
         dy::log(dy::Level::critical) << "Chunk not generated\n";
         return;
     }
-    reg.emplace<Position>(entity, position);
+    float height = getTile(position)->level;
+    reg.emplace<Position>(entity, position, height);
     chunk->addObject(entity);
 }
 
 void MapManager::move(entt::entity entity, glm::vec2 position) {
     auto& pos = reg.get<Position>(entity);
+    float height = pos.getHeight();
     if(getChunkPos(position) != getChunkPos(pos)) {
         Chunk* old_chunk = getChunk(getChunkPos(pos));
         if(old_chunk == nullptr) {
@@ -78,8 +80,9 @@ void MapManager::move(entt::entity entity, glm::vec2 position) {
             return;
         }
         new_chunk->addObject(entity);
+        height = getTile(position)->level;
     }
-    pos = position;
+    reg.replace<Position>(entity, pos, height);
 }
 
 void MapManager::remove(entt::entity entity) {
@@ -103,7 +106,7 @@ glm::vec2 MapManager::getMousePosition() const {
     auto& input = reg.ctx<Input>();
     auto& cam = reg.ctx<Camera>();
     
-    return cam.fromScreenSpace(input.mousePos, input.screenSize);
+    return cam.fromScreenSpace(input.mousePos);
     
 }
 

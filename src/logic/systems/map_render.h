@@ -34,7 +34,10 @@ public:
     
 private:
     
-    void initPipeline(vk::RenderPass);
+    void initPipeline();
+
+    int numIndices;
+    std::shared_ptr<dy::VmaBuffer> indexBuffer;
 
     vk::PipelineLayout pipelineLayout;
     vk::Pipeline graphicsPipeline;

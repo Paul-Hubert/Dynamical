@@ -3,7 +3,6 @@
 #include "renderer/context/context.h"
 
 #include "imgui.h"
-#include <string.h>
 
 #include "util/util.h"
 #include "util/log.h"
@@ -20,17 +19,39 @@
 using namespace dy;
 
 MapRenderSys::MapRenderSys(entt::registry& reg) : System(reg) {
-    
+
     Context& ctx = *reg.ctx<Context*>();
 
-    initPipeline(ctx.classic_render.renderpass);
-    
+    initPipeline();
+
+    std::vector<int> indices;
+
+    float gridSize = Chunk::size + 1;
+
+    for(int x = 0; x<gridSize; x++) {
+        for(int y = 0; y<gridSize; y++) {
+
+            int vertex_index = x + y * gridSize;
+            indices.push_back(vertex_index);
+            indices.push_back(vertex_index + 1);
+            indices.push_back(vertex_index + gridSize);
+            indices.push_back(vertex_index + 1);
+            indices.push_back(vertex_index + gridSize + 1);
+            indices.push_back(vertex_index + gridSize);
+
+        }
+    }
+
+    numIndices = indices.size();
+
+    indexBuffer = ctx.transfer.createBuffer(indices.data(), vk::BufferCreateInfo({}, indices.size() * sizeof(uint32_t), vk::BufferUsageFlagBits::eIndexBuffer, vk::SharingMode::eExclusive));
+
 }
 
 void MapRenderSys::tick(float dt) {
     
     OPTICK_EVENT();
-    
+
     Context& ctx = *reg.ctx<Context*>();
 
     MapUploadData& data = reg.ctx<MapUploadData>();
@@ -38,22 +59,23 @@ void MapRenderSys::tick(float dt) {
     ctx.classic_render.command.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
     
     ctx.classic_render.command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, { ctx.classic_render.per_frame[ctx.frame_index].set, data.descSet}, nullptr);
-    
-    ctx.classic_render.command.draw(3, 1, 0, 0);
-    
-    
+
+    ctx.classic_render.command.bindIndexBuffer(indexBuffer->buffer, 0, vk::IndexType::eUint32);
+
+    ctx.classic_render.command.drawIndexed(numIndices, data.num_chunks, 0, 0, 0);
+
 }
 
-void MapRenderSys::initPipeline(vk::RenderPass renderpass) {
-    
+void MapRenderSys::initPipeline() {
+
     Context& ctx = *reg.ctx<Context*>();
 
     MapUploadData& data = reg.ctx<MapUploadData>();
     
     // PIPELINE INFO
     
-    auto vertShaderCode = dy::readFile("./resources/shaders/maprender.vert.glsl.spv");
-    auto fragShaderCode = dy::readFile("./resources/shaders/maprender.frag.glsl.spv");
+    auto vertShaderCode = dy::readFile("resources/shaders/maprender.vert.glsl.spv");
+    auto fragShaderCode = dy::readFile("resources/shaders/maprender.frag.glsl.spv");
     
     VkShaderModuleCreateInfo moduleInfo = {};
     moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -66,20 +88,21 @@ void MapRenderSys::initPipeline(vk::RenderPass renderpass) {
     moduleInfo.pCode = reinterpret_cast<const uint32_t*>(fragShaderCode.data());
     VkShaderModule fragShaderModule = static_cast<VkShaderModule> (ctx.device->createShaderModule(moduleInfo));
 
-    VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
-    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertShaderStageInfo.module = vertShaderModule;
-    vertShaderStageInfo.pName = "main";
-    
     auto specEntries = std::vector {
         vk::SpecializationMapEntry(0, 0, sizeof(int)),
         vk::SpecializationMapEntry(1, sizeof(int), sizeof(int)),
         vk::SpecializationMapEntry(2, 2 * sizeof(int), sizeof(int))
     };
-    
+
     auto specValues = std::vector<int> {Chunk::size, Tile::Type::max, max_chunks};
     auto specInfo = vk::SpecializationInfo(specEntries.size(), specEntries.data(), specValues.size() * sizeof(int), specValues.data());
+
+    VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+    vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertShaderStageInfo.module = vertShaderModule;
+    vertShaderStageInfo.pName = "main";
+    vertShaderStageInfo.pSpecializationInfo = reinterpret_cast<VkSpecializationInfo*> (&specInfo);
 
     VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
     fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -201,7 +224,7 @@ void MapRenderSys::initPipeline(vk::RenderPass renderpass) {
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynInfo;
     pipelineInfo.layout = static_cast<VkPipelineLayout>(pipelineLayout);
-    pipelineInfo.renderPass = static_cast<VkRenderPass>(renderpass);
+    pipelineInfo.renderPass = static_cast<VkRenderPass>(ctx.classic_render.renderpass);
     pipelineInfo.subpass = 0;
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
@@ -214,7 +237,7 @@ void MapRenderSys::initPipeline(vk::RenderPass renderpass) {
 }
 
 MapRenderSys::~MapRenderSys() {
-    
+
     Context& ctx = *reg.ctx<Context*>();
     
     ctx.device->destroy(graphicsPipeline);

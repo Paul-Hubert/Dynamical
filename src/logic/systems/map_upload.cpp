@@ -58,7 +58,7 @@ MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
 
     {
         auto bindings = std::vector {
-            vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eFragment)
+            vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
         };
         data.descLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, (uint32_t) bindings.size(), bindings.data()));
 
@@ -104,12 +104,13 @@ void MapUploadSys::tick(float dt) {
     auto& map = reg.ctx<MapManager>();
     auto& camera = reg.ctx<Camera>();
 
-    auto corner_pos = map.getChunkPos(camera.corner)-1;
-    auto end_pos = map.getChunkPos(camera.corner + camera.size)+1;
+    auto corner_pos = map.getChunkPos(camera.getCorner());//-1;
+    auto end_pos = map.getChunkPos(camera.getCorner() + camera.getSize());//+1;
 
     header->corner_indices = corner_pos;
     header->chunk_length = end_pos.y - corner_pos.y + 1;
     int chunk_indices_counter = 0;
+
 
     for(int x = corner_pos.x; x <= end_pos.x; x++) {
         for(int y = corner_pos.y; y <= end_pos.y; y++) {
@@ -202,6 +203,9 @@ void MapUploadSys::tick(float dt) {
     }
 
     transfer.copyBuffer(f.stagingBuffer, storageBuffer, regions);
+
+    MapUploadData& data = reg.ctx<MapUploadData>();
+    data.num_chunks = chunk_indices_counter;
 
 }
 

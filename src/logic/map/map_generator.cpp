@@ -139,11 +139,11 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
     auto fnFractal = FastNoise::New<FastNoise::FractalFBm>();
 
     fnFractal->SetSource(fnSimplex);
-    fnFractal->SetOctaveCount(20);
+    fnFractal->SetOctaveCount(10);
     
     std::vector<float> noiseOutput(Chunk::size * Chunk::size);
 
-    fnFractal->GenUniformGrid2D(noiseOutput.data(), pos.x * Chunk::size, pos.y * Chunk::size, Chunk::size, Chunk::size, 0.0006f, 1346);
+    fnFractal->GenUniformGrid2D(noiseOutput.data(), pos.x * Chunk::size, pos.y * Chunk::size, Chunk::size, Chunk::size, 0.001f, 1347);
     
     for(int i = 0; i<Chunk::size; i++) {
         for(int j = 0; j<Chunk::size; j++) {

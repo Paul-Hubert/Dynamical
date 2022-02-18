@@ -78,15 +78,8 @@ void ClassicRender::prepare() {
         ctx.device->resetFences({ f.fence });
 
     }
-    
-    {
-        auto& camera = reg.ctx<Camera>();
 
-        f.pointer->position = camera.corner;
-        f.pointer->size = camera.size;
-    }
-    
-    
+
     ctx.swap.current = ctx.swap.acquire(f.acquireSemaphore);
 
     command = f.commandBuffer;
@@ -106,7 +99,6 @@ void ClassicRender::prepare() {
     command.setViewport(0, vk::Viewport(0.f, 0.f, (float)ctx.swap.extent.width, (float)ctx.swap.extent.height, 0.f, 1.f));
 
     command.setScissor(0, vk::Rect2D(vk::Offset2D(), vk::Extent2D(ctx.swap.extent.width, ctx.swap.extent.height)));
-
 
 }
 
@@ -130,9 +122,13 @@ void ClassicRender::render(vk::Semaphore semaphore) {
 
     {
         auto& camera = reg.ctx<Camera>();
-        
-        f.pointer->position = camera.corner;
-        f.pointer->size = camera.size;
+
+        f.pointer->projection = camera.getProjection();
+        f.pointer->view = camera.getView();
+
+        f.pointer->position = camera.getCorner();
+        f.pointer->size = camera.getSize();
+
     }
 
     // Submit command buffer
@@ -178,6 +174,6 @@ ClassicRender::~ClassicRender() {
     ctx.device->destroy(commandPool);
     ctx.device->destroy(descriptorPool);
     ctx.device->destroy(view_layout);
-    
+
 
 }

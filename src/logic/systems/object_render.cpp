@@ -23,9 +23,9 @@ struct RenderObject {
 };
 
 ObjectRenderSys::ObjectRenderSys(entt::registry& reg) : System(reg) {
-    
+
     Context& ctx = *reg.ctx<Context*>();
-    
+
     per_frame.resize(NUM_FRAMES);
     
     {
@@ -62,16 +62,16 @@ ObjectRenderSys::ObjectRenderSys(entt::registry& reg) : System(reg) {
         
     }
 
-    initPipeline(ctx.classic_render.renderpass);
+    initPipeline();
     
 }
 
 void ObjectRenderSys::tick(float dt) {
     
     OPTICK_EVENT();
-    
+
     Context& ctx = *reg.ctx<Context*>();
-    
+
     auto& f = per_frame[ctx.frame_index];
     
     auto transfer = ctx.transfer.getCommandBuffer();
@@ -82,8 +82,8 @@ void ObjectRenderSys::tick(float dt) {
     auto& map = reg.ctx<MapManager>();
     auto& camera = reg.ctx<Camera>();
     
-    auto corner_pos = map.getChunkPos(camera.corner)-1;
-    auto end_pos = map.getChunkPos(camera.corner + camera.size)+1;
+    auto corner_pos = map.getChunkPos(camera.getCorner())-1;
+    auto end_pos = map.getChunkPos(camera.getCorner() + camera.getSize())+1;
     
     for(int x = corner_pos.x; x <= end_pos.x; x++) {
         for(int y = corner_pos.y; y <= end_pos.y; y++) {
@@ -143,8 +143,8 @@ void ObjectRenderSys::tick(float dt) {
     
 }
 
-void ObjectRenderSys::initPipeline(vk::RenderPass renderpass) {
-    
+void ObjectRenderSys::initPipeline() {
+
     Context& ctx = *reg.ctx<Context*>();
     
     // PIPELINE INFO
@@ -288,7 +288,7 @@ void ObjectRenderSys::initPipeline(vk::RenderPass renderpass) {
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynInfo;
     pipelineInfo.layout = static_cast<VkPipelineLayout>(pipelineLayout);
-    pipelineInfo.renderPass = static_cast<VkRenderPass>(renderpass);
+    pipelineInfo.renderPass = static_cast<VkRenderPass>(ctx.classic_render.renderpass);
     pipelineInfo.subpass = 0;
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
@@ -301,7 +301,7 @@ void ObjectRenderSys::initPipeline(vk::RenderPass renderpass) {
 }
 
 ObjectRenderSys::~ObjectRenderSys() {
-    
+
     Context& ctx = *reg.ctx<Context*>();
     
     ctx.device->destroy(descPool);

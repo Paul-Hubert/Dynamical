@@ -15,10 +15,9 @@ void CameraSys::preinit() {
     auto& ctx = *reg.ctx<Context*>();
     
     auto& camera = reg.set<Camera>();
-    camera.center = glm::ivec2(0,0);
-    camera.corner = camera.center - camera.size / 2.f;
-    camera.size.x = 100.0f;
-    camera.size.y = camera.size.x * ctx.swap.extent.height / ctx.swap.extent.width;
+    camera.setCenter(glm::vec3(0,0,0));
+    float width = 100.f;
+    camera.setSize(glm::vec2(width, camera.getSize().x * ctx.swap.extent.height / ctx.swap.extent.width));
 }
 
 void CameraSys::init() {
@@ -32,29 +31,44 @@ void CameraSys::tick(float dt) {
     auto& input = reg.ctx<Input>();
     
     auto& camera = reg.ctx<Camera>();
+
+    glm::vec2 size = camera.getSize();
+    glm::vec3 center = camera.getCenter();
+
+    size.x *= 1 - 0.1 * input.mouseWheel.y;
     
-    camera.size.x *= 1 - 0.1 * input.mouseWheel.y;
-    
-    float speed = 20.0 * camera.size.x / 100.0;
+    float speed = 20.0 * size.x / 100.0;
     
     if(input.on[Input::FORWARD]) {
-        camera.center.y -= speed * dt;
+        center.y -= speed * dt;
     } if(input.on[Input::BACKWARD]) {
-        camera.center.y += speed * dt;
+        center.y += speed * dt;
     } if(input.on[Input::LEFT]) {
-        camera.center.x -= speed * dt;
+        center.x -= speed * dt;
     } if(input.on[Input::RIGHT]) {
-        camera.center.x += speed * dt;
+        center.x += speed * dt;
     }
     
     
     auto& ctx = *reg.ctx<Context*>();
-    camera.size.y = camera.size.x * ctx.swap.extent.height / ctx.swap.extent.width;
-    
-    camera.corner = camera.center - camera.size / 2.f;
+    size.y = size.x * ctx.swap.extent.height / ctx.swap.extent.width;
+
+    camera.setCenter(center);
+    camera.setSize(size);
     
 }
 
 void CameraSys::finish() {
     
 }
+
+glm::mat4 Camera::createProjection() {
+    return glm::ortho(-size.x/2, size.x/2, -size.y/2, +size.y/2, -10.f, 10.f);
+}
+
+glm::mat4 Camera::createView() {
+    glm::mat4 camera = glm::identity<glm::mat4>();
+    camera = glm::translate(camera, center);
+    return glm::inverse(camera);
+}
+
