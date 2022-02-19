@@ -17,12 +17,17 @@ layout(set = 0, binding = 0) uniform Camera {
     vec2 size;
 };
 
+struct Tile {
+    int type;
+    float height;
+};
+
 layout(std430, set = 1, binding = 0) readonly buffer Map {
     vec4 colors[NUM_TYPES];
     ivec2 corner_indices;
     int chunk_length;
     int chunk_indices[MAX_CHUNKS];
-    int tiles[];
+    Tile tiles[];
 };
 
 void main() {

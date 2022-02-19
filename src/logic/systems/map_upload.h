@@ -21,6 +21,11 @@ namespace dy {
     constexpr int max_chunks = 10000;
     constexpr int max_stored_chunks = 50000;
 
+    struct TileData {
+        int type;
+        float height;
+    };
+
     struct Header {
         glm::vec4 colors[Tile::Type::max];
         glm::ivec2 corner_indices;
@@ -29,7 +34,7 @@ namespace dy {
     };
 
     struct RenderChunk {
-        int tiles[Chunk::size*Chunk::size];
+        TileData tiles[Chunk::size*Chunk::size];
     };
 
     struct MapUploadData {

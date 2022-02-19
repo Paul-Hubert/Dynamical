@@ -167,7 +167,8 @@ void MapUploadSys::tick(float dt) {
 
                 for(int i = 0; i<Chunk::size; i++) {
                     for(int j = 0; j<Chunk::size; j++) {
-                        rchunk[staging_counter].tiles[i * Chunk::size + j] = chunk->get(glm::vec2(i,j)).terrain;
+                        Tile& tile = chunk->get(glm::vec2(i,j));
+                        rchunk[staging_counter].tiles[i * Chunk::size + j] = {tile.terrain, tile.level};
                     }
                 }
 

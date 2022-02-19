@@ -72,7 +72,7 @@ void Game::start() {
 
     set->post_add<MapUploadSys>();
     set->post_add<MapRenderSys>();
-    set->post_add<ObjectRenderSys>();
+    //set->post_add<ObjectRenderSys>();
     set->post_add<UIRenderSys>();
     
     

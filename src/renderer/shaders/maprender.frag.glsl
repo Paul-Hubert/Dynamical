@@ -15,19 +15,24 @@ layout(set = 0, binding = 0) uniform Camera {
     vec2 size;
 };
 
+struct Tile {
+    int type;
+    float height;
+};
+
 layout(std430, set = 1, binding = 0) readonly buffer Map {
     vec4 colors[NUM_TYPES];
     ivec2 corner_indices;
     int chunk_length;
     int chunk_indices[MAX_CHUNKS];
-    int tiles[];
+    Tile tiles[];
 };
 
 ivec2 ifloor(vec2 v) {
     return ivec2(floor(v));
 }
 
-int getType(vec2 pos) {
+Tile getTile(vec2 pos) {
 
     ivec2 ipos = ifloor(pos);
 
@@ -35,16 +40,16 @@ int getType(vec2 pos) {
 
     ivec2 indices = real_indices - corner_indices;
 
-    if(indices.x * chunk_length + indices.y >= MAX_CHUNKS) return -1;
+    //if(indices.x * chunk_length + indices.y >= MAX_CHUNKS) return -1;
 
     ivec2 tile_space = ipos - real_indices * CHUNK_SIZE;
 
     int chunk_index = chunk_indices[indices.x * chunk_length + indices.y];
-    
-    int type = tiles[chunk_index * CHUNK_SIZE * CHUNK_SIZE + tile_space.x * CHUNK_SIZE + tile_space.y];
-    
-    return type;
-    
+
+    Tile tile = tiles[chunk_index * CHUNK_SIZE * CHUNK_SIZE + tile_space.x * CHUNK_SIZE + tile_space.y];
+
+    return tile;
+
 }
 
 vec2 diagonal(vec2 pos) {
@@ -56,22 +61,22 @@ float rand(vec2 co){
 }
 
 void main() {
-    
+
     vec2 pos = v_pos;
     ivec2 ipos = ifloor(pos);
     
-    int type = getType(pos);
+    Tile tile = getTile(pos);
     vec2 rond = round(pos);
     vec2 dist = rond - pos;
     vec2 diag = rond + dist;
-    int xadj = getType(vec2(diag.x, pos.y));
-    int yadj = getType(vec2(pos.x, diag.y));
-    int dadj = getType(diag);
+    Tile xadj = getTile(vec2(diag.x, pos.y));
+    Tile yadj = getTile(vec2(pos.x, diag.y));
+    Tile dadj = getTile(diag);
     
     int trespass = 0;
-    if(xadj == yadj) {
-        if(type != dadj) {trespass = 1;}
-        else if(type != xadj) {
+    if(xadj.type == yadj.type) {
+        if(tile.type != dadj.type) {trespass = 1;}
+        else if(tile.type != xadj.type) {
             float ran = rand(rond) - 0.5;
             ran *= sign(dist.x) * sign(dist.y);
             if(ran >= 0) trespass = 1;
@@ -79,9 +84,9 @@ void main() {
     }
     
     if(trespass == 1 && length(pos - (ifloor(pos) + 0.5)) > 0.5)
-            type = xadj;
+            tile.type = xadj.type;
     
-    vec4 color = colors[type];
+    vec4 color = colors[tile.type];
     
     outColor = color;
 
