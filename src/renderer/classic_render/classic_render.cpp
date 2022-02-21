@@ -145,7 +145,7 @@ void ClassicRender::render(vk::Semaphore semaphore) {
         
         if(semaphore) {
             semaphores.push_back(semaphore);
-            stages.push_back(vk::PipelineStageFlagBits::eTopOfPipe);
+            stages.push_back(vk::PipelineStageFlagBits::eVertexInput);
         }
         
         OPTICK_EVENT("submit");

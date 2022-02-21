@@ -17,7 +17,7 @@ void CameraSys::preinit() {
     auto& camera = reg.set<Camera>();
     camera.setCenter(glm::vec3(0,0,0));
     float width = 100.f;
-    camera.setSize(glm::vec2(width, camera.getSize().x * ctx.swap.extent.height / ctx.swap.extent.width));
+    camera.setSize(glm::vec2(width, width * ctx.swap.extent.height / ctx.swap.extent.width));
 }
 
 void CameraSys::init() {

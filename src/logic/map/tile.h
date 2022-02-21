@@ -17,7 +17,7 @@ public:
         water,
         shallow_water,
         max
-    };
+    }; // MUST UPDATE IN SHADER
     
     const inline static std::unordered_map<Type, float> terrain_speed = {
         {nothing, 0.0},

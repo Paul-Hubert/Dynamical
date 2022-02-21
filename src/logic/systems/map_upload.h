@@ -18,12 +18,12 @@
 
 namespace dy {
     
-    constexpr int max_chunks = 10000;
+    constexpr int max_chunks = 10000; // MUST CHANGE IN SHADER
     constexpr int max_stored_chunks = 50000;
 
     struct TileData {
         int type;
-        float height;
+        //float height;
     };
 
     struct Header {
@@ -71,7 +71,7 @@ namespace dy {
             glm::ivec2 position; // in chunk space
             bool used = false;
             bool stored = false;
-            Chunk* chunk;
+            Chunk* chunk = nullptr;
         };
         std::vector<StoredChunk> stored_chunks;
         int storage_counter = 0;

@@ -1,12 +1,13 @@
 #version 450
 
 layout(location = 0) in vec2 v_pos;
+layout(location = 1) in vec4 v_color;
 
 layout(location = 0) out vec4 outColor;
 
 layout(constant_id = 0) const int CHUNK_SIZE = 32;
 layout(constant_id = 1) const int NUM_TYPES = 7;
-layout(constant_id = 2) const int MAX_CHUNKS = 10000;
+layout(constant_id = 2) const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
 layout(set = 0, binding = 0) uniform Camera {
     mat4 projection;
@@ -17,7 +18,7 @@ layout(set = 0, binding = 0) uniform Camera {
 
 struct Tile {
     int type;
-    float height;
+    //float height;
 };
 
 layout(std430, set = 1, binding = 0) readonly buffer Map {
@@ -40,7 +41,7 @@ Tile getTile(vec2 pos) {
 
     ivec2 indices = real_indices - corner_indices;
 
-    //if(indices.x * chunk_length + indices.y >= MAX_CHUNKS) return -1;
+    if(indices.x * chunk_length + indices.y >= MAX_CHUNKS) discard;
 
     ivec2 tile_space = ipos - real_indices * CHUNK_SIZE;
 
@@ -61,6 +62,10 @@ float rand(vec2 co){
 }
 
 void main() {
+    
+    outColor = v_color;
+
+    /*
 
     vec2 pos = v_pos;
     ivec2 ipos = ifloor(pos);
@@ -98,8 +103,9 @@ void main() {
 
     int chunk_index = chunk_indices[indices.x * chunk_length + indices.y];
 
-    //outColor.rgb = vec3(float(chunk_index) / 100.0);
+    //outColor.rgb = vec3(float(indices.x * chunk_length + indices.y) / MAX_CHUNKS);
 
     outColor.a = 1.0;
+    */
     
 }

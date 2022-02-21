@@ -77,6 +77,8 @@ void MapUploadSys::tick(float dt) {
     OPTICK_EVENT();
 
     Context& ctx = *reg.ctx<Context*>();
+    
+    MapUploadData& data = reg.ctx<MapUploadData>();
 
     auto& f = per_frame[ctx.frame_index];
 
@@ -100,7 +102,6 @@ void MapUploadSys::tick(float dt) {
 
     int staging_counter = 0;
 
-
     auto& map = reg.ctx<MapManager>();
     auto& camera = reg.ctx<Camera>();
 
@@ -109,28 +110,30 @@ void MapUploadSys::tick(float dt) {
 
     header->corner_indices = corner_pos;
     header->chunk_length = end_pos.y - corner_pos.y + 1;
-    int chunk_indices_counter = 0;
 
+    data.num_chunks = 0;
 
     for(int x = corner_pos.x; x <= end_pos.x; x++) {
         for(int y = corner_pos.y; y <= end_pos.y; y++) {
 
             OPTICK_EVENT("MapRenderSys::tick::chunk");
 
-            auto pos = glm::ivec2(x, y);
+            auto chunk_pos = glm::ivec2(x, y);
 
             bool stored = false;
+            
+            StoredChunk& sc = stored_chunks[0];
+            int index;
+
             for(int i = 0; i<stored_chunks.size(); i++) {
-                auto& sc = stored_chunks[i];
-                if(sc.stored && sc.position == pos) {
+                sc = stored_chunks[i];
+                if(sc.stored && sc.position == chunk_pos) {
                     if(sc.chunk->isUpdated()) {
                         sc.stored = false;
                         break;
                     }
                     stored = true;
-                    header->chunk_indices[chunk_indices_counter] = i;
-                    chunk_indices_counter++;
-                    sc.used = true;
+                    index = i;
                     break;
                 }
             }
@@ -139,62 +142,59 @@ void MapUploadSys::tick(float dt) {
 
             if(!stored) {
 
-                int index;
-
-                if(stored_chunks.size() >= max_stored_chunks) {
-                    auto& sc = stored_chunks[storage_counter];
-                    while(
-                            sc.stored
-                            && (sc.used
-                            || (sc.position.x >= corner_pos.x && sc.position.x <= end_pos.x
-                            && sc.position.y >= corner_pos.y && sc.position.y <= end_pos.y))
-                            ) {
-                        storage_counter = (storage_counter+1)%max_stored_chunks;
-                        sc = stored_chunks[storage_counter];
-                    }
-                    index = storage_counter;
+                sc = stored_chunks[storage_counter];
+                while(
+                        sc.stored
+                        && (sc.used
+                        || (sc.position.x >= corner_pos.x && sc.position.x <= end_pos.x
+                        && sc.position.y >= corner_pos.y && sc.position.y <= end_pos.y))
+                        ) {
                     storage_counter = (storage_counter+1)%max_stored_chunks;
-                } else {
-                    index = stored_chunks.size();
-                    stored_chunks.push_back(StoredChunk{pos});
-                    storage_counter = (storage_counter+1)%max_stored_chunks;
+                    sc = stored_chunks[storage_counter];
                 }
 
-                Chunk* chunk = map.getChunk(pos);
-                if(chunk == nullptr) chunk = map.generateChunk(pos);
+                index = storage_counter;
+                storage_counter = (storage_counter+1)%max_stored_chunks;
+
+
+                Chunk* chunk = map.getChunk(chunk_pos);
+                if(chunk == nullptr) chunk = map.generateChunk(chunk_pos);
 
                 RenderChunk* rchunk = reinterpret_cast<RenderChunk*>(header+1);
 
                 for(int i = 0; i<Chunk::size; i++) {
                     for(int j = 0; j<Chunk::size; j++) {
                         Tile& tile = chunk->get(glm::vec2(i,j));
-                        rchunk[staging_counter].tiles[i * Chunk::size + j] = {tile.terrain, tile.level};
+                        rchunk[staging_counter].tiles[i * Chunk::size + j] = {tile.terrain/*, tile.level*/};
                     }
                 }
 
                 regions.push_back(vk::BufferCopy(sizeof(Header) + staging_counter * sizeof(RenderChunk), sizeof(Header) + index * sizeof(RenderChunk), sizeof(RenderChunk)));
 
-                header->chunk_indices[chunk_indices_counter] = index;
-                chunk_indices_counter++;
-
-
-                stored_chunks[index].position = pos;
-                stored_chunks[index].used = true;
-                stored_chunks[index].stored = true;
-                stored_chunks[index].chunk = chunk;
+                sc.position = chunk_pos;
+                sc.stored = true;
+                sc.chunk = chunk;
 
                 staging_counter++;
 
                 chunk->setUpdated(false);
 
             }
-
-            if(chunk_indices_counter >= max_chunks) {
+            
+            glm::vec2 chunk_screen_coords = chunk_pos - corner_pos;
+            int chunk_index_index = chunk_screen_coords.x * header->chunk_length + chunk_screen_coords.y;
+            
+            if(chunk_index_index >= max_chunks) {
                 log(Level::warning) << "too many chunks\n";
                 x = end_pos.x + 1;
                 y = end_pos.y + 1;
                 break;
             }
+            
+            header->chunk_indices[chunk_index_index] = index;
+            sc.used = true;
+            
+            data.num_chunks++;
 
         }
     }
@@ -204,9 +204,6 @@ void MapUploadSys::tick(float dt) {
     }
 
     transfer.copyBuffer(f.stagingBuffer, storageBuffer, regions);
-
-    MapUploadData& data = reg.ctx<MapUploadData>();
-    data.num_chunks = chunk_indices_counter;
 
 }
 

@@ -28,8 +28,8 @@ MapRenderSys::MapRenderSys(entt::registry& reg) : System(reg) {
 
     float gridSize = Chunk::size + 1;
 
-    for(int x = 0; x<gridSize; x++) {
-        for(int y = 0; y<gridSize; y++) {
+    for(int x = 0; x<Chunk::size; x++) {
+        for(int y = 0; y<Chunk::size; y++) {
 
             int vertex_index = x + y * gridSize;
             indices.push_back(vertex_index);
