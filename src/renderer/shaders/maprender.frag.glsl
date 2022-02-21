@@ -1,13 +1,14 @@
 #version 450
 
-layout(location = 0) in vec2 v_pos;
-layout(location = 1) in vec4 v_color;
-
-layout(location = 0) out vec4 outColor;
-
 layout(constant_id = 0) const int CHUNK_SIZE = 32;
 layout(constant_id = 1) const int NUM_TYPES = 7;
 layout(constant_id = 2) const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
+
+layout(location = 0) in vec2 v_pos;
+//layout(location = 1) in vec4 v_color;
+layout(location = 2) in float v_types[NUM_TYPES];
+
+layout(location = 0) out vec4 outColor;
 
 layout(set = 0, binding = 0) uniform Camera {
     mat4 projection;
@@ -62,8 +63,19 @@ float rand(vec2 co){
 }
 
 void main() {
+
+    vec3 color = vec3(0);
+    float max = 0;
+
+    for(int i = 0; i<NUM_TYPES; i++) {
+        if(v_types[i] > max) {
+            max = v_types[i];
+            color = colors[i].rgb;
+        }
+    }
     
-    outColor = v_color;
+    outColor = vec4(color, 1);
+    //outColor = v_color;
 
     /*
 
