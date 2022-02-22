@@ -20,7 +20,7 @@ layout(set = 0, binding = 0) uniform Camera {
 
 struct Tile {
     int type;
-    //float height;
+    float height;
 };
 
 layout(std430, set = 1, binding = 0) readonly buffer Map {
@@ -78,6 +78,8 @@ void main() {
     }
     v_types[tile.type] = 1;
     
-    gl_Position = projection * view * vec4(v_pos, 0.0f, 1.0f);
+    gl_Position = projection * view * vec4(v_pos, -tile.height, 1.0f);
+    gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0;
+
     
 }

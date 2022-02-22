@@ -2,7 +2,6 @@
 
 #include <math.h>
 
-#define GLM_ENABLE_EXPERIMENTAL
 #include "glm/gtx/string_cast.hpp"
 
 #include "logic/components/camera.h"
@@ -21,6 +20,7 @@ void CameraSys::preinit() {
     camera.setCenter(glm::vec3(0,0,0));
     float width = 100.f;
     camera.setSize(glm::vec2(width, width * ctx.swap.extent.height / ctx.swap.extent.width));
+    //camera.setAngle(0);
     camera.setAngle(M_PI / 4);
 }
 
@@ -68,7 +68,7 @@ void CameraSys::finish() {
 }
 
 glm::mat4 Camera::createProjection() {
-    return glm::ortho(-size.x/2, size.x/2, -size.y/2, +size.y/2, -10000.f, 10000.f);
+    return glm::ortho(-size.x/2, size.x/2, -size.y/2, +size.y/2, -1000.f, 1000.f);
 }
 
 glm::mat4 Camera::createView() {

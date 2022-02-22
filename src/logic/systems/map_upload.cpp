@@ -114,11 +114,9 @@ void MapUploadSys::tick(float dt) {
     */
     
     auto corner_rpos = camera.fromScreenSpace(glm::vec2());
-    dy::log() << glm::to_string(corner_rpos) << "\n";
-    auto corner_pos = map.getChunkPos(corner_rpos);
+    auto corner_pos = map.getChunkPos(corner_rpos)-1;
     auto end_rpos = camera.fromScreenSpace(camera.getScreenSize());
-    dy::log() << glm::to_string(end_rpos) << "\n";
-    auto end_pos = map.getChunkPos(end_rpos);
+    auto end_pos = map.getChunkPos(end_rpos)+1;
 
     header->corner_indices = corner_pos;
     header->chunk_length = end_pos.y - corner_pos.y + 1;
@@ -177,7 +175,7 @@ void MapUploadSys::tick(float dt) {
                 for(int i = 0; i<Chunk::size; i++) {
                     for(int j = 0; j<Chunk::size; j++) {
                         Tile& tile = chunk->get(glm::vec2(i,j));
-                        rchunk[staging_counter].tiles[i * Chunk::size + j] = {tile.terrain/*, tile.level*/};
+                        rchunk[staging_counter].tiles[i * Chunk::size + j] = {tile.terrain, tile.level};
                     }
                 }
 

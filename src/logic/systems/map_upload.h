@@ -23,7 +23,7 @@ namespace dy {
 
     struct TileData {
         int type;
-        //float height;
+        float height;
     };
 
     struct Header {

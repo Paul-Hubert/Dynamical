@@ -18,7 +18,7 @@ layout(set = 0, binding = 0) uniform Camera {
 
 struct Tile {
     int type;
-    //float height;
+    float height;
 };
 
 layout(std430, set = 1, binding = 0) readonly buffer Map {
