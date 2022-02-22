@@ -5,6 +5,9 @@
 #include "imgui.h"
 #include <string.h>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include "glm/gtx/string_cast.hpp"
+
 #include "util/util.h"
 #include "util/log.h"
 #include "util/color.h"
@@ -105,8 +108,17 @@ void MapUploadSys::tick(float dt) {
     auto& map = reg.ctx<MapManager>();
     auto& camera = reg.ctx<Camera>();
 
+    /*
     auto corner_pos = map.getChunkPos(camera.getCorner());//-1;
     auto end_pos = map.getChunkPos(camera.getCorner() + camera.getSize());//+1;
+    */
+    
+    auto corner_rpos = camera.fromScreenSpace(glm::vec2());
+    dy::log() << glm::to_string(corner_rpos) << "\n";
+    auto corner_pos = map.getChunkPos(corner_rpos);
+    auto end_rpos = camera.fromScreenSpace(camera.getScreenSize());
+    dy::log() << glm::to_string(end_rpos) << "\n";
+    auto end_pos = map.getChunkPos(end_rpos);
 
     header->corner_indices = corner_pos;
     header->chunk_length = end_pos.y - corner_pos.y + 1;

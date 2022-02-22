@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include "position.h"
+#include "util/log.h"
 
 namespace dy {
 
@@ -20,6 +21,18 @@ public:
 
     glm::vec2 getCorner() {
         return glm::vec2(center.x, center.y) - size / 2.f;
+    }
+    
+    float getRotation() {
+        return rotation;
+    }
+    
+    float getAngle() {
+        return angle;
+    }
+    
+    glm::vec2 getScreenSize() {
+        return screen_size;
     }
 
     glm::mat4 getProjection() {
@@ -47,7 +60,7 @@ public:
         view_update = true;
     }
 
-    void setScreenSize(glm::vec3 screen_size) {
+    void setScreenSize(glm::vec2 screen_size) {
         this->screen_size = screen_size;
         projection_update = true;
     }
@@ -56,14 +69,20 @@ public:
         this->size = size;
         projection_update = true;
     }
-
-    glm::vec2 fromWorldSpace(glm::vec3 position) {
-        return glm::project(position, view, projection, glm::vec4(screen_size.x, screen_size.y, 1, 1));
+    
+    void setRotation(float rotation) {
+        this->rotation = rotation;
+        view_update = true;
     }
     
-    glm::vec3 fromScreenSpace(glm::vec2 screen_position) {
-        return glm::unProject(glm::vec3(screen_position, 1), view, projection, glm::vec4(screen_size.x, screen_size.y, 1, 1));
+    void setAngle(float angle) {
+        this->angle = angle;
+        view_update = true;
     }
+
+    glm::vec2 fromWorldSpace(glm::vec3 position);
+    
+    glm::vec3 fromScreenSpace(glm::vec2 screen_position);
     
     glm::vec2 fromWorldSize(glm::vec2 world_size) {
         return world_size * screen_size / size;
@@ -82,6 +101,8 @@ private:
     bool projection_update = true;
     glm::mat4 view;
     bool view_update = true;
+    float rotation;
+    float angle;
     //glm::vec2 corner;
     //glm::vec2 size;
     

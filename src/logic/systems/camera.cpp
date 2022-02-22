@@ -2,6 +2,9 @@
 
 #include <math.h>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include "glm/gtx/string_cast.hpp"
+
 #include "logic/components/camera.h"
 #include "renderer/context/context.h"
 #include "logic/components/input.h"
@@ -18,6 +21,7 @@ void CameraSys::preinit() {
     camera.setCenter(glm::vec3(0,0,0));
     float width = 100.f;
     camera.setSize(glm::vec2(width, width * ctx.swap.extent.height / ctx.swap.extent.width));
+    camera.setAngle(M_PI / 4);
 }
 
 void CameraSys::init() {
@@ -55,6 +59,7 @@ void CameraSys::tick(float dt) {
 
     camera.setCenter(center);
     camera.setSize(size);
+    camera.setScreenSize(glm::vec2(ctx.swap.extent.width, ctx.swap.extent.width));
     
 }
 
@@ -63,12 +68,28 @@ void CameraSys::finish() {
 }
 
 glm::mat4 Camera::createProjection() {
-    return glm::ortho(-size.x/2, size.x/2, -size.y/2, +size.y/2, -10.f, 10.f);
+    return glm::ortho(-size.x/2, size.x/2, -size.y/2, +size.y/2, -10000.f, 10000.f);
 }
 
 glm::mat4 Camera::createView() {
     glm::mat4 camera = glm::identity<glm::mat4>();
     camera = glm::translate(camera, center);
+    camera = glm::rotate(camera, angle, glm::vec3(1,0,0));
     return glm::inverse(camera);
+}
+
+glm::vec2 Camera::fromWorldSpace(glm::vec3 position) {
+        return glm::project(position, getView(), getProjection(), glm::vec4(0, 0, screen_size.x, screen_size.y));
+}
+
+glm::vec3 Camera::fromScreenSpace(glm::vec2 screen_position) {
+    glm::vec3 a = glm::unProject(glm::vec3(screen_position, 0), getView(), getProjection(), glm::vec4(0, 0, screen_size.x, screen_size.y));
+    glm::vec3 b = glm::unProject(glm::vec3(screen_position, 1), getView(), getProjection(), glm::vec4(0, 0, screen_size.x, screen_size.y));
+    // p = (b - a) * t + a
+    // 0 = (b.z - a.z) * t + a.z
+    // -a.z / (b.z - a.z) = t;
+    float t = -a.z / (b.z - a.z);
+    glm::vec3 p = (b - a) * t + a;
+    return p;
 }
 
