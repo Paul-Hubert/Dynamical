@@ -5,7 +5,6 @@ layout(constant_id = 1) const int NUM_TYPES = 7;
 layout(constant_id = 2) const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
 layout(location = 0) out vec2 v_pos;
-//layout(location = 1) out vec4 v_color;
 layout(location = 2) out float v_types[NUM_TYPES];
 
 out gl_PerVertex {
@@ -32,22 +31,53 @@ layout(std430, set = 1, binding = 0) readonly buffer Map {
     Tile tiles[];
 };
 
+
+
+ivec2 ifloor(vec2 v) {
+    return ivec2(floor(v));
+}
+
+Tile getTile(vec2 pos) {
+
+    ivec2 ipos = ifloor(pos);
+
+    ivec2 real_indices = ifloor(pos / CHUNK_SIZE);
+
+    ivec2 indices = real_indices - corner_indices;
+
+    int chunk_index = chunk_indices[indices.x * chunk_length + indices.y];
+    
+    ivec2 tile_space = ipos - real_indices * CHUNK_SIZE;
+
+    Tile tile = tiles[chunk_index * CHUNK_SIZE * CHUNK_SIZE + tile_space.x * CHUNK_SIZE + tile_space.y];
+
+    return tile;
+
+}
+
+vec2 diagonal(vec2 pos) {
+    return pos + (pos - round(pos));
+}
+
+float rand(vec2 co){
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+
 void main() {
 
     int gridSize = CHUNK_SIZE + 1;
     ivec2 vertex_coords = ivec2(gl_VertexIndex%gridSize, int(gl_VertexIndex/gridSize));
     ivec2 chunk_coords = ivec2(int(gl_InstanceIndex/chunk_length), gl_InstanceIndex%chunk_length);
     v_pos = (corner_indices + chunk_coords) * CHUNK_SIZE + vertex_coords;
-    gl_Position = projection * view * vec4(v_pos, 0.0f, 1.0f);
     
-    int chunk_index_index = chunk_coords.x * chunk_length + chunk_coords.y;    
-    int chunk_index = chunk_indices[chunk_index_index];
-    Tile tile = tiles[chunk_index * CHUNK_SIZE * CHUNK_SIZE + vertex_coords.x * CHUNK_SIZE + vertex_coords.y];
-    //v_color = colors[tile.type];
+    Tile tile = getTile(v_pos);
     
     for(int i = 0; i<NUM_TYPES; i++) {
         v_types[i] = 0;
     }
     v_types[tile.type] = 1;
+    
+    gl_Position = projection * view * vec4(v_pos, 0.0f, 1.0f);
     
 }

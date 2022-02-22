@@ -5,7 +5,6 @@ layout(constant_id = 1) const int NUM_TYPES = 7;
 layout(constant_id = 2) const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
 layout(location = 0) in vec2 v_pos;
-//layout(location = 1) in vec4 v_color;
 layout(location = 2) in float v_types[NUM_TYPES];
 
 layout(location = 0) out vec4 outColor;
@@ -42,8 +41,6 @@ Tile getTile(vec2 pos) {
 
     ivec2 indices = real_indices - corner_indices;
 
-    if(indices.x * chunk_length + indices.y >= MAX_CHUNKS) discard;
-
     ivec2 tile_space = ipos - real_indices * CHUNK_SIZE;
 
     int chunk_index = chunk_indices[indices.x * chunk_length + indices.y];
@@ -75,7 +72,6 @@ void main() {
     }
     
     outColor = vec4(color, 1);
-    //outColor = v_color;
 
     /*
 
