@@ -5,7 +5,9 @@ layout(constant_id = 1) const int NUM_TYPES = 7;
 layout(constant_id = 2) const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
 layout(location = 0) in vec2 v_pos;
-layout(location = 2) in float v_types[NUM_TYPES];
+layout(location = 1) in vec3 v_normal;
+layout(location = 2) in vec3 v_color;
+layout(location = 3) in float v_types[NUM_TYPES];
 
 layout(location = 0) out vec4 outColor;
 
@@ -72,6 +74,13 @@ void main() {
     }
     
     outColor = vec4(color, 1);
+    outColor = vec4(v_color, 1);
+    
+    const vec3 sun_dir = normalize(vec3(1, 1, 1));
+    
+    vec3 normal = normalize(v_normal);
+    
+    outColor *= abs(dot(normal, sun_dir)) * 0.7 + 0.3;
 
     /*
 

@@ -5,7 +5,9 @@ layout(constant_id = 1) const int NUM_TYPES = 7;
 layout(constant_id = 2) const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
 layout(location = 0) out vec2 v_pos;
-layout(location = 2) out float v_types[NUM_TYPES];
+layout(location = 1) out vec3 v_normal;
+layout(location = 2) out vec3 v_color;
+layout(location = 3) out float v_types[NUM_TYPES];
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -51,6 +53,10 @@ Tile getTile(vec2 pos) {
 
     Tile tile = tiles[chunk_index * CHUNK_SIZE * CHUNK_SIZE + tile_space.x * CHUNK_SIZE + tile_space.y];
 
+    if(tile.type == 5) {
+        tile.height = 0;
+    }
+    
     return tile;
 
 }
@@ -73,13 +79,22 @@ void main() {
     
     Tile tile = getTile(v_pos);
     
+    if(tile.type == 5) tile.height = 0;
+    
+    v_color = colors[tile.type].rgb;
+    
     for(int i = 0; i<NUM_TYPES; i++) {
         v_types[i] = 0;
     }
     v_types[tile.type] = 1;
     
-    gl_Position = projection * view * vec4(v_pos, -tile.height, 1.0f);
+    
+    float dhdx = getTile(v_pos - vec2(1,0)).height - getTile(v_pos + vec2(1,0)).height;
+    float dhdy = getTile(v_pos - vec2(0,1)).height - getTile(v_pos + vec2(0,1)).height;
+    v_normal = normalize(vec3(dhdx, dhdy, -2));
+    
+    
+    gl_Position = projection * view * vec4(v_pos, -tile.height*4.f, 1.0f);
     gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0;
-
     
 }
