@@ -41,7 +41,7 @@ void CameraSys::tick(float dt) {
 
     size.x *= 1 - 0.1 * input.mouseWheel.y;
     
-    float speed = 20.0 * size.x / 100.0;
+    float speed = 50.0 * size.x / 100.0;
     
     if(input.on[Input::FORWARD]) {
         center.y -= speed * dt;
@@ -55,11 +55,11 @@ void CameraSys::tick(float dt) {
     
     
     auto& ctx = *reg.ctx<Context*>();
+    camera.setScreenSize(glm::vec2(ctx.swap.extent.width, ctx.swap.extent.width));
     size.y = size.x * ctx.swap.extent.height / ctx.swap.extent.width;
 
     camera.setCenter(center);
     camera.setSize(size);
-    camera.setScreenSize(glm::vec2(ctx.swap.extent.width, ctx.swap.extent.width));
     
 }
 
@@ -69,6 +69,7 @@ void CameraSys::finish() {
 
 glm::mat4 Camera::createProjection() {
     return glm::ortho(-size.x/2, size.x/2, -size.y/2, +size.y/2, -1000.f, 1000.f);
+    //return glm::perspective(glm::radians(70.f), screen_size.x / screen_size.y, 0.001f, 1000.f);
 }
 
 glm::mat4 Camera::createView() {
