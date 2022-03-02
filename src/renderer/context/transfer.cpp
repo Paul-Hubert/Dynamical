@@ -38,8 +38,11 @@ bool Transfer::flush(vk::Semaphore semaphore) {
             semaphores.push_back(semaphore);
         }
         ctx.device.transfer.submit(vk::SubmitInfo(0, nullptr, nullptr, 1, &current.command, semaphores.size(), semaphores.data()), current.fence);
-        
+
         uploads.push_back(std::move(current));
+
+        //ctx.device->waitForFences({current.fence}, VK_TRUE, std::numeric_limits<uint64_t>::max());
+
         current.reset(ctx, pool);
         
         current.command.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));

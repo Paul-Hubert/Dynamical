@@ -1,7 +1,5 @@
 #include "classic_render.h"
 
-#include <glm/glm.hpp>
-
 #include "util/log.h"
 
 #include "renderer/context/context.h"
@@ -9,7 +7,6 @@
 
 #include "renderer/util/vk_util.h"
 
-#include "logic/components/input.h"
 #include "logic/components/camera.h"
 
 using namespace dy;
@@ -141,7 +138,7 @@ void ClassicRender::render(vk::Semaphore semaphore) {
         auto stages = std::vector<vk::PipelineStageFlags>();
         
         semaphores.push_back(f.acquireSemaphore);
-        stages.push_back(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+        stages.push_back(vk::PipelineStageFlagBits::eTopOfPipe);
         
         if(semaphore) {
             semaphores.push_back(semaphore);
@@ -154,6 +151,8 @@ void ClassicRender::render(vk::Semaphore semaphore) {
                 1, &command,
                 1, &f.presentSemaphore
         ) }, f.fence);
+
+        ctx.device->waitForFences({ f.fence }, VK_TRUE, std::numeric_limits<uint64_t>::max());
 
     }
 

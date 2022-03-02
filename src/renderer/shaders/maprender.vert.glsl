@@ -2,12 +2,10 @@
 
 layout(constant_id = 0) const int CHUNK_SIZE = 32;
 layout(constant_id = 1) const int NUM_TYPES = 7;
-layout(constant_id = 2) const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
+layout(constant_id = 2) const int MAX_CHUNKS = 2000; // MUST BE SAME AS IN MAP_UPLOAD
 
 layout(location = 0) out vec2 v_pos;
 layout(location = 1) out vec3 v_normal;
-layout(location = 2) out vec3 v_color;
-layout(location = 3) out float v_types[NUM_TYPES];
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -81,13 +79,14 @@ void main() {
     
     if(tile.type == 5) tile.height = 0;
     
+    /*
     v_color = colors[tile.type].rgb;
     
     for(int i = 0; i<NUM_TYPES; i++) {
         v_types[i] = 0;
     }
     v_types[tile.type] = 1;
-    
+    */
     
     float dhdx = getTile(v_pos - vec2(1,0)).height - getTile(v_pos + vec2(1,0)).height;
     float dhdy = getTile(v_pos - vec2(0,1)).height - getTile(v_pos + vec2(0,1)).height;

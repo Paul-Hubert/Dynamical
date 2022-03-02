@@ -21,7 +21,7 @@ void CameraSys::preinit() {
     float width = 100.f;
     camera.setSize(glm::vec2(width, width * ctx.swap.extent.height / ctx.swap.extent.width));
     //camera.setAngle(0);
-    camera.setAngle(M_PI / 4);
+    camera.setAngle(M_PI / 3);
 }
 
 void CameraSys::init() {

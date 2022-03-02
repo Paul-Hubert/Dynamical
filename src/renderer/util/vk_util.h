@@ -6,6 +6,8 @@
 
 #include <vector>
 
+#include "renderer/context/num_frames.h"
+
 namespace dy {
 
 std::vector<const char*> checkLayers(std::vector<const char*> layers, std::vector<vk::LayerProperties> availableLayers);
@@ -25,6 +27,22 @@ XRAPI_ATTR XrBool32 XRAPI_CALL debugCallback(XrDebugUtilsMessageSeverityFlagsEXT
 void vkCheckResult(VkResult result);
 
 void xrCheckResult(XrResult result);
+
+
+class Context;
+
+template<typename T>
+class PerFrame {
+public:
+    template<typename... Args>
+    PerFrame(Args&&... args) : frames(std::forward<Args>(args)...) {}
+    PerFrame() {}
+
+    T& get(uint32_t index) {frames.get(index);}
+private:
+    std::array<T, NUM_FRAMES> frames;
+};
+
 
 }
 

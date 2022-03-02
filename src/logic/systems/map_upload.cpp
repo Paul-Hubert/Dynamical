@@ -113,10 +113,11 @@ void MapUploadSys::tick(float dt) {
     auto end_pos = map.getChunkPos(camera.getCorner() + camera.getSize());//+1;
     */
     
-    auto corner_rpos = camera.fromScreenSpace(glm::vec2());
-    auto corner_pos = map.getChunkPos(corner_rpos)-1;
-    auto end_rpos = camera.fromScreenSpace(camera.getScreenSize());
-    auto end_pos = map.getChunkPos(end_rpos)+1;
+    auto corner_rpos = camera.fromScreenSpace(glm::vec2()) - 10.f;
+    auto corner_pos = map.getChunkPos(corner_rpos);
+    auto end_rpos = camera.fromScreenSpace(camera.getScreenSize()) + 10.f;
+    auto end_pos = map.getChunkPos(end_rpos);
+    end_pos.y++;
 
     header->corner_indices = corner_pos;
     header->chunk_length = end_pos.y - corner_pos.y + 1;
@@ -126,49 +127,22 @@ void MapUploadSys::tick(float dt) {
     for(int x = corner_pos.x; x <= end_pos.x; x++) {
         for(int y = corner_pos.y; y <= end_pos.y; y++) {
 
-            OPTICK_EVENT("MapRenderSys::tick::chunk");
+            OPTICK_EVENT("MapUploadSys::tick::chunk");
 
             auto chunk_pos = glm::ivec2(x, y);
 
+            Chunk* chunk = map.getChunk(chunk_pos);
+            if(chunk == nullptr) chunk = map.generateChunk(chunk_pos);
+
             bool stored = false;
-            
-            StoredChunk& sc = stored_chunks[0];
-            int index;
 
-            for(int i = 0; i<stored_chunks.size(); i++) {
-                sc = stored_chunks[i];
-                if(sc.stored && sc.position == chunk_pos) {
-                    if(sc.chunk->isUpdated()) {
-                        sc.stored = false;
-                        break;
-                    }
-                    stored = true;
-                    index = i;
-                    break;
-                }
-            }
+            int index = find_stored_chunk(chunk_pos);
 
-
+            if(index != -1) stored = true;
 
             if(!stored) {
 
-                sc = stored_chunks[storage_counter];
-                while(
-                        sc.stored
-                        && (sc.used
-                        || (sc.position.x >= corner_pos.x && sc.position.x <= end_pos.x
-                        && sc.position.y >= corner_pos.y && sc.position.y <= end_pos.y))
-                        ) {
-                    storage_counter = (storage_counter+1)%max_stored_chunks;
-                    sc = stored_chunks[storage_counter];
-                }
-
-                index = storage_counter;
-                storage_counter = (storage_counter+1)%max_stored_chunks;
-
-
-                Chunk* chunk = map.getChunk(chunk_pos);
-                if(chunk == nullptr) chunk = map.generateChunk(chunk_pos);
+                index = find_storage_slot();
 
                 RenderChunk* rchunk = reinterpret_cast<RenderChunk*>(header+1);
 
@@ -180,10 +154,6 @@ void MapUploadSys::tick(float dt) {
                 }
 
                 regions.push_back(vk::BufferCopy(sizeof(Header) + staging_counter * sizeof(RenderChunk), sizeof(Header) + index * sizeof(RenderChunk), sizeof(RenderChunk)));
-
-                sc.position = chunk_pos;
-                sc.stored = true;
-                sc.chunk = chunk;
 
                 staging_counter++;
 
@@ -202,6 +172,12 @@ void MapUploadSys::tick(float dt) {
             }
             
             header->chunk_indices[chunk_index_index] = index;
+
+            StoredChunk& sc = stored_chunks[index];
+
+            sc.position = chunk_pos;
+            sc.stored = true;
+            sc.chunk = chunk;
             sc.used = true;
             
             data.num_chunks++;
@@ -214,6 +190,12 @@ void MapUploadSys::tick(float dt) {
     }
 
     transfer.copyBuffer(f.stagingBuffer, storageBuffer, regions);
+    
+    ImGui::Begin("Chunk updates", nullptr);
+    
+    ImGui::Text("%i", staging_counter);
+    
+    ImGui::End();
 
 }
 
@@ -230,4 +212,34 @@ MapUploadSys::~MapUploadSys() {
 
 }
 
+int MapUploadSys::find_stored_chunk(glm::ivec2 chunk_pos) {
 
+    for(int i = 0; i<stored_chunks.size(); i++) {
+        StoredChunk& sc = stored_chunks[i];
+        if(sc.stored && sc.position == chunk_pos) {
+            if(sc.chunk->isUpdated()) {
+                sc.stored = false;
+                return -1;
+            }
+            return i;
+        }
+    }
+    return -1;
+
+}
+
+int MapUploadSys::find_storage_slot() {
+
+    StoredChunk& sc = stored_chunks[storage_counter];
+    while(sc.stored
+            && (sc.used
+            /*|| (sc.position.x >= corner_pos.x && sc.position.x <= end_pos.x && sc.position.y >= corner_pos.y && sc.position.y <= end_pos.y)*/
+            )) {
+        storage_counter = (storage_counter+1)%stored_chunks.size();
+        sc = stored_chunks[storage_counter];
+    }
+    int index = storage_counter;
+    storage_counter++;
+    return index;
+
+}

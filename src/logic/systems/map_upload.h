@@ -11,6 +11,8 @@
 #include <entt/entt.hpp>
 
 #include <glm/glm.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
 
 #include "logic/map/chunk.h"
 
@@ -18,8 +20,8 @@
 
 namespace dy {
     
-    constexpr int max_chunks = 10000; // MUST CHANGE IN SHADER
-    constexpr int max_stored_chunks = 50000;
+    constexpr int max_chunks = 2000; // MUST CHANGE IN SHADER
+    constexpr int max_stored_chunks = 10000;
 
     struct TileData {
         int type;
@@ -58,6 +60,9 @@ namespace dy {
         void tick(float dt) override;
 
     private:
+
+        int find_stored_chunk(glm::ivec2 chunk_pos);
+        int find_storage_slot();
 
         vk::DescriptorPool descPool;
 

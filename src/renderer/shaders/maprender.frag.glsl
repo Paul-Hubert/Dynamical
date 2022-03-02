@@ -2,12 +2,10 @@
 
 layout(constant_id = 0) const int CHUNK_SIZE = 32;
 layout(constant_id = 1) const int NUM_TYPES = 7;
-layout(constant_id = 2) const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
+layout(constant_id = 2) const int MAX_CHUNKS = 2000; // MUST BE SAME AS IN MAP_UPLOAD
 
 layout(location = 0) in vec2 v_pos;
 layout(location = 1) in vec3 v_normal;
-layout(location = 2) in vec3 v_color;
-layout(location = 3) in float v_types[NUM_TYPES];
 
 layout(location = 0) out vec4 outColor;
 
@@ -63,6 +61,7 @@ float rand(vec2 co){
 
 void main() {
 
+/*
     vec3 color = vec3(0);
     float max = 0;
 
@@ -75,14 +74,7 @@ void main() {
     
     outColor = vec4(color, 1);
     outColor = vec4(v_color, 1);
-    
-    const vec3 sun_dir = normalize(vec3(1, 1, 1));
-    
-    vec3 normal = normalize(v_normal);
-    
-    outColor *= abs(dot(normal, sun_dir)) * 0.7 + 0.3;
-
-    /*
+*/
 
     vec2 pos = v_pos;
     ivec2 ipos = ifloor(pos);
@@ -111,18 +103,11 @@ void main() {
     vec4 color = colors[tile.type];
     
     outColor = color;
-
-    ivec2 real_indices = ifloor(pos / CHUNK_SIZE);
-
-    ivec2 indices = real_indices - corner_indices;
-
-    ivec2 tile_space = ipos - real_indices * CHUNK_SIZE;
-
-    int chunk_index = chunk_indices[indices.x * chunk_length + indices.y];
-
-    //outColor.rgb = vec3(float(indices.x * chunk_length + indices.y) / MAX_CHUNKS);
-
-    outColor.a = 1.0;
-    */
+    
+    const vec3 sun_dir = normalize(vec3(1, -1, 1));
+    
+    vec3 normal = normalize(v_normal);
+    
+    outColor.rgb *= abs(dot(normal, sun_dir)) * 0.7 + 0.3;
     
 }
