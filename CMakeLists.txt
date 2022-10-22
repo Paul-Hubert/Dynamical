@@ -7,6 +7,8 @@ project(dynamical)
 set(FASTNOISE2_NOISETOOL OFF CACHE BOOL "Build Noise Tool" FORCE)
 add_subdirectory(lib/FastNoise2)
 
+add_subdirectory(lib/VulkanMemoryAllocator)
+
 include_directories("./src")
 include_directories("./lib")
 
@@ -23,42 +25,42 @@ endif()
 find_package(Vulkan REQUIRED)
 target_link_libraries(dynamical PRIVATE Vulkan::Vulkan)
 
-find_package(SDL2 CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE SDL2::SDL2 SDL2::SDL2main)
+find_package(SDL2 REQUIRED)
+include_directories(${SDL2_INCLUDE_DIR})
+target_link_libraries(dynamical PRIVATE ${SDL2_LIBRARIES})
 
-find_package(imgui CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE imgui::imgui)
+find_path(CEREAL_INCLUDE_DIRS "cereal")
+target_include_directories(dynamical PRIVATE ${CEREAL_INCLUDE_DIRS})
 
-find_package(cereal CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE cereal)
+find_path(GLM_INCLUDE_DIR "glm")
+target_include_directories(dynamical PRIVATE ${GLM_INCLUDE_DIRS})
 
-find_package(glm CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE glm)
+find_path(TASKFLOW_INCLUDE_DIR "taskflow")
+target_include_directories(dynamical PRIVATE ${TASKFLOW_INCLUDE_DIRS})
 
-find_package(Taskflow CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE Taskflow::Taskflow)
+target_include_directories(dynamical PRIVATE "lib/imgui")
+target_sources(
+  dynamical PRIVATE	 
+  "lib/imgui/imgui.cpp"
+  "lib/imgui/imgui_demo.cpp"
+  "lib/imgui/imgui_draw.cpp"
+  "lib/imgui/imgui_tables.cpp"
+  "lib/imgui/imgui_widgets.cpp"
+) 
+           
 
-find_path(STB_INCLUDE_DIRS "stb.h")
-target_include_directories(dynamical PRIVATE ${STB_INCLUDE_DIRS})
-
-find_package(unofficial-vulkan-memory-allocator CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE unofficial::vulkan-memory-allocator::vulkan-memory-allocator)
-
-find_package(OpenXR CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE OpenXR::headers OpenXR::openxr_loader OpenXR::openxr-all-supported)
-
-find_package(Bullet CONFIG REQUIRED)
+find_package(Bullet REQUIRED)
 target_include_directories(dynamical PUBLIC ${BULLET_INCLUDE_DIRS})
 target_link_libraries(dynamical PRIVATE BulletDynamics BulletCollision LinearMath)
 
-find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
-target_include_directories(dynamical PRIVATE ${TINYGLTF_INCLUDE_DIRS})
-
-find_package(nlohmann_json CONFIG REQUIRED)
+find_package(nlohmann_json REQUIRED)
 target_link_libraries(dynamical PRIVATE nlohmann_json nlohmann_json::nlohmann_json)
 
 target_link_libraries(dynamical PRIVATE FastNoise)
 target_include_directories(dynamical PRIVATE "lib/FastNoise2/include/")
+
+target_link_libraries(dynamical PRIVATE VulkanMemoryAllocator)
+target_include_directories(dynamical PRIVATE "lib/VulkanMemoryAllocator/include/")
 
 target_compile_definitions(dynamical PRIVATE OPTICK_ENABLE_GPU_D3D12=0)
 target_compile_definitions(dynamical PRIVATE OPTICK_ENABLE_GPU_VULKAN=1)

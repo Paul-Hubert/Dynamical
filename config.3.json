@@ -1,0 +1,11 @@
+{
+    "window_width": 0,
+    "window_height": 0,
+    "fullscreen": true,
+    "fps_max": 60,
+    "username": "John Doe",
+    "server_side": false,
+    "client_side": false,
+    "vr_mode": 1,
+    "spectator_mode": 2
+}

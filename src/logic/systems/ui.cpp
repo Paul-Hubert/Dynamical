@@ -1,6 +1,6 @@
 #include "ui.h"
 
-#include "imgui.h"
+#include <imgui/imgui.h>
 
 #include "util/log.h"
 

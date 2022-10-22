@@ -5,7 +5,7 @@
 
 #include "entt/entt.hpp"
 
-#include "imgui.h"
+#include <imgui/imgui.h>
 #include <SDL.h>
 
 namespace dy {
