@@ -5,6 +5,8 @@
 
 #include <vector>
 
+#include "renderer/context/num_frames.h"
+
 namespace dy {
 
 std::vector<const char*> checkLayers(std::vector<const char*> layers, std::vector<vk::LayerProperties> availableLayers);

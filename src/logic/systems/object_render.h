@@ -32,7 +32,7 @@ public:
     
 private:
     
-    void initPipeline(vk::RenderPass);
+    void initPipeline();
     
     vk::DescriptorPool descPool;
     vk::DescriptorSetLayout descLayout;

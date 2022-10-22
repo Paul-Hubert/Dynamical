@@ -1,7 +1,5 @@
 #include "classic_render.h"
 
-#include <glm/glm.hpp>
-
 #include "util/log.h"
 
 #include "renderer/context/context.h"
@@ -9,7 +7,6 @@
 
 #include "renderer/util/vk_util.h"
 
-#include "logic/components/input.h"
 #include "logic/components/camera.h"
 
 using namespace dy;
@@ -78,15 +75,8 @@ void ClassicRender::prepare() {
         ctx.device->resetFences({ f.fence });
 
     }
-    
-    {
-        auto& camera = reg.ctx<Camera>();
 
-        f.pointer->position = camera.corner;
-        f.pointer->size = camera.size;
-    }
-    
-    
+
     ctx.swap.current = ctx.swap.acquire(f.acquireSemaphore);
 
     command = f.commandBuffer;
@@ -106,7 +96,6 @@ void ClassicRender::prepare() {
     command.setViewport(0, vk::Viewport(0.f, 0.f, (float)ctx.swap.extent.width, (float)ctx.swap.extent.height, 0.f, 1.f));
 
     command.setScissor(0, vk::Rect2D(vk::Offset2D(), vk::Extent2D(ctx.swap.extent.width, ctx.swap.extent.height)));
-
 
 }
 
@@ -130,9 +119,13 @@ void ClassicRender::render(vk::Semaphore semaphore) {
 
     {
         auto& camera = reg.ctx<Camera>();
-        
-        f.pointer->position = camera.corner;
-        f.pointer->size = camera.size;
+
+        f.pointer->projection = camera.getProjection();
+        f.pointer->view = camera.getView();
+
+        f.pointer->position = camera.getCorner();
+        f.pointer->size = camera.getSize();
+
     }
 
     // Submit command buffer
@@ -145,11 +138,11 @@ void ClassicRender::render(vk::Semaphore semaphore) {
         auto stages = std::vector<vk::PipelineStageFlags>();
         
         semaphores.push_back(f.acquireSemaphore);
-        stages.push_back(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+        stages.push_back(vk::PipelineStageFlagBits::eTopOfPipe);
         
         if(semaphore) {
             semaphores.push_back(semaphore);
-            stages.push_back(vk::PipelineStageFlagBits::eTopOfPipe);
+            stages.push_back(vk::PipelineStageFlagBits::eVertexInput);
         }
         
         OPTICK_EVENT("submit");
@@ -158,6 +151,8 @@ void ClassicRender::render(vk::Semaphore semaphore) {
                 1, &command,
                 1, &f.presentSemaphore
         ) }, f.fence);
+
+        ctx.device->waitForFences({ f.fence }, VK_TRUE, std::numeric_limits<uint64_t>::max());
 
     }
 
@@ -178,6 +173,6 @@ ClassicRender::~ClassicRender() {
     ctx.device->destroy(commandPool);
     ctx.device->destroy(descriptorPool);
     ctx.device->destroy(view_layout);
-    
+
 
 }
