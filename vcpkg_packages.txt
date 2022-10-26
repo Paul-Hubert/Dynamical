@@ -1,1 +1,1 @@
-cereal entt glm sdl2[vulkan] taskflow stb vulkan
+cereal glm sdl2[vulkan] taskflow stb vulkan
