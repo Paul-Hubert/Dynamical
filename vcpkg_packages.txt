@@ -1,1 +1,1 @@
-cereal entt glm imgui sdl2[vulkan] taskflow stb vulkan vulkan-memory-allocator
+cereal entt glm sdl2[vulkan] taskflow stb vulkan

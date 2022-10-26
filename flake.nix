@@ -35,11 +35,16 @@
           nlohmann_json
           stb
           glslang
+
+          # Perso
+          libclang
+          lldb
+          vcpp
         ];
         
         shellHook = ''
           export PATH="${pkgs.lib.makeBinPath buildInputs}:$PATH"
-          export VK_LAYER_PATH="${pkgs.vulkan-validation-layers}/lib"
+          export VK_LAYER_PATH="${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d"
         '';
       };
 

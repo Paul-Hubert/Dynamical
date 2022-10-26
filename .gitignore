@@ -13,3 +13,6 @@ CMakeLists.txt.user
 resources/collada
 resources/gltf
 config.*.json
+.cache
+/result
+/compile_commands.json
