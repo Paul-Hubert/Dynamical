@@ -148,6 +148,7 @@ Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     VmaAllocatorCreateInfo allocatorInfo = {};
     allocatorInfo.physicalDevice = physical;
     allocatorInfo.device = logical;
+    allocatorInfo.instance = ctx.instance;
     vmaCreateAllocator(&allocatorInfo, &allocator);
     
 }

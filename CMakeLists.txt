@@ -47,23 +47,12 @@ target_sources(
   "lib/imgui/imgui_tables.cpp"
   "lib/imgui/imgui_widgets.cpp"
 ) 
-           
-
-find_package(Bullet REQUIRED)
-target_include_directories(dynamical PUBLIC ${BULLET_INCLUDE_DIRS})
-target_link_libraries(dynamical PRIVATE BulletDynamics BulletCollision LinearMath)
-
-find_package(nlohmann_json REQUIRED)
-target_link_libraries(dynamical PRIVATE nlohmann_json nlohmann_json::nlohmann_json)
 
 target_link_libraries(dynamical PRIVATE FastNoise)
 target_include_directories(dynamical PRIVATE "lib/FastNoise2/include/")
 
 target_link_libraries(dynamical PRIVATE VulkanMemoryAllocator)
 target_include_directories(dynamical PRIVATE "lib/VulkanMemoryAllocator/include/")
-
-target_compile_definitions(dynamical PRIVATE OPTICK_ENABLE_GPU_D3D12=0)
-target_compile_definitions(dynamical PRIVATE OPTICK_ENABLE_GPU_VULKAN=1)
 
 # Copy resources to build
 file(

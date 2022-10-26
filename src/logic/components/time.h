@@ -1,7 +1,7 @@
 #ifndef TIME_H
 #define TIME_H
 
-#include <bits/stdint-uintn.h>
+#include <cstdint>
 
 namespace dy {
     
