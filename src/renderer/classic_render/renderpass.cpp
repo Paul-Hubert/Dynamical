@@ -15,7 +15,7 @@ ClRenderpass::ClRenderpass(Context& ctx) : frames(ctx.swap.num_frames), ctx(ctx)
             vk::AttachmentDescription({}, vk::Format(ctx.swap.format), vk::SampleCountFlagBits::e1,
                                       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
                                       vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-                                      vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal
+                                      vk::ImageLayout::eUndefined, vk::ImageLayout::ePresentSrcKHR
             ),
             vk::AttachmentDescription({}, depthFormat, vk::SampleCountFlagBits::e1,
                                       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,

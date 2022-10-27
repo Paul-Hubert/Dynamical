@@ -52,7 +52,7 @@ Tile getTile(vec2 pos) {
     Tile tile = tiles[chunk_index * CHUNK_SIZE * CHUNK_SIZE + tile_space.x * CHUNK_SIZE + tile_space.y];
 
     if(tile.type == 5) {
-        tile.height = 0;
+        tile.height = 0.0f;
     }
     
     return tile;
@@ -77,7 +77,7 @@ void main() {
     
     Tile tile = getTile(v_pos);
     
-    if(tile.type == 5) tile.height = 0;
+    if(tile.type == 5) tile.height = 0.0f;
     
     /*
     v_color = colors[tile.type].rgb;
