@@ -17,6 +17,7 @@ file(GLOB_RECURSE sources ./src/main.cpp ./src/*.cpp ./src/*.h)
 add_executable(dynamical ${sources})
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ./)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined -g")
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(dynamical PRIVATE -Wall -Wextra -Wno-sign-compare -Wno-unused-variable -Wno-unused-parameter -Wno-class-memaccess -Wno-unused-but-set-variable -Wno-reorder -Wno-missing-field-initializers -Wno-unused-function -Wno-type-limits)

@@ -41,7 +41,7 @@ bool Transfer::flush(vk::Semaphore semaphore) {
 
         uploads.push_back(std::move(current));
 
-        //ctx.device->waitForFences({current.fence}, VK_TRUE, std::numeric_limits<uint64_t>::max());
+        ctx.device->waitForFences({current.fence}, VK_TRUE, std::numeric_limits<uint64_t>::max());
 
         current.reset(ctx, pool);
         
@@ -161,7 +161,7 @@ std::shared_ptr<VmaBuffer> Transfer::createBuffer(const void* data, vk::BufferCr
         VmaAllocationCreateInfo ainfo{};
         ainfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
         ainfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-        auto binfo = vk::BufferCreateInfo({}, info.size, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, 1, &ctx.device.t_i);
+        auto binfo = vk::BufferCreateInfo({}, info.size, vk::BufferUsageFlagBits::eTransferSrc|info.usage, vk::SharingMode::eExclusive, 1, &ctx.device.t_i);
         
         auto buffer = VmaBuffer(ctx.device, &ainfo, binfo);
 

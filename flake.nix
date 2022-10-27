@@ -20,7 +20,7 @@
 
         buildInputs = with pkgs; [ 
           cmake 
-          clang 
+          gcc
           ninja 
           vulkan-tools
           vulkan-headers
@@ -37,9 +37,9 @@
           glslang
 
           # Perso
-          libclang
-          lldb
-          vcpp
+          valgrind
+          gdb
+          jetbrains.clion
         ];
         
         shellHook = ''

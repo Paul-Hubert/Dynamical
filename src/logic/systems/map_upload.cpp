@@ -239,7 +239,7 @@ int MapUploadSys::find_storage_slot() {
         sc = stored_chunks[storage_counter];
     }
     int index = storage_counter;
-    storage_counter++;
+    storage_counter = (storage_counter+1)%stored_chunks.size();
     return index;
 
 }
