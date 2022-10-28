@@ -2,6 +2,8 @@
 #define INPUT_H
 
 #include <bitset>
+#include <optional>
+#include <array>
 #include "glm/glm.hpp"
 #include <SDL.h>
 
@@ -22,7 +24,8 @@ public:
         EXIT,
         END_ENUM
     };
-    
+
+    std::optional<std::array<char, SDL_TEXTINPUTEVENT_TEXT_SIZE>> text;
     std::bitset<Action::END_ENUM> on;
     glm::ivec2 mousePos;
     glm::ivec2 mouseWheel;

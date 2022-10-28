@@ -56,6 +56,7 @@ void Game::start() {
     set->pre_add<CameraSys>();
     set->pre_add<TimeSys>();
     set->pre_add<DevMenuSys>();
+    set->pre_add<MapConfiguratorSys>();
     set->pre_add<SelectionSys>();
     
     set->pre_add<ChunkGenerationSys>();

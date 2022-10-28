@@ -194,17 +194,13 @@ void MapRenderSys::initPipeline() {
     depthStencil.stencilTestEnable = VK_FALSE;
     depthStencil.front = {}; // Optional
     depthStencil.back = {}; // Optional
-    
-    
+
     VkDynamicState states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dynInfo = {};
     dynInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     dynInfo.dynamicStateCount = 2;
     dynInfo.pDynamicStates = &states[0];
-    
-    
-    
-    
+
     auto layouts = std::vector<vk::DescriptorSetLayout> {ctx.classic_render.view_layout, data.descLayout};
     
     auto range = vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, 4 * sizeof(float));

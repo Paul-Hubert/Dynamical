@@ -90,7 +90,7 @@ void InputSys::tick(float dt) {
                     break;
             }
             
-        } if(e.type == SDL_MOUSEWHEEL) {
+        } else if(e.type == SDL_MOUSEWHEEL) {
             
             input.mouseWheel.x = e.wheel.x;
             input.mouseWheel.y = e.wheel.y;
@@ -100,7 +100,14 @@ void InputSys::tick(float dt) {
             if (e.wheel.y > 0) input.mouseWheel.y += 1;
             else if (e.wheel.y < 0) input.mouseWheel.y -= 1;
             */
-            
+        }
+
+        if(e.type == SDL_TEXTINPUT) {
+            std::array<char, SDL_TEXTINPUTEVENT_TEXT_SIZE> text;
+            std::copy(std::begin(e.text.text), std::end(e.text.text), std::begin(text));
+            input.text = std::make_optional(text);
+        } else {
+            input.text = std::nullopt;
         }
         
     }
