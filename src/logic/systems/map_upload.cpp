@@ -63,12 +63,46 @@ MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
         auto bindings = std::vector {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
         };
-        data.descLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, (uint32_t) bindings.size(), bindings.data()));
+        data.mapLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, (uint32_t) bindings.size(), bindings.data()));
 
-        data.descSet = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &data.descLayout))[0];
+        data.mapSet = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &data.mapLayout))[0];
 
         auto info = vk::DescriptorBufferInfo(storageBuffer, 0, storageBuffer.size);
-        auto write = vk::WriteDescriptorSet(data.descSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &info, nullptr);
+        auto write = vk::WriteDescriptorSet(data.mapSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &info, nullptr);
+        ctx.device->updateDescriptorSets(1, &write, 0, nullptr);
+
+    }
+
+    {
+        auto poolSizes = std::vector {
+                vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, NUM_FRAMES),
+        };
+        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, NUM_FRAMES, (uint32_t) poolSizes.size(), poolSizes.data()));
+
+        auto bindings = std::vector {
+                vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
+        };
+        data.objectLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, (uint32_t) bindings.size(), bindings.data()));
+
+    }
+
+    for(int i = 0; i< per_frame.size(); i++) {
+        auto& f = per_frame[i];
+
+        VmaAllocationCreateInfo info {};
+        info.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        f.uniformBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(RenderObject) * max_objects, vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive));
+
+        VmaAllocationInfo inf;
+        vmaGetAllocationInfo(ctx.device, f.uniformBuffer.allocation, &inf);
+
+        f.uniformPointer = inf.pMappedData;
+
+        f.descSet = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &descLayout))[0];
+
+        auto bufferInfo = vk::DescriptorBufferInfo(f.uniformBuffer, 0, f.uniformBuffer.size);
+        auto write = vk::WriteDescriptorSet(f.descSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &bufferInfo, nullptr);
         ctx.device->updateDescriptorSets(1, &write, 0, nullptr);
 
     }
@@ -208,7 +242,7 @@ MapUploadSys::~MapUploadSys() {
 
     MapUploadData& data = reg.ctx<MapUploadData>();
 
-    ctx.device->destroy(data.descLayout);
+    ctx.device->destroy(data.mapLayout);
 
 }
 

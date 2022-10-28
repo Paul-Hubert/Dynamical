@@ -8,8 +8,8 @@ out gl_PerVertex {
 };
 
 layout(set = 0, binding = 0) uniform Camera {
-    vec2 position;
-    vec2 size;
+    mat4 projection;
+    mat4 view;
 };
 
 struct Object {
@@ -34,8 +34,10 @@ const vec2 vertices[6] = vec2[] (
 
 void main() {
     v_uv = vertices[gl_VertexIndex];
-    vec2 pos = objects[gl_InstanceIndex].box.xy + (v_uv - 0.5) * objects[gl_InstanceIndex].box.zw - position;
-    gl_Position = vec4(pos / size * 2.f - 1.f, 0.5f, 1.0f);
+    vec3 pos = objects[gl_InstanceIndex].box.xyz;
+    gl_Position = view * vec4(pos, 1.0f);
+    gl_Position.xy += (v_uv - 0.5) * objects[gl_InstanceIndex].box.w / gl_Position.w;
+    gl_Position = projection * gl_Position;
     v_color = objects[gl_InstanceIndex].color;
 }
 

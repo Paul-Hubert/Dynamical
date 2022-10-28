@@ -40,9 +40,12 @@ namespace dy {
     };
 
     struct MapUploadData {
-        vk::DescriptorSetLayout descLayout;
-        vk::DescriptorSet descSet;
+        vk::DescriptorSetLayout mapLayout;
+        vk::DescriptorSet mapSet;
         int num_chunks;
+        vk::DescriptorSetLayout objectLayout;
+        vk::DescriptorSet objectSet;
+        int num_objects;
     };
 
     class Context;

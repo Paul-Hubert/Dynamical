@@ -14,8 +14,6 @@ out gl_PerVertex {
 layout(set = 0, binding = 0) uniform Camera {
     mat4 projection;
     mat4 view;
-    vec2 position;
-    vec2 size;
 };
 
 struct Tile {

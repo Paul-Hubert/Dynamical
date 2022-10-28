@@ -108,6 +108,6 @@ void main() {
     
     vec3 normal = normalize(v_normal);
     
-    outColor.rgb *= abs(dot(normal, sun_dir)) * 0.7 + 0.3;
+    outColor.rgb *= abs(dot(normal, sun_dir)) * 0.9 + 0.1;
     
 }
