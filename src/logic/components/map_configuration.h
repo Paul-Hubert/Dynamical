@@ -6,8 +6,9 @@
 
 class MapConfiguration {
 public:
-    std::vector<ImVec2> points;
-    float octave_count;
+    std::vector<float> points_x;
+    std::vector<float> points_y;
+    uint32_t octave_count;
     float frequency;
     uint32_t seed;
     float gain;

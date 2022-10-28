@@ -22,7 +22,9 @@ public:
         MENU,
         DEBUG,
         EXIT,
-        END_ENUM
+        BACKSPACE,
+        TAB,
+        END_ENUM,
     };
 
     std::optional<std::array<char, SDL_TEXTINPUTEVENT_TEXT_SIZE>> text;
@@ -42,7 +44,7 @@ public:
     bool leftClick = false;
     bool rightClick = false;
     bool middleClick = false;
-    
+
     bool focused = false;
     bool window_showing = true;
 };

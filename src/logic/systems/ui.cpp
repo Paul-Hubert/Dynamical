@@ -41,7 +41,11 @@ void UISys::tick(float dt) {
 
     if(auto text = input.text) {
         io.AddInputCharactersUTF8((*text).data());
+        input.text = std::nullopt;
     }
+
+    io.AddKeyEvent(ImGuiKey_Backspace, input.on[Input::BACKSPACE]);
+    io.AddKeyEvent(ImGuiKey_Tab, input.on[Input::TAB]);
 
     if(input.focused)
         io.MousePos = ImVec2((float) input.mousePos.x, (float) input.mousePos.y);
