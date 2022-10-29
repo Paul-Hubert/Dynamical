@@ -24,7 +24,6 @@ void Settings::save() {
 
     cereal::JSONOutputArchive out(os);
     serialize(out);
-
 }
 
 Settings::Settings(int argc, char** argv) {

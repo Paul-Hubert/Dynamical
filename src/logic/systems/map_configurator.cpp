@@ -1,6 +1,7 @@
 #include "system_list.h"
 #include "logic/settings/settings.h"
 #include "logic/components/input.h"
+#include "util/util.h"
 
 #include <imgui/imgui.h>
 #include <implot/implot.h>
@@ -102,15 +103,23 @@ void MapConfiguratorSys::tick(float dt) {
             ImPlot::PlotLine("Curve", conf.points_x.data(), conf.points_y.data(), conf.points_x.size());
 
             if(input.mouseLeft) {
-                auto pos = ImPlot::GetPlotMousePos();
 
-                const double MAX_DISTANCE_X = 0.1;
-                const double MAX_DISTANCE_Y = 2;
+                const double MAX_DISTANCE = 7*7; //magic number, do not change or it will segfault
 
+                double min_distance = -1;
+                int min_index = -1;
                 for(int i = 0; i < conf.points_x.size(); ++i) {
-                    if(abs(pos.x - conf.points_x.at(i)) < MAX_DISTANCE_X && abs(pos.y - conf.points_y.at(i)) < MAX_DISTANCE_Y) {
-                        current = i;
+                    auto p = ImPlot::PlotToPixels(conf.points_x.at(i), conf.points_y.at(i));
+                    double dist = sq(p.x - input.mousePos.x) + sq(p.y - input.mousePos.y);
+
+                    if(dist < MAX_DISTANCE && (min_distance == -1 || dist < min_distance)) {
+                        min_distance = dist;
+                        min_index = i;
                     }
+                }
+
+                if(min_index != -1) {
+                    current = min_index;
                 }
             }
 

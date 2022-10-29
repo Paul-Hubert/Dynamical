@@ -181,6 +181,7 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
             else if(level >= 0 && level < 1) tile.terrain = Tile::sand;
             else if(level >= 1 && level < 10) tile.terrain = Tile::grass;
             else if(level >= 10) tile.terrain = Tile::stone;
+
             
             if(tile.terrain == Tile::grass) {
                 auto plant_pos = position + glm::vec2(frand(), frand());
