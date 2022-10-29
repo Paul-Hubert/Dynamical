@@ -76,7 +76,6 @@ void MapGenerator::fillRiver(glm::vec2 pos, Tile* tile) {
                 }
 
                 queue.emplace(adj, tile->level);
-
             }
         }
 
@@ -174,7 +173,6 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
                     lower_y = conf.points_y.at(i);
                 }
             }
-
 
             tile.level = (double)level;
             

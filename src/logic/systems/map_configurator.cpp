@@ -1,5 +1,6 @@
 #include "system_list.h"
 #include "logic/components/map_configuration.h"
+#include "logic/components/input.h"
 
 #include <imgui/imgui.h>
 #include <implot/implot.h>
@@ -10,12 +11,12 @@ using namespace dy;
 void MapConfiguratorSys::preinit() {
     auto& conf = reg.set<MapConfiguration>();
     conf.frequency = 0.001;
-    conf.gain = 0.5f;
-    conf.lacunarity = 2.0f;
-    conf.octave_count = 3;
+    conf.gain = 0.6f;
+    conf.lacunarity = 1.8f;
+    conf.octave_count = 6;
     conf.seed = 12345;
     conf.weighted_strength = 0.0f;
-    conf.amplitude = 1;
+    conf.amplitude = 10;
 
     conf.points_x.emplace_back(-1);
     conf.points_y.emplace_back(-10);
@@ -35,6 +36,7 @@ void MapConfiguratorSys::finish() {
 
 void MapConfiguratorSys::tick(float dt) {
     auto& conf = reg.ctx<MapConfiguration>();
+    auto& input = reg.ctx<Input>();
 
     static bool open = false;
     if(ImGui::Begin("Map Configurator", &open)) {
@@ -50,9 +52,10 @@ void MapConfiguratorSys::tick(float dt) {
         //seed is an unsigned int, imgui takes a signed integer but they're the same size
         // and the value doesn't matter so it's okay
         ImGui::InputInt("Seed", (int*)&conf.seed);
-        ImGui::InputFloat("Gain", &conf.gain);
-        ImGui::InputFloat("Lacunarity", &conf.lacunarity);
-        ImGui::InputFloat("Amplitude", &conf.amplitude);
+        ImGui::InputFloat("Gain", &conf.gain, 0.1);
+        ImGui::InputFloat("Lacunarity", &conf.lacunarity, 0.1);
+        ImGui::InputFloat("Amplitude", &conf.amplitude, 0.1);
+        ImGui::InputFloat("Weighted strength", &conf.weighted_strength, 0.1);
 
         static int prev_current = 0;
         static int current = 0;
@@ -97,14 +100,28 @@ void MapConfiguratorSys::tick(float dt) {
         ImGui::Separator();
         if(ImPlot::BeginPlot("Terrain height configurator")) {
             ImPlot::SetupAxes("Perlin variation", "Height");
-            ImPlot::SetupAxisLimits(ImAxis_X1, -1, 1);
-            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, -1, 1);
+            ImPlot::SetupAxisLimits(ImAxis_X1, -1.05, 1.05);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, -1.05, 1.05);
 
             ImPlot::SetupAxisLimits(ImAxis_Y1, -5, 20);
             ImPlot::SetupFinish();
 
-            ImPlot::DragPoint(0, &current_x, &current_y, ImVec4(1,0.6,0.2,1));
+            ImPlot::DragPoint(0, &current_x, &current_y, ImVec4(1,0.6,0.2,1), 7);
             ImPlot::PlotLine("Curve", conf.points_x.data(), conf.points_y.data(), conf.points_x.size());
+
+            if(input.mouseLeft) {
+                auto pos = ImPlot::GetPlotMousePos();
+
+                const double MAX_DISTANCE_X = 0.1;
+                const double MAX_DISTANCE_Y = 2;
+
+                for(int i = 0; i < conf.points_x.size(); ++i) {
+                    if(abs(pos.x - conf.points_x.at(i)) < MAX_DISTANCE_X && abs(pos.y - conf.points_y.at(i)) < MAX_DISTANCE_Y) {
+                        current = i;
+                    }
+                }
+            }
+
             ImPlot::EndPlot();
         }
 
