@@ -168,8 +168,6 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
                 if(noise <= x) {
                     double mid_point = (noise - lower_x) / (x - lower_x);
                     level = (lower_y + (mid_point * (y-lower_y)))*conf.amplitude;
-                    std::cout << mid_point << std::endl;
-                    std::cout << level << std::endl;
                     break;
                 } else {
                     lower_x = x;
