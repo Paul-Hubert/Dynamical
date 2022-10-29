@@ -148,7 +148,8 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
     std::vector<float> noiseOutput(Chunk::size * Chunk::size);
 
     fnFractal->GenUniformGrid2D(noiseOutput.data(), pos.x * Chunk::size, pos.y * Chunk::size, Chunk::size, Chunk::size, conf.frequency, conf.seed);
-    
+
+    //First pass, initialize level
     for(int i = 0; i<Chunk::size; i++) {
         for(int j = 0; j<Chunk::size; j++) {
             glm::vec2 position = pos*Chunk::size + glm::ivec2(i,j);
@@ -175,14 +176,41 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
             }
 
             tile.level = (double)level;
-            
-            tile.terrain = Tile::nothing;
-            if(level < 0) tile.terrain = Tile::water;
-            else if(level >= 0 && level < 1) tile.terrain = Tile::sand;
-            else if(level >= 1 && level < 10) tile.terrain = Tile::grass;
-            else if(level >= 10) tile.terrain = Tile::stone;
+        }
+    }
 
-            
+    //Second pass, initialize tile
+    for(int i = 0; i<Chunk::size; i++) {
+        for (int j = 0; j < Chunk::size; j++) {
+            glm::vec2 position = pos * Chunk::size + glm::ivec2(i, j);
+            auto& tile = chunk.get(glm::ivec2(i, j));
+            tile.terrain = Tile::nothing;
+
+            if(tile.level < 0) tile.terrain = Tile::water;
+            else if(tile.level >= 0 && tile.level < 1) tile.terrain = Tile::sand;
+            else tile.terrain = Tile::grass;
+
+            auto neighbours = {
+                glm::ivec2 (i-1,j),
+                glm::ivec2 (i+1,j),
+                glm::ivec2 (i,j+1),
+                glm::ivec2 (i,j-1),
+            };
+
+            float derivative_sum = 0;
+            int neighbours_count = 0;
+            for(auto v : neighbours) {
+                if(v.x >= 0 && v.x < Chunk::size && v.y >= 0 && v.y < Chunk::size) {
+                    auto& other_tile = chunk.get(v);
+                    derivative_sum += std::abs(other_tile.level - tile.level);
+                    ++neighbours_count;
+                }
+            }
+
+            if(neighbours_count > 0 && derivative_sum/neighbours_count > 1) {
+                tile.terrain = Tile::stone;
+            }
+
             if(tile.terrain == Tile::grass) {
                 auto plant_pos = position + glm::vec2(frand(), frand());
                 if(frand()< 0.03) {
@@ -191,25 +219,12 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
                     tile.object = dy::buildBerryBush(reg, plant_pos);
                 }
             }
-            
-        }
-    }
-
-    for(int i = 0; i<Chunk::size; i++) {
-        for(int j = 0; j<Chunk::size; j++) {
-            glm::vec2 position = pos*Chunk::size + glm::ivec2(i,j);
-
-            Tile& tile = chunk.get(glm::ivec2(i,j));
 
             if(tile.level > 10 && frand()< 0.00007) {
                 auto entity = reg.create();
                 reg.emplace<WaterFlow>(entity, reg, position);
                 //fillRiver(position, &tile);
             }
-
         }
     }
-
-
-    
 }

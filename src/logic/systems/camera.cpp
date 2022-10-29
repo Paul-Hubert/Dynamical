@@ -41,7 +41,7 @@ void CameraSys::tick(float dt) {
 
     size.x *= 1 - 0.1 * input.mouseWheel.y;
     
-    float speed = 10.0 * size.x / 100.0;
+    float speed = 40.0 * size.x / 100.0;
     
     if(input.on[Input::FORWARD]) {
         center.y -= speed * dt;
