@@ -9,15 +9,16 @@ using namespace dy;
 
 void MapConfiguratorSys::preinit() {
     auto& conf = reg.set<MapConfiguration>();
-    conf.frequency = 1;
-    conf.gain = 1;
-    conf.lacunarity = 1;
-    conf.octave_count = 1;
+    conf.frequency = 0.001;
+    conf.gain = 0.5f;
+    conf.lacunarity = 2.0f;
+    conf.octave_count = 3;
     conf.seed = 12345;
-    conf.weighted_strength = 1;
+    conf.weighted_strength = 0.0f;
+    conf.amplitude = 1;
 
     conf.points_x.emplace_back(-1);
-    conf.points_y.emplace_back(10);
+    conf.points_y.emplace_back(-10);
 
     conf.points_x.emplace_back(1);
     conf.points_y.emplace_back(10);
@@ -35,9 +36,9 @@ void MapConfiguratorSys::finish() {
 void MapConfiguratorSys::tick(float dt) {
     auto& conf = reg.ctx<MapConfiguration>();
 
-    static bool open = true;
+    static bool open = false;
     if(ImGui::Begin("Map Configurator", &open)) {
-        static int octave = 1;
+        static int octave = conf.octave_count;
         ImGui::InputInt("Octave count", &octave);
         if(octave < 1) {
             octave = 1;
@@ -51,13 +52,10 @@ void MapConfiguratorSys::tick(float dt) {
         ImGui::InputInt("Seed", (int*)&conf.seed);
         ImGui::InputFloat("Gain", &conf.gain);
         ImGui::InputFloat("Lacunarity", &conf.lacunarity);
+        ImGui::InputFloat("Amplitude", &conf.amplitude);
 
         static int prev_current = 0;
         static int current = 0;
-
-        if(ImGui::Button("Reload chunk")) {
-
-        }
 
         if(ImGui::Button("Add point")) {
 
@@ -90,19 +88,31 @@ void MapConfiguratorSys::tick(float dt) {
             ImGui::EndDisabled();
         }
 
-        static float current_x = conf.points_x.at(current);
+        static double current_x = conf.points_x.at(current);
+        ImGui::InputDouble("Current X", &current_x, 0.01, 0.1);
 
-        ImGui::InputFloat("Current X", &current_x, 0.01, 0.1);
-        if(current_x < -1) {
-            current_x = -1;
-        } else if(current_x > 1) {
-            current_x = 1;
-        }
-
-        static float current_y = conf.points_y.at(current);
-        ImGui::InputFloat("Current Y", &current_y, 0.5, 5);
+        static double current_y = conf.points_y.at(current);
+        ImGui::InputDouble("Current Y", &current_y, 0.5, 5);
 
         ImGui::Separator();
+        if(ImPlot::BeginPlot("Terrain height configurator")) {
+            ImPlot::SetupAxes("Perlin variation", "Height");
+            ImPlot::SetupAxisLimits(ImAxis_X1, -1, 1);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, -1, 1);
+
+            ImPlot::SetupAxisLimits(ImAxis_Y1, -5, 20);
+            ImPlot::SetupFinish();
+
+            ImPlot::DragPoint(0, &current_x, &current_y, ImVec4(1,0.6,0.2,1));
+            ImPlot::PlotLine("Curve", conf.points_x.data(), conf.points_y.data(), conf.points_x.size());
+            ImPlot::EndPlot();
+        }
+
+        if(current_x < -1 || current == 0) {
+            current_x = -1;
+        } else if(current_x > 1 || current == conf.points_x.size()-1) {
+            current_x = 1;
+        }
 
         for(auto i = 0; i < conf.points_x.size(); ++i) {
             auto x = conf.points_x.at(i);
@@ -148,16 +158,6 @@ void MapConfiguratorSys::tick(float dt) {
             conf.points_x.at(current) = current_x;
             conf.points_y.at(current) = current_y;
         }
-
-        //ImPlot::PlotLine("sneed", conf.points.data(), conf.points.size());
-
-        if(ImPlot::BeginPlot("Terrain height configurator")) {
-            ImPlot::SetupAxes("Perlin variation", "Height");
-            ImPlot::SetupFinish();
-            ImPlot::PlotLine("Cool stuff", conf.points_x.data(), conf.points_y.data(), conf.points_x.size());
-            ImPlot::EndPlot();
-        }
-
     }
     ImGui::End();
 }
