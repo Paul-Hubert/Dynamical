@@ -27,7 +27,9 @@ Windu::Windu(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     if (window == nullptr) {
         std::cout << "Could not create SDL window: " << SDL_GetError() << std::endl;
     }
-    
+
+    SDL_StartTextInput();
+
     SDL_GetWindowSize(window, &width, &height);
     
 }
@@ -57,6 +59,8 @@ bool Windu::resize() {
 }
 
 Windu::~Windu() {
+
+    SDL_StopTextInput();
     
     SDL_DestroyWindow(window);
 

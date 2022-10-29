@@ -2,20 +2,10 @@
 
 #include "renderer/context/context.h"
 
-#include <imgui/imgui.h>
-#include <string.h>
-
 #include "util/util.h"
-#include "util/log.h"
-#include "util/color.h"
-
-#include "logic/map/tile.h"
-#include "logic/map/chunk.h"
-#include "logic/map/map_manager.h"
 
 #include "map_upload.h"
 
-#include "logic/components/camera.h"
 #include "logic/components/map_upload_data.h"
 
 using namespace dy;
@@ -195,17 +185,13 @@ void MapRenderSys::initPipeline() {
     depthStencil.stencilTestEnable = VK_FALSE;
     depthStencil.front = {}; // Optional
     depthStencil.back = {}; // Optional
-    
-    
+
     VkDynamicState states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dynInfo = {};
     dynInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     dynInfo.dynamicStateCount = 2;
     dynInfo.pDynamicStates = &states[0];
-    
-    
-    
-    
+
     auto layouts = std::vector<vk::DescriptorSetLayout> {ctx.classic_render.view_layout, data.mapLayout};
     
     auto range = vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, 4 * sizeof(float));

@@ -47,7 +47,13 @@ target_sources(
   "lib/imgui/imgui_draw.cpp"
   "lib/imgui/imgui_tables.cpp"
   "lib/imgui/imgui_widgets.cpp"
-) 
+  "lib/implot/implot.cpp"
+  "lib/implot/implot_demo.cpp"
+  "lib/implot/implot_items.cpp"
+)
+
+target_include_directories(dynamical PRIVATE "lib/implot")
+
 
 target_link_libraries(dynamical PRIVATE FastNoise)
 target_include_directories(dynamical PRIVATE "lib/FastNoise2/include/")

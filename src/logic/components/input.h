@@ -2,6 +2,8 @@
 #define INPUT_H
 
 #include <bitset>
+#include <optional>
+#include <array>
 #include "glm/glm.hpp"
 #include <SDL.h>
 
@@ -20,9 +22,12 @@ public:
         MENU,
         DEBUG,
         EXIT,
-        END_ENUM
+        BACKSPACE,
+        TAB,
+        END_ENUM,
     };
-    
+
+    std::optional<std::array<char, SDL_TEXTINPUTEVENT_TEXT_SIZE>> text;
     std::bitset<Action::END_ENUM> on;
     glm::ivec2 mousePos;
     glm::ivec2 mouseWheel;
@@ -39,7 +44,7 @@ public:
     bool leftClick = false;
     bool rightClick = false;
     bool middleClick = false;
-    
+
     bool focused = false;
     bool window_showing = true;
 };

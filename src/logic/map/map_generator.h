@@ -6,7 +6,6 @@
 
 #include "chunk.h"
 
-
 namespace dy {
 
 class MapManager;

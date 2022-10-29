@@ -140,7 +140,8 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
 
     fnFractal->SetSource(fnSimplex);
     fnFractal->SetOctaveCount(10);
-    
+
+
     std::vector<float> noiseOutput(Chunk::size * Chunk::size);
 
     fnFractal->GenUniformGrid2D(noiseOutput.data(), pos.x * Chunk::size, pos.y * Chunk::size, Chunk::size, Chunk::size, 0.001f, 1347);
@@ -152,9 +153,9 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
             Tile& tile = chunk.get(glm::ivec2(i,j));
             
             float noise = noiseOutput[j * Chunk::size + i];
-            
+
             float level = noise * 60;
-            
+
             tile.level = level;
             
             tile.terrain = Tile::nothing;
