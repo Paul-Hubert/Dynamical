@@ -126,7 +126,7 @@ void Game::start() {
         float dt = std::chrono::duration_cast<std::chrono::nanoseconds>(clock::now() - start).count() / 1000000000.0;
         start = clock::now();
 
-        log(Level::info) << "FPS : " << 1/dt;
+        log(Level::info) << "FPS : " << 1/dt << "\n";
 
         set->pre_tick(dt);
 
