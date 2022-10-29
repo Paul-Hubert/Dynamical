@@ -20,10 +20,6 @@ public:
     glm::vec2 getSize() {
         return size;
     }
-
-    glm::vec2 getCorner() {
-        return glm::vec2(center.x, center.y) - size / 2.f;
-    }
     
     float getRotation() {
         return rotation;
@@ -105,8 +101,6 @@ private:
     bool view_update = true;
     float rotation;
     float angle;
-    //glm::vec2 corner;
-    //glm::vec2 size;
     
 };
 

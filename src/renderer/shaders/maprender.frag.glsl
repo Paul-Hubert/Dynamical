@@ -12,9 +12,8 @@ layout(location = 0) out vec4 outColor;
 layout(set = 0, binding = 0) uniform Camera {
     mat4 projection;
     mat4 view;
-    vec2 position;
-    vec2 size;
-};
+    vec3 position;
+} camera;
 
 struct Tile {
     int type;
@@ -105,7 +104,7 @@ void main() {
     outColor = color;
     
     const vec3 sun_dir = normalize(vec3(1, -1, 1));
-    
+
     vec3 normal = normalize(v_normal);
     
     outColor.rgb *= abs(dot(normal, sun_dir)) * 0.9 + 0.1;

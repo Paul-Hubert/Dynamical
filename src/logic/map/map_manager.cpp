@@ -80,8 +80,8 @@ void MapManager::move(entt::entity entity, glm::vec2 position) {
             return;
         }
         new_chunk->addObject(entity);
-        height = getTile(position)->level;
     }
+    height = getTile(position)->level;
     reg.replace<Position>(entity, pos, height);
 }
 

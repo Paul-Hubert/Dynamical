@@ -39,13 +39,9 @@ namespace dy {
         TileData tiles[Chunk::size*Chunk::size];
     };
 
-    struct MapUploadData {
-        vk::DescriptorSetLayout mapLayout;
-        vk::DescriptorSet mapSet;
-        int num_chunks;
-        vk::DescriptorSetLayout objectLayout;
-        vk::DescriptorSet objectSet;
-        int num_objects;
+    struct RenderObject {
+        glm::vec4 sphere;
+        glm::vec4 color;
     };
 
     class Context;
@@ -71,7 +67,10 @@ namespace dy {
 
         struct per_frame {
             VmaBuffer stagingBuffer;
-            void* stagingPointer;
+            Header* stagingPointer;
+            VmaBuffer objectBuffer;
+            RenderObject* objectPointer;
+            vk::DescriptorSet objectSet;
         };
         std::vector<per_frame> per_frame;
 

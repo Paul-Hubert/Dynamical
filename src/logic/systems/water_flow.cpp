@@ -8,7 +8,7 @@ using namespace dy;
 
 void floodWater(entt::registry& reg, MapManager& map, glm::vec2 pos, Tile* tile) {
 
-    tile->terrain = Tile::shallow_water;
+    tile->terrain = Tile::river;
 
     if(tile->object != entt::null && reg.get<Object>(tile->object).type == Object::plant) {
         dy::destroyObject(reg, tile->object);

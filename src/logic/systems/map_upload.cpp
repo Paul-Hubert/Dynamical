@@ -17,8 +17,12 @@
 #include "logic/map/map_manager.h"
 
 #include "logic/components/camera.h"
+#include "logic/components/renderable.h"
+#include "logic/components/map_upload_data.h"
 
 using namespace dy;
+
+constexpr int max_objects = 20000;
 
 MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
 
@@ -41,7 +45,7 @@ MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
         VmaAllocationInfo inf;
         vmaGetAllocationInfo(ctx.device, f.stagingBuffer.allocation, &inf);
 
-        f.stagingPointer = inf.pMappedData;
+        f.stagingPointer = reinterpret_cast<Header*> (inf.pMappedData);
     }
 
     {
@@ -54,9 +58,9 @@ MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
 
     {
         auto poolSizes = std::vector {
-            vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 1),
+            vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 1 + NUM_FRAMES),
             };
-        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, 1, (uint32_t) poolSizes.size(), poolSizes.data()));
+        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, 1 + NUM_FRAMES, (uint32_t) poolSizes.size(), poolSizes.data()));
     }
 
     {
@@ -74,16 +78,10 @@ MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
     }
 
     {
-        auto poolSizes = std::vector {
-                vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, NUM_FRAMES),
-        };
-        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, NUM_FRAMES, (uint32_t) poolSizes.size(), poolSizes.data()));
-
         auto bindings = std::vector {
                 vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
         };
         data.objectLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, (uint32_t) bindings.size(), bindings.data()));
-
     }
 
     for(int i = 0; i< per_frame.size(); i++) {
@@ -92,17 +90,17 @@ MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
         VmaAllocationCreateInfo info {};
         info.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
         info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        f.uniformBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(RenderObject) * max_objects, vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive));
+        f.objectBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(RenderObject) * max_objects, vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive));
 
         VmaAllocationInfo inf;
-        vmaGetAllocationInfo(ctx.device, f.uniformBuffer.allocation, &inf);
+        vmaGetAllocationInfo(ctx.device, f.objectBuffer.allocation, &inf);
 
-        f.uniformPointer = inf.pMappedData;
+        f.objectPointer = reinterpret_cast<RenderObject*> (inf.pMappedData);
 
-        f.descSet = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &descLayout))[0];
+        f.objectSet = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &data.objectLayout))[0];
 
-        auto bufferInfo = vk::DescriptorBufferInfo(f.uniformBuffer, 0, f.uniformBuffer.size);
-        auto write = vk::WriteDescriptorSet(f.descSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &bufferInfo, nullptr);
+        auto bufferInfo = vk::DescriptorBufferInfo(f.objectBuffer, 0, f.objectBuffer.size);
+        auto write = vk::WriteDescriptorSet(f.objectSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &bufferInfo, nullptr);
         ctx.device->updateDescriptorSets(1, &write, 0, nullptr);
 
     }
@@ -123,7 +121,7 @@ void MapUploadSys::tick(float dt) {
 
     std::vector<vk::BufferCopy> regions;
 
-    auto header = reinterpret_cast<Header*> (f.stagingPointer);
+    auto header = f.stagingPointer;
 
     memset(header, 0, sizeof(Header));
 
@@ -132,20 +130,19 @@ void MapUploadSys::tick(float dt) {
     header->colors[Tile::grass] = glm::vec4(0.3373,0.4902,0.2745,1);
     header->colors[Tile::stone] = glm::vec4(0.6118,0.6353,0.7216,1);
     header->colors[Tile::sand] = glm::vec4(0.761,0.698,0.502,1);
-    header->colors[Tile::shallow_water] = Color("74ccf4").rgba;
+    header->colors[Tile::river] = Color("74ccf4").rgba;
     header->colors[Tile::water] = Color("2389da").rgba;
 
     regions.push_back(vk::BufferCopy(0, 0, sizeof(Header)));
 
     int staging_counter = 0;
 
+    auto objectBuffer = f.objectPointer;
+
+    data.objectSet = f.objectSet;
+
     auto& map = reg.ctx<MapManager>();
     auto& camera = reg.ctx<Camera>();
-
-    /*
-    auto corner_pos = map.getChunkPos(camera.getCorner());//-1;
-    auto end_pos = map.getChunkPos(camera.getCorner() + camera.getSize());//+1;
-    */
     
     auto corner_rpos = camera.fromScreenSpace(glm::vec2()) - 10.f;
     auto corner_pos = map.getChunkPos(corner_rpos);
@@ -157,6 +154,7 @@ void MapUploadSys::tick(float dt) {
     header->chunk_length = end_pos.y - corner_pos.y + 1;
 
     data.num_chunks = 0;
+    data.num_objects = 0;
 
     for(int x = corner_pos.x; x <= end_pos.x; x++) {
         for(int y = corner_pos.y; y <= end_pos.y; y++) {
@@ -167,6 +165,31 @@ void MapUploadSys::tick(float dt) {
 
             Chunk* chunk = map.getChunk(chunk_pos);
             if(chunk == nullptr) chunk = map.generateChunk(chunk_pos);
+
+
+            // Add Objects from chunk
+
+            if(data.num_objects < max_objects) {
+                for (auto entity: chunk->getObjects()) {
+                    if (reg.all_of<Renderable>(entity)) {
+                        auto &position = reg.get<Position>(entity);
+                        auto &renderable = reg.get<Renderable>(entity);
+                        objectBuffer[data.num_objects].sphere.x = position.x;
+                        objectBuffer[data.num_objects].sphere.y = position.y;
+                        objectBuffer[data.num_objects].sphere.z = position.getHeight();
+                        objectBuffer[data.num_objects].sphere.w = 0.5f;
+                        objectBuffer[data.num_objects].color = renderable.color.rgba;
+
+                        data.num_objects++;
+
+                        if(data.num_objects >= max_objects) {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Add chunk data
 
             bool stored = false;
 
@@ -243,6 +266,7 @@ MapUploadSys::~MapUploadSys() {
     MapUploadData& data = reg.ctx<MapUploadData>();
 
     ctx.device->destroy(data.mapLayout);
+    ctx.device->destroy(data.objectLayout);
 
 }
 

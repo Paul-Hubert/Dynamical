@@ -14,7 +14,8 @@ out gl_PerVertex {
 layout(set = 0, binding = 0) uniform Camera {
     mat4 projection;
     mat4 view;
-};
+    vec3 position;
+} camera;
 
 struct Tile {
     int type;
@@ -91,7 +92,7 @@ void main() {
     v_normal = normalize(vec3(dhdx, dhdy, -2));
     
     
-    gl_Position = projection * view * vec4(v_pos, -tile.height*4.f, 1.0f);
+    gl_Position = camera.projection * camera.view * vec4(v_pos, -tile.height, 1.0f);
     gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0;
     
 }

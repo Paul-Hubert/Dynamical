@@ -16,6 +16,7 @@
 #include "map_upload.h"
 
 #include "logic/components/camera.h"
+#include "logic/components/map_upload_data.h"
 
 using namespace dy;
 

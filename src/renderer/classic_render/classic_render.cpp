@@ -22,7 +22,7 @@ per_frame(NUM_FRAMES) {
         vk::DescriptorSetLayoutCreateInfo({}, (uint32_t)bindings.size(), bindings.data()));
     
     
-    commandPool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx.device.g_i));
+    commandPool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo({}, ctx.device.g_i));
 
     auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, (uint32_t)per_frame.size()));
 
@@ -83,7 +83,9 @@ void ClassicRender::prepare() {
     
     // Record with swapchain images
 
-    command.begin(vk::CommandBufferBeginInfo({}, nullptr));
+    ctx.device->resetCommandPool(commandPool);
+
+    command.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
     OPTICK_GPU_CONTEXT(command);
     OPTICK_GPU_EVENT("draw");
 
@@ -118,8 +120,7 @@ void ClassicRender::render(vk::Semaphore semaphore) {
         f.pointer->projection = camera.getProjection();
         f.pointer->view = camera.getView();
 
-        f.pointer->position = camera.getCorner();
-        f.pointer->size = camera.getSize();
+        f.pointer->position = camera.getCenter();
 
     }
 
@@ -168,6 +169,5 @@ ClassicRender::~ClassicRender() {
     ctx.device->destroy(commandPool);
     ctx.device->destroy(descriptorPool);
     ctx.device->destroy(view_layout);
-
 
 }

@@ -52,7 +52,7 @@ void MapGenerator::fillRiver(glm::vec2 pos, Tile* tile) {
             return;
         }
 
-        lowest_tile->terrain = Tile::shallow_water;
+        lowest_tile->terrain = Tile::river;
 
         map.getChunk(map.getChunkPos(min.pos))->setUpdated();
 
@@ -68,7 +68,7 @@ void MapGenerator::fillRiver(glm::vec2 pos, Tile* tile) {
                     tile = map.getTile(adj);
                 }
 
-                if(tile->terrain == Tile::shallow_water) continue;
+                if(tile->terrain == Tile::river) continue;
 
                 if(tile->level < min.level) {
                     //queue = std::priority_queue<PriorityElement, std::vector<PriorityElement>>();
@@ -85,7 +85,7 @@ void MapGenerator::fillRiver(glm::vec2 pos, Tile* tile) {
 
 void MapGenerator::generateRiver(glm::vec2 pos, Tile* tile) {
     
-    tile->terrain = Tile::shallow_water;
+    tile->terrain = Tile::river;
     
     map.getChunk(map.getChunkPos(pos))->setUpdated();
 
@@ -105,7 +105,7 @@ void MapGenerator::generateRiver(glm::vec2 pos, Tile* tile) {
                 tile2 = map.getTile(pos2);
             }
 
-            if(tile2->terrain == Tile::shallow_water) {
+            if(tile2->terrain == Tile::river) {
                 continue;
             }
             
@@ -153,7 +153,7 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
             
             float noise = noiseOutput[j * Chunk::size + i];
             
-            float level = noise * 20;
+            float level = noise * 60;
             
             tile.level = level;
             
