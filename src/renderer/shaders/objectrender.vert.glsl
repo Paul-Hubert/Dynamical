@@ -4,6 +4,7 @@ layout (location = 0) out vec2 v_uv;
 layout (location = 1) out vec4 v_color;
 layout (location = 2) out flat vec4 v_sphere;
 layout (location = 3) out vec3 v_pos;
+layout (location = 4) out vec3 v_cam;
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -46,5 +47,7 @@ void main() {
     v_pos = (inverse(camera.view) * gl_Position).xyz;
     gl_Position = camera.projection * gl_Position;
     gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0;
+
+    v_cam = (inverse(camera.projection * camera.view) * vec4(gl_Position.xy, 0, 1)).xyz;
 }
 
