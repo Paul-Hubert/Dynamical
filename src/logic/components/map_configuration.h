@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <imgui/imgui.h>
+#include <stdint.h>
 
 class MapConfiguration {
 public:

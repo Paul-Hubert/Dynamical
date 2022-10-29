@@ -24,9 +24,12 @@ void ChunkGenerationSys::tick(float dt) { // to be parallelized
     
     auto& map = reg.ctx<MapManager>();
     auto& camera = reg.ctx<Camera>();
-    
-    auto corner_pos = map.getChunkPos(camera.getCorner())-1;
-    auto end_pos = map.getChunkPos(camera.getCorner() + camera.getSize())+1;
+
+    auto corner_rpos = camera.fromScreenSpace(glm::vec2()) - 10.f;
+    auto corner_pos = map.getChunkPos(corner_rpos);
+    auto end_rpos = camera.fromScreenSpace(camera.getScreenSize()) + 10.f;
+    auto end_pos = map.getChunkPos(end_rpos);
+    end_pos.y++;
     
     for(int x = corner_pos.x; x <= end_pos.x; x++) {
         for(int y = corner_pos.y; y <= end_pos.y; y++) {

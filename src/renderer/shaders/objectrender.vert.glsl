@@ -2,22 +2,25 @@
 
 layout (location = 0) out vec2 v_uv;
 layout (location = 1) out vec4 v_color;
+layout (location = 2) out flat vec4 v_sphere;
+layout (location = 3) out vec3 v_pos;
 
 out gl_PerVertex {
     vec4 gl_Position;
 };
 
 layout(set = 0, binding = 0) uniform Camera {
-    vec2 position;
-    vec2 size;
-};
+    mat4 projection;
+    mat4 view;
+    vec3 position;
+} camera;
 
 struct Object {
-    vec4 box;
+    vec4 sphere;
     vec4 color;
 };
 
-const int MAX_OBJECTS = 5000;
+const int MAX_OBJECTS = 20000;
 
 layout(std430, set = 1, binding = 0) readonly buffer Objects {
     Object objects[MAX_OBJECTS];
@@ -34,8 +37,14 @@ const vec2 vertices[6] = vec2[] (
 
 void main() {
     v_uv = vertices[gl_VertexIndex];
-    vec2 pos = objects[gl_InstanceIndex].box.xy + (v_uv - 0.5) * objects[gl_InstanceIndex].box.zw - position;
-    gl_Position = vec4(pos / size * 2.f - 1.f, 0.5f, 1.0f);
+    v_sphere = objects[gl_InstanceIndex].sphere;
     v_color = objects[gl_InstanceIndex].color;
+    v_sphere.z *= -1;
+    v_pos = v_sphere.xyz;
+    gl_Position = camera.view * vec4(v_pos, 1.0f);
+    gl_Position.xy += (v_uv - 0.5) * v_sphere.w*2;
+    v_pos = (inverse(camera.view) * gl_Position).xyz;
+    gl_Position = camera.projection * gl_Position;
+    gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0;
 }
 

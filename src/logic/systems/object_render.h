@@ -33,18 +33,9 @@ public:
 private:
     
     void initPipeline();
-    
-    vk::DescriptorPool descPool;
-    vk::DescriptorSetLayout descLayout;
+
     vk::PipelineLayout pipelineLayout;
     vk::Pipeline graphicsPipeline;
-    
-    struct per_frame {
-        VmaBuffer uniformBuffer;
-        void* uniformPointer;
-        vk::DescriptorSet descSet;
-    };
-    std::vector<per_frame> per_frame;
     
 };
 

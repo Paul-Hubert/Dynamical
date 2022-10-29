@@ -2,65 +2,15 @@
 
 #include "renderer/context/context.h"
 
-#include <imgui/imgui.h>
-#include <string.h>
-
 #include "util/util.h"
-#include "util/log.h"
-#include "logic/map/map_manager.h"
 
 using namespace dy;
 
-#include "logic/components/camera.h"
-#include "logic/components/renderable.h"
-#include "logic/components/position.h"
-
-constexpr int max_objects = 20000;
-
-struct RenderObject {
-    glm::vec4 box;
-    glm::vec4 color;
-};
+#include "logic/components/map_upload_data.h"
 
 ObjectRenderSys::ObjectRenderSys(entt::registry& reg) : System(reg) {
 
     Context& ctx = *reg.ctx<Context*>();
-
-    per_frame.resize(NUM_FRAMES);
-    
-    {
-        auto poolSizes = std::vector {
-            vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, NUM_FRAMES),
-        };
-        descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, NUM_FRAMES, (uint32_t) poolSizes.size(), poolSizes.data()));
-        
-        auto bindings = std::vector {
-            vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
-        };
-        descLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, (uint32_t) bindings.size(), bindings.data()));
-        
-    }
-    
-    for(int i = 0; i< per_frame.size(); i++) {
-        auto& f = per_frame[i];
-        
-        VmaAllocationCreateInfo info {};
-        info.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-        info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        f.uniformBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(RenderObject) * max_objects, vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive));
-        
-        VmaAllocationInfo inf;
-        vmaGetAllocationInfo(ctx.device, f.uniformBuffer.allocation, &inf);
-        
-        f.uniformPointer = inf.pMappedData;
-        
-        f.descSet = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &descLayout))[0];
-        
-        auto bufferInfo = vk::DescriptorBufferInfo(f.uniformBuffer, 0, f.uniformBuffer.size);
-        auto write = vk::WriteDescriptorSet(f.descSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &bufferInfo, nullptr);
-        ctx.device->updateDescriptorSets(1, &write, 0, nullptr);
-        
-    }
 
     initPipeline();
     
@@ -71,74 +21,16 @@ void ObjectRenderSys::tick(float dt) {
     OPTICK_EVENT();
 
     Context& ctx = *reg.ctx<Context*>();
-
-    auto& f = per_frame[ctx.frame_index];
     
     auto transfer = ctx.transfer.getCommandBuffer();
-    
-    auto buffer = reinterpret_cast<RenderObject*> (f.uniformPointer);
-    int objectCounter = 0;
-    
-    auto& map = reg.ctx<MapManager>();
-    auto& camera = reg.ctx<Camera>();
-    
-    auto corner_pos = map.getChunkPos(camera.getCorner())-1;
-    auto end_pos = map.getChunkPos(camera.getCorner() + camera.getSize())+1;
-    
-    for(int x = corner_pos.x; x <= end_pos.x; x++) {
-        for(int y = corner_pos.y; y <= end_pos.y; y++) {
-            
-            OPTICK_EVENT("ObjectRenderSys::tick::chunk");
-            
-            auto pos = glm::ivec2(x, y);
-            
-            Chunk* chunk = map.getChunk(pos);
-            if(chunk == nullptr) continue;
-            
-            for(auto entity : chunk->getObjects()) {
-                if(reg.all_of<Renderable>(entity)) {
-                    auto& position = reg.get<Position>(entity);
-                    auto& renderable = reg.get<Renderable>(entity);
-                    buffer[objectCounter].box.x = position.x;
-                    buffer[objectCounter].box.y = position.y;
-                    buffer[objectCounter].box.z = renderable.size.x;
-                    buffer[objectCounter].box.w = renderable.size.y;
-                    buffer[objectCounter].color = renderable.color.rgba;
-                    
-                    objectCounter++;
-                    if(objectCounter >= max_objects) {
-                        //dy::log(dy::Level::warning) << "too many objects\n";
-                        x = end_pos.x + 1;
-                        y = end_pos.y + 1;
-                        return;
-                    }
-                }
-            }
-            
-        }
-    }
-    
-    
-    /*
-    auto view = reg.view<RenderableC, PositionC>();
-    for(auto entity : view) {
-        auto& position = view.get<PositionC>(entity);
-        auto& renderable = view.get<RenderableC>(entity);
-        buffer[objectCounter].box.x = position.position.x;
-        buffer[objectCounter].box.y = position.position.y;
-        buffer[objectCounter].box.z = renderable.size.x;
-        buffer[objectCounter].box.w = renderable.size.y;
-        buffer[objectCounter].color = renderable.color;
-        
-        objectCounter++;
-    }
-    */
+
+    auto& data = reg.ctx<MapUploadData>();
     
     ctx.classic_render.command.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
     
-    ctx.classic_render.command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, { ctx.classic_render.per_frame[ctx.frame_index].set, f.descSet}, nullptr);
+    ctx.classic_render.command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, { ctx.classic_render.per_frame[ctx.frame_index].set, data.objectSet}, nullptr);
     
-    ctx.classic_render.command.draw(6, objectCounter, 0, 0);
+    ctx.classic_render.command.draw(6, data.num_objects, 0, 0);
     
     
 }
@@ -146,6 +38,8 @@ void ObjectRenderSys::tick(float dt) {
 void ObjectRenderSys::initPipeline() {
 
     Context& ctx = *reg.ctx<Context*>();
+
+    auto& data = reg.ctx<MapUploadData>();
     
     // PIPELINE INFO
     
@@ -268,7 +162,7 @@ void ObjectRenderSys::initPipeline() {
     
     
     
-    auto layouts = std::vector<vk::DescriptorSetLayout> {ctx.classic_render.view_layout, descLayout};
+    auto layouts = std::vector<vk::DescriptorSetLayout> {ctx.classic_render.view_layout, data.objectLayout};
     
     auto range = vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, 4 * sizeof(float));
     
@@ -303,10 +197,6 @@ void ObjectRenderSys::initPipeline() {
 ObjectRenderSys::~ObjectRenderSys() {
 
     Context& ctx = *reg.ctx<Context*>();
-    
-    ctx.device->destroy(descPool);
-    
-    ctx.device->destroy(descLayout);
     
     ctx.device->destroy(graphicsPipeline);
     

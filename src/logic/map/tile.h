@@ -15,7 +15,7 @@ public:
         stone,
         sand,
         water,
-        shallow_water,
+        river,
         max
     }; // MUST UPDATE IN SHADER
     
@@ -26,7 +26,7 @@ public:
         {stone, 0.0},
         {sand, 0.6},
         {water, 0.0},
-        {shallow_water, 0.4}
+        {river, 0.4}
     };
     
     Type terrain = nothing;

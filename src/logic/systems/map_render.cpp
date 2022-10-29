@@ -2,20 +2,11 @@
 
 #include "renderer/context/context.h"
 
-#include <imgui/imgui.h>
-#include <string.h>
-
 #include "util/util.h"
-#include "util/log.h"
-#include "util/color.h"
-
-#include "logic/map/tile.h"
-#include "logic/map/chunk.h"
-#include "logic/map/map_manager.h"
 
 #include "map_upload.h"
 
-#include "logic/components/camera.h"
+#include "logic/components/map_upload_data.h"
 
 using namespace dy;
 
@@ -59,7 +50,7 @@ void MapRenderSys::tick(float dt) {
     
     ctx.classic_render.command.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
     
-    ctx.classic_render.command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, { ctx.classic_render.per_frame[ctx.frame_index].set, data.descSet}, nullptr);
+    ctx.classic_render.command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, { ctx.classic_render.per_frame[ctx.frame_index].set, data.mapSet}, nullptr);
 
     ctx.classic_render.command.bindIndexBuffer(indexBuffer->buffer, 0, vk::IndexType::eUint32);
 
@@ -201,7 +192,7 @@ void MapRenderSys::initPipeline() {
     dynInfo.dynamicStateCount = 2;
     dynInfo.pDynamicStates = &states[0];
 
-    auto layouts = std::vector<vk::DescriptorSetLayout> {ctx.classic_render.view_layout, data.descLayout};
+    auto layouts = std::vector<vk::DescriptorSetLayout> {ctx.classic_render.view_layout, data.mapLayout};
     
     auto range = vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, 4 * sizeof(float));
     
