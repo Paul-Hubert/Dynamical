@@ -188,27 +188,29 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
 
             if(tile.level < 0) tile.terrain = Tile::water;
             else if(tile.level >= 0 && tile.level < 1) tile.terrain = Tile::sand;
-            else tile.terrain = Tile::grass;
+            else {
+                tile.terrain = Tile::grass;
 
-            auto neighbours = {
-                glm::ivec2 (i-1,j),
-                glm::ivec2 (i+1,j),
-                glm::ivec2 (i,j+1),
-                glm::ivec2 (i,j-1),
-            };
+                auto neighbours = {
+                        glm::ivec2 (i-1,j),
+                        glm::ivec2 (i+1,j),
+                        glm::ivec2 (i,j+1),
+                        glm::ivec2 (i,j-1),
+                };
 
-            float derivative_sum = 0;
-            int neighbours_count = 0;
-            for(auto v : neighbours) {
-                if(v.x >= 0 && v.x < Chunk::size && v.y >= 0 && v.y < Chunk::size) {
-                    auto& other_tile = chunk.get(v);
-                    derivative_sum += std::abs(other_tile.level - tile.level);
-                    ++neighbours_count;
+                float derivative_sum = 0;
+                int neighbours_count = 0;
+                for(auto v : neighbours) {
+                    if(v.x >= 0 && v.x < Chunk::size && v.y >= 0 && v.y < Chunk::size) {
+                        auto& other_tile = chunk.get(v);
+                        derivative_sum += std::abs(other_tile.level - tile.level);
+                        ++neighbours_count;
+                    }
                 }
-            }
 
-            if(neighbours_count > 0 && derivative_sum/neighbours_count > 1) {
-                tile.terrain = Tile::stone;
+                if(neighbours_count > 0 && derivative_sum/neighbours_count > 1) {
+                    tile.terrain = Tile::stone;
+                }
             }
 
             if(tile.terrain == Tile::grass) {
