@@ -1,5 +1,5 @@
 #include "system_list.h"
-#include "logic/components/map_configuration.h"
+#include "logic/settings/settings.h"
 #include "logic/components/input.h"
 
 #include <imgui/imgui.h>
@@ -9,20 +9,7 @@
 using namespace dy;
 
 void MapConfiguratorSys::preinit() {
-    auto& conf = reg.set<MapConfiguration>();
-    conf.frequency = 0.001;
-    conf.gain = 0.6f;
-    conf.lacunarity = 1.8f;
-    conf.octave_count = 6;
-    conf.seed = 12345;
-    conf.weighted_strength = 0.0f;
-    conf.amplitude = 10;
 
-    conf.points_x.emplace_back(-1);
-    conf.points_y.emplace_back(-10);
-
-    conf.points_x.emplace_back(1);
-    conf.points_y.emplace_back(10);
 }
 
 void MapConfiguratorSys::init() {
@@ -35,10 +22,12 @@ void MapConfiguratorSys::finish() {
 }
 
 void MapConfiguratorSys::tick(float dt) {
-    auto& conf = reg.ctx<MapConfiguration>();
+    auto& settings = reg.ctx<Settings>();
+    auto& conf = settings.map_configuration;
     auto& input = reg.ctx<Input>();
 
     static bool open = false;
+
     if(ImGui::Begin("Map Configurator", &open)) {
         static int octave = conf.octave_count;
         ImGui::InputInt("Octave count", &octave);
@@ -57,11 +46,14 @@ void MapConfiguratorSys::tick(float dt) {
         ImGui::InputFloat("Amplitude", &conf.amplitude, 0.1);
         ImGui::InputFloat("Weighted strength", &conf.weighted_strength, 0.1);
 
+        if(ImGui::Button("Save settings")) {
+            settings.save();
+        }
+
         static int prev_current = 0;
         static int current = 0;
 
         if(ImGui::Button("Add point")) {
-
             const float INITIAL_X = 0;
             const float INITIAL_Y = 10;
 

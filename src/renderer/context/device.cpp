@@ -9,7 +9,7 @@
 #include <string>
 
 #include "renderer/util/vk_util.h"
-#include "logic/settings.h"
+#include "logic/settings/settings.h"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 

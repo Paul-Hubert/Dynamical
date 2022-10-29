@@ -6,7 +6,7 @@
 #include "context/num_frames.h"
 
 #include "extra/optick/optick.h"
-#include "logic/settings.h"
+#include "logic/settings/settings.h"
 
 using namespace dy;
 
