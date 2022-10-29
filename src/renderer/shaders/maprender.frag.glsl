@@ -105,8 +105,8 @@ void main() {
     
     const vec3 sun_dir = normalize(vec3(1, -1, 1));
 
-    vec3 normal = normalize(v_normal);
+    vec3 normal = -normalize(v_normal);
     
-    outColor.rgb *= abs(dot(normal, sun_dir)) * 0.9 + 0.1;
+    outColor.rgb *= max(dot(normal, sun_dir), 0.0) * 0.9 + 0.1;
     
 }
