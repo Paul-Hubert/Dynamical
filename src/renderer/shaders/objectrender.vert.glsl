@@ -44,12 +44,11 @@ void main() {
     gl_Position = camera.view * vec4(v_sphere.xyz, 1.0f);
     gl_Position.xy += (v_uv - 0.5) * v_sphere.w*2;
 
-    gl_Position = camera.projection * gl_Position;
-
-    mat4 inv = inverse(camera.projection * camera.view);
-
+    mat4 inv = inverse(camera.view);
     v_pos = (inv * gl_Position).xyz;
-    v_cam = (inv * vec4(gl_Position.xy, 0, gl_Position.w)).xyz;
+    v_cam = (inv * vec4(gl_Position.xy, 1, 1)).xyz;
+
+    gl_Position = camera.projection * gl_Position;
 
     gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0;
 

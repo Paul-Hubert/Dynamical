@@ -148,7 +148,7 @@ void MapUploadSys::tick(float dt) {
     auto corner_pos = map.getChunkPos(corner_rpos);
     auto end_rpos = camera.fromScreenSpace(camera.getScreenSize()) + 10.f;
     auto end_pos = map.getChunkPos(end_rpos);
-    end_pos.y++;
+    end_pos.y+=5;
 
     header->corner_indices = corner_pos;
     header->chunk_length = end_pos.y - corner_pos.y + 1;
@@ -244,6 +244,12 @@ void MapUploadSys::tick(float dt) {
 
     for(int i = 0; i<stored_chunks.size(); i++) {
         stored_chunks[i].used = false;
+    }
+
+    for(int i = 0; i<max_chunks; i++) {
+        if(header->chunk_indices[i] >= max_stored_chunks) {
+            log() << header->chunk_indices[i];
+        }
     }
 
     transfer.copyBuffer(f.stagingBuffer, storageBuffer, regions);

@@ -117,7 +117,6 @@ void Game::start() {
 
         renderer->prepare();
 
-
         if (input.on[Input::EXIT]) {
             running = false;
             input.on.set(Input::EXIT, false);
