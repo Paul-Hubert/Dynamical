@@ -13,7 +13,7 @@
 
 #include "util/entt_util.h"
 
-#include "settings.h"
+#include "logic/settings/settings.h"
 
 #include "logic/components/input.h"
 

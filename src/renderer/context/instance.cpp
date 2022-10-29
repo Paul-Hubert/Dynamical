@@ -9,7 +9,7 @@
 #include "context.h"
 
 #include "renderer/util/vk_util.h"
-#include "logic/settings.h"
+#include "logic/settings/settings.h"
 
 using namespace dy;
 

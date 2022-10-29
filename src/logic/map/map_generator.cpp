@@ -5,7 +5,7 @@
 #include "logic/factories/factory_list.h"
 
 #include "logic/components/position.h"
-#include "logic/components/map_configuration.h"
+#include "logic/settings/settings.h"
 #include <extra/optick/optick.h>
 
 #include "map_manager.h"
@@ -76,7 +76,6 @@ void MapGenerator::fillRiver(glm::vec2 pos, Tile* tile) {
                 }
 
                 queue.emplace(adj, tile->level);
-
             }
         }
 
@@ -133,7 +132,7 @@ float MapGenerator::frand() {
 
 void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
 
-    auto& conf = reg.ctx<MapConfiguration>();
+    auto& conf = reg.ctx<Settings>().map_configuration;
     OPTICK_EVENT();
     
     auto fnSimplex = FastNoise::New<FastNoise::Simplex>();
@@ -174,7 +173,6 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
                     lower_y = conf.points_y.at(i);
                 }
             }
-
 
             tile.level = (double)level;
             
