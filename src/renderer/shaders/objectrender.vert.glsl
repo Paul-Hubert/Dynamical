@@ -53,6 +53,5 @@ void main() {
 
     gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0;
 
-
 }
 

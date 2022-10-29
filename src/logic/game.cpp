@@ -31,7 +31,14 @@
 
 #include "ai/ai.h"
 
+#include "util/log.h"
+
 #include "logic/map/map_manager.h"
+
+
+#include <chrono>
+
+using namespace std::chrono_literals;
 
 using namespace dy;
 
@@ -98,7 +105,11 @@ void Game::start() {
     Input& input = reg.ctx<Input>();
 
     // start loop
-    
+
+    using clock = std::chrono::high_resolution_clock;
+
+    auto start = clock::now();
+
     bool running = true;
     while(running) {
 
@@ -106,12 +117,16 @@ void Game::start() {
 
         renderer->prepare();
 
-        float dt = (float) (1. / 60.);
 
         if (input.on[Input::EXIT]) {
             running = false;
             input.on.set(Input::EXIT, false);
         }
+
+        float dt = std::chrono::duration_cast<std::chrono::nanoseconds>(clock::now() - start).count() / 1000000000.0;
+        start = clock::now();
+
+        log(Level::info) << "FPS : " << 1/dt;
 
         set->pre_tick(dt);
 
