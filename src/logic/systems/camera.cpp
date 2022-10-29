@@ -40,9 +40,9 @@ void CameraSys::tick(float dt) {
     glm::vec3 center = camera.getCenter();
 
     size.x *= 1 - 0.1 * input.mouseWheel.y;
-    
-    float speed = 40.0 * size.x / 100.0;
-    
+
+    float speed = 1 * size.x;
+
     if(input.on[Input::FORWARD]) {
         center.y -= speed * dt;
     } if(input.on[Input::BACKWARD]) {

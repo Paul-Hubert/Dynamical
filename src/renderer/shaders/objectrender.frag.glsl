@@ -39,7 +39,7 @@ void main() {
         float b = dot(oc, dir);
         float c = dot(oc, oc) - v_sphere.w*v_sphere.w;
         float h = b*b - c;
-        h = sqrt( h );
+        h = sqrt(h);
         float rlen = -b - h;
         vec3 rpos = v_cam + dir * rlen;
 

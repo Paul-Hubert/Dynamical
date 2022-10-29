@@ -157,7 +157,7 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
             Tile& tile = chunk.get(glm::ivec2(i,j));
             
             float noise = noiseOutput[j * Chunk::size + i];
-            double level;
+            double level = 0;
 
             double lower_x = -1;
             double lower_y = conf.points_y.at(0);
