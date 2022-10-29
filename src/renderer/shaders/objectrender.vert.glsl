@@ -13,7 +13,7 @@ out gl_PerVertex {
 layout(set = 0, binding = 0) uniform Camera {
     mat4 projection;
     mat4 view;
-    vec3 position;
+    ivec2 screen_size;
 } camera;
 
 struct Object {
@@ -41,13 +41,18 @@ void main() {
     v_sphere = objects[gl_InstanceIndex].sphere;
     v_color = objects[gl_InstanceIndex].color;
     v_sphere.z *= -1;
-    v_pos = v_sphere.xyz;
-    gl_Position = camera.view * vec4(v_pos, 1.0f);
+    gl_Position = camera.view * vec4(v_sphere.xyz, 1.0f);
     gl_Position.xy += (v_uv - 0.5) * v_sphere.w*2;
-    v_pos = (inverse(camera.view) * gl_Position).xyz;
+
     gl_Position = camera.projection * gl_Position;
+
+    mat4 inv = inverse(camera.projection * camera.view);
+
+    v_pos = (inv * gl_Position).xyz;
+    v_cam = (inv * vec4(gl_Position.xy, 0, gl_Position.w)).xyz;
+
     gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0;
 
-    v_cam = (inverse(camera.projection * camera.view) * vec4(gl_Position.xy, 0, 1)).xyz;
+
 }
 
