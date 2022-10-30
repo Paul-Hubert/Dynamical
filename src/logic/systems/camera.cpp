@@ -1,7 +1,6 @@
 #include "system_list.h"
 
 #include <cmath>
-#include <algorithm>
 
 #include "logic/components/camera.h"
 #include "renderer/context/context.h"
@@ -64,6 +63,11 @@ void CameraSys::tick(float dt) {
         angle = 1.5;
     } else if(angle < 0) {
         angle = 0;
+    }
+    if(rotation > M_PI) {
+        rotation -= M_PI;
+    } else if(rotation < -M_PI) {
+        rotation += M_PI;
     }
 
     auto& ctx = *reg.ctx<Context*>();
