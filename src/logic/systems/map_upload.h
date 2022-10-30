@@ -20,7 +20,7 @@
 
 namespace dy {
     
-    constexpr int max_chunks = 2000; // MUST CHANGE IN SHADER
+    constexpr int max_chunks = 5000; // MUST CHANGE IN SHADER
     constexpr int max_stored_chunks = 10000;
 
     struct TileData {

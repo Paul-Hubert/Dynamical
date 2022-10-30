@@ -144,11 +144,12 @@ void MapUploadSys::tick(float dt) {
     auto& map = reg.ctx<MapManager>();
     auto& camera = reg.ctx<Camera>();
     
-    auto corner_rpos = camera.fromScreenSpace(glm::vec2());// - 10.f;
-    auto corner_pos = map.getChunkPos(corner_rpos) + 1;
-    auto end_rpos = camera.fromScreenSpace(camera.getScreenSize());// + 10.f;
-    auto end_pos = map.getChunkPos(end_rpos) - 1;
-    //end_pos.y+=5;
+    auto corner_rpos = camera.fromScreenSpace(glm::vec2()) - 10.f;
+    auto end_rpos = camera.fromScreenSpace(camera.getScreenSize()) + 10.f;
+    auto corner_pos = map.getChunkPos(corner_rpos);
+    auto end_pos = map.getChunkPos(end_rpos);
+
+    end_pos.y += abs(end_pos.y - corner_pos.y);
 
     header->corner_indices = corner_pos;
     header->chunk_length = end_pos.y - corner_pos.y + 1;

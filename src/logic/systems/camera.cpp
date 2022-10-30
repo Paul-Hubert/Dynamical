@@ -50,10 +50,6 @@ void CameraSys::tick(float dt) {
         center.x -= move_speed * dt;
     } if(input.on[Input::RIGHT]) {
         center.x += move_speed * dt;
-    } if(input.on[Input::ROTATE_LEFT]) {
-        rotation -= rotate_speed * dt;
-    } if(input.on[Input::ROTATE_RIGHT]) {
-        rotation += rotate_speed * dt;
     } if(input.on[Input::ANGLE_UP]) {
         angle -= angle_speed * dt;
     } if(input.on[Input::ANGLE_DOWN]) {
@@ -81,7 +77,7 @@ void CameraSys::finish() {
 }
 
 glm::mat4 Camera::createProjection() {
-    return glm::ortho(-size.x/2, size.x/2, -size.y/2, +size.y/2, -1000.f, 1000.f);
+    return glm::ortho(-size.x/2, size.x/2, -size.y/2, +size.y/2, -100000.f, 100000.f);
     //return glm::perspective(glm::radians(70.f), screen_size.x / screen_size.y, 0.001f, 1000.f);
 }
 
