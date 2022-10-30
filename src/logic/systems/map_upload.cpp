@@ -102,9 +102,7 @@ MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
         auto bufferInfo = vk::DescriptorBufferInfo(f.objectBuffer, 0, f.objectBuffer.size);
         auto write = vk::WriteDescriptorSet(f.objectSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &bufferInfo, nullptr);
         ctx.device->updateDescriptorSets(1, &write, 0, nullptr);
-
     }
-
 }
 
 void MapUploadSys::tick(float dt) {
