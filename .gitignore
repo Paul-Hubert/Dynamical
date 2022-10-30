@@ -17,3 +17,4 @@ config.*.json
 .cache
 /result
 /compile_commands.json
+renderdoc.cap
