@@ -1,6 +1,7 @@
 #include "system_list.h"
 
 #include <cmath>
+#include <algorithm>
 
 #include "logic/components/camera.h"
 #include "renderer/context/context.h"
@@ -24,7 +25,6 @@ void CameraSys::init() {
 }
 
 void CameraSys::tick(float dt) {
-    
     OPTICK_EVENT();
     
     auto& input = reg.ctx<Input>();
@@ -60,6 +60,12 @@ void CameraSys::tick(float dt) {
         angle += angle_speed * dt;
     }
 
+    if(angle > 1.5) {
+        angle = 1.5;
+    } else if(angle < 0) {
+        angle = 0;
+    }
+
     auto& ctx = *reg.ctx<Context*>();
     camera.setScreenSize(glm::vec2(ctx.swap.extent.width, ctx.swap.extent.width));
     size.y = size.x * ctx.swap.extent.height / ctx.swap.extent.width;
@@ -68,7 +74,6 @@ void CameraSys::tick(float dt) {
     camera.setRotation(rotation);
     camera.setAngle(angle);
     camera.setSize(size);
-    
 }
 
 void CameraSys::finish() {
