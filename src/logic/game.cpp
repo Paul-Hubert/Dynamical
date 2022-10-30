@@ -66,7 +66,7 @@ void Game::start() {
     set->pre_add<MapConfiguratorSys>();
     set->pre_add<SelectionSys>();
     
-    set->pre_add<ChunkGenerationSys>();
+    //set->pre_add<ChunkGenerationSys>();
     set->pre_add<WaterFlowSys>();
     
     set->pre_add<PatherSys>();

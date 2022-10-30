@@ -82,8 +82,8 @@ glm::mat4 Camera::createProjection() {
 
 glm::mat4 Camera::createView() {
     glm::mat4 camera = glm::identity<glm::mat4>();
-    camera = glm::translate(camera, center);
     camera = glm::rotate(camera, rotation, glm::vec3(0,0,1));
+    camera = glm::translate(camera, center);
     camera = glm::rotate(camera, angle, glm::vec3(1,0,0));
     return glm::inverse(camera);
 }

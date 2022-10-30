@@ -91,7 +91,7 @@ void ClassicRender::prepare() {
 
     auto clearValues = std::vector<vk::ClearValue>{
             vk::ClearValue(vk::ClearColorValue(std::array<float, 4> { 0.2f, 0.2f, 0.2f, 1.0f })),
-            vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0)) };
+            vk::ClearValue(vk::ClearDepthStencilValue(0.0f, 0)) };
 
     command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.frames[ctx.swap.current].framebuffer, vk::Rect2D({}, vk::Extent2D(ctx.swap.extent.width, ctx.swap.extent.height)), (uint32_t)clearValues.size(), clearValues.data()), vk::SubpassContents::eInline);
 
