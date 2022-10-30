@@ -9,7 +9,7 @@ struct ViewUBO {
 
     glm::mat4 projection;
     glm::mat4 view;
-    glm::ivec2 screen_size;
+    glm::vec3 direction;
     
 };
 

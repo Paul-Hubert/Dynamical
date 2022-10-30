@@ -11,21 +11,9 @@ layout(location = 0) out vec4 outColor;
 layout(set = 0, binding = 0) uniform Camera {
     mat4 projection;
     mat4 view;
-    ivec2 screen_size;
+    vec3 direction;
 } camera;
 
-/*
-float intersect(vec3 origin, vec3 direction)
-{
-    float3 oc = origin - v_sphere.xyz;
-    float b = dot( oc, direction );
-    float c = dot( oc, oc ) - v_sphere.w*v_sphere.w;
-    float h = b*b - c;
-    if( h<0.0 ) return -1.0;
-    h = sqrt( h );
-    return -b - h;
-}
-*/
 
 void main() {
 
