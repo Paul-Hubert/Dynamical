@@ -120,7 +120,7 @@ void ClassicRender::render(vk::Semaphore semaphore) {
         f.pointer->projection = camera.getProjection();
         f.pointer->view = camera.getView();
 
-        f.pointer->screen_size = camera.getScreenSize();
+        f.pointer->direction = camera.getDirection();
 
     }
 

@@ -13,7 +13,6 @@ out gl_PerVertex {
 layout(set = 0, binding = 0) uniform Camera {
     mat4 projection;
     mat4 view;
-    ivec2 screen_size;
 } camera;
 
 struct Object {
@@ -45,11 +44,12 @@ void main() {
     gl_Position.xy += (v_uv - 0.5) * v_sphere.w*2;
 
     mat4 inv = inverse(camera.view);
-    v_pos = (inv * gl_Position).xyz;
-    v_cam = (inv * vec4(gl_Position.xy, 1, 1)).xyz;
+    vec4 cpos = gl_Position;
+    v_pos = (inv * cpos).xyz;
+    cpos.z -= 1;
+    v_cam = (inv * cpos).xyz;
 
     gl_Position = camera.projection * gl_Position;
-
     gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0;
 
 }

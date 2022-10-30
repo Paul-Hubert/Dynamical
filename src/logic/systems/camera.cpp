@@ -1,14 +1,10 @@
 #include "system_list.h"
 
-#include <math.h>
-
-#include "glm/gtx/string_cast.hpp"
+#include <cmath>
 
 #include "logic/components/camera.h"
 #include "renderer/context/context.h"
 #include "logic/components/input.h"
-
-#include "util/log.h"
 
 using namespace dy;
 
@@ -20,7 +16,6 @@ void CameraSys::preinit() {
     camera.setCenter(glm::vec3(0,0,0));
     float width = 100.f;
     camera.setSize(glm::vec2(width, width * ctx.swap.extent.height / ctx.swap.extent.width));
-    //camera.setAngle(0);
     camera.setAngle(M_PI / 3);
 }
 
@@ -80,7 +75,7 @@ glm::mat4 Camera::createView() {
 }
 
 glm::vec2 Camera::fromWorldSpace(glm::vec3 position) {
-        return glm::project(position, getView(), getProjection(), glm::vec4(0, 0, screen_size.x, screen_size.y));
+    return glm::project(position, getView(), getProjection(), glm::vec4(0, 0, screen_size.x, screen_size.y));
 }
 
 glm::vec3 Camera::fromScreenSpace(glm::vec2 screen_position) {
