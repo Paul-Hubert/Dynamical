@@ -20,8 +20,8 @@ MapRenderSys::MapRenderSys(entt::registry& reg) : System(reg) {
 
     float gridSize = Chunk::size + 1;
 
-    for(int x = 0; x<Chunk::size; x++) {
-        for(int y = 0; y<Chunk::size; y++) {
+    for(int x = 0; x < Chunk::size; x++) {
+        for(int y = 0; y < Chunk::size; y++) {
 
             int vertex_index = x + y * gridSize;
             indices.push_back(vertex_index);
@@ -221,7 +221,6 @@ void MapRenderSys::initPipeline() {
 
     ctx.device->destroyShaderModule(static_cast<vk::ShaderModule> (fragShaderModule));
     ctx.device->destroyShaderModule(static_cast<vk::ShaderModule> (vertShaderModule));
-    
 }
 
 MapRenderSys::~MapRenderSys() {

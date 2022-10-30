@@ -24,6 +24,10 @@ public:
         EXIT,
         BACKSPACE,
         TAB,
+        ROTATE_RIGHT,
+        ROTATE_LEFT,
+        ANGLE_UP,
+        ANGLE_DOWN,
         END_ENUM,
     };
 

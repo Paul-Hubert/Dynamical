@@ -38,27 +38,40 @@ void CameraSys::tick(float dt) {
 
     glm::vec2 size = camera.getSize();
     glm::vec3 center = camera.getCenter();
+    float rotation = camera.getRotation();
+    float angle = camera.getAngle();
 
     size.x *= 1 - 0.1 * input.mouseWheel.y;
 
-    float speed = 1 * size.x;
+    float move_speed = 1 * size.x;
+    float rotate_speed = 2;
+    float angle_speed = 2;
 
     if(input.on[Input::FORWARD]) {
-        center.y -= speed * dt;
+        center.y -= move_speed * dt;
     } if(input.on[Input::BACKWARD]) {
-        center.y += speed * dt;
+        center.y += move_speed * dt;
     } if(input.on[Input::LEFT]) {
-        center.x -= speed * dt;
+        center.x -= move_speed * dt;
     } if(input.on[Input::RIGHT]) {
-        center.x += speed * dt;
+        center.x += move_speed * dt;
+    } if(input.on[Input::ROTATE_LEFT]) {
+        rotation -= rotate_speed * dt;
+    } if(input.on[Input::ROTATE_RIGHT]) {
+        rotation += rotate_speed * dt;
+    } if(input.on[Input::ANGLE_UP]) {
+        angle -= angle_speed * dt;
+    } if(input.on[Input::ANGLE_DOWN]) {
+        angle += angle_speed * dt;
     }
-    
-    
+
     auto& ctx = *reg.ctx<Context*>();
     camera.setScreenSize(glm::vec2(ctx.swap.extent.width, ctx.swap.extent.width));
     size.y = size.x * ctx.swap.extent.height / ctx.swap.extent.width;
 
     camera.setCenter(center);
+    camera.setRotation(rotation);
+    camera.setAngle(angle);
     camera.setSize(size);
     
 }
@@ -75,6 +88,7 @@ glm::mat4 Camera::createProjection() {
 glm::mat4 Camera::createView() {
     glm::mat4 camera = glm::identity<glm::mat4>();
     camera = glm::translate(camera, center);
+    camera = glm::rotate(camera, rotation, glm::vec3(0,0,1));
     camera = glm::rotate(camera, angle, glm::vec3(1,0,0));
     return glm::inverse(camera);
 }
