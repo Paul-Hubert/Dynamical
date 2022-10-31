@@ -26,6 +26,7 @@ void DevMenuSys::tick(float dt) {
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
     static bool open = true;
     if(ImGui::Begin("Object Creator", &open)) {
+        ImGui::SetWindowCollapsed(true, ImGuiCond_FirstUseEver);
         static int option = 0;
         ImGui::RadioButton("Nothing", &option, 0);
         ImGui::RadioButton("Tree", &option, 1);

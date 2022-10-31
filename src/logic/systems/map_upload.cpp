@@ -240,9 +240,11 @@ void MapUploadSys::tick(float dt) {
 
     transfer.copyBuffer(f.stagingBuffer, storageBuffer, regions);
     
-    ImGui::Begin("Chunk updates", nullptr);
-    
-    ImGui::Text("%i", staging_counter);
+    if(ImGui::Begin("Chunk updates", nullptr)) {
+        ImGui::SetWindowCollapsed(true, ImGuiCond_FirstUseEver);
+        ImGui::Text("%i", staging_counter);
+    }
+
     
     ImGui::End();
 

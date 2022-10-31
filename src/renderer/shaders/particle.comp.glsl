@@ -81,8 +81,15 @@ Tile getTile(vec2 pos) {
 void main()
 {
     uint particle_index = gl_GlobalInvocationID.x;
+
     if(particle_index < new_particle_count) {
         particles[particle_count - new_particle_count + particle_index] = new_particles[particle_index];
     }
 
+    Particle p = particles[particle_index];
+
+    p.speed.z -= 0.01;
+    p.sphere.xyz += p.speed.xyz;
+
+    particles[particle_index] = p;
 }
