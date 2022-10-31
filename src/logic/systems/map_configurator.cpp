@@ -31,25 +31,38 @@ void MapConfiguratorSys::tick(float dt) {
 
     if(ImGui::Begin("Map Configurator", &open)) {
         static int octave = conf.octave_count;
+        ImGui::BeginGroup();
+
+        ImGui::PushItemWidth(100);
         ImGui::InputInt("Octave count", &octave);
         if(octave < 1) {
             octave = 1;
         }
+        ImGui::SameLine();
         conf.octave_count = octave;
 
-        ImGui::InputFloat("Frequency", &conf.frequency);
 
+        ImGui::InputFloat("Frequency", &conf.frequency, 0.01, 0.1);
+        ImGui::SameLine();
         //seed is an unsigned int, imgui takes a signed integer but they're the same size
         // and the value doesn't matter so it's okay
         ImGui::InputInt("Seed", (int*)&conf.seed);
+        ImGui::SameLine();
         ImGui::InputFloat("Gain", &conf.gain, 0.1);
+
         ImGui::InputFloat("Lacunarity", &conf.lacunarity, 0.1);
+        ImGui::SameLine();
+
         ImGui::InputFloat("Amplitude", &conf.amplitude, 0.1);
+        ImGui::SameLine();
         ImGui::InputFloat("Weighted strength", &conf.weighted_strength, 0.1);
+        ImGui::SameLine();
+        ImGui::EndGroup();
 
         if(ImGui::Button("Save settings")) {
             settings.save();
         }
+        ImGui::SameLine();
 
         static int prev_current = 0;
         static int current = 0;
@@ -68,6 +81,7 @@ void MapConfiguratorSys::tick(float dt) {
                 }
             }
         }
+        ImGui::SameLine();
 
         auto disabled = conf.points_x.size() <= 2;
         if(disabled) {
@@ -80,17 +94,19 @@ void MapConfiguratorSys::tick(float dt) {
             --current;
         }
 
+
         if(disabled) {
             ImGui::EndDisabled();
         }
 
         static double current_x = conf.points_x.at(current);
         ImGui::InputDouble("Current X", &current_x, 0.01, 0.1);
-
+        ImGui::SameLine();
         static double current_y = conf.points_y.at(current);
         ImGui::InputDouble("Current Y", &current_y, 0.5, 5);
 
         ImGui::Separator();
+        ImGui::PopItemWidth();
         if(ImPlot::BeginPlot("Terrain height configurator")) {
             ImPlot::SetupAxes("Perlin variation", "Height");
             ImPlot::SetupAxisLimits(ImAxis_X1, -1.05, 1.05);
