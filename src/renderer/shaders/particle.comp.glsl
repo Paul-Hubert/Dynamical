@@ -50,6 +50,34 @@ layout(std430, set = 1, binding = 0) readonly buffer Map {
     Tile tiles[];
 };
 
+ivec2 ifloor(vec2 v) {
+    return ivec2(floor(v));
+}
+
+Tile getTile(vec2 pos) {
+
+    ivec2 ipos = ifloor(pos);
+
+    ivec2 real_indices = ifloor(pos / CHUNK_SIZE);
+
+    ivec2 indices = real_indices - corner_indices;
+
+    if(indices.x < 0 || indices.y < 0) return Tile(0, 0);
+
+    int chunk_index = chunk_indices[indices.x * chunk_length + indices.y];
+
+    ivec2 tile_space = ipos - real_indices * CHUNK_SIZE;
+
+    Tile tile = tiles[chunk_index * CHUNK_SIZE * CHUNK_SIZE + tile_space.x * CHUNK_SIZE + tile_space.y];
+
+    if(tile.type == 5) {
+        tile.height = 0.0f;
+    }
+
+    return tile;
+
+}
+
 void main()
 {
     uint particle_index = gl_GlobalInvocationID.x;
