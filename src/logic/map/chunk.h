@@ -3,6 +3,8 @@
 
 #include <entt/entt.hpp>
 
+#include <glm/glm.hpp>
+
 #include <unordered_set>
 
 #include "tile.h"

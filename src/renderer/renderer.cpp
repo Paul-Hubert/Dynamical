@@ -47,13 +47,12 @@ void Renderer::render() {
     OPTICK_EVENT();
     
     auto& f = per_frame[ctx.frame_index];
-    
-    vk::Semaphore s = f.transfer_semaphore;
-    if(!ctx.transfer.flush(s)) {
-        s = nullptr;
-    }
-    
-    ctx.classic_render.render(s);
+
+    ctx.transfer.flush({}, {}, {});
+
+    ctx.compute.flush({}, {}, {});
+
+    ctx.classic_render.render();
 
 }
 

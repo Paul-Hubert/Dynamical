@@ -17,7 +17,7 @@ class Context;
 class Transfer {
 public:
     Transfer(Context& ctx, entt::registry& reg);
-    bool flush(vk::Semaphore semaphore = nullptr);
+    bool flush(std::vector<vk::Semaphore> waits, std::vector<vk::PipelineStageFlags> stages, std::vector<vk::Semaphore> signals);
     vk::CommandBuffer getCommandBuffer();
     
     std::shared_ptr<VmaImage> createImage(const void* data, size_t real_size, vk::ImageCreateInfo info, vk::ImageLayout layout);
