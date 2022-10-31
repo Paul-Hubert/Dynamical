@@ -29,8 +29,7 @@ void SelectionSys::tick(float dt) {
         auto& map = reg.ctx<MapManager>();
         
         glm::vec2 pos = map.getMousePosition();
-        
-        
+
         Chunk* chunk = map.getChunk(map.getChunkPos(pos));
         if(chunk == nullptr) return;
         
