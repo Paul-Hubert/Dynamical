@@ -28,6 +28,7 @@ DEFINE_SYSTEM(HarvestSys)
 DEFINE_SYSTEM(EatSys)
 DEFINE_SYSTEM(ActionBarSys)
 DEFINE_SYSTEM(MapConfiguratorSys)
+DEFINE_SYSTEM(MapEditorSys)
 
 }
 

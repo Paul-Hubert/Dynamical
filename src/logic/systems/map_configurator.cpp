@@ -94,7 +94,7 @@ void MapConfiguratorSys::tick(float dt) {
                     ImGui::SameLine();
                     conf.octave_count = s.octave;
 
-                    ImGui::InputFloat("Frequency", &conf.frequency, 0.01, 0.1);
+                    ImGui::InputFloat("Frequency", &conf.frequency, 0.0001, 0.001);
                     ImGui::SameLine();
                     //seed is an unsigned int, imgui takes a signed integer but they're the same size
                     // and the value doesn't matter so it's okay
@@ -126,7 +126,7 @@ void MapConfiguratorSys::tick(float dt) {
                     }
                     ImGui::SameLine();
 
-                    auto disabled = conf.points_x.size() <= 2;
+                    auto disabled = s.current == 0 || s.current == conf.points_x.size();
                     if(disabled) {
                         ImGui::BeginDisabled(true);
                     }
@@ -136,7 +136,6 @@ void MapConfiguratorSys::tick(float dt) {
                         conf.points_y.erase(conf.points_y.begin()+s.current);
                         --s.current;
                     }
-
 
                     if(disabled) {
                         ImGui::EndDisabled();
