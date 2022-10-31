@@ -29,6 +29,7 @@ void MapEditorSys::tick(float dt) {
 
     static float sq_radius = radius*radius;
     if(ImGui::Begin("Brush configurator", &open)) {
+        ImGui::SetWindowCollapsed(true, ImGuiCond_FirstUseEver);
         ImGui::PushItemWidth(100);
         if(ImGui::InputFloat("Radius", &radius, 1, 5)) {
             sq_radius = radius*radius;

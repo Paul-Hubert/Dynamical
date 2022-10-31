@@ -42,6 +42,7 @@ void ActionBarSys::tick(float dt) {
         
         sprintf(buffer, "NULL###ActionBar%i", id);
         if(ImGui::Begin(buffer, nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground)) {
+            ImGui::SetWindowCollapsed(true, ImGuiCond_FirstUseEver);
             glm::vec2 size = cam.fromWorldSize(glm::vec2(1.0, 0.2));
             ImVec2 real_size = ImGui::GetWindowSize();
             ImGui::SetWindowPos(ImVec2(pos.x - size.x/2, pos.y - size.y/2 + size.x/2));

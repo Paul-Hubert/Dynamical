@@ -38,7 +38,7 @@ void MapConfiguratorSys::tick(float dt) {
     static bool open = false;
 
     if(ImGui::Begin("Map Configurator", &open)) {
-
+        ImGui::SetWindowCollapsed(true, ImGuiCond_FirstUseEver);
         if(ImGui::Button("Add new parametric perlin")) {
             configurations.emplace_back();
         }
