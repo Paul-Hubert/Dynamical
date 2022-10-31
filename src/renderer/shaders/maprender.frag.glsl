@@ -107,5 +107,4 @@ void main() {
     vec3 normal = -normalize(v_normal);
     
     outColor.rgb *= max(dot(normal, sun_dir), 0.0) * 0.9 + 0.1;
-    
 }

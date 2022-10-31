@@ -99,7 +99,7 @@ glm::vec2 Camera::fromWorldSpace(glm::vec3 position) {
 
 glm::vec3 Camera::fromScreenSpace(glm::vec2 screen_position) {
     glm::vec3 a = glm::unProject(glm::vec3(screen_position, 0), getView(), getProjection(), glm::vec4(0, 0, screen_size.x, screen_size.y));
-    glm::vec3 b = glm::unProject(glm::vec3(screen_position, 1), getView(), getProjection(), glm::vec4(0, 0, screen_size.x, screen_size.y));
+    glm::vec3 b = glm::unProject(glm::vec3(screen_position, 0.5), getView(), getProjection(), glm::vec4(0, 0, screen_size.x, screen_size.y));
     // p = (b - a) * t + a
     // 0 = (b.z - a.z) * t + a.z
     // -a.z / (b.z - a.z) = t;

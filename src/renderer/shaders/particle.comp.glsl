@@ -66,7 +66,6 @@ Tile getTile(vec2 pos) {
 
     int chunk_index = chunk_indices[indices.x * chunk_length + indices.y];
 
-
     ivec2 tile_space = ipos - real_indices * CHUNK_SIZE;
 
     Tile tile = tiles[chunk_index * CHUNK_SIZE * CHUNK_SIZE + tile_space.x * CHUNK_SIZE + tile_space.y];
@@ -75,7 +74,7 @@ Tile getTile(vec2 pos) {
         tile.height = 0.0f;
     }
 
-    return Tile(0, 10);
+    return tile;
 
 }
 
@@ -96,16 +95,18 @@ void main()
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 
-    Tile t = getTile(p.sphere.xy);
+    Tile t = getTile(new_pos.xy);
 
     //@TODO fixme!
     vec3 norm = vec3(0,0,1);
 
-    if(new_pos.z - p.sphere.w < t.height) {
+    if(new_pos.z < t.height + p.sphere.w) {
         new_pos.z = t.height + p.sphere.w;
         p.speed.xyz -= 2 * dot(p.speed.xyz, norm) * norm;
     }
     p.sphere.xyz = new_pos;
+
+    //p.sphere.z = t.height + p.sphere.w;
 
     particles[particle_index] = p;
 }

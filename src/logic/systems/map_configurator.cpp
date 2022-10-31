@@ -82,6 +82,7 @@ void MapConfiguratorSys::tick(float dt) {
                         statics.erase(statics.begin()+i);
                         --i;
                         ImGui::PopStyleColor();
+                        ImGui::EndTabItem();
                         continue;
                     }
                     ImGui::PopStyleColor();
