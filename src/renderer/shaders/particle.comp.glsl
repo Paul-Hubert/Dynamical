@@ -1,5 +1,4 @@
 #version 450
-#extension GL_EXT_debug_printf : enable
 
 layout (local_size_x = 256) in;
 
@@ -66,7 +65,7 @@ Tile getTile(vec2 pos) {
     if(indices.x < 0 || indices.y < 0) return Tile(0, 0);
 
     int chunk_index = chunk_indices[indices.x * chunk_length + indices.y];
-    debugPrintfEXT("chonker is %f", chunk_index);
+
 
     ivec2 tile_space = ipos - real_indices * CHUNK_SIZE;
 
