@@ -23,7 +23,7 @@ ParticleSimulationSys::ParticleSimulationSys(entt::registry& reg) : System(reg) 
 
         info.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
         info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        uniformBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(Particle) * max_new_particles, vk::BufferUsageFlagBits::eUniformBuffer, vk::SharingMode::eExclusive));
+        uniformBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(Particle) * max_new_particles, vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive));
 
 
         VmaAllocationInfo inf;
@@ -35,7 +35,7 @@ ParticleSimulationSys::ParticleSimulationSys(entt::registry& reg) : System(reg) 
 
     {
         auto poolSizes = std::vector {
-                vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2),
+                vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 3),
                 vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1)
         };
         descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, 1, (uint32_t) poolSizes.size(), poolSizes.data()));
@@ -45,7 +45,7 @@ ParticleSimulationSys::ParticleSimulationSys(entt::registry& reg) : System(reg) 
         auto bindings = std::vector {
                 vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute),
                 vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute),
-                vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eCompute)
+                vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer, 1, vk::ShaderStageFlagBits::eCompute)
         };
         descLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, (uint32_t) bindings.size(), bindings.data()));
 
@@ -57,7 +57,7 @@ ParticleSimulationSys::ParticleSimulationSys(entt::registry& reg) : System(reg) 
         auto writes = std::vector<vk::WriteDescriptorSet> {
             {descSet, 0, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &particleInfo, nullptr},
             {descSet, 1, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &hashmapInfo, nullptr},
-            {descSet, 2, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &uniformInfo, nullptr}
+            {descSet, 2, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &uniformInfo, nullptr}
         };
         ctx.device->updateDescriptorSets(writes.size(), writes.data(), 0, nullptr);
 
@@ -118,8 +118,8 @@ void ParticleSimulationSys::AddParticles() {
         if (tile) {
 
             new_particle_count++;
-            auto &particle = uniformPointer[0];
-            particle = {};
+            uniformPointer[0] = {};
+            auto& particle = uniformPointer[0];
             particle.sphere.x = pos.x;
             particle.sphere.y = pos.y;
             particle.sphere.z = tile->level + 0.5f;

@@ -29,7 +29,7 @@ layout(std430, set = 0, binding = 1) buffer HashMap {
 
 const uint MAX_NEW_PARTICLES = 100;
 
-layout(std140, set = 0, binding = 2) uniform NewParticles {
+layout(std430, set = 0, binding = 2) readonly buffer NewParticles {
     Particle new_particles[MAX_NEW_PARTICLES];
 };
 
@@ -82,11 +82,13 @@ void main()
 {
     uint particle_index = gl_GlobalInvocationID.x;
 
-    if(particle_index < new_particle_count) {
-        particles[particle_count - new_particle_count + particle_index] = new_particles[particle_index];
-    }
+    Particle p;
 
-    Particle p = particles[particle_index];
+    if(particle_index >= particle_count - new_particle_count) {
+        p = new_particles[particle_count - particle_index - new_particle_count];
+    } else {
+        p = particles[particle_index];
+    }
 
     p.speed.z -= 0.01;
     p.sphere.xyz += p.speed.xyz;
