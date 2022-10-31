@@ -2,11 +2,11 @@
 
 #include "renderer/context/context.h"
 
+#include "logic/components/map_upload_data.h"
+
 #include "util/util.h"
 
 using namespace dy;
-
-#include "logic/components/map_upload_data.h"
 
 ObjectRenderSys::ObjectRenderSys(entt::registry& reg) : System(reg) {
 
@@ -21,18 +21,26 @@ void ObjectRenderSys::tick(float dt) {
     OPTICK_EVENT();
 
     Context& ctx = *reg.ctx<Context*>();
-    
-    auto transfer = ctx.transfer.getCommandBuffer();
 
     auto& data = reg.ctx<MapUploadData>();
+
+    // Objects
+    ctx.classic_render.command.bindPipeline(vk::PipelineBindPoint::eGraphics, objectPipeline);
     
-    ctx.classic_render.command.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
-    
-    ctx.classic_render.command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, { ctx.classic_render.per_frame[ctx.frame_index].set, data.objectSet}, nullptr);
-    
+    ctx.classic_render.command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, { ctx.classic_render.per_frame[ctx.frame_index].set}, nullptr);
+
+    ctx.classic_render.command.bindVertexBuffers(0, {data.objectBuffer}, {0});
+
     ctx.classic_render.command.draw(6, data.num_objects, 0, 0);
-    
-    
+
+
+    // Particles
+    ctx.classic_render.command.bindPipeline(vk::PipelineBindPoint::eGraphics, particlePipeline);
+
+    ctx.classic_render.command.bindVertexBuffers(0, {data.particleBuffer}, {0});
+
+    ctx.classic_render.command.draw(6, data.num_particles, 0, 0);
+
 }
 
 void ObjectRenderSys::initPipeline() {
@@ -73,9 +81,15 @@ void ObjectRenderSys::initPipeline() {
     
     // VERTEX INPUT
     
-    auto vertexInputBindings = std::vector<vk::VertexInputBindingDescription> {};
+    auto vertexInputBindings = std::vector<vk::VertexInputBindingDescription> {
+            vk::VertexInputBindingDescription(0, sizeof(RenderObject), vk::VertexInputRate::eInstance)
+    };
+
     // Inpute attribute bindings describe shader attribute locations and memory layouts
-    auto vertexInputAttributs = std::vector<vk::VertexInputAttributeDescription> {};
+    auto vertexInputAttributs = std::vector<vk::VertexInputAttributeDescription> {
+            vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32A32Sfloat, 0),
+            vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32A32Sfloat, 4 * sizeof(float))
+    };
 
     auto vertexInputState = vk::PipelineVertexInputStateCreateInfo({}, (uint32_t) vertexInputBindings.size(), vertexInputBindings.data(), (uint32_t) vertexInputAttributs.size(), vertexInputAttributs.data());
 
@@ -162,12 +176,10 @@ void ObjectRenderSys::initPipeline() {
     
     
     
-    auto layouts = std::vector<vk::DescriptorSetLayout> {ctx.classic_render.view_layout, data.objectLayout};
-    
-    auto range = vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, 4 * sizeof(float));
+    auto layouts = std::vector<vk::DescriptorSetLayout> {ctx.classic_render.view_layout};
     
     pipelineLayout = ctx.device->createPipelineLayout(vk::PipelineLayoutCreateInfo(
-        {}, (uint32_t) layouts.size(), layouts.data(), 1, &range
+        {}, (uint32_t) layouts.size(), layouts.data()
     ));
     
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
@@ -187,7 +199,24 @@ void ObjectRenderSys::initPipeline() {
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    graphicsPipeline = ctx.device->createGraphicsPipeline(nullptr, {pipelineInfo}).value;
+    objectPipeline = ctx.device->createGraphicsPipeline(nullptr, {pipelineInfo}).value;
+
+    // VERTEX INPUT
+
+    vertexInputBindings = std::vector<vk::VertexInputBindingDescription> {
+            vk::VertexInputBindingDescription(0, sizeof(Particle), vk::VertexInputRate::eInstance)
+    };
+
+    // Inpute attribute bindings describe shader attribute locations and memory layouts
+    vertexInputAttributs = std::vector<vk::VertexInputAttributeDescription> {
+            vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32A32Sfloat, 0),
+            vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32A32Sfloat, 2 * 4 * sizeof(float))
+    };
+
+    vertexInputState = vk::PipelineVertexInputStateCreateInfo({}, (uint32_t) vertexInputBindings.size(), vertexInputBindings.data(), (uint32_t) vertexInputAttributs.size(), vertexInputAttributs.data());
+
+    pipelineInfo.pVertexInputState = &vertexInputState.operator const VkPipelineVertexInputStateCreateInfo &();
+    particlePipeline = ctx.device->createGraphicsPipeline(nullptr, {pipelineInfo}).value;
 
     ctx.device->destroyShaderModule(static_cast<vk::ShaderModule> (fragShaderModule));
     ctx.device->destroyShaderModule(static_cast<vk::ShaderModule> (vertShaderModule));
@@ -198,7 +227,8 @@ ObjectRenderSys::~ObjectRenderSys() {
 
     Context& ctx = *reg.ctx<Context*>();
     
-    ctx.device->destroy(graphicsPipeline);
+    ctx.device->destroy(objectPipeline);
+    ctx.device->destroy(particlePipeline);
     
     ctx.device->destroy(pipelineLayout);
     

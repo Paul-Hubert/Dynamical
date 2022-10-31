@@ -35,7 +35,8 @@ private:
     void initPipeline();
 
     vk::PipelineLayout pipelineLayout;
-    vk::Pipeline graphicsPipeline;
+    vk::Pipeline objectPipeline;
+    vk::Pipeline particlePipeline;
     
 };
 

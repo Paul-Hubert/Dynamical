@@ -16,33 +16,14 @@
 
 #include "logic/map/chunk.h"
 
+#include "logic/components/map_upload_data.h"
+
 #include <memory>
 
 namespace dy {
-    
-    constexpr int max_chunks = 5000; // MUST CHANGE IN SHADER
-    constexpr int max_stored_chunks = 10000;
 
-    struct TileData {
-        int type;
-        float height;
-    };
 
-    struct Header {
-        glm::vec4 colors[Tile::Type::max];
-        glm::ivec2 corner_indices;
-        int chunk_length;
-        int chunk_indices[max_chunks];
-    };
 
-    struct RenderChunk {
-        TileData tiles[Chunk::size*Chunk::size];
-    };
-
-    struct RenderObject {
-        glm::vec4 sphere;
-        glm::vec4 color;
-    };
 
     class Context;
     class Renderpass;
@@ -70,7 +51,6 @@ namespace dy {
             Header* stagingPointer;
             VmaBuffer objectBuffer;
             RenderObject* objectPointer;
-            vk::DescriptorSet objectSet;
         };
         std::vector<per_frame> per_frame;
 

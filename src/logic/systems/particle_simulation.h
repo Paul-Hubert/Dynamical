@@ -10,34 +10,58 @@
 
 #include <entt/entt.hpp>
 
+#include "logic/components/map_upload_data.h"
+
 #include <glm/glm.hpp>
 
 #include <memory>
 
 namespace dy {
 
-    class Context;
-    class Renderpass;
+class Context;
 
-    class ParticleSimulationSys : public System {
-    public:
-        ParticleSimulationSys(entt::registry& reg);
-        ~ParticleSimulationSys() override;
+const uint32_t max_particles = 100000;
+const uint32_t hashmap_slots = max_particles * 2;
+const uint32_t max_new_particles = 100;
 
-        const char* name() override {
-            return "ParticleSimulation";
-        }
+struct PushConstants {
+    uint32_t particle_count;
+    uint32_t new_particle_count;
+};
 
-        void tick(float dt) override;
+class ParticleSimulationSys : public System {
+public:
+    ParticleSimulationSys(entt::registry& reg);
+    ~ParticleSimulationSys() override;
 
-    private:
+    void AddParticles();
 
-        void initPipeline();
+    const char* name() override {
+        return "ParticleSimulation";
+    }
 
-        vk::PipelineLayout pipelineLayout;
-        vk::Pipeline graphicsPipeline;
+    void tick(float dt) override;
 
-    };
+private:
+
+    uint32_t new_particle_count = 0;
+    uint32_t particle_count = 0;
+
+    void initPipeline();
+
+    VmaBuffer particleBuffer;
+    VmaBuffer hashmapBuffer;
+    VmaBuffer uniformBuffer;
+    Particle* uniformPointer;
+
+    vk::DescriptorPool descPool;
+    vk::DescriptorSetLayout descLayout;
+    vk::DescriptorSet descSet;
+
+    vk::PipelineLayout pipelineLayout;
+    vk::Pipeline computePipeline;
+
+};
 
 }
 

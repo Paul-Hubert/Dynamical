@@ -23,7 +23,7 @@ void Transfer::Upload::reset(Context& ctx, vk::CommandPool pool) {
     command = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(pool, vk::CommandBufferLevel::ePrimary, 1))[0];
 }
 
-bool Transfer::flush(vk::Semaphore semaphore) {
+bool Transfer::flush(std::vector<vk::Semaphore> waits, std::vector<vk::PipelineStageFlags> stages, std::vector<vk::Semaphore> signals) {
 
     OPTICK_EVENT();
 
@@ -32,12 +32,8 @@ bool Transfer::flush(vk::Semaphore semaphore) {
     if(!empty) {
         
         current.command.end();
-        
-        std::vector<vk::Semaphore> semaphores;
-        if(semaphore) {
-            semaphores.push_back(semaphore);
-        }
-        ctx.device.transfer.submit(vk::SubmitInfo(0, nullptr, nullptr, 1, &current.command, semaphores.size(), semaphores.data()), current.fence);
+
+        ctx.device.transfer.submit(vk::SubmitInfo(waits.size(), waits.data(), stages.data(), 1, &current.command, signals.size(), signals.data()), current.fence);
 
         uploads.push_back(std::move(current));
 
