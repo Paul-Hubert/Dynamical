@@ -6,6 +6,7 @@
 #include "util/log.h"
 
 #include "logic/map/map_manager.h"
+#include "logic/components/input.h"
 
 using namespace dy;
 
@@ -102,22 +103,26 @@ void ParticleSimulationSys::tick(float dt) {
 
 void ParticleSimulationSys::AddParticles() {
 
-    auto& map = reg.ctx<MapManager>();
+    auto& input = reg.ctx<Input>();
 
-    glm::vec2 pos = map.getMousePosition();
-    Tile* tile = map.getTile(pos);
-    if(tile) {
+    if(input.leftDown) {
+        auto &map = reg.ctx<MapManager>();
 
-        new_particle_count++;
-        auto &particle = uniformPointer[0];
-        particle = {};
-        particle.sphere.x = pos.x;
-        particle.sphere.y = pos.y;
-        particle.sphere.z = tile->level + 0.5f;
-        particle.sphere.w = 0.5f;
+        glm::vec2 pos = map.getMousePosition();
+        Tile *tile = map.getTile(pos);
+        if (tile) {
 
-        particle.color = glm::vec4(0,0,1,1);
+            new_particle_count++;
+            auto &particle = uniformPointer[0];
+            particle = {};
+            particle.sphere.x = pos.x;
+            particle.sphere.y = pos.y;
+            particle.sphere.z = tile->level + 0.5f;
+            particle.sphere.w = 0.5f;
 
+            particle.color = glm::vec4(0, 0, 1, 1);
+
+        }
     }
 
 }
@@ -169,7 +174,7 @@ ParticleSimulationSys::~ParticleSimulationSys() {
 
     Context& ctx = *reg.ctx<Context*>();
 
-    //ctx.device->destroy(computePipeline);
+    ctx.device->destroy(computePipeline);
 
     ctx.device->destroy(descPool);
 
