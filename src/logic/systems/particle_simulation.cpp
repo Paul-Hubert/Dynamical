@@ -82,6 +82,11 @@ void ParticleSimulationSys::tick(float dt) {
 
     particle_count += new_particle_count;
 
+    if(particle_count > max_particles) {
+        particle_count = max_particles;
+        new_particle_count = 0;
+    }
+
     PushConstants cons {};
     cons.new_particle_count = new_particle_count;
     cons.particle_count = particle_count;
