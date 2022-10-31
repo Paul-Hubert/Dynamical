@@ -62,7 +62,7 @@ Tile getTile(vec2 pos) {
 
     ivec2 indices = real_indices - corner_indices;
 
-    if(indices.x < 0 || indices.y < 0) return Tile(0, 0);
+    if(indices.x < 0 || indices.y < 0 || indices.x * chunk_length + indices.y >= MAX_CHUNKS) return Tile(0, 0);
 
     int chunk_index = chunk_indices[indices.x * chunk_length + indices.y];
 
@@ -74,7 +74,7 @@ Tile getTile(vec2 pos) {
         tile.height = 0.0f;
     }
 
-    return tile;
+    return Tile(0, 10);
 
 }
 
@@ -83,7 +83,6 @@ void main()
     uint particle_index = gl_GlobalInvocationID.x;
 
     Particle p;
-    Tile t = getTile(p.sphere.xy);
     if(particle_index >= particle_count - new_particle_count) {
         p = new_particles[particle_count - particle_index - 1];
     } else {
@@ -95,11 +94,14 @@ void main()
     p.speed.z -= 0.1;
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
+
+    Tile t = getTile(p.sphere.xy);
+
     //@TODO fixme!
     vec3 norm = vec3(0,0,1);
 
-    if(new_pos.z < t.height) {
-        new_pos.z = t.height + 0.0001;
+    if(new_pos.z - p.sphere.w < t.height) {
+        new_pos.z = t.height + p.sphere.w;
         p.speed.xyz -= 2 * dot(p.speed.xyz, norm) * norm;
     }
     p.sphere.xyz = new_pos;
