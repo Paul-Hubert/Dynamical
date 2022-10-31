@@ -29,7 +29,7 @@ layout(std430, set = 0, binding = 1) buffer HashMap {
 
 const uint MAX_NEW_PARTICLES = 100;
 
-layout(std140, set = 0, binding = 2) uniform NewParticles {
+layout(std430, set = 0, binding = 2) readonly buffer NewParticles {
     Particle new_particles[MAX_NEW_PARTICLES];
 };
 
@@ -82,12 +82,14 @@ void main()
 {
     uint particle_index = gl_GlobalInvocationID.x;
 
-    if(particle_index < new_particle_count) {
-        particles[particle_count - new_particle_count + particle_index] = new_particles[particle_index];
+    Particle p;
+    Tile t = getTile(p.sphere.xy);
+    if(particle_index >= particle_count - new_particle_count) {
+        p = new_particles[particle_count - particle_index - new_particle_count];
+    } else {
+        p = particles[particle_index];
     }
 
-    Particle p = particles[particle_index];
-    Tile t = getTile(p.sphere.xy);
 
     //Gravité, plus tard on ajoutera une force dépendante des autres particules
     p.speed.z -= 0.1;
@@ -96,7 +98,7 @@ void main()
     //@TODO fixme!
     vec3 norm = vec3(0,0,1);
 
-    if(new_pos.z-p.sphere.w*2 < t.height) {
+    if(new_pos.z < t.height) {
         new_pos.z = t.height + 0.0001;
         p.speed.xyz -= 2 * dot(p.speed.xyz, norm) * norm;
     }

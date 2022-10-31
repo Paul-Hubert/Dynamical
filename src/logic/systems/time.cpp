@@ -50,7 +50,7 @@ void TimeSys::tick(float dt) {
     }
     ImGui::End();
     
-    time.dt = time.speed * time.speed_modifier * (double) dt;
+    time.dt = time.speed * time.speed_modifier;
     time.current += time.dt;
     
 }
