@@ -87,9 +87,20 @@ void main()
     }
 
     Particle p = particles[particle_index];
+    Tile t = getTile(p.sphere.xy);
 
-    p.speed.z -= 0.01;
-    p.sphere.xyz += p.speed.xyz;
+    //Gravité, plus tard on ajoutera une force dépendante des autres particules
+    p.speed.z -= 0.1;
+
+    vec3 new_pos = p.sphere.xyz + p.speed.xyz;
+    //@TODO fixme!
+    vec3 norm = vec3(0,0,1);
+
+    if(new_pos.z-p.sphere.w*2 < t.height) {
+        new_pos.z = t.height + 0.0001;
+        p.speed.xyz -= 2 * dot(p.speed.xyz, norm) * norm;
+    }
+    p.sphere.xyz = new_pos;
 
     particles[particle_index] = p;
 }
