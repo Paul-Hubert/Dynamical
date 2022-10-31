@@ -32,7 +32,7 @@ public:
     int vr_mode = 1;
     int spectator_mode = 2;
 
-    MapConfiguration map_configuration;
+    std::vector<MapConfiguration> map_configurations;
 
     template <class Archive>
     void serialize(Archive& ar) {
@@ -46,7 +46,7 @@ public:
             CEREAL_NVP(client_side),
             CEREAL_NVP(vr_mode),
             CEREAL_NVP(spectator_mode),
-            CEREAL_NVP(map_configuration)
+            CEREAL_NVP(map_configurations)
         );
     }
 
@@ -56,7 +56,7 @@ private:
     #ifndef DYNAMICAL_CONFIG_DIR
         #define DYNAMICAL_CONFIG_DIR "./"
     #endif
-    #define DYNAMICAL_CONFIG_MAGIC "4"
+    #define DYNAMICAL_CONFIG_MAGIC "5"
     #define DYNAMICAL_CONFIG_FILE DYNAMICAL_CONFIG_DIR "config." DYNAMICAL_CONFIG_MAGIC ".json"
 };
 

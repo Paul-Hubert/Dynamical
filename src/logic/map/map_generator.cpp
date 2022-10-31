@@ -131,55 +131,64 @@ float MapGenerator::frand() {
 }
 
 void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
+    //First pass, initialize levels at 0, so we can increment them later
+    for(int i = 0; i<Chunk::size; i++) {
+        for (int j = 0; j < Chunk::size; j++) {
+            glm::vec2 position = pos * Chunk::size + glm::ivec2(i, j);
+            chunk.get(glm::ivec2(i, j)).level = 0;
+        }
+    }
 
-    auto& conf = reg.ctx<Settings>().map_configuration;
+    auto& configurations = reg.ctx<Settings>().map_configurations;
     OPTICK_EVENT();
     
     auto fnSimplex = FastNoise::New<FastNoise::Simplex>();
     auto fnFractal = FastNoise::New<FastNoise::FractalFBm>();
 
     fnFractal->SetSource(fnSimplex);
-    fnFractal->SetOctaveCount(conf.octave_count);
 
-    fnFractal->SetGain(conf.gain);
-    fnFractal->SetLacunarity(conf.lacunarity);
-    fnFractal->SetWeightedStrength(conf.weighted_strength);
+    //Apply each perlin
+    for(auto& conf : configurations) {
+        fnFractal->SetOctaveCount(conf.octave_count);
 
-    std::vector<float> noiseOutput(Chunk::size * Chunk::size);
+        fnFractal->SetGain(conf.gain);
+        fnFractal->SetLacunarity(conf.lacunarity);
+        fnFractal->SetWeightedStrength(conf.weighted_strength);
 
-    fnFractal->GenUniformGrid2D(noiseOutput.data(), pos.x * Chunk::size, pos.y * Chunk::size, Chunk::size, Chunk::size, conf.frequency, conf.seed);
+        std::vector<float> noiseOutput(Chunk::size * Chunk::size);
 
-    //First pass, initialize level
-    for(int i = 0; i<Chunk::size; i++) {
-        for(int j = 0; j<Chunk::size; j++) {
-            glm::vec2 position = pos*Chunk::size + glm::ivec2(i,j);
-            
-            Tile& tile = chunk.get(glm::ivec2(i,j));
-            
-            float noise = noiseOutput[j * Chunk::size + i];
-            double level = 0;
+        fnFractal->GenUniformGrid2D(noiseOutput.data(), pos.x * Chunk::size, pos.y * Chunk::size, Chunk::size,
+                                    Chunk::size, conf.frequency, conf.seed);
+        for (int i = 0; i < Chunk::size; i++) {
+            for (int j = 0; j < Chunk::size; j++) {
+                glm::vec2 position = pos * Chunk::size + glm::ivec2(i, j);
 
-            double lower_x = -1;
-            double lower_y = conf.points_y.at(0);
-            for(auto i = 1; i < conf.points_x.size(); ++i) {
-                double x = conf.points_x.at(i);
+                Tile &tile = chunk.get(glm::ivec2(i, j));
 
-                double y = conf.points_y.at(i);
-                if(noise <= x) {
-                    double mid_point = (noise - lower_x) / (x - lower_x);
-                    level = (lower_y + (mid_point * (y-lower_y)))*conf.amplitude;
-                    break;
-                } else {
-                    lower_x = x;
-                    lower_y = conf.points_y.at(i);
+                float noise = noiseOutput[j * Chunk::size + i];
+                double level = 0;
+
+                double lower_x = -1;
+                double lower_y = conf.points_y.at(0);
+                for (int i = 1; i < conf.points_x.size(); ++i) {
+                    double x = conf.points_x.at(i);
+
+                    double y = conf.points_y.at(i);
+                    if (noise <= x) {
+                        double mid_point = (noise - lower_x) / (x - lower_x);
+                        level = (lower_y + (mid_point * (y - lower_y))) * conf.amplitude;
+                        break;
+                    } else {
+                        lower_x = x;
+                        lower_y = conf.points_y.at(i);
+                    }
                 }
-            }
 
-            tile.level = (double)level;
+                tile.level += (double) level;
+            }
         }
     }
-
-    //Second pass, initialize tile
+    //We then initialize the kind of tile (based on height and local slope)
     for(int i = 0; i<Chunk::size; i++) {
         for (int j = 0; j < Chunk::size; j++) {
             glm::vec2 position = pos * Chunk::size + glm::ivec2(i, j);
