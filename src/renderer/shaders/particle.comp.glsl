@@ -85,7 +85,7 @@ void main()
     Particle p;
 
     if(particle_index >= particle_count - new_particle_count) {
-        p = new_particles[particle_count - particle_index - new_particle_count];
+        p = new_particles[particle_count - particle_index - 1];
     } else {
         p = particles[particle_index];
     }
