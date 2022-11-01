@@ -2,12 +2,13 @@
 
 #include <cmath>
 
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/rotate_vector.hpp>
 
 #include "logic/components/camera.h"
 #include "renderer/context/context.h"
 #include "logic/components/input.h"
+
+
+#include <glm/gtx/rotate_vector.hpp>
 
 using namespace dy;
 
@@ -19,7 +20,7 @@ void CameraSys::preinit() {
     camera.setCenter(glm::vec3(0,0,0));
     float width = 100.f;
     camera.setSize(glm::vec2(width, width * ctx.swap.extent.height / ctx.swap.extent.width));
-    camera.setAngle(M_PI / 3);
+    camera.setAngle(-M_PI / 3);
 }
 
 void CameraSys::init() {
@@ -59,21 +60,21 @@ void CameraSys::tick(float dt) {
     } if(input.on[Input::ROTATE_RIGHT]) {
         rotation += rotate_speed * dt;
     } if(input.on[Input::ANGLE_UP]) {
-        angle -= angle_speed * dt;
-    } if(input.on[Input::ANGLE_DOWN]) {
         angle += angle_speed * dt;
+    } if(input.on[Input::ANGLE_DOWN]) {
+        angle -= angle_speed * dt;
     }
 
     center += glm::rotateZ(movement, rotation);
 
-    if(angle > 1.5) {
-        angle = 1.5;
-    } else if(angle < 0) {
+    if(angle < -1.5) {
+        angle = -1.5;
+    } else if(angle > 0) {
         angle = 0;
     }
 
     auto& ctx = *reg.ctx<Context*>();
-    camera.setScreenSize(glm::vec2(ctx.swap.extent.width, ctx.swap.extent.width));
+    camera.setScreenSize(glm::vec2(ctx.swap.extent.width, ctx.swap.extent.height));
     size.y = size.x * ctx.swap.extent.height / ctx.swap.extent.width;
 
     camera.setCenter(center);
@@ -87,7 +88,7 @@ void CameraSys::finish() {
 }
 
 glm::mat4 Camera::createProjection() {
-    return glm::ortho(-size.x/2, size.x/2, -size.y/2, +size.y/2, -100000.f, 100000.f);
+    return glm::ortho(-size.x/2, size.x/2, -size.y/2, +size.y/2, -10000.f, 10000.f);
     //return glm::perspective(glm::radians(70.f), screen_size.x / screen_size.y, 0.001f, 1000.f);
 }
 
@@ -105,7 +106,8 @@ glm::vec2 Camera::fromWorldSpace(glm::vec3 position) {
 
 glm::vec3 Camera::fromScreenSpace(glm::vec2 screen_position) {
     glm::vec3 a = glm::unProject(glm::vec3(screen_position, 0), getView(), getProjection(), glm::vec4(0, 0, screen_size.x, screen_size.y));
-    glm::vec3 b = glm::unProject(glm::vec3(screen_position, 0.5), getView(), getProjection(), glm::vec4(0, 0, screen_size.x, screen_size.y));
+    glm::vec3 b = glm::unProject(glm::vec3(screen_position, 1), getView(), getProjection(), glm::vec4(0, 0, screen_size.x, screen_size.y));
+
     // p = (b - a) * t + a
     // 0 = (b.z - a.z) * t + a.z
     // -a.z / (b.z - a.z) = t;

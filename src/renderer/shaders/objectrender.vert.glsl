@@ -31,18 +31,16 @@ void main() {
     v_uv = vertices[gl_VertexIndex];
     v_sphere = a_sphere;
     v_color = a_color;
-    v_sphere.z *= -1;
     gl_Position = camera.view * vec4(v_sphere.xyz, 1.0f);
     gl_Position.xy += (v_uv - 0.5) * v_sphere.w*2;
 
     mat4 inv = inverse(camera.view);
     vec4 cpos = gl_Position;
     v_pos = (inv * cpos).xyz;
-    cpos.z -= 0.1;
+    cpos.z -= 10;
     v_cam = (inv * cpos).xyz;
 
     gl_Position = camera.projection * gl_Position;
-    gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0;
 
 }
 

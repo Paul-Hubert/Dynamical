@@ -104,7 +104,6 @@ void main() {
     float dhdy = getTile(v_pos - vec2(0,1)).height - getTile(v_pos + vec2(0,1)).height;
     v_normal = normalize(vec3(dhdx, dhdy, -1));
 
-    gl_Position = camera.projection * camera.view * vec4(v_pos, -tile.height, 1.0f);
-    gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0;
+    gl_Position = camera.projection * camera.view * vec4(v_pos, tile.height, 1.0f);
     
 }

@@ -120,7 +120,6 @@ glm::vec2 MapManager::getMousePosition() const {
     auto& cam = reg.ctx<Camera>();
     
     return cam.fromScreenSpace(input.mousePos);
-    
 }
 
 struct Distance {
