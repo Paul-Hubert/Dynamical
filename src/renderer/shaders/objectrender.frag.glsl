@@ -14,9 +14,7 @@ layout(set = 0, binding = 0) uniform Camera {
     vec3 direction;
 } camera;
 
-
 void main() {
-
     vec3 v = v_pos-v_sphere.xyz;
     float len = dot(v,v); // length^2
     if(len < v_sphere.w*v_sphere.w) {
