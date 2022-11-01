@@ -131,7 +131,7 @@ void MapUploadSys::tick(float dt) {
     auto& camera = reg.ctx<Camera>();
 
     auto screen_size = camera.getScreenSize();
-    screen_size.y *= 1.5;
+    screen_size.y *= 2;
 
     std::vector<glm::vec2> corners{
             glm::vec2(),

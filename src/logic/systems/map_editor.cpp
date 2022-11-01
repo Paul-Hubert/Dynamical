@@ -23,8 +23,8 @@ void MapEditorSys::tick(float dt) {
     OPTICK_EVENT();
     static bool open = false;
 
-    static float radius = 10;
-    static float power = 0.25;
+    static float radius = 50;
+    static float power = 0.01;
     static bool remove = false;
 
     static float sq_radius = radius*radius;
@@ -35,7 +35,7 @@ void MapEditorSys::tick(float dt) {
             sq_radius = radius*radius;
         }
         ImGui::SameLine();
-        ImGui::InputFloat("Power", &power, 0.01, 0.1);
+        ImGui::InputFloat("Power", &power, 0.001, 0.1);
 
         ImGui::Checkbox("Remove", &remove);
         ImGui::PopItemWidth();

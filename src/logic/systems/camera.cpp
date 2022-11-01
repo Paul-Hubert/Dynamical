@@ -2,6 +2,9 @@
 
 #include <cmath>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/rotate_vector.hpp>
+
 #include "logic/components/camera.h"
 #include "renderer/context/context.h"
 #include "logic/components/input.h"
@@ -41,14 +44,16 @@ void CameraSys::tick(float dt) {
     float rotate_speed = 2;
     float angle_speed = 2;
 
+    glm::vec3 movement(0, 0, 0);
+
     if(input.on[Input::FORWARD]) {
-        center.y -= move_speed * dt;
+        movement.y -= move_speed * dt;
     } if(input.on[Input::BACKWARD]) {
-        center.y += move_speed * dt;
+        movement.y += move_speed * dt;
     } if(input.on[Input::LEFT]) {
-        center.x -= move_speed * dt;
+        movement.x -= move_speed * dt;
     } if(input.on[Input::RIGHT]) {
-        center.x += move_speed * dt;
+        movement.x += move_speed * dt;
     } if(input.on[Input::ROTATE_LEFT]) {
         rotation -= rotate_speed * dt;
     } if(input.on[Input::ROTATE_RIGHT]) {
@@ -58,6 +63,8 @@ void CameraSys::tick(float dt) {
     } if(input.on[Input::ANGLE_DOWN]) {
         angle += angle_speed * dt;
     }
+
+    center += glm::rotateZ(movement, rotation);
 
     if(angle > 1.5) {
         angle = 1.5;
@@ -86,8 +93,8 @@ glm::mat4 Camera::createProjection() {
 
 glm::mat4 Camera::createView() {
     glm::mat4 camera = glm::identity<glm::mat4>();
-    camera = glm::rotate(camera, rotation, glm::vec3(0,0,1));
     camera = glm::translate(camera, center);
+    camera = glm::rotate(camera, rotation, glm::vec3(0,0,1));
     camera = glm::rotate(camera, angle, glm::vec3(1,0,0));
     return glm::inverse(camera);
 }
