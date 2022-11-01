@@ -82,9 +82,9 @@ void insert_particle(vec3 pos, uint particle_index) {
     uint slot = code % HASHMAP_SLOTS;
 
     while(true) {
-        uint prev = atomicCompSwap(map.slots[i].key, HASHMAP_EMPTY, code);
+        uint prev = atomicCompSwap(map.slots[slot].key, HASHMAP_EMPTY, code);
         if(prev == HASHMAP_EMPTY) {
-            map.slots[i].value = particle_index;
+            map.slots[slot].value = particle_index;
             break;
         }
         //@TODO replace modulo by bitwise operator for performance
@@ -93,7 +93,21 @@ void insert_particle(vec3 pos, uint particle_index) {
 }
 
 void interaction(uint p_index, inout Particle p, uint other) {
-    
+    if(p_index != other) {
+        Particle o = particles[other];
+        vec3 norm = p.sphere.xyz - o.sphere.xyz;
+        float distance = dot(norm, norm);
+        float min_distance = p.sphere.w + o.sphere.w;
+        if(distance < min_distance) {
+            vec3 pusher = normalize(norm) * (distance-min_distance)/2;
+            o.sphere.xyz += pusher;
+            p.sphere.xyz -= pusher;
+
+            p.speed.xyz -= 2 * dot(p.speed.xyz, norm) * norm;
+            o.speed.xyz += 2 * dot(p.speed.xyz, norm) * norm;
+            particles[other] = o;
+        }
+    }
 }
 
 void lookup_and_apply(uint p_index, inout Particle p, ivec3 pos) {
@@ -151,6 +165,24 @@ Tile getTile(vec2 pos) {
     return tile;
 }
 
+void neighbours_z(uint p_index, inout Particle p, ivec3 ipos) {
+    lookup_and_apply(p_index, p, ipos);
+    ipos.z += 1;
+    lookup_and_apply(p_index, p, ipos);
+}
+
+void neighbours_yz(uint p_index, inout Particle p, ivec3 ipos) {
+    neighbours_z(p_index, p, ipos);
+    ipos.y += 1;
+    neighbours_z(p_index, p, ipos);
+}
+
+void neighbours_xyz(uint p_index, inout Particle p, ivec3 ipos) {
+    neighbours_yz(p_index, p, ipos);
+    ipos.x += 1;
+    neighbours_yz(p_index, p, ipos);
+}
+
 void main()
 {
     uint particle_index = gl_GlobalInvocationID.x;
@@ -158,13 +190,19 @@ void main()
     Particle p;
     if(particle_index >= particle_count - new_particle_count) {
         p = new_particles[particle_count - particle_index - 1];
+        particles[particle_index] = p;
+        insert_particle(p.sphere.xyz, particle_index);
     } else {
         p = particles[particle_index];
     }
 
+    barrier();
+
 
     //Gravité, plus tard on ajoutera une force dépendante des autres particules
     p.speed.z -= 0.1;
+
+    neighbours_xyz(particle_index, p, round_vec(p.sphere.xyz));
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 
