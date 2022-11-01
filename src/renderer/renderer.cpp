@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include "util/util.h"
+#include "util/log.h"
 
 #include "context/num_frames.h"
 

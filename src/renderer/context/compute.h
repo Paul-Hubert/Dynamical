@@ -17,6 +17,7 @@ class Context;
 class Compute {
 public:
     Compute(Context& ctx, entt::registry& reg);
+    void prepare();
     bool flush(std::vector<vk::Semaphore> waits, std::vector<vk::PipelineStageFlags> stages, std::vector<vk::Semaphore> signals);
     vk::CommandBuffer getCommandBuffer();
 

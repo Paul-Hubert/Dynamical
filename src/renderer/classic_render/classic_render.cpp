@@ -22,7 +22,7 @@ per_frame(NUM_FRAMES) {
         vk::DescriptorSetLayoutCreateInfo({}, (uint32_t)bindings.size(), bindings.data()));
     
     
-    commandPool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo({}, ctx.device.g_i));
+    commandPool = ctx.device->createCommandPool(vk::CommandPoolCreateInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, ctx.device.g_i));
 
     auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, (uint32_t)per_frame.size()));
 
@@ -83,8 +83,6 @@ void ClassicRender::prepare() {
     
     // Record with swapchain images
 
-    ctx.device->resetCommandPool(commandPool);
-
     command.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
     OPTICK_GPU_CONTEXT(command);
     OPTICK_GPU_EVENT("draw");
@@ -137,6 +135,8 @@ void ClassicRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Pip
                 1, &command,
                 signals.size(), signals.data()
         ) }, f.fence);
+
+        //ctx.device->waitForFences({ f.fence }, VK_TRUE, std::numeric_limits<uint64_t>::max());
 
     }
 

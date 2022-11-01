@@ -19,7 +19,7 @@ ParticleSimulationSys::ParticleSimulationSys(entt::registry& reg) : System(reg) 
         VmaAllocationCreateInfo info {};
         info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
         particleBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(Particle) * max_particles, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eVertexBuffer, vk::SharingMode::eExclusive));
-        hashmapBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(uint32_t) * 2 * hashmap_slots, vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive));
+        hashmapBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(uint32_t) * 2 * hashmap_slots, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::SharingMode::eExclusive));
 
         info.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
         info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
@@ -97,6 +97,9 @@ void ParticleSimulationSys::tick(float dt) {
     data.particleBuffer = particleBuffer.buffer;
 
     command.fillBuffer(hashmapBuffer.buffer, 0, hashmapBuffer.size, 0);
+
+    auto barrier = vk::BufferMemoryBarrier(vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eShaderWrite, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, hashmapBuffer.buffer, 0, hashmapBuffer.size);
+    command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eComputeShader, vk::DependencyFlagBits::eByRegion, {}, {barrier}, {});
 
     command.bindPipeline(vk::PipelineBindPoint::eCompute, computePipeline);
 

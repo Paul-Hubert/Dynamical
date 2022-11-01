@@ -20,7 +20,18 @@ Compute::Compute(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg), per_fr
 
     }
 
-    current = per_frame[index].command;
+    prepare();
+
+}
+
+void Compute::prepare() {
+
+    auto& f = per_frame[index];
+
+    ctx.device->waitForFences({f.fence}, VK_TRUE, std::numeric_limits<uint64_t>::max());
+    ctx.device->resetFences({f.fence});
+
+    current = f.command;
     current.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
 }
@@ -35,17 +46,12 @@ bool Compute::flush(std::vector<vk::Semaphore> waits, std::vector<vk::PipelineSt
 
         current.end();
 
-        ctx.device->waitForFences({f.fence}, VK_TRUE, std::numeric_limits<uint64_t>::max());
-
-        ctx.device->resetFences({f.fence});
-
         ctx.device.compute.submit(vk::SubmitInfo(waits.size(), waits.data(), stages.data(), 1, &current, signals.size(), signals.data()), f.fence);
 
         index = (index+1)%per_frame.size();
-        current = per_frame[index].command;
 
-        current.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-        
+        prepare();
+
         empty = true;
         
         return true;

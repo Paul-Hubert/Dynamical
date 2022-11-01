@@ -1,6 +1,6 @@
 #version 450
 
-layout (local_size_x = 256) in;
+layout (local_size_x = 1) in;
 
 const int CHUNK_SIZE = 32;
 const int NUM_TYPES = 7;
@@ -36,7 +36,7 @@ layout(std430, set = 0, binding = 1) buffer HashMap {
 
 const uint MAX_NEW_PARTICLES = 100;
 
-layout(std430, set = 0, binding = 3) readonly buffer NewParticles {
+layout(std430, set = 0, binding = 2) readonly buffer NewParticles {
     Particle new_particles[MAX_NEW_PARTICLES];
 };
 
@@ -77,8 +77,8 @@ ivec3 round_vec(vec3 pos) {
     return ivec3(int(pos.x+0.5),int(pos.y+0.5),int(pos.z+0.5));
 }
 
-void insert_particle(vec3 pos, uint particle_index) {
-    uint code = morton(round_vec(pos));
+void insert_particle(ivec3 pos, uint particle_index) {
+    uint code = morton(pos);
     uint slot = code % HASHMAP_SLOTS;
 
     while(true) {
@@ -96,10 +96,11 @@ void interaction(uint p_index, inout Particle p, uint other) {
     if(p_index != other) {
         Particle o = particles[other];
         vec3 norm = p.sphere.xyz - o.sphere.xyz;
-        float distance = dot(norm, norm);
+        float distance = sqrt(dot(norm, norm));
         float min_distance = p.sphere.w + o.sphere.w;
+        norm = norm/distance;
         if(distance < min_distance) {
-            vec3 pusher = normalize(norm) * (distance-min_distance)/2;
+            vec3 pusher = norm * (distance-min_distance)/2;
             o.sphere.xyz += pusher;
             p.sphere.xyz -= pusher;
 
@@ -190,12 +191,12 @@ void main()
     Particle p;
     if(particle_index >= particle_count - new_particle_count) {
         p = new_particles[particle_count - particle_index - 1];
-        particles[particle_index] = p;
+        //particles[particle_index] = p;
     } else {
         p = particles[particle_index];
     }
 
-    insert_particle(p.sphere.xyz, particle_index);
+    insert_particle(round_vec(p.sphere.xyz), particle_index);
     barrier();
 
 
