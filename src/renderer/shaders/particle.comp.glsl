@@ -33,7 +33,7 @@ const uint HASHMAP_EMPTY = 0;
 layout(std430, set = 0, binding = 1) buffer HashMap {
     KeyValue slots[HASHMAP_SLOTS];
 } map;
-é
+
 const uint MAX_NEW_PARTICLES = 100;
 
 layout(std430, set = 0, binding = 3) readonly buffer NewParticles {
