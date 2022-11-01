@@ -33,10 +33,10 @@ const uint HASHMAP_EMPTY = 0;
 layout(std430, set = 0, binding = 1) buffer HashMap {
     KeyValue slots[HASHMAP_SLOTS];
 } map;
-
+é
 const uint MAX_NEW_PARTICLES = 100;
 
-layout(std430, set = 0, binding = 2) readonly buffer NewParticles {
+layout(std430, set = 0, binding = 3) readonly buffer NewParticles {
     Particle new_particles[MAX_NEW_PARTICLES];
 };
 
@@ -191,11 +191,11 @@ void main()
     if(particle_index >= particle_count - new_particle_count) {
         p = new_particles[particle_count - particle_index - 1];
         particles[particle_index] = p;
-        insert_particle(p.sphere.xyz, particle_index);
     } else {
         p = particles[particle_index];
     }
 
+    insert_particle(p.sphere.xyz, particle_index);
     barrier();
 
 

@@ -20,7 +20,7 @@ ParticleSimulationSys::ParticleSimulationSys(entt::registry& reg) : System(reg) 
         info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
         particleBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(Particle) * max_particles, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eVertexBuffer, vk::SharingMode::eExclusive));
         hashmapBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(uint32_t) * 2 * hashmap_slots, vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive));
-        
+
         info.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
         info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
         uniformBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(Particle) * max_new_particles, vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive));
