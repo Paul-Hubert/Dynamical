@@ -43,6 +43,8 @@ namespace dy {
 
         int find_stored_chunk(glm::ivec2 chunk_pos);
         int find_storage_slot();
+        uint32_t hash(glm::ivec2 chunk_pos);
+        void insert_chunk(Header* header, glm::ivec2 chunk_pos, int index);
 
         vk::DescriptorPool descPool;
 

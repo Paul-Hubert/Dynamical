@@ -2,7 +2,7 @@
 
 layout(constant_id = 0) const int CHUNK_SIZE = 32;
 layout(constant_id = 1) const int NUM_TYPES = 7;
-layout(constant_id = 2) const int MAX_CHUNKS = 5000; // MUST BE SAME AS IN MAP_UPLOAD
+layout(constant_id = 2) const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
 layout(location = 0) in vec2 v_pos;
 layout(location = 1) in vec3 v_normal;
@@ -19,11 +19,16 @@ struct Tile {
     float height;
 };
 
+struct KeyValue {
+    uint key;
+    uint value;
+};
+
 layout(std430, set = 1, binding = 0) readonly buffer Map {
     vec4 colors[NUM_TYPES];
     ivec2 corner_indices;
-    int chunk_length;
-    int chunk_indices[MAX_CHUNKS];
+    uint chunk_length;
+    KeyValue chunk_indices[MAX_CHUNKS];
     Tile tiles[];
 };
 
@@ -31,19 +36,43 @@ ivec2 ifloor(vec2 v) {
     return ivec2(floor(v));
 }
 
+uint hash(ivec2 chunk_pos) {
+    return chunk_pos.x * (1<<16) + chunk_pos.y + 1;
+}
+
 Tile getTile(vec2 pos) {
 
     ivec2 ipos = ifloor(pos);
 
-    ivec2 real_indices = ifloor(pos / CHUNK_SIZE);
+    ivec2 chunk_pos = ifloor(pos / CHUNK_SIZE);
 
-    ivec2 indices = real_indices - corner_indices;
+    uint hash = hash(chunk_pos);
 
-    ivec2 tile_space = ipos - real_indices * CHUNK_SIZE;
+    uint slot = hash%MAX_CHUNKS;
 
-    int chunk_index = chunk_indices[indices.x * chunk_length + indices.y];
+    int index = -1;
 
-    Tile tile = tiles[chunk_index * CHUNK_SIZE * CHUNK_SIZE + tile_space.x * CHUNK_SIZE + tile_space.y];
+    while(true) {
+        if(chunk_indices[slot].key == hash) {
+            index = int(chunk_indices[slot].value);
+            break;
+        } else if(chunk_indices[slot].key == 0) {
+            break;
+        }
+        slot = (slot+1) % MAX_CHUNKS;
+    }
+
+    if(index == -1) {
+        return Tile(0, 0);
+    }
+
+    ivec2 tile_space = ipos - chunk_pos * CHUNK_SIZE;
+
+    Tile tile = tiles[index * CHUNK_SIZE * CHUNK_SIZE + tile_space.x * CHUNK_SIZE + tile_space.y];
+
+    if(tile.type == 5) {
+        tile.height = 0.0f;
+    }
 
     return tile;
 

@@ -134,6 +134,12 @@ void MapUploadSys::tick(float dt) {
     auto corner_pos = map.getChunkPos(corner_rpos);
     auto end_pos = map.getChunkPos(end_rpos);
 
+    auto max = glm::max(corner_pos, end_pos);
+    auto min = glm::min(corner_pos, end_pos);
+
+    corner_pos = min;
+    end_pos = max;
+
     end_pos.y += abs(end_pos.y - corner_pos.y);
 
     header->corner_indices = corner_pos;
@@ -203,18 +209,8 @@ void MapUploadSys::tick(float dt) {
                 chunk->setUpdated(false);
 
             }
-            
-            glm::vec2 chunk_screen_coords = chunk_pos - corner_pos;
-            int chunk_index_index = chunk_screen_coords.x * header->chunk_length + chunk_screen_coords.y;
-            
-            if(chunk_index_index >= max_chunks) {
-                log(Level::warning) << "too many chunks\n";
-                x = end_pos.x + 1;
-                y = end_pos.y + 1;
-                break;
-            }
-            
-            header->chunk_indices[chunk_index_index] = index;
+
+            insert_chunk(header, chunk_pos, index);
 
             StoredChunk& sc = stored_chunks[index];
 
@@ -230,12 +226,6 @@ void MapUploadSys::tick(float dt) {
 
     for(int i = 0; i<stored_chunks.size(); i++) {
         stored_chunks[i].used = false;
-    }
-
-    for(int i = 0; i<max_chunks; i++) {
-        if(header->chunk_indices[i] >= max_stored_chunks) {
-            log() << header->chunk_indices[i];
-        }
     }
 
     transfer.copyBuffer(f.stagingBuffer, storageBuffer, regions);
@@ -260,6 +250,26 @@ MapUploadSys::~MapUploadSys() {
     MapUploadData& data = reg.ctx<MapUploadData>();
 
     ctx.device->destroy(data.mapLayout);
+
+}
+
+uint32_t MapUploadSys::hash(glm::ivec2 chunk_pos) {
+    return chunk_pos.x * (1<<16) + chunk_pos.y + 1;
+}
+
+void MapUploadSys::insert_chunk(Header* header, glm::ivec2 chunk_pos, int index) {
+
+    uint32_t key = hash(chunk_pos);
+
+    uint32_t slot = key % max_chunks;
+    while(true) {
+        if(header->chunk_indices[slot].key == 0) {
+            header->chunk_indices[slot].key = key;
+            header->chunk_indices[slot].value = index;
+            return;
+        }
+        slot = (slot+1) % max_chunks;
+    }
 
 }
 

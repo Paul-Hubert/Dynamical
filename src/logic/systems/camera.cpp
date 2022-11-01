@@ -49,6 +49,10 @@ void CameraSys::tick(float dt) {
         center.x -= move_speed * dt;
     } if(input.on[Input::RIGHT]) {
         center.x += move_speed * dt;
+    } if(input.on[Input::ROTATE_LEFT]) {
+        rotation -= rotate_speed * dt;
+    } if(input.on[Input::ROTATE_RIGHT]) {
+        rotation += rotate_speed * dt;
     } if(input.on[Input::ANGLE_UP]) {
         angle -= angle_speed * dt;
     } if(input.on[Input::ANGLE_DOWN]) {

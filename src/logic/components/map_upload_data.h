@@ -6,19 +6,24 @@
 
 namespace dy {
 
-constexpr int max_chunks = 5000; // MUST CHANGE IN SHADER
-constexpr int max_stored_chunks = 10000;
+constexpr int max_chunks = 10000; // MUST CHANGE IN SHADER
+constexpr int max_stored_chunks = 20000;
 
 struct TileData {
     int type;
     float height;
 };
 
+struct KeyValue {
+    uint32_t key;
+    uint32_t value;
+};
+
 struct Header {
     glm::vec4 colors[Tile::Type::max];
     glm::ivec2 corner_indices;
-    int chunk_length;
-    int chunk_indices[max_chunks];
+    uint32_t chunk_length;
+    KeyValue chunk_indices[max_chunks];
 };
 
 struct RenderChunk {
