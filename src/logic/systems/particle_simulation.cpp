@@ -96,6 +96,8 @@ void ParticleSimulationSys::tick(float dt) {
     data.num_particles = particle_count;
     data.particleBuffer = particleBuffer.buffer;
 
+    command.fillBuffer(hashmapBuffer.buffer, 0, hashmapBuffer.size, 0);
+
     command.bindPipeline(vk::PipelineBindPoint::eCompute, computePipeline);
 
     command.bindDescriptorSets(vk::PipelineBindPoint::eCompute, pipelineLayout, 0, { descSet, data.mapSet}, nullptr);
