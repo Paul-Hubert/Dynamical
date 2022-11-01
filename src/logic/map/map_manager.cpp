@@ -9,6 +9,8 @@
 #include "logic/components/position.h"
 #include "logic/components/input.h"
 #include "logic/components/camera.h"
+#include "logic/components/object.h"
+#include "logic/factories/factory_list.h"
 #include <extra/optick/optick.h>
 
 using namespace dy;
@@ -27,7 +29,7 @@ Chunk* MapManager::getChunk(glm::ivec2 chunk_pos) const {
 
 Chunk* MapManager::getTileChunk(glm::vec2 pos) const {
     try {
-        return map.at(pos).get();
+        return map.at(getChunkPos(pos)).get();
     } catch(std::out_of_range&) {
         return nullptr;
     }
@@ -44,6 +46,17 @@ Chunk* MapManager::generateChunk(glm::ivec2 chunk_pos) {
     generator.generateChunk(*chunk, chunk_pos);
     
     return chunk;
+}
+
+void MapManager::updateTile(glm::vec2 pos) {
+    Tile* tile = getTile(pos);
+    if(!tile) return;
+    generator.setTileType(*tile, pos);
+    if(tile->object != entt::null && reg.get<Object>(tile->object).type == Object::plant) {
+        dy::destroyObject(reg, tile->object);
+        tile->object = entt::null;
+    }
+    getTileChunk(pos)->setUpdated();
 }
 
 Tile* MapManager::getTile(glm::vec2 pos) const {
@@ -107,7 +120,6 @@ glm::vec2 MapManager::getMousePosition() const {
     auto& cam = reg.ctx<Camera>();
     
     return cam.fromScreenSpace(input.mousePos);
-    
 }
 
 struct Distance {

@@ -23,8 +23,8 @@ void MapEditorSys::tick(float dt) {
     OPTICK_EVENT();
     static bool open = false;
 
-    static float radius = 10;
-    static float power = 0.25;
+    static float radius = 50;
+    static float power = 0.01;
     static bool remove = false;
 
     static float sq_radius = radius*radius;
@@ -35,7 +35,7 @@ void MapEditorSys::tick(float dt) {
             sq_radius = radius*radius;
         }
         ImGui::SameLine();
-        ImGui::InputFloat("Power", &power, 0.01, 0.1);
+        ImGui::InputFloat("Power", &power, 0.001, 0.1);
 
         ImGui::Checkbox("Remove", &remove);
         ImGui::PopItemWidth();
@@ -54,10 +54,11 @@ void MapEditorSys::tick(float dt) {
                 float sq_distance = sq(pos.x-i) + sq(pos.y-j);
                 if(sq_distance < sq_radius) {
                     auto v = glm::vec2(i,j);
-                    auto chunk = map.getChunk(map.getChunkPos(v));
+                    auto chunk = map.getTileChunk(v);
+                    if(!chunk) chunk = map.generateChunk(map.getChunkPos(v));
                     auto& tile = chunk->get(map.getTilePos(v));
                     tile.level += (remove ? -1 : 1) * power * sqrt(sq_radius-sq_distance);
-                    chunk->setUpdated();
+                    map.updateTile(v);
                 }
             }
         }

@@ -6,8 +6,6 @@
 
 #include "map_upload.h"
 
-#include "logic/components/map_upload_data.h"
-
 using namespace dy;
 
 MapRenderSys::MapRenderSys(entt::registry& reg) : System(reg) {
@@ -80,28 +78,17 @@ void MapRenderSys::initPipeline() {
     moduleInfo.pCode = reinterpret_cast<const uint32_t*>(fragShaderCode.data());
     VkShaderModule fragShaderModule = static_cast<VkShaderModule> (ctx.device->createShaderModule(moduleInfo));
 
-    auto specEntries = std::vector {
-        vk::SpecializationMapEntry(0, 0, sizeof(int)),
-        vk::SpecializationMapEntry(1, sizeof(int), sizeof(int)),
-        vk::SpecializationMapEntry(2, 2 * sizeof(int), sizeof(int))
-    };
-
-    auto specValues = std::vector<int> {Chunk::size, Tile::Type::max, max_chunks};
-    auto specInfo = vk::SpecializationInfo(specEntries.size(), specEntries.data(), specValues.size() * sizeof(int), specValues.data());
-
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
     vertShaderStageInfo.module = vertShaderModule;
     vertShaderStageInfo.pName = "main";
-    vertShaderStageInfo.pSpecializationInfo = reinterpret_cast<VkSpecializationInfo*> (&specInfo);
 
     VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
     fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
     fragShaderStageInfo.module = fragShaderModule;
     fragShaderStageInfo.pName = "main";
-    fragShaderStageInfo.pSpecializationInfo = reinterpret_cast<VkSpecializationInfo*> (&specInfo);
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
     
@@ -178,7 +165,7 @@ void MapRenderSys::initPipeline() {
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_TRUE;
     depthStencil.depthWriteEnable = VK_TRUE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_GREATER;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.minDepthBounds = 0.0f; // Optional
     depthStencil.maxDepthBounds = 1.0f; // Optional

@@ -1,8 +1,8 @@
 #version 450
 
-layout(constant_id = 0) const int CHUNK_SIZE = 32;
-layout(constant_id = 1) const int NUM_TYPES = 7;
-layout(constant_id = 2) const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
+const int CHUNK_SIZE = 32;
+const int NUM_TYPES = 7;
+const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
 layout(location = 0) out vec2 v_pos;
 layout(location = 1) out vec3 v_normal;
@@ -100,23 +100,10 @@ void main() {
     
     Tile tile = getTile(v_pos);
     
-    if(tile.type == 5) tile.height = 0.0f;
-    
-    /*
-    v_color = colors[tile.type].rgb;
-    
-    for(int i = 0; i<NUM_TYPES; i++) {
-        v_types[i] = 0;
-    }
-    v_types[tile.type] = 1;
-    */
-    
     float dhdx = getTile(v_pos - vec2(1,0)).height - getTile(v_pos + vec2(1,0)).height;
     float dhdy = getTile(v_pos - vec2(0,1)).height - getTile(v_pos + vec2(0,1)).height;
-    v_normal = normalize(vec3(dhdx, dhdy, -2));
-    
-    
-    gl_Position = camera.projection * camera.view * vec4(v_pos, -tile.height, 1.0f);
-    gl_Position.z = (gl_Position.z + gl_Position.w) / 2.0;
+    v_normal = normalize(vec3(dhdx, dhdy, -1));
+
+    gl_Position = camera.projection * camera.view * vec4(v_pos, tile.height, 1.0f);
     
 }

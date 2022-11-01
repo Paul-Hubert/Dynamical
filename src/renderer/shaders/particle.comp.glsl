@@ -2,6 +2,10 @@
 
 layout (local_size_x = 256) in;
 
+const int CHUNK_SIZE = 32;
+const int NUM_TYPES = 7;
+const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
+
 struct Particle {
     vec4 sphere;
     vec4 speed;
@@ -35,10 +39,6 @@ const uint MAX_NEW_PARTICLES = 100;
 layout(std430, set = 0, binding = 2) readonly buffer NewParticles {
     Particle new_particles[MAX_NEW_PARTICLES];
 };
-
-const int CHUNK_SIZE = 32;
-const int NUM_TYPES = 7;
-const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
 struct Tile {
     int type;
@@ -168,19 +168,20 @@ void main()
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 
+    vec2 pos = new_pos.xy;
+
     Tile t = getTile(new_pos.xy);
 
-    //@TODO fixme!
-    vec3 norm = vec3(0,0,1);
+    float dhdx = getTile(pos - vec2(1,0)).height - getTile(pos + vec2(1,0)).height;
+    float dhdy = getTile(pos - vec2(0,1)).height - getTile(pos + vec2(0,1)).height;
+    vec3 norm = normalize(vec3(dhdx, dhdy, 1));
 
     if(new_pos.z < t.height + p.sphere.w) {
         new_pos.z = t.height + p.sphere.w;
         p.speed.xyz -= 2 * dot(p.speed.xyz, norm) * norm;
-        p.speed.z = 0.;
+        p.speed.xyz *= 0.9;
     }
     p.sphere.xyz = new_pos;
-
-    //p.sphere.z = t.height + p.sphere.w;
 
     particles[particle_index] = p;
 }

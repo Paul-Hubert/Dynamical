@@ -28,10 +28,6 @@ public:
     float getAngle() {
         return angle;
     }
-
-    glm::vec3 getDirection() {
-        return glm::vec3(0,0,1);
-    }
     
     glm::vec2 getScreenSize() {
         return screen_size;

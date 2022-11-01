@@ -24,6 +24,7 @@ public:
     Chunk* getTileChunk(glm::vec2 pos) const;
     Tile* getTile(glm::vec2 pos) const;
     Chunk* generateChunk(glm::ivec2 pos);
+    void updateTile(glm::vec2 pos);
     
     const std::vector<glm::vec2> pathfind(glm::vec2 start, std::function<bool(glm::vec2)> predicate, int iteration_limit = std::numeric_limits<int>::max()) const;
     
@@ -44,7 +45,7 @@ public:
     }
     
     glm::vec2 getMousePosition() const;
-    
+
     ~MapManager();
 private:
     entt::registry& reg;
