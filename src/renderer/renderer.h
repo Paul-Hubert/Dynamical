@@ -24,8 +24,12 @@ private:
     
     struct per_frame {
         vk::Semaphore transfer_semaphore;
+        vk::Semaphore compute_semaphore;
+        vk::Semaphore graphics_semaphore;
     };
     std::vector<per_frame> per_frame;
+
+    vk::Semaphore last_frame_semaphore = VK_NULL_HANDLE;
     
 };
 

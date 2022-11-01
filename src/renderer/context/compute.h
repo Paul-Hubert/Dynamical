@@ -34,6 +34,10 @@ private:
     };
     std::vector<per_frame> per_frame;
 
+    uint32_t index = 0;
+
+    vk::CommandBuffer current;
+
     bool empty = true;
     
 };

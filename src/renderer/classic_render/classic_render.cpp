@@ -101,7 +101,7 @@ void ClassicRender::prepare() {
 
 }
 
-void ClassicRender::render(vk::Semaphore semaphore) {
+void ClassicRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::PipelineStageFlags> stages, std::vector<vk::Semaphore> signals) {
 
     OPTICK_EVENT();
     
@@ -125,28 +125,18 @@ void ClassicRender::render(vk::Semaphore semaphore) {
     // Submit command buffer
 
     {
-
         
-        
-        std::vector<vk::Semaphore> semaphores;
-        auto stages = std::vector<vk::PipelineStageFlags>();
-        
-        semaphores.push_back(f.acquireSemaphore);
+        waits.push_back(f.acquireSemaphore);
         stages.push_back(vk::PipelineStageFlagBits::eTopOfPipe);
-        
-        if(semaphore) {
-            semaphores.push_back(semaphore);
-            stages.push_back(vk::PipelineStageFlagBits::eVertexInput);
-        }
-        
+
+        signals.push_back(f.presentSemaphore);
+
         OPTICK_EVENT("submit");
         ctx.device.graphics.submit({ vk::SubmitInfo(
-                semaphores.size(), semaphores.data(), stages.data(),
+                waits.size(), waits.data(), stages.data(),
                 1, &command,
-                1, &f.presentSemaphore
+                signals.size(), signals.data()
         ) }, f.fence);
-
-        ctx.device->waitForFences({ f.fence }, VK_TRUE, std::numeric_limits<uint64_t>::max());
 
     }
 

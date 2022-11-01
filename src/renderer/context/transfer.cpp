@@ -37,7 +37,7 @@ bool Transfer::flush(std::vector<vk::Semaphore> waits, std::vector<vk::PipelineS
 
         uploads.push_back(std::move(current));
 
-        ctx.device->waitForFences({current.fence}, VK_TRUE, std::numeric_limits<uint64_t>::max());
+        //ctx.device->waitForFences({current.fence}, VK_TRUE, std::numeric_limits<uint64_t>::max());
 
         current.reset(ctx, pool);
         
