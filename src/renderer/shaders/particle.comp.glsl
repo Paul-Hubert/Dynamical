@@ -23,8 +23,11 @@ struct KeyValue {
     uint value;
 };
 
+//MUST be the same as in particle_simulation.h
+const uint HASHMAP_SLOTS = 131072;
+const uint HASHMAP_EMPTY = 0;
 layout(std430, set = 0, binding = 1) buffer HashMap {
-    KeyValue slots[];
+    KeyValue slots[HASHMAP_SLOTS];
 } map;
 
 const uint MAX_NEW_PARTICLES = 100;
@@ -54,7 +57,60 @@ ivec2 ifloor(vec2 v) {
     return ivec2(floor(v));
 }
 
-uint hash(ivec2 chunk_pos) {
+// taken from
+// https://gist.github.com/franjaviersans/885c136932ef37d8905a6433d0828be6
+uint part1by2(uint n){
+    n = n & 0x000003ff;
+    n = (n ^ (n << 16)) & 0xff0000ff;
+    n = (n ^ (n << 8)) & 0x0300f00f;
+    n = (n ^ (n << 4)) & 0x030c30c3;
+    n = (n ^ (n << 2)) & 0x09249249;
+    return n;
+}
+
+uint morton(ivec3 pos) {
+    //0x80000 so that it's never zero
+    return 0x800000 | part1by2(pos.x) | (part1by2(pos.y) << 1) | (part1by2(pos.z) << 2);
+}
+
+ivec3 round_vec(vec3 pos) {
+    return ivec3(int(pos.x+0.5),int(pos.y+0.5),int(pos.z+0.5));
+}
+
+void insert_particle(vec3 pos, uint particle_index) {
+    uint code = morton(round_vec(pos));
+    uint slot = code % HASHMAP_SLOTS;
+
+    while(true) {
+        uint prev = atomicCompSwap(map.slots[i].key, HASHMAP_EMPTY, code);
+        if(prev == HASHMAP_EMPTY) {
+            map.slots[i].value = particle_index;
+            break;
+        }
+        //@TODO replace modulo by bitwise operator for performance
+        slot = (slot + 1) % HASHMAP_SLOTS;
+    }
+}
+
+void interaction(uint p_index, inout Particle p, uint other) {
+    
+}
+
+void lookup_and_apply(uint p_index, inout Particle p, ivec3 pos) {
+    uint code = morton(pos);
+    uint slot = (code % HASHMAP_SLOTS) + 1;
+
+    while (true) {
+        if (map.slots[slot].key == code) {
+            interaction(p_index, p, map.slots[slot].value);
+        } else if(map.slots[slot].key == HASHMAP_EMPTY) {
+            break;
+        }
+        slot = (slot + 1) % HASHMAP_SLOTS;
+    }
+}
+
+uint hash_chunk(ivec2 chunk_pos) {
     return chunk_pos.x * (1<<16) + chunk_pos.y + 1;
 }
 
@@ -64,7 +120,7 @@ Tile getTile(vec2 pos) {
 
     ivec2 chunk_pos = ifloor(pos / CHUNK_SIZE);
 
-    uint hash = hash(chunk_pos);
+    uint hash = hash_chunk(chunk_pos);
 
     uint slot = hash%MAX_CHUNKS;
 
@@ -93,7 +149,6 @@ Tile getTile(vec2 pos) {
     }
 
     return tile;
-
 }
 
 void main()

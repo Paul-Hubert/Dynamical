@@ -21,7 +21,7 @@ namespace dy {
 class Context;
 
 const uint32_t max_particles = 100000;
-const uint32_t hashmap_slots = max_particles * 2;
+const uint32_t hashmap_slots = 131072; //next pow^2
 const uint32_t max_new_particles = 100;
 
 struct PushConstants {
