@@ -15,12 +15,13 @@ Compute::Compute(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg), per_fr
     for(int i = 0; i< per_frame.size(); i++) {
         auto &f = per_frame[i];
 
-        f.fence = ctx.device->createFence({});
+        f.fence = ctx.device->createFence({vk::FenceCreateFlagBits::eSignaled});
         f.command = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(pool, vk::CommandBufferLevel::ePrimary, 1))[0];
 
-        f.command.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-
     }
+
+    current = per_frame[index].command;
+    current.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
 }
 
@@ -30,19 +31,20 @@ bool Compute::flush(std::vector<vk::Semaphore> waits, std::vector<vk::PipelineSt
     
     if(!empty) {
 
-        auto f = per_frame[ctx.frame_index];
+        auto& f = per_frame[index];
 
-        auto command = f.command;
-
-        command.end();
-
-        ctx.device.compute.submit(vk::SubmitInfo(waits.size(), waits.data(), stages.data(), 1, &command, signals.size(), signals.data()), f.fence);
+        current.end();
 
         ctx.device->waitForFences({f.fence}, VK_TRUE, std::numeric_limits<uint64_t>::max());
 
         ctx.device->resetFences({f.fence});
 
-        command.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+        ctx.device.compute.submit(vk::SubmitInfo(waits.size(), waits.data(), stages.data(), 1, &current, signals.size(), signals.data()), f.fence);
+
+        index = (index+1)%per_frame.size();
+        current = per_frame[index].command;
+
+        current.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
         
         empty = true;
         
@@ -54,7 +56,7 @@ bool Compute::flush(std::vector<vk::Semaphore> waits, std::vector<vk::PipelineSt
 
 vk::CommandBuffer Compute::getCommandBuffer() {
     empty = false;
-    return per_frame[ctx.frame_index].command;
+    return current;
 }
 
 Compute::~Compute() {

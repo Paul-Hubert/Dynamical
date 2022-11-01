@@ -19,7 +19,7 @@ public:
     ClassicRender(Context& ctx, entt::registry& reg);
 
     void prepare();
-    void render(vk::Semaphore semaphore = nullptr);
+    void render(std::vector<vk::Semaphore> waits, std::vector<vk::PipelineStageFlags> stages, std::vector<vk::Semaphore> signals);
 
     vk::RenderPass getRenderpass() {
         return renderpass;
