@@ -125,13 +125,6 @@ void ParticleSimulationSys::AddParticles() {
             particle.sphere.z = tile->level + 0.5f;
             particle.sphere.w = 0.5f;
 
-            //test, @TODO remove me
-
-
-            particle.speed.x = 0.1;
-            particle.speed.y = 0;
-            particle.speed.z = 0.1;
-
             particle.color = glm::vec4(0, 0, 1, 1);
 
         }

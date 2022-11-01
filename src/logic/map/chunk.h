@@ -13,7 +13,7 @@ namespace dy {
     
 class Chunk {
 public:
-    constexpr static int size = 64;
+    constexpr static int size = 32;
     
     const Tile& get(glm::ivec2 pos) const {
         return tiles[pos.x][pos.y];
