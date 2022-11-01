@@ -22,110 +22,6 @@ MapGenerator::MapGenerator(entt::registry& reg, MapManager& map) : reg(reg), map
     
 }
 
-struct PriorityElement {
-    PriorityElement(glm::vec2 pos, float level) : pos(pos), level(level) {}
-    PriorityElement() {
-        level = std::numeric_limits<float>::max();
-    }
-    glm::vec2 pos;
-    float level;
-
-};
-
-inline bool operator < (const PriorityElement a, const PriorityElement b) {
-    return a.level > b.level;
-}
-
-void MapGenerator::fillRiver(glm::vec2 pos, Tile* tile) {
-
-    std::priority_queue<PriorityElement, std::vector<PriorityElement>> queue;
-
-    queue.emplace(pos, tile->level);
-
-    while(!queue.empty()) {
-
-        PriorityElement min = queue.top();
-        queue.pop();
-
-        Tile* lowest_tile = map.getTile(min.pos);
-
-        if(lowest_tile->terrain == Tile::water) {
-            return;
-        }
-
-        lowest_tile->terrain = Tile::river;
-
-        map.getChunk(map.getChunkPos(min.pos))->setUpdated();
-
-        for(int x = -1; x<=1; x++) {
-            for(int y = -1; y<=1; y++) {
-                if(abs(x) + abs(y) != 1) continue;
-                glm::vec2 adj = min.pos + glm::vec2(x, y);
-
-                Tile* tile = map.getTile(adj);
-
-                if(!tile) {
-                    map.generateChunk(map.getChunkPos(adj));
-                    tile = map.getTile(adj);
-                }
-
-                if(tile->terrain == Tile::river) continue;
-
-                if(tile->level < min.level) {
-                    //queue = std::priority_queue<PriorityElement, std::vector<PriorityElement>>();
-                }
-
-                queue.emplace(adj, tile->level);
-            }
-        }
-
-    }
-
-}
-
-void MapGenerator::generateRiver(glm::vec2 pos, Tile* tile) {
-    
-    tile->terrain = Tile::river;
-    
-    map.getChunk(map.getChunkPos(pos))->setUpdated();
-
-    Tile* lowest_tile = nullptr;
-    glm::vec2 lowest_pos;
-    float lowest_level = 100000;
-    
-    for(int x = -1; x<=1; x++) {
-        for(int y = -1; y<=1; y++) {
-            if(abs(x) + abs(y) != 1) continue;
-            glm::vec2 pos2 = pos + glm::vec2(x, y);
-            
-            Tile* tile2 = map.getTile(pos2);
-            
-            if(!tile2) {
-                map.generateChunk(map.getChunkPos(pos2));
-                tile2 = map.getTile(pos2);
-            }
-
-            if(tile2->terrain == Tile::river) {
-                continue;
-            }
-            
-            if(tile2->level <= lowest_level) {
-                lowest_level = tile2->level;
-                lowest_pos = pos2;
-                lowest_tile = tile2;
-            }
-            
-        }
-    }
-    
-    if(lowest_tile == nullptr || lowest_tile->terrain == Tile::water) {
-        return;
-    }
-    
-    generateRiver(lowest_pos, lowest_tile);
-    
-}
-
 float MapGenerator::frand() {
     return (double) std::rand() / (RAND_MAX + 1u);
 }
@@ -188,54 +84,67 @@ void MapGenerator::generateChunk(Chunk& chunk, glm::ivec2 pos) {
             }
         }
     }
-    //We then initialize the kind of tile (based on height and local slope)
+
+
+    for(int i = 0; i<Chunk::size; i++) {
+        for (int j = 0; j < Chunk::size; j++) {
+            glm::vec2 position = pos * Chunk::size + glm::ivec2(i, j);
+            Tile &tile = chunk.get(glm::ivec2(i, j));
+            setTileType(tile, position);
+        }
+    }
+
     for(int i = 0; i<Chunk::size; i++) {
         for (int j = 0; j < Chunk::size; j++) {
             glm::vec2 position = pos * Chunk::size + glm::ivec2(i, j);
             auto& tile = chunk.get(glm::ivec2(i, j));
-            tile.terrain = Tile::nothing;
 
-            if(tile.level < 0) tile.terrain = Tile::water;
-            else if(tile.level >= 0 && tile.level < 1) tile.terrain = Tile::sand;
-            else {
-                tile.terrain = Tile::grass;
-
-                auto neighbours = {
-                        glm::ivec2 (i-1,j),
-                        glm::ivec2 (i+1,j),
-                        glm::ivec2 (i,j+1),
-                        glm::ivec2 (i,j-1),
-                };
-
-                float derivative_sum = 0;
-                int neighbours_count = 0;
-                for(auto v : neighbours) {
-                    if(v.x >= 0 && v.x < Chunk::size && v.y >= 0 && v.y < Chunk::size) {
-                        auto& other_tile = chunk.get(v);
-                        derivative_sum += std::abs(other_tile.level - tile.level);
-                        ++neighbours_count;
-                    }
-                }
-
-                if(neighbours_count > 0 && derivative_sum/neighbours_count > 1) {
-                    tile.terrain = Tile::stone;
-                }
-            }
-
-            if(tile.terrain == Tile::grass) {
+            if (tile.terrain == Tile::grass) {
                 auto plant_pos = position + glm::vec2(frand(), frand());
-                if(frand()< 0.03) {
+                if (frand() < 0.01) {
                     tile.object = dy::buildTree(reg, plant_pos);
-                } else if(frand()< 0.001) {
+                } else if (frand() < 0.001) {
                     tile.object = dy::buildBerryBush(reg, plant_pos);
                 }
             }
 
-            if(tile.level > 10 && frand()< 0.00007) {
+            if (tile.level > 10 && frand() < 0.00007) {
                 auto entity = reg.create();
                 reg.emplace<WaterFlow>(entity, reg, position);
-                //fillRiver(position, &tile);
             }
         }
     }
+}
+
+void MapGenerator::setTileType(Tile& tile, glm::ivec2 pos) {
+    //We then initialize the kind of tile (based on height and local slope)
+
+    tile.terrain = Tile::nothing;
+
+    if(tile.level < 0) tile.terrain = Tile::water;
+    else if(tile.level >= 0 && tile.level < 1) tile.terrain = Tile::sand;
+    else {
+        tile.terrain = Tile::grass;
+
+        auto neighbours = {
+                glm::ivec2 (-1,0),
+                glm::ivec2 (+1,0),
+                glm::ivec2 (0,+1),
+                glm::ivec2 (0,-1),
+        };
+
+        float derivative_sum = 0;
+        int neighbours_count = 0;
+        for(auto v : neighbours) {
+            Tile* other_tile = map.getTile(pos + v);
+            if(!other_tile) continue;
+            derivative_sum += std::abs(other_tile->level - tile.level);
+            ++neighbours_count;
+        }
+
+        if(neighbours_count > 0 && derivative_sum/neighbours_count > 1) {
+            tile.terrain = Tile::stone;
+        }
+    }
+
 }

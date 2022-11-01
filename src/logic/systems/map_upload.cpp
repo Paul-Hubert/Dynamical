@@ -7,6 +7,7 @@
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include "glm/gtx/string_cast.hpp"
+#include <algorithm>
 
 #include "util/util.h"
 #include "util/log.h"
@@ -128,19 +129,34 @@ void MapUploadSys::tick(float dt) {
 
     auto& map = reg.ctx<MapManager>();
     auto& camera = reg.ctx<Camera>();
-    
-    auto corner_rpos = camera.fromScreenSpace(glm::vec2()) - 10.f;
-    auto end_rpos = camera.fromScreenSpace(camera.getScreenSize()) + 10.f;
-    auto corner_pos = map.getChunkPos(corner_rpos);
-    auto end_pos = map.getChunkPos(end_rpos);
 
-    auto max = glm::max(corner_pos, end_pos);
-    auto min = glm::min(corner_pos, end_pos);
+    auto screen_size = camera.getScreenSize();
+    screen_size.y *= 1.5;
 
-    corner_pos = min;
-    end_pos = max;
+    std::vector<glm::vec2> corners{
+            glm::vec2(),
+            glm::vec2(screen_size.x, 0),
+            glm::vec2(0,screen_size.y),
+            camera.getScreenSize()
+    };
 
-    end_pos.y += abs(end_pos.y - corner_pos.y);
+    int maxvalue = 10000000;
+    glm::ivec2 max_pos(-maxvalue, -maxvalue);
+    glm::ivec2 min_pos(maxvalue, maxvalue);
+
+    for(auto corner : corners) {
+        auto corner_rpos = camera.fromScreenSpace(corner);
+        auto corner_pos = map.getChunkPos(corner_rpos);
+        max_pos.x = std::max(max_pos.x, corner_pos.x);
+        max_pos.y = std::max(max_pos.y, corner_pos.y);
+        min_pos.x = std::min(min_pos.x, corner_pos.x);
+        min_pos.y = std::min(min_pos.y, corner_pos.y);
+    }
+
+    auto corner_pos = min_pos;
+    auto end_pos = max_pos;
+
+    //end_pos.y += abs(end_pos.y - corner_pos.y);
 
     header->corner_indices = corner_pos;
     header->chunk_length = end_pos.y - corner_pos.y + 1;

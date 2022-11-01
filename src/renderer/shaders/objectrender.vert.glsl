@@ -38,7 +38,7 @@ void main() {
     mat4 inv = inverse(camera.view);
     vec4 cpos = gl_Position;
     v_pos = (inv * cpos).xyz;
-    cpos.z -= 1;
+    cpos.z -= 0.1;
     v_cam = (inv * cpos).xyz;
 
     gl_Position = camera.projection * gl_Position;

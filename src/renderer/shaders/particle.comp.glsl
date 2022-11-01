@@ -125,7 +125,7 @@ void main()
     }
     p.sphere.xyz = new_pos;
 
-    //p.sphere.z = t.height + p.sphere.w;
+    p.sphere.z = t.height + p.sphere.w;
 
     particles[particle_index] = p;
 }

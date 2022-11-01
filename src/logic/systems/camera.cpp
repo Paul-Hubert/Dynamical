@@ -64,11 +64,6 @@ void CameraSys::tick(float dt) {
     } else if(angle < 0) {
         angle = 0;
     }
-    if(rotation > M_PI) {
-        rotation -= M_PI;
-    } else if(rotation < -M_PI) {
-        rotation += M_PI;
-    }
 
     auto& ctx = *reg.ctx<Context*>();
     camera.setScreenSize(glm::vec2(ctx.swap.extent.width, ctx.swap.extent.width));

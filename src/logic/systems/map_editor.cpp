@@ -54,10 +54,11 @@ void MapEditorSys::tick(float dt) {
                 float sq_distance = sq(pos.x-i) + sq(pos.y-j);
                 if(sq_distance < sq_radius) {
                     auto v = glm::vec2(i,j);
-                    auto chunk = map.getChunk(map.getChunkPos(v));
+                    auto chunk = map.getTileChunk(v);
+                    if(!chunk) chunk = map.generateChunk(map.getChunkPos(v));
                     auto& tile = chunk->get(map.getTilePos(v));
                     tile.level += (remove ? -1 : 1) * power * sqrt(sq_radius-sq_distance);
-                    chunk->setUpdated();
+                    map.updateTile(v);
                 }
             }
         }
