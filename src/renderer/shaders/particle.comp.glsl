@@ -297,7 +297,7 @@ void main()
     }
 
     p.density = p.new_density;
-    p.new_density = 0.0;
+    p.new_density = 1.0;
 
     p.pressure = p.new_pressure;
     p.new_pressure = vec3(0,0,0);
