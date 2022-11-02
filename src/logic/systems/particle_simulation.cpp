@@ -115,6 +115,7 @@ void ParticleSimulationSys::AddParticles() {
 
     auto& input = reg.ctx<Input>();
 
+    /*
     //DEBUG ! REMOVE ME
     {
         auto &map = reg.ctx<MapManager>();
@@ -161,7 +162,7 @@ void ParticleSimulationSys::AddParticles() {
             particle.color = glm::vec4(0, 0, 1, 1);
         }
     }
-
+    */
 
     if(input.leftDown) {
         auto &map = reg.ctx<MapManager>();
@@ -180,7 +181,7 @@ void ParticleSimulationSys::AddParticles() {
 
             particle.density = particle.new_density = 1;
 
-            particle.pressure = particle.new_pressure = glm::vec3(0,0,0);
+            particle.pressure = particle.new_pressure = glm::vec3(1,1,1)*0.1f;
 
             particle.viscosity = particle.new_viscosity = glm::vec4(0,0,0,0);
 
