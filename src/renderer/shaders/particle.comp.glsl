@@ -321,7 +321,7 @@ void main()
     p.new_viscosity *= PARTICLE_MASS * VISCOSITY;
 
     p.speed.z -= 0.1;
-    p.speed.xyz += 10*(p.new_viscosity + p.new_pressure) / PARTICLE_MASS;
+    p.speed.xyz += (p.new_viscosity + p.new_pressure) / PARTICLE_MASS;
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 

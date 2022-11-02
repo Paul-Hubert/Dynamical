@@ -114,10 +114,6 @@ void ParticleSimulationSys::tick(double dt) {
 void ParticleSimulationSys::AddParticles() {
 
     auto& input = reg.ctx<Input>();
-<<<<<<< HEAD
-=======
-
->>>>>>> 41dbca4309da17f89f3ed4266c9d32d192e845c0
     /*
     //DEBUG ! REMOVE ME
     {
@@ -165,12 +161,7 @@ void ParticleSimulationSys::AddParticles() {
             particle.color = glm::vec4(0, 0, 1, 1);
         }
     }
-<<<<<<< HEAD
-     */
-
-=======
-    */
->>>>>>> 41dbca4309da17f89f3ed4266c9d32d192e845c0
+ */
 
     if(input.leftDown) {
         auto &map = reg.ctx<MapManager>();
