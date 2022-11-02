@@ -314,6 +314,7 @@ void main()
     p.new_pressure *= (-PARTICLE_MASS/p.density);
     p.new_viscosity *= PARTICLE_MASS * VISCOSITY;
 
+
     p.speed.z -= 0.1;
     p.speed.xyz += 0.001 * (p.new_viscosity + p.new_pressure + p.new_density) / PARTICLE_MASS;
 
