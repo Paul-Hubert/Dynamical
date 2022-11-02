@@ -6,6 +6,8 @@ const int CHUNK_SIZE = 32;
 const int NUM_TYPES = 7;
 const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
+const float slot_size = 5;
+
 struct Particle {
     vec4 sphere;
     vec4 speed;
@@ -77,6 +79,10 @@ ivec3 round_vec(vec3 pos) {
     return ivec3(int(pos.x+0.5),int(pos.y+0.5),int(pos.z+0.5));
 }
 
+ivec3 get_indices(vec3 pos) {
+    return round_vec(pos/slot_size);
+}
+
 void insert_particle(ivec3 pos, uint particle_index) {
     uint code = morton(pos);
     uint slot = code % HASHMAP_SLOTS;
@@ -104,8 +110,14 @@ void interaction(uint p_index, inout Particle p, uint other) {
             o.sphere.xyz += pusher;
             p.sphere.xyz -= pusher;
 
-            p.speed.xyz -= 2 * dot(p.speed.xyz, norm) * norm;
-            o.speed.xyz += 2 * dot(p.speed.xyz, norm) * norm;
+            vec3 vn = dot(p.speed.xyz, norm) * norm;
+            vec3 vno = dot(o.speed.xyz, norm) * norm;
+
+            p.speed.xyz = p.speed.xyz - vn + vno;
+            o.speed.xyz = o.speed.xyz - vno + vn;
+
+            p.speed.xyz *= 0.9;
+            o.speed.xyz *= 0.9;
             particles[other] = o;
         }
     }
@@ -196,14 +208,14 @@ void main()
         p = particles[particle_index];
     }
 
-    insert_particle(round_vec(p.sphere.xyz), particle_index);
+    insert_particle(get_indices(p.sphere.xyz), particle_index);
     barrier();
 
 
     //Gravité, plus tard on ajoutera une force dépendante des autres particules
     p.speed.z -= 0.1;
 
-    neighbours_xyz(particle_index, p, round_vec(p.sphere.xyz));
+    neighbours_xyz(particle_index, p, get_indices(p.sphere.xyz));
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 
