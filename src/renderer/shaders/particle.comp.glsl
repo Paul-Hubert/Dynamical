@@ -159,6 +159,24 @@ void interaction(uint p_index, inout Particle p, uint other) {
             p.new_pressure += PARTICLE_MASS * (pressure(p.density)+pressure(o.density)) / (2*o.density) * smooth_pressure_grad(distance) * diff;
             p.new_viscosity += PARTICLE_MASS * (o.speed.xyz-p.speed.xyz) / o.density * smooth_viscosity(distance);
         }
+
+        float min_distance = p.sphere.w + o.sphere.w;
+        diff = diff/distance;
+        if(distance < min_distance) {
+            vec3 pusher = diff * (distance-min_distance)/2;
+            o.sphere.xyz += pusher;
+            p.sphere.xyz -= pusher;
+
+            vec3 vn = dot(p.speed.xyz, diff) * diff;
+            vec3 vno = dot(o.speed.xyz, diff) * diff;
+
+            p.speed.xyz = p.speed.xyz - vn + vno;
+            o.speed.xyz = o.speed.xyz - vno + vn;
+
+            p.speed.xyz *= FRICTION;
+            o.speed.xyz *= FRICTION;
+            particles[other] = o;
+        }
     }
 }
 
@@ -168,23 +186,7 @@ void interaction(uint p_index, inout Particle p, uint other) {
         Particle o = particles[other];
         vec3 norm = p.sphere.xyz - o.sphere.xyz;
         float distance = sqrt(dot(norm, norm));
-        float min_distance = p.sphere.w + o.sphere.w;
-        norm = norm/distance;
-        if(distance < min_distance) {
-            vec3 pusher = norm * (distance-min_distance)/2;
-            o.sphere.xyz += pusher;
-            p.sphere.xyz -= pusher;
 
-            vec3 vn = dot(p.speed.xyz, norm) * norm;
-            vec3 vno = dot(o.speed.xyz, norm) * norm;
-
-            p.speed.xyz = p.speed.xyz - vn + vno;
-            o.speed.xyz = o.speed.xyz - vno + vn;
-
-            p.speed.xyz *= FRICTION;
-            o.speed.xyz *= FRICTION;
-            particles[other] = o;
-        }
     }
 }
 */
@@ -321,7 +323,7 @@ void main()
     p.new_viscosity *= PARTICLE_MASS * VISCOSITY;
 
     p.speed.z -= 0.1;
-    p.speed.xyz += (p.new_viscosity + p.new_pressure) / PARTICLE_MASS;
+    p.speed.xyz += 0.0001*(p.new_viscosity + p.new_pressure) / PARTICLE_MASS;
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 
