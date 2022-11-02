@@ -107,8 +107,8 @@ float smooth_viscosity(float distance) {
     return (45*(KERNEL_RADIUS-distance))/(PI*KERNEL_RADIUS_P6);
 }
 
-vec3 smooth_pressure_grad(vec3 pre1, vec3 pre2) {
-    vec3 delta = pre1-pre2;
+vec3 smooth_pressure_grad(vec3 pos1, vec3 pos2) {
+    vec3 delta = pos1-pos2;
     float norm = sqrt(dot(delta,delta));
     float scal = (KERNEL_RADIUS-norm);
     scal *= scal;
@@ -152,7 +152,7 @@ void interaction(uint p_index, inout Particle p, uint other) {
         if(distance <= KERNEL_RADIUS) {
             p.new_density += PARTICLE_MASS*smooth_density(distance);
 
-            p.new_pressure += (PARTICLE_MASS/(2*o.density)) * (p.pressure+o.pressure) * smooth_pressure_grad(p.pressure, o.pressure);
+            p.new_pressure += (PARTICLE_MASS/(2*o.density)) * (p.pressure+o.pressure) * smooth_pressure_grad(p.sphere.xyz, o.sphere.xyz);
 
             p.new_viscosity += ((PARTICLE_MASS*(o.speed.xyz-p.speed.xyz))/o.density) * smooth_viscosity(distance);
         }
