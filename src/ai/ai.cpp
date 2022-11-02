@@ -47,7 +47,7 @@ void AISys::decide(entt::entity entity, AIC& ai) {
     testBehavior<WanderBehavior>(entity, max_score, max_behavior);
 
     if(reg.all_of<BasicNeeds>(entity)) {
-        //testBehavior<EatBehavior>(entity, max_score, max_behavior);
+        testBehavior<EatBehavior>(entity, max_score, max_behavior);
     }
 
     if(max_score > ai.score || ai.action == nullptr) {

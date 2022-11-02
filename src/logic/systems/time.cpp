@@ -50,7 +50,7 @@ void TimeSys::tick(double dt) {
     }
     ImGui::End();
     
-    time.dt = time.speed * time.speed_modifier * dt;
+    time.dt = time.speed * time.speed_modifier * dt * 10;
     time.current += time.dt;
 
     if(ImGui::Begin("Frame time", nullptr)) {
