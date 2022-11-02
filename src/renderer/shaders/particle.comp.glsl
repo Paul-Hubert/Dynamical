@@ -149,11 +149,13 @@ void interaction(uint p_index, inout Particle p, uint other) {
         vec3 diff = o.sphere.xyz - p.sphere.xyz;
         float distance = sqrt(dot(diff, diff));
 
-        p.new_density += PARTICLE_MASS*smooth_density(distance);
+        if(distance <= KERNEL_RADIUS) {
+            p.new_density += PARTICLE_MASS*smooth_density(distance);
 
-        p.new_pressure += (PARTICLE_MASS/(2*o.density)) * (p.pressure+o.pressure) * smooth_pressure_grad(p.pressure, o.pressure);
+            p.new_pressure += (PARTICLE_MASS/(2*o.density)) * (p.pressure+o.pressure) * smooth_pressure_grad(p.pressure, o.pressure);
 
-        p.new_viscosity += ((PARTICLE_MASS*(o.speed.xyz-p.speed.xyz))/o.density) * smooth_viscosity(distance);
+            p.new_viscosity += ((PARTICLE_MASS*(o.speed.xyz-p.speed.xyz))/o.density) * smooth_viscosity(distance);
+        }
     }
 }
 
