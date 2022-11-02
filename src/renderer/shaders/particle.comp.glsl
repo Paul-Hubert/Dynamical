@@ -143,6 +143,7 @@ void insert_particle(ivec3 pos, uint particle_index) {
     }
 }
 
+/*
 void interaction(uint p_index, inout Particle p, uint other) {
     if(p_index != other) {
         Particle o = particles[other];
@@ -158,8 +159,8 @@ void interaction(uint p_index, inout Particle p, uint other) {
         }
     }
 }
+*/
 
-/*
 void interaction(uint p_index, inout Particle p, uint other) {
     if(p_index != other) {
         Particle o = particles[other];
@@ -183,7 +184,7 @@ void interaction(uint p_index, inout Particle p, uint other) {
             particles[other] = o;
         }
     }
-}*/
+}
 
 void lookup_and_apply(uint p_index, inout Particle p, ivec3 pos) {
     uint code = morton(pos);
@@ -298,26 +299,14 @@ void main()
         p = particles[particle_index];
     }
 
-    p.density = p.new_density;
-    p.new_density = 1.0;
-
-    p.pressure = p.new_pressure;
-    p.new_pressure = vec3(0,0,0);
-
-    p.viscosity = p.new_viscosity;
-    p.new_viscosity = vec3(0,0,0);
-
     insert_particle(get_indices(p.sphere.xyz), particle_index);
     barrier();
 
 
     //Gravité, plus tard on ajoutera une force dépendante des autres particules
     neighbours_xyz(particle_index, p, get_indices(p.sphere.xyz));
-    p.new_pressure *= (-PARTICLE_MASS/p.density);
-    p.new_viscosity *= PARTICLE_MASS * VISCOSITY;
 
     p.speed.z -= 0.1;
-    p.speed.xyz += 0.01 * (p.new_viscosity + p.new_pressure + p.new_density) / PARTICLE_MASS;
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 
