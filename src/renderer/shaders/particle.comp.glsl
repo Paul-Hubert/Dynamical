@@ -107,16 +107,13 @@ float smooth_density(float distance) {
 }
 
 float smooth_viscosity(float distance) {
-    return (45*(KERNEL_RADIUS-distance))/(PI*KERNEL_RADIUS_P6);
+    return 45*(KERNEL_RADIUS-distance)/(PI*KERNEL_RADIUS_P6);
 }
 
-vec3 smooth_pressure_grad(vec3 pos1, vec3 pos2) {
-    vec3 delta = pos1-pos2;
-    float norm = sqrt(dot(delta,delta));
-    float scal = (KERNEL_RADIUS-norm);
-    scal *= scal;
-    scal *= -45 * (1/(PI*KERNEL_RADIUS_P6*norm));
-    return delta*scal;
+float smooth_pressure_grad(float distance) {
+    float hd = (KERNEL_RADIUS-distance);
+    float scal = -45. / (PI*KERNEL_RADIUS_P6 * distance) * hd*hd;
+    return scal;
 }
 
 uint morton(ivec3 pos) {
@@ -153,15 +150,14 @@ float pressure(float density) {
 void interaction(uint p_index, inout Particle p, uint other) {
     if(p_index != other) {
         Particle o = particles[other];
-        vec3 diff = o.sphere.xyz - p.sphere.xyz;
+        vec3 diff = p.sphere.xyz - o.sphere.xyz;
         float distance = sqrt(dot(diff, diff));
 
-        if(distance <= KERNEL_RADIUS) {
+        if(distance != 0 && distance <= KERNEL_RADIUS) {
             p.new_density += PARTICLE_MASS*smooth_density(distance);
 
-            p.new_pressure += (PARTICLE_MASS/(2*o.density)) * (pressure(p.density)+pressure(o.density)) * smooth_pressure_grad(p.sphere.xyz, o.sphere.xyz);
-
-            p.new_viscosity += ((PARTICLE_MASS*(o.speed.xyz-p.speed.xyz))/o.density) * smooth_viscosity(distance);
+            p.new_pressure += PARTICLE_MASS * (pressure(p.density)+pressure(o.density)) / (2*o.density) * smooth_pressure_grad(distance) * diff;
+            p.new_viscosity += PARTICLE_MASS * (o.speed.xyz-p.speed.xyz) / o.density * smooth_viscosity(distance);
         }
     }
 }
@@ -321,11 +317,11 @@ void main()
 
     //Gravité, plus tard on ajoutera une force dépendante des autres particules
     neighbours_xyz(particle_index, p, get_indices(p.sphere.xyz));
-    p.new_pressure *= (-PARTICLE_MASS/p.density);
+    p.new_pressure *= -PARTICLE_MASS/p.density;
     p.new_viscosity *= PARTICLE_MASS * VISCOSITY;
 
     p.speed.z -= 0.1;
-    p.speed.xyz += 0.01 * (p.new_viscosity + p.new_pressure + p.new_density) / PARTICLE_MASS;
+    p.speed.xyz += 10*(p.new_viscosity + p.new_pressure) / PARTICLE_MASS;
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 
