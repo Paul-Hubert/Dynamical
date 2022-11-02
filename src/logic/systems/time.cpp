@@ -34,7 +34,7 @@ void TimeSys::tick(double dt) {
         ImGui::SetWindowPos(ImVec2(input.screenSize.x - size.x, 0));
         
         Date date(time.current);
-        ImGui::Text("Time : %llu of %s, %llu %llu:%llu:%llu", date.days+1, Date::names_of_months[date.months], date.years, date.hours, date.minutes, date.seconds);
+        ImGui::Text("Time : %lu of %s, %llu %lu:%lu:%lu", date.days+1, Date::names_of_months[date.months], date.years, date.hours, date.minutes, date.seconds);
         
         int mode = time.speed_modifier;
         ImGui::Text("Speed : "); ImGui::SameLine();

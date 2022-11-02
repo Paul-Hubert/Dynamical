@@ -37,6 +37,7 @@
           glslang
 
           # Perso
+          renderdoc
           valgrind
           gdb
           jetbrains.clion
@@ -45,6 +46,7 @@
         shellHook = ''
           export PATH="${pkgs.lib.makeBinPath buildInputs}:$PATH"
           export VK_LAYER_PATH="${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d"
+          export SDL_VIDEODRIVER=x11
         '';
       };
 

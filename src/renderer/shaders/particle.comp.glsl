@@ -87,8 +87,8 @@ void insert_particle(ivec3 pos, uint particle_index) {
             map.slots[slot].value = particle_index;
             break;
         }
-        //@TODO replace modulo by bitwise operator for performance
-        slot = (slot + 1) % HASHMAP_SLOTS;
+
+        slot = (slot + 1) & (HASHMAP_SLOTS-1);
     }
 }
 
@@ -166,22 +166,25 @@ Tile getTile(vec2 pos) {
     return tile;
 }
 
-void neighbours_z(uint p_index, inout Particle p, ivec3 ipos) {
-    lookup_and_apply(p_index, p, ipos);
-    ipos.z += 1;
-    lookup_and_apply(p_index, p, ipos);
+void neighbours_z(uint p_index, inout Particle p, ivec3 ipos, uint radius) {
+    for(int i = 0; i < radius; ++i) {
+        lookup_and_apply(p_index, p, ipos);
+        ipos.z += 1;
+    }
 }
 
-void neighbours_yz(uint p_index, inout Particle p, ivec3 ipos) {
-    neighbours_z(p_index, p, ipos);
-    ipos.y += 1;
-    neighbours_z(p_index, p, ipos);
+void neighbours_yz(uint p_index, inout Particle p, ivec3 ipos, uint radius) {
+    for(int i = 0; i < radius; ++i) {
+        neighbours_z(p_index, p, ipos, radius);
+        ipos.y += 1;
+    }
 }
 
-void neighbours_xyz(uint p_index, inout Particle p, ivec3 ipos) {
-    neighbours_yz(p_index, p, ipos);
-    ipos.x += 1;
-    neighbours_yz(p_index, p, ipos);
+void neighbours_xyz(uint p_index, inout Particle p, ivec3 ipos, uint radius) {
+    for(int i = 0; i < radius; ++i) {
+        neighbours_yz(p_index, p, ipos, radius);
+        ipos.x += 1;
+    }
 }
 
 void main()
@@ -203,7 +206,7 @@ void main()
     //Gravité, plus tard on ajoutera une force dépendante des autres particules
     p.speed.z -= 0.1;
 
-    neighbours_xyz(particle_index, p, round_vec(p.sphere.xyz));
+    neighbours_xyz(particle_index, p, round_vec(p.sphere.xyz), 3);
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 
