@@ -291,7 +291,7 @@ void main()
     Particle p;
     if(particle_index >= particle_count - new_particle_count) {
         p = new_particles[particle_count - particle_index - 1];
-        //particles[particle_index] = p;
+        particles[particle_index] = p;
     } else {
         p = particles[particle_index];
     }
