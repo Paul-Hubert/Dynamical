@@ -187,6 +187,14 @@ void neighbours_xyz(uint p_index, inout Particle p, ivec3 ipos, uint radius) {
     }
 }
 
+ivec3 round_and_dec(vec3 pos, int dec) {
+    ivec3 ret;
+    ret.x = int(pos.x+0.5)-dec;
+    ret.y = int(pos.y+0.5)-dec;
+    ret.z = int(pos.z+0.5)-dec;
+    return ret;
+}
+
 void main()
 {
     uint particle_index = gl_GlobalInvocationID.x;
@@ -206,7 +214,7 @@ void main()
     //Gravité, plus tard on ajoutera une force dépendante des autres particules
     p.speed.z -= 0.1;
 
-    neighbours_xyz(particle_index, p, round_vec(p.sphere.xyz), 3);
+    neighbours_xyz(particle_index, p, round_and_dec(p.sphere.xyz, 1), 3);
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 
