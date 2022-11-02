@@ -6,6 +6,8 @@ const int CHUNK_SIZE = 32;
 const int NUM_TYPES = 7;
 const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
+const float slot_size = 5;
+
 struct Particle {
     vec4 sphere;
     vec4 speed;
@@ -77,9 +79,13 @@ ivec3 round_vec(vec3 pos) {
     return ivec3(int(pos.x+0.5),int(pos.y+0.5),int(pos.z+0.5));
 }
 
+ivec3 get_indices(vec3 pos) {
+    return round_vec(pos/slot_size);
+}
+
 void insert_particle(ivec3 pos, uint particle_index) {
     uint code = morton(pos);
-    uint slot = code % HASHMAP_SLOTS;
+    uint slot = code & (HASHMAP_SLOTS-1);
 
     while(true) {
         uint prev = atomicCompSwap(map.slots[slot].key, HASHMAP_EMPTY, code);
@@ -87,7 +93,6 @@ void insert_particle(ivec3 pos, uint particle_index) {
             map.slots[slot].value = particle_index;
             break;
         }
-
         slot = (slot + 1) & (HASHMAP_SLOTS-1);
     }
 }
@@ -104,8 +109,14 @@ void interaction(uint p_index, inout Particle p, uint other) {
             o.sphere.xyz += pusher;
             p.sphere.xyz -= pusher;
 
-            p.speed.xyz -= 2 * dot(p.speed.xyz, norm) * norm;
-            o.speed.xyz += 2 * dot(p.speed.xyz, norm) * norm;
+            vec3 vn = dot(p.speed.xyz, norm) * norm;
+            vec3 vno = dot(o.speed.xyz, norm) * norm;
+
+            p.speed.xyz = p.speed.xyz - vn + vno;
+            o.speed.xyz = o.speed.xyz - vno + vn;
+
+            p.speed.xyz *= 0.9;
+            o.speed.xyz *= 0.9;
             particles[other] = o;
         }
     }
@@ -113,7 +124,7 @@ void interaction(uint p_index, inout Particle p, uint other) {
 
 void lookup_and_apply(uint p_index, inout Particle p, ivec3 pos) {
     uint code = morton(pos);
-    uint slot = (code % HASHMAP_SLOTS) + 1;
+    uint slot = code & (HASHMAP_SLOTS-1);
 
     while (true) {
         if (map.slots[slot].key == code) {
@@ -121,7 +132,7 @@ void lookup_and_apply(uint p_index, inout Particle p, ivec3 pos) {
         } else if(map.slots[slot].key == HASHMAP_EMPTY) {
             break;
         }
-        slot = (slot + 1) % HASHMAP_SLOTS;
+        slot = (slot + 1) & (HASHMAP_SLOTS-1);
     }
 }
 
@@ -166,33 +177,22 @@ Tile getTile(vec2 pos) {
     return tile;
 }
 
-void neighbours_z(uint p_index, inout Particle p, ivec3 ipos, uint radius) {
-    for(int i = 0; i < radius; ++i) {
-        lookup_and_apply(p_index, p, ipos);
-        ipos.z += 1;
-    }
+void neighbours_z(uint p_index, inout Particle p, ivec3 ipos) {
+    lookup_and_apply(p_index, p, ipos);
+    ipos.z += 1;
+    lookup_and_apply(p_index, p, ipos);
 }
 
-void neighbours_yz(uint p_index, inout Particle p, ivec3 ipos, uint radius) {
-    for(int i = 0; i < radius; ++i) {
-        neighbours_z(p_index, p, ipos, radius);
-        ipos.y += 1;
-    }
+void neighbours_yz(uint p_index, inout Particle p, ivec3 ipos) {
+    neighbours_z(p_index, p, ipos);
+    ipos.y += 1;
+    neighbours_z(p_index, p, ipos);
 }
 
-void neighbours_xyz(uint p_index, inout Particle p, ivec3 ipos, uint radius) {
-    for(int i = 0; i < radius; ++i) {
-        neighbours_yz(p_index, p, ipos, radius);
-        ipos.x += 1;
-    }
-}
-
-ivec3 round_and_dec(vec3 pos, int dec) {
-    ivec3 ret;
-    ret.x = int(pos.x+0.5)-dec;
-    ret.y = int(pos.y+0.5)-dec;
-    ret.z = int(pos.z+0.5)-dec;
-    return ret;
+void neighbours_xyz(uint p_index, inout Particle p, ivec3 ipos) {
+    neighbours_yz(p_index, p, ipos);
+    ipos.x += 1;
+    neighbours_yz(p_index, p, ipos);
 }
 
 void main()
@@ -207,14 +207,14 @@ void main()
         p = particles[particle_index];
     }
 
-    insert_particle(round_vec(p.sphere.xyz), particle_index);
+    insert_particle(get_indices(p.sphere.xyz), particle_index);
     barrier();
 
 
     //Gravité, plus tard on ajoutera une force dépendante des autres particules
     p.speed.z -= 0.1;
 
-    neighbours_xyz(particle_index, p, round_and_dec(p.sphere.xyz, 1), 3);
+    neighbours_xyz(particle_index, p, get_indices(p.sphere.xyz));
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 
