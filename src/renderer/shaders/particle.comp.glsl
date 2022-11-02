@@ -2,16 +2,36 @@
 
 layout (local_size_x = 1) in;
 
+const float PI = 3.1415926535897932384626433832795;
 const int CHUNK_SIZE = 32;
 const int NUM_TYPES = 7;
 const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
 const float slot_size = 5;
 
+const float PARTICLE_MASS = 1;
+const float PARTICLE_MASS_P2 = PARTICLE_MASS*PARTICLE_MASS;
+
+const float VISCOSITY = 1;
+
+const float KERNEL_RADIUS = 5;
+const float KERNEL_RADIUS_P2 = KERNEL_RADIUS*KERNEL_RADIUS;
+const float KERNEL_RADIUS_P6 = KERNEL_RADIUS_P2*KERNEL_RADIUS_P2*KERNEL_RADIUS_P2;
+const float KERNEL_RADIUS_P9 = KERNEL_RADIUS_P6*KERNEL_RADIUS_P2*KERNEL_RADIUS;
+
 struct Particle {
     vec4 sphere;
     vec4 speed;
     vec4 color;
+
+    float density;
+    float new_density;
+
+    vec3 pressure;
+    vec3 new_pressure;
+
+    vec3 viscosity;
+    vec3 new_viscosity;
 };
 
 layout( push_constant ) uniform constants
@@ -70,6 +90,26 @@ uint part1by2(uint n){
     return n;
 }
 
+float smooth_density(float distance) {
+    float ret = (KERNEL_RADIUS_P2-(distance*distance));
+    ret = ret * ret * ret;
+    ret *= 315/(64*PI*KERNEL_RADIUS_P9);
+    return ret;
+}
+
+float smooth_viscosity(float distance) {
+    return (45*(KERNEL_RADIUS-distance))/(PI*KERNEL_RADIUS_P6);
+}
+
+vec3 smooth_pressure_grad(vec3 pre1, vec3 pre2) {
+    vec3 delta = pre1-pre2;
+    float norm = sqrt(dot(delta,delta));
+    float scal = (KERNEL_RADIUS-norm);
+    scal *= scal;
+    scal *= -45 * (1/(PI*KERNEL_RADIUS_P6*norm));
+    return delta*scal;
+}
+
 uint morton(ivec3 pos) {
     //0x80000 so that it's never zero
     return 0x800000 | part1by2(pos.x) | (part1by2(pos.y) << 1) | (part1by2(pos.z) << 2);
@@ -100,6 +140,21 @@ void insert_particle(ivec3 pos, uint particle_index) {
 void interaction(uint p_index, inout Particle p, uint other) {
     if(p_index != other) {
         Particle o = particles[other];
+        vec3 diff = o.sphere.xyz - p.sphere.xyz;
+        float distance = sqrt(dot(diff, diff));
+
+        p.new_density += PARTICLE_MASS*smooth_density(distance);
+
+        p.new_pressure += (PARTICLE_MASS/(2*o.density)) * (p.pressure+o.pressure) * smooth_pressure_grad(p.pressure, o.pressure);
+
+        p.new_viscosity += ((PARTICLE_MASS*(o.speed.xyz-p.speed.xyz))/o.density) * smooth_viscosity(distance);
+    }
+}
+
+/*
+void interaction(uint p_index, inout Particle p, uint other) {
+    if(p_index != other) {
+        Particle o = particles[other];
         vec3 norm = p.sphere.xyz - o.sphere.xyz;
         float distance = sqrt(dot(norm, norm));
         float min_distance = p.sphere.w + o.sphere.w;
@@ -120,7 +175,7 @@ void interaction(uint p_index, inout Particle p, uint other) {
             particles[other] = o;
         }
     }
-}
+}*/
 
 void lookup_and_apply(uint p_index, inout Particle p, ivec3 pos) {
     uint code = morton(pos);
@@ -207,6 +262,12 @@ void main()
         p = particles[particle_index];
     }
 
+    p.density = p.new_density;
+    p.new_density = 0.0;
+
+    p.pressure = p.new_pressure;
+    p.new_pressure = vec3(0,0,0);
+
     insert_particle(get_indices(p.sphere.xyz), particle_index);
     barrier();
 
@@ -215,6 +276,8 @@ void main()
     p.speed.z -= 0.1;
 
     neighbours_xyz(particle_index, p, get_indices(p.sphere.xyz));
+    p.new_pressure *= (-PARTICLE_MASS/p.density);
+    
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 
