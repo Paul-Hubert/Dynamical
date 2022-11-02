@@ -130,6 +130,12 @@ void ParticleSimulationSys::AddParticles() {
             particle.sphere.z = tile->level + 0.5f;
             particle.sphere.w = 0.5f;
 
+            particle.density = particle.new_density = 1;
+
+            particle.pressure = particle.new_pressure = glm::vec3(0,0,0);
+
+            particle.viscosity = particle.new_viscosity = glm::vec4(0,0,0,0);
+
             particle.color = glm::vec4(0, 0, 1, 1);
 
         }

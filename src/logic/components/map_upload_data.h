@@ -37,8 +37,17 @@ struct RenderObject {
 
 struct Particle {
     glm::vec4 sphere;
-    glm::vec4 speed;
     glm::vec4 color;
+    glm::vec4 speed;
+
+    glm::vec3 pressure;
+    float density;
+    glm::vec3 new_pressure;
+    float new_density;
+
+    glm::vec4 viscosity;
+    glm::vec4 new_viscosity;
+
 };
 
 struct MapUploadData {

@@ -7,9 +7,11 @@ const int CHUNK_SIZE = 32;
 const int NUM_TYPES = 7;
 const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
-const float slot_size = 5;
+const float SLOT_SIZE = 5;
 
 const float GRAVITY = 9;
+const float FRICTION = 0.9;
+
 const float PARTICLE_MASS = 1;
 const float PARTICLE_MASS_P2 = PARTICLE_MASS*PARTICLE_MASS;
 
@@ -22,17 +24,20 @@ const float KERNEL_RADIUS_P9 = KERNEL_RADIUS_P6*KERNEL_RADIUS_P2*KERNEL_RADIUS;
 
 struct Particle {
     vec4 sphere;
-    vec4 speed;
     vec4 color;
-
-    float density;
-    float new_density;
+    vec4 speed;
 
     vec3 pressure;
+    float density;
+
     vec3 new_pressure;
+    float new_density;
 
     vec3 viscosity;
+    float a;
+
     vec3 new_viscosity;
+    float b;
 };
 
 layout( push_constant ) uniform constants
@@ -121,7 +126,7 @@ ivec3 round_vec(vec3 pos) {
 }
 
 ivec3 get_indices(vec3 pos) {
-    return round_vec(pos/slot_size);
+    return round_vec(pos/SLOT_SIZE);
 }
 
 void insert_particle(ivec3 pos, uint particle_index) {
@@ -171,8 +176,8 @@ void interaction(uint p_index, inout Particle p, uint other) {
             p.speed.xyz = p.speed.xyz - vn + vno;
             o.speed.xyz = o.speed.xyz - vno + vn;
 
-            p.speed.xyz *= 0.9;
-            o.speed.xyz *= 0.9;
+            p.speed.xyz *= FRICTION;
+            o.speed.xyz *= FRICTION;
             particles[other] = o;
         }
     }
@@ -251,6 +256,34 @@ void neighbours_xyz(uint p_index, inout Particle p, ivec3 ipos) {
     neighbours_yz(p_index, p, ipos);
 }
 
+float getSmoothHeight(vec2 pos) {
+    Tile t = getTile(pos);
+
+    float hoo = t.height;
+    float hoi = getTile(pos + vec2(0,1)).height;
+    float hio = getTile(pos + vec2(1,0)).height;
+    float hii = getTile(pos + vec2(1,1)).height;
+
+    vec2 tile_space = pos - floor(pos);
+
+    float hxo = hoo * (1.-tile_space.x) + hio * tile_space.x;
+    float hxi = hoi * (1.-tile_space.x) + hii * tile_space.x;
+    float rheight = hxo * (1.-tile_space.y) + hxi * tile_space.y;
+
+    return rheight;
+}
+
+vec3 getDerivative(vec2 pos) {
+    float hoo = getTile(pos).height;
+    float hoi = getTile(pos + vec2(0,1)).height;
+    float hio = getTile(pos + vec2(1,0)).height;
+
+    float dhdx = hoo - hio;
+    float dhdy = hoo - hoi;
+    vec3 norm = normalize(vec3(dhdx, dhdy, 1));
+    return norm;
+}
+
 void main()
 {
     uint particle_index = gl_GlobalInvocationID.x;
@@ -282,22 +315,22 @@ void main()
     p.new_viscosity *= PARTICLE_MASS * VISCOSITY;
 
     p.speed.z -= 0.1;
-    p.speed.xyz += (p.new_viscosity + p.new_pressure + p.new_density) / PARTICLE_MASS;
+    p.speed.xyz += 0.001 * (p.new_viscosity + p.new_pressure + p.new_density) / PARTICLE_MASS;
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 
     vec2 pos = new_pos.xy;
 
-    Tile t = getTile(new_pos.xy);
+    vec3 norm = getDerivative(pos);
 
-    float dhdx = getTile(pos - vec2(1,0)).height - getTile(pos + vec2(1,0)).height;
-    float dhdy = getTile(pos - vec2(0,1)).height - getTile(pos + vec2(0,1)).height;
-    vec3 norm = normalize(vec3(dhdx, dhdy, 1));
+    float rheight = getSmoothHeight(pos);
 
-    if(new_pos.z < t.height + p.sphere.w) {
-        new_pos.z = t.height + p.sphere.w;
+    float dist = -dot(vec3(0, 0, rheight - new_pos.z), norm);
+
+    if(dist < p.sphere.w) {
+        new_pos += norm * (p.sphere.w - dist);
         p.speed.xyz -= 2 * dot(p.speed.xyz, norm) * norm;
-        p.speed.xyz *= 0.9;
+        p.speed.xyz *= FRICTION;
     }
     p.sphere.xyz = new_pos;
 
