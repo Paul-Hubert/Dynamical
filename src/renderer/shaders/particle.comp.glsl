@@ -9,6 +9,7 @@ const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
 const float slot_size = 5;
 
+const float GRAVITY = 9;
 const float PARTICLE_MASS = 1;
 const float PARTICLE_MASS_P2 = PARTICLE_MASS*PARTICLE_MASS;
 
@@ -268,16 +269,20 @@ void main()
     p.pressure = p.new_pressure;
     p.new_pressure = vec3(0,0,0);
 
+    p.viscosity = p.new_viscosity;
+    p.new_viscosity = vec3(0,0,0);
+
     insert_particle(get_indices(p.sphere.xyz), particle_index);
     barrier();
 
 
     //Gravité, plus tard on ajoutera une force dépendante des autres particules
-    p.speed.z -= 0.1;
-
     neighbours_xyz(particle_index, p, get_indices(p.sphere.xyz));
     p.new_pressure *= (-PARTICLE_MASS/p.density);
-    
+    p.new_viscosity *= PARTICLE_MASS * VISCOSITY;
+
+    p.speed.z -= 0.1;
+    p.speed.xyz += (p.new_viscosity + p.new_pressure + p.new_density) / PARTICLE_MASS;
 
     vec3 new_pos = p.sphere.xyz + p.speed.xyz;
 
