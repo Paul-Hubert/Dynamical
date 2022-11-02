@@ -115,6 +115,54 @@ void ParticleSimulationSys::AddParticles() {
 
     auto& input = reg.ctx<Input>();
 
+    //DEBUG ! REMOVE ME
+    {
+        auto &map = reg.ctx<MapManager>();
+
+        glm::vec2 pos = glm::vec2(0,0);
+        Tile *tile = map.getTile(pos);
+        if (tile) {
+
+            new_particle_count++;
+            uniformPointer[0] = {};
+            auto& particle = uniformPointer[0];
+            particle.sphere.x = pos.x;
+            particle.sphere.y = pos.y;
+            particle.sphere.z = tile->level + 0.5f;
+            particle.sphere.w = 0.5f;
+
+            particle.density = particle.new_density = 1;
+
+            particle.pressure = particle.new_pressure = glm::vec3(0,0,0);
+
+            particle.viscosity = particle.new_viscosity = glm::vec4(0,0,0,0);
+
+            particle.color = glm::vec4(0, 0, 1, 1);
+
+        }
+
+        pos = glm::vec2(1,0);
+        tile = map.getTile(pos);
+        if (tile) {
+            new_particle_count++;
+            uniformPointer[1] = {};
+            auto& particle = uniformPointer[1];
+            particle.sphere.x = pos.x;
+            particle.sphere.y = pos.y;
+            particle.sphere.z = tile->level + 0.5f;
+            particle.sphere.w = 0.5f;
+
+            particle.density = particle.new_density = 1;
+
+            particle.pressure = particle.new_pressure = glm::vec3(0,0,0);
+
+            particle.viscosity = particle.new_viscosity = glm::vec4(0,0,0,0);
+
+            particle.color = glm::vec4(0, 0, 1, 1);
+        }
+    }
+
+
     if(input.leftDown) {
         auto &map = reg.ctx<MapManager>();
 
