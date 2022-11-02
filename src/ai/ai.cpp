@@ -19,7 +19,7 @@ AISys::AISys(entt::registry& reg) : System(reg) {
     
 }
 
-void AISys::tick(float dt) {
+void AISys::tick(double dt) {
     
     OPTICK_EVENT();
     
@@ -47,12 +47,12 @@ void AISys::decide(entt::entity entity, AIC& ai) {
     testBehavior<WanderBehavior>(entity, max_score, max_behavior);
 
     if(reg.all_of<BasicNeeds>(entity)) {
-        testBehavior<EatBehavior>(entity, max_score, max_behavior);
+        //testBehavior<EatBehavior>(entity, max_score, max_behavior);
     }
 
     if(max_score > ai.score || ai.action == nullptr) {
         ai.score = max_score;
-        ai.action = max_behavior->action();
+        ai.action = std::move(max_behavior->action());
     }
     
 }

@@ -17,7 +17,7 @@ void DevMenuSys::init() {
     
 }
 
-void DevMenuSys::tick(float dt) {
+void DevMenuSys::tick(double dt) {
     
     OPTICK_EVENT();
     

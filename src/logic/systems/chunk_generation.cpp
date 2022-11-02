@@ -18,7 +18,7 @@ void ChunkGenerationSys::init() {
     
 }
 
-void ChunkGenerationSys::tick(float dt) { // to be parallelized
+void ChunkGenerationSys::tick(double dt) { // to be parallelized
     
     OPTICK_EVENT();
     

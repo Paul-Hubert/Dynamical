@@ -15,7 +15,7 @@ void TimeSys::init() {
     
 }
 
-void TimeSys::tick(float dt) {
+void TimeSys::tick(double dt) {
     
     OPTICK_EVENT();
     
@@ -34,7 +34,7 @@ void TimeSys::tick(float dt) {
         ImGui::SetWindowPos(ImVec2(input.screenSize.x - size.x, 0));
         
         Date date(time.current);
-        ImGui::Text("Time : %lu of %s, %lu %lu:%lu:%lu", date.days+1, Date::names_of_months[date.months], date.years, date.hours, date.minutes, date.seconds);
+        ImGui::Text("Time : %llu of %s, %llu %llu:%llu:%llu", date.days+1, Date::names_of_months[date.months], date.years, date.hours, date.minutes, date.seconds);
         
         int mode = time.speed_modifier;
         ImGui::Text("Speed : "); ImGui::SameLine();
@@ -50,8 +50,13 @@ void TimeSys::tick(float dt) {
     }
     ImGui::End();
     
-    time.dt = time.speed * time.speed_modifier;
+    time.dt = time.speed * time.speed_modifier * dt;
     time.current += time.dt;
+
+    if(ImGui::Begin("Frame time", nullptr)) {
+        ImGui::Text("%f ms", dt*1000.);
+        ImGui::Text("%f fps", 1./dt);
+    }
     
 }
 

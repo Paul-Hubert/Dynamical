@@ -35,7 +35,7 @@ InputSys::InputSys(entt::registry& reg) : System(reg) {
 
 
 
-void InputSys::tick(float dt) {
+void InputSys::tick(double dt) {
 
     OPTICK_EVENT();
     

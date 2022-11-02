@@ -16,7 +16,7 @@ ObjectRenderSys::ObjectRenderSys(entt::registry& reg) : System(reg) {
     
 }
 
-void ObjectRenderSys::tick(float dt) {
+void ObjectRenderSys::tick(double dt) {
     
     OPTICK_EVENT();
 

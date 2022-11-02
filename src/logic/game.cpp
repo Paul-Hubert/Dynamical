@@ -125,7 +125,7 @@ void Game::start() {
             input.on.set(Input::EXIT, false);
         }
 
-        float dt = std::chrono::duration_cast<std::chrono::nanoseconds>(clock::now() - start).count() / 1000000000.0;
+        double dt = std::chrono::duration_cast<std::chrono::nanoseconds>(clock::now() - start).count() / 1000000000.0;
         start = clock::now();
 
         //log(Level::info) << "FPS : " << 1/dt << "\n";

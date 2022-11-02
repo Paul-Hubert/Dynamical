@@ -57,7 +57,9 @@ std::unique_ptr<Action> EatAction::act(std::unique_ptr<Action> self) {
 void EatAction::find() {
     
     const Storage& storage = reg.get<Storage>(entity);
-    
+
+    food = Item::null;
+
     if(storage.amount(Item::berry) > 0) {
         food = Item::berry;
     }

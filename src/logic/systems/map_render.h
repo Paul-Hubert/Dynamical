@@ -30,7 +30,7 @@ public:
         return "MapRender";
     }
 
-    void tick(float dt) override;
+    void tick(double dt) override;
     
 private:
     

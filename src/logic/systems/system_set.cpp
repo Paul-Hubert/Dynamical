@@ -28,7 +28,7 @@ void SystemSet::init() {
     
 }
 
-void SystemSet::pre_tick(float dt) {
+void SystemSet::pre_tick(double dt) {
 
     OPTICK_EVENT();
     
@@ -38,7 +38,7 @@ void SystemSet::pre_tick(float dt) {
     
 }
 
-void SystemSet::post_tick(float dt) {
+void SystemSet::post_tick(double dt) {
 
     OPTICK_EVENT();
 

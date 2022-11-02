@@ -18,7 +18,7 @@ void PatherSys::init() {
     
 }
 
-void PatherSys::tick(float dt) {
+void PatherSys::tick(double dt) {
     
     OPTICK_EVENT();
     

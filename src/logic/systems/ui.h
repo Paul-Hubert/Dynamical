@@ -21,7 +21,7 @@ public:
         return "UI";
     }
 
-    void tick(float dt) override;
+    void tick(double dt) override;
     
 private:
     SDL_Cursor* g_MouseCursors[ImGuiMouseCursor_COUNT] = {0};

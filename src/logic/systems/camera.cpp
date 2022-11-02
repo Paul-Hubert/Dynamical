@@ -27,7 +27,7 @@ void CameraSys::init() {
     
 }
 
-void CameraSys::tick(float dt) {
+void CameraSys::tick(double dt) {
     OPTICK_EVENT();
     
     auto& input = reg.ctx<Input>();

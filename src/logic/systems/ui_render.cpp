@@ -98,7 +98,7 @@ void UIRenderSys::createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buf
     
 }
 
-void UIRenderSys::tick(float dt) {
+void UIRenderSys::tick(double dt) {
     
     OPTICK_EVENT();
     

@@ -93,7 +93,7 @@ MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
     }
 }
 
-void MapUploadSys::tick(float dt) {
+void MapUploadSys::tick(double dt) {
 
     OPTICK_EVENT();
 
@@ -245,12 +245,6 @@ void MapUploadSys::tick(float dt) {
     }
 
     transfer.copyBuffer(f.stagingBuffer, storageBuffer, regions);
-    
-    if(ImGui::Begin("Chunk updates", nullptr)) {
-        ImGui::SetWindowCollapsed(true, ImGuiCond_FirstUseEver);
-        ImGui::Text("%i", staging_counter);
-    }
-
     
     ImGui::End();
 

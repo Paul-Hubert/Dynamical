@@ -18,7 +18,7 @@ void MapEditorSys::init() {}
 
 void MapEditorSys::finish() {}
 
-void MapEditorSys::tick(float dt) {
+void MapEditorSys::tick(double dt) {
 
     OPTICK_EVENT();
     static bool open = false;

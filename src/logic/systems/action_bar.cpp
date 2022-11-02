@@ -17,7 +17,7 @@ void ActionBarSys::init() {
     
 }
 
-void ActionBarSys::tick(float dt) {
+void ActionBarSys::tick(double dt) {
     
     OPTICK_EVENT();
     

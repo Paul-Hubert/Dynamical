@@ -27,9 +27,9 @@ public:
     
     void init();
     
-    void pre_tick(float dt);
+    void pre_tick(double dt);
 
-    void post_tick(float dt);
+    void post_tick(double dt);
     
     void finish();
     

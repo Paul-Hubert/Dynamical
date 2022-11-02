@@ -15,7 +15,7 @@ public:
     const char* name() override {
         return "AI";
     }
-    void tick(float dt) override;
+    void tick(double dt) override;
 private:
     void decide(entt::entity entity, AIC& ai);
     template<typename T>

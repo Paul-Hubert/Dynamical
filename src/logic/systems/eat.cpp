@@ -16,7 +16,7 @@ void EatSys::init() {
     
 }
 
-void EatSys::tick(float dt) {
+void EatSys::tick(double dt) {
     
     OPTICK_EVENT();
     

@@ -17,7 +17,7 @@ void SelectionSys::preinit() {
     reg.set<Selection>();
 }
 
-void SelectionSys::tick(float dt) {
+void SelectionSys::tick(double dt) {
     
     OPTICK_EVENT();
     

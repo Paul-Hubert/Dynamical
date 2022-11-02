@@ -15,8 +15,8 @@ public:
     System(entt::registry& reg) : reg(reg) {};
     virtual void preinit() {}
     virtual void init() {};
-    virtual void tick(float dt) = 0;
-    void operator()(float dt) {
+    virtual void tick(double dt) = 0;
+    void operator()(double dt) {
         tick(dt);
     }
     virtual void finish() {}

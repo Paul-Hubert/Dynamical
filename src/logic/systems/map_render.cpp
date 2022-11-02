@@ -38,7 +38,7 @@ MapRenderSys::MapRenderSys(entt::registry& reg) : System(reg) {
 
 }
 
-void MapRenderSys::tick(float dt) {
+void MapRenderSys::tick(double dt) {
     
     OPTICK_EVENT();
 

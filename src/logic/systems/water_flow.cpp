@@ -116,7 +116,7 @@ bool fillWater(entt::registry& reg, MapManager& map, entt::entity entity, WaterF
 
 }
 
-void WaterFlowSys::tick(float dt) {
+void WaterFlowSys::tick(double dt) {
 
     auto& map = reg.ctx<MapManager>();
 

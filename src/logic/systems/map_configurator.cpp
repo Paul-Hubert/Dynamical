@@ -30,7 +30,7 @@ struct GuiStatic {
     double current_y;
 };
 
-void MapConfiguratorSys::tick(float dt) {
+void MapConfiguratorSys::tick(double dt) {
     auto& settings = reg.ctx<Settings>();
     auto& configurations = settings.map_configurations;
     auto& input = reg.ctx<Input>();

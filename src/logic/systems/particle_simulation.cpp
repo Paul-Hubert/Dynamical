@@ -67,7 +67,7 @@ ParticleSimulationSys::ParticleSimulationSys(entt::registry& reg) : System(reg) 
 
 }
 
-void ParticleSimulationSys::tick(float dt) {
+void ParticleSimulationSys::tick(double dt) {
 
     OPTICK_EVENT();
 
