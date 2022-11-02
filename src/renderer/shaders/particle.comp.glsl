@@ -23,17 +23,20 @@ const float KERNEL_RADIUS_P9 = KERNEL_RADIUS_P6*KERNEL_RADIUS_P2*KERNEL_RADIUS;
 
 struct Particle {
     vec4 sphere;
-    vec4 speed;
     vec4 color;
-
-    float density;
-    float new_density;
+    vec4 speed;
 
     vec3 pressure;
+    float density;
+
     vec3 new_pressure;
+    float new_density;
 
     vec3 viscosity;
+    float a;
+
     vec3 new_viscosity;
+    float b;
 };
 
 layout( push_constant ) uniform constants

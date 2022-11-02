@@ -209,8 +209,8 @@ void ObjectRenderSys::initPipeline() {
 
     // Inpute attribute bindings describe shader attribute locations and memory layouts
     vertexInputAttributs = std::vector<vk::VertexInputAttributeDescription> {
-            vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32A32Sfloat, 0),
-            vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32A32Sfloat, 2 * 4 * sizeof(float))
+            vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32A32Sfloat, offsetof(Particle, sphere)),
+            vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32A32Sfloat, offsetof(Particle, color))
     };
 
     vertexInputState = vk::PipelineVertexInputStateCreateInfo({}, (uint32_t) vertexInputBindings.size(), vertexInputBindings.data(), (uint32_t) vertexInputAttributs.size(), vertexInputAttributs.data());
