@@ -7,6 +7,9 @@ const int CHUNK_SIZE = 32;
 const int NUM_TYPES = 7;
 const int MAX_CHUNKS = 10000; // MUST BE SAME AS IN MAP_UPLOAD
 
+const float GLOBAL_DENSITY = 1000;
+const float STIFFNESS = 1;
+
 const float SLOT_SIZE = 5;
 
 const float GRAVITY = 9;
@@ -143,6 +146,10 @@ void insert_particle(ivec3 pos, uint particle_index) {
     }
 }
 
+float pressure(float density) {
+    return STIFFNESS*(density-GLOBAL_DENSITY);
+}
+
 void interaction(uint p_index, inout Particle p, uint other) {
     if(p_index != other) {
         Particle o = particles[other];
@@ -152,7 +159,7 @@ void interaction(uint p_index, inout Particle p, uint other) {
         if(distance <= KERNEL_RADIUS) {
             p.new_density += PARTICLE_MASS*smooth_density(distance);
 
-            p.new_pressure += (PARTICLE_MASS/(2*o.density)) * (p.pressure+o.pressure) * smooth_pressure_grad(p.sphere.xyz, o.sphere.xyz);
+            p.new_pressure += (PARTICLE_MASS/(2*o.density)) * (pressure(p.density)+pressure(o.density)) * smooth_pressure_grad(p.sphere.xyz, o.sphere.xyz);
 
             p.new_viscosity += ((PARTICLE_MASS*(o.speed.xyz-p.speed.xyz))/o.density) * smooth_viscosity(distance);
         }
@@ -183,7 +190,8 @@ void interaction(uint p_index, inout Particle p, uint other) {
             particles[other] = o;
         }
     }
-}*/
+}
+*/
 
 void lookup_and_apply(uint p_index, inout Particle p, ivec3 pos) {
     uint code = morton(pos);
