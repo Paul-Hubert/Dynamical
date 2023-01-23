@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include "util/util.h"
+#include "util/log.h"
 
 #include <SDL_vulkan.h>
 #include "renderer/util/vk.h"
@@ -13,15 +14,13 @@ using namespace dy;
 Windu::Windu(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
-    
-    SDL_DisplayMode mode;
-    
-    SDL_GetCurrentDisplayMode(0, &mode);
-    
+
+
+
     window = SDL_CreateWindow("Dynamical",
                               SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                              mode.w, mode.h,
-                              SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN
+                              -1, -1,
+                              SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP
              );
     
     if (window == nullptr) {
