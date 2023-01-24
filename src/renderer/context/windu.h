@@ -26,8 +26,8 @@ private:
     Context& ctx;
     entt::registry& reg;
 
-    int width;
-    int height;
+    int width = 0;
+    int height = 0;
     SDL_Window* window;
 };
 

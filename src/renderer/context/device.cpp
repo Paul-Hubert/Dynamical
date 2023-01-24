@@ -9,7 +9,7 @@
 #include <string>
 
 #include "renderer/util/vk_util.h"
-#include "logic/settings.h"
+#include "logic/settings/settings.h"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
@@ -113,7 +113,10 @@ Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     if(t_i == 1000) {
         throw std::runtime_error("Could not get transfer queue family");
     }
-    
+
+    // Actually just set every queue to the same one
+    t_i = c_i = g_i;
+
     // Create Device
     
     logical = physical.createDevice(vk::DeviceCreateInfo({}, countF, pqinfo.data(), 0, nullptr, (uint32_t) extensions.size(), extensions.data(), &requiredFeatures));
@@ -148,6 +151,7 @@ Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     VmaAllocatorCreateInfo allocatorInfo = {};
     allocatorInfo.physicalDevice = physical;
     allocatorInfo.device = logical;
+    allocatorInfo.instance = ctx.instance;
     vmaCreateAllocator(&allocatorInfo, &allocator);
     
 }

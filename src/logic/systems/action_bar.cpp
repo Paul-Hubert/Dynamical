@@ -1,6 +1,6 @@
 #include "system_list.h"
 
-#include <imgui.h>
+#include <imgui/imgui.h>
 
 #include <logic/components/action_bar.h>
 #include <logic/components/position.h>
@@ -17,7 +17,7 @@ void ActionBarSys::init() {
     
 }
 
-void ActionBarSys::tick(float dt) {
+void ActionBarSys::tick(double dt) {
     
     OPTICK_EVENT();
     
@@ -35,14 +35,15 @@ void ActionBarSys::tick(float dt) {
     view.each([&](auto entity, auto& action_bar, auto position) {
         
         constexpr float margin = 100;
-        glm::vec2 pos = cam.fromWorldSpace(position, input.screenSize);
+        glm::vec2 pos = cam.fromWorldSpace(position.getVec3());
         if(pos.x < -margin || pos.y < -margin || pos.x > input.screenSize.x + margin || pos.y > input.screenSize.y + margin) {
             return;
         }
         
         sprintf(buffer, "NULL###ActionBar%i", id);
         if(ImGui::Begin(buffer, nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground)) {
-            glm::vec2 size = cam.fromWorldSize(glm::vec2(1.0, 0.2), input.screenSize);
+            ImGui::SetWindowCollapsed(true, ImGuiCond_FirstUseEver);
+            glm::vec2 size = cam.fromWorldSize(glm::vec2(1.0, 0.2));
             ImVec2 real_size = ImGui::GetWindowSize();
             ImGui::SetWindowPos(ImVec2(pos.x - size.x/2, pos.y - size.y/2 + size.x/2));
             ImGui::ProgressBar((float) (time.current - action_bar.start) / (action_bar.end - action_bar.start), ImVec2(size.x, size.y), "");

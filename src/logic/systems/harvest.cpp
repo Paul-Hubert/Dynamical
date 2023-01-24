@@ -20,7 +20,7 @@ void HarvestSys::init() {
     
 }
 
-void HarvestSys::tick(float dt) {
+void HarvestSys::tick(double dt) {
     
     OPTICK_EVENT();
     

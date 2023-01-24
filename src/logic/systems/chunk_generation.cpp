@@ -18,15 +18,18 @@ void ChunkGenerationSys::init() {
     
 }
 
-void ChunkGenerationSys::tick(float dt) { // to be parallelized
+void ChunkGenerationSys::tick(double dt) { // to be parallelized
     
     OPTICK_EVENT();
     
     auto& map = reg.ctx<MapManager>();
     auto& camera = reg.ctx<Camera>();
-    
-    auto corner_pos = map.getChunkPos(camera.corner)-2;
-    auto end_pos = map.getChunkPos(camera.corner + camera.size)+2;
+
+    auto corner_rpos = camera.fromScreenSpace(glm::vec2()) - 10.f;
+    auto corner_pos = map.getChunkPos(corner_rpos);
+    auto end_rpos = camera.fromScreenSpace(camera.getScreenSize()) + 10.f;
+    auto end_pos = map.getChunkPos(end_rpos);
+    end_pos.y++;
     
     for(int x = corner_pos.x; x <= end_pos.x; x++) {
         for(int y = corner_pos.y; y <= end_pos.y; y++) {

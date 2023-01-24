@@ -74,7 +74,9 @@ void HarvestAction::find() {
     auto& map = reg.ctx<MapManager>();
     
     auto position = reg.get<Position>(entity);
-    
+
+    target = entt::null;
+
     reg.emplace<Path>(entity, map.pathfind(position, [&](glm::vec2 pos) {
         auto object = map.getTile(pos)->object;
         if(object != entt::null && reg.all_of<Object>(object) && reg.get<Object>(object).id == plant && !reg.all_of<entt::tag<"reserved"_hs>>(object) && !reg.all_of<Harvested>(object)) {

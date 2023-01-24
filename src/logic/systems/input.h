@@ -14,7 +14,7 @@ public:
     const char* name() override {
         return "Input";
     }
-    void tick(float dt) override;
+    void tick(double dt) override;
 };
 
 }

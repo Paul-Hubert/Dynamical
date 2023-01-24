@@ -23,7 +23,7 @@ void Transfer::Upload::reset(Context& ctx, vk::CommandPool pool) {
     command = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(pool, vk::CommandBufferLevel::ePrimary, 1))[0];
 }
 
-bool Transfer::flush(vk::Semaphore semaphore) {
+bool Transfer::flush(std::vector<vk::Semaphore> waits, std::vector<vk::PipelineStageFlags> stages, std::vector<vk::Semaphore> signals) {
 
     OPTICK_EVENT();
 
@@ -32,14 +32,13 @@ bool Transfer::flush(vk::Semaphore semaphore) {
     if(!empty) {
         
         current.command.end();
-        
-        std::vector<vk::Semaphore> semaphores;
-        if(semaphore) {
-            semaphores.push_back(semaphore);
-        }
-        ctx.device.transfer.submit(vk::SubmitInfo(0, nullptr, nullptr, 1, &current.command, semaphores.size(), semaphores.data()), current.fence);
-        
+
+        ctx.device.transfer.submit(vk::SubmitInfo(waits.size(), waits.data(), stages.data(), 1, &current.command, signals.size(), signals.data()), current.fence);
+
         uploads.push_back(std::move(current));
+
+        //ctx.device->waitForFences({current.fence}, VK_TRUE, std::numeric_limits<uint64_t>::max());
+
         current.reset(ctx, pool);
         
         current.command.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
@@ -158,7 +157,7 @@ std::shared_ptr<VmaBuffer> Transfer::createBuffer(const void* data, vk::BufferCr
         VmaAllocationCreateInfo ainfo{};
         ainfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
         ainfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-        auto binfo = vk::BufferCreateInfo({}, info.size, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, 1, &ctx.device.t_i);
+        auto binfo = vk::BufferCreateInfo({}, info.size, vk::BufferUsageFlagBits::eTransferSrc|info.usage, vk::SharingMode::eExclusive, 1, &ctx.device.t_i);
         
         auto buffer = VmaBuffer(ctx.device, &ainfo, binfo);
 

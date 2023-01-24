@@ -15,9 +15,9 @@ public:
         stone,
         sand,
         water,
-        shallow_water,
+        river,
         max
-    };
+    }; // MUST UPDATE IN SHADER
     
     const inline static std::unordered_map<Type, float> terrain_speed = {
         {nothing, 0.0},
@@ -26,7 +26,7 @@ public:
         {stone, 0.0},
         {sand, 0.6},
         {water, 0.0},
-        {shallow_water, 0.4}
+        {river, 0.4}
     };
     
     Type terrain = nothing;

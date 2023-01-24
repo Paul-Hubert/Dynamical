@@ -18,7 +18,13 @@ std::unordered_map<SDL_Scancode, Input::Action> actionMap = {
     {SDL_SCANCODE_D, Input::RIGHT},
     {SDL_SCANCODE_SPACE, Input::PAUSE},
     {SDL_SCANCODE_M, Input::MENU},
-    {SDL_SCANCODE_K, Input::DEBUG}
+    {SDL_SCANCODE_K, Input::DEBUG},
+    {SDL_SCANCODE_BACKSPACE, Input::BACKSPACE},
+    {SDL_SCANCODE_LEFT, Input::ROTATE_LEFT},
+    {SDL_SCANCODE_RIGHT, Input::ROTATE_RIGHT},
+    {SDL_SCANCODE_UP, Input::ANGLE_UP},
+    {SDL_SCANCODE_DOWN, Input::ANGLE_DOWN},
+    {SDL_SCANCODE_TAB, Input::TAB}
 };
 
 InputSys::InputSys(entt::registry& reg) : System(reg) {
@@ -29,7 +35,7 @@ InputSys::InputSys(entt::registry& reg) : System(reg) {
 
 
 
-void InputSys::tick(float dt) {
+void InputSys::tick(double dt) {
 
     OPTICK_EVENT();
     
@@ -68,13 +74,10 @@ void InputSys::tick(float dt) {
             input.on.set(Input::EXIT);
             
         } else if(e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
-            
             try {
                 input.on.set(actionMap.at(e.key.keysym.scancode), e.type == SDL_KEYDOWN);
             } catch(std::out_of_range&) {}
-            
         } else if(e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) {
-            
             switch(e.button.button) {
                 case SDL_BUTTON_LEFT:
                     input.mouseLeft = input.leftDown = e.type == SDL_MOUSEBUTTONDOWN;
@@ -90,7 +93,7 @@ void InputSys::tick(float dt) {
                     break;
             }
             
-        } if(e.type == SDL_MOUSEWHEEL) {
+        } else if(e.type == SDL_MOUSEWHEEL) {
             
             input.mouseWheel.x = e.wheel.x;
             input.mouseWheel.y = e.wheel.y;
@@ -100,7 +103,10 @@ void InputSys::tick(float dt) {
             if (e.wheel.y > 0) input.mouseWheel.y += 1;
             else if (e.wheel.y < 0) input.mouseWheel.y -= 1;
             */
-            
+        } else if(e.type == SDL_TEXTINPUT) {
+            std::array<char, SDL_TEXTINPUTEVENT_TEXT_SIZE> text;
+            std::copy(std::begin(e.text.text), std::end(e.text.text), std::begin(text));
+            input.text = std::make_optional(text);
         }
         
     }

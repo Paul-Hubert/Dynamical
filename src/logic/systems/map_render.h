@@ -4,7 +4,7 @@
 #include "renderer/util/vk.h"
 #include "renderer/util/vmapp.h"
 
-#include "imgui.h"
+#include <imgui/imgui.h>
 
 #include "system.h"
 
@@ -30,34 +30,17 @@ public:
         return "MapRender";
     }
 
-    void tick(float dt) override;
+    void tick(double dt) override;
     
 private:
     
-    void initPipeline(vk::RenderPass);
-    
-    vk::DescriptorPool descPool;
-    vk::DescriptorSetLayout descLayout;
-    vk::DescriptorSet descSet;
+    void initPipeline();
+
+    int numIndices;
+    std::shared_ptr<dy::VmaBuffer> indexBuffer;
+
     vk::PipelineLayout pipelineLayout;
     vk::Pipeline graphicsPipeline;
-    
-    struct per_frame {
-        VmaBuffer stagingBuffer;
-        void* stagingPointer;
-    };
-    std::vector<per_frame> per_frame;
-    
-    struct StoredChunk {
-        glm::ivec2 position; // in chunk space
-        bool used = false;
-        bool stored = false;
-        Chunk* chunk;
-    };
-    std::vector<StoredChunk> stored_chunks;
-    int storage_counter = 0;
-    
-    VmaBuffer storageBuffer;
     
 };
 

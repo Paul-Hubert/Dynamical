@@ -8,14 +8,9 @@ using namespace dy;
 
 void floodWater(entt::registry& reg, MapManager& map, glm::vec2 pos, Tile* tile) {
 
-    tile->terrain = Tile::shallow_water;
+    map.updateTile(pos);
 
-    if(tile->object != entt::null && reg.get<Object>(tile->object).type == Object::plant) {
-        dy::destroyObject(reg, tile->object);
-        tile->object = entt::null;
-    }
-
-    map.getChunk(map.getChunkPos(pos))->setUpdated();
+    tile->terrain = Tile::river;
 }
 
 bool fillNeighbours(entt::registry& reg, MapManager& map, WaterFlow& flow, glm::vec2 pos) {
@@ -121,7 +116,7 @@ bool fillWater(entt::registry& reg, MapManager& map, entt::entity entity, WaterF
 
 }
 
-void WaterFlowSys::tick(float dt) {
+void WaterFlowSys::tick(double dt) {
 
     auto& map = reg.ctx<MapManager>();
 

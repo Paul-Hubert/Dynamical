@@ -1,6 +1,6 @@
 #include "ui.h"
 
-#include "imgui.h"
+#include <imgui/imgui.h>
 
 #include "util/log.h"
 
@@ -27,7 +27,7 @@ UISys::UISys(entt::registry& reg) : System(reg) {
     
 }
 
-void UISys::tick(float dt) {
+void UISys::tick(double dt) {
     
     OPTICK_EVENT();
     
@@ -38,6 +38,14 @@ void UISys::tick(float dt) {
     io.MouseDown[0] = input.mouseLeft;
     io.MouseDown[1] = input.mouseRight;
     io.MouseDown[2] = input.mouseMiddle;
+
+    if(auto text = input.text) {
+        io.AddInputCharactersUTF8((*text).data());
+        input.text = std::nullopt;
+    }
+
+    io.AddKeyEvent(ImGuiKey_Backspace, input.on[Input::BACKSPACE]);
+    io.AddKeyEvent(ImGuiKey_Tab, input.on[Input::TAB]);
 
     if(input.focused)
         io.MousePos = ImVec2((float) input.mousePos.x, (float) input.mousePos.y);
@@ -63,6 +71,8 @@ void UISys::tick(float dt) {
         input.rightDown = input.mouseRight;
         input.middleDown = input.mouseMiddle;
     }
+
+
     
 }
 

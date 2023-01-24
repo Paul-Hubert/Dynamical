@@ -2,11 +2,12 @@
 
 #include <iostream>
 #include "util/util.h"
+#include "util/log.h"
 
 #include "context/num_frames.h"
 
 #include "extra/optick/optick.h"
-#include "logic/settings.h"
+#include "logic/settings/settings.h"
 
 using namespace dy;
 
@@ -17,7 +18,9 @@ per_frame(NUM_FRAMES) {
     auto& settings = reg.ctx<Settings>();
     
     for(int i = 0; i<NUM_FRAMES; i++) {
-        per_frame[i].transfer_semaphore = ctx.device->createSemaphore(vk::SemaphoreCreateInfo());
+        per_frame[i].transfer_semaphore = ctx.device->createSemaphore({});
+        per_frame[i].compute_semaphore = ctx.device->createSemaphore( {});
+        per_frame[i].graphics_semaphore = ctx.device->createSemaphore( {});
     }
 
 }
@@ -47,13 +50,35 @@ void Renderer::render() {
     OPTICK_EVENT();
     
     auto& f = per_frame[ctx.frame_index];
-    
-    vk::Semaphore s = f.transfer_semaphore;
-    if(!ctx.transfer.flush(s)) {
-        s = nullptr;
+
+    std::vector<vk::Semaphore> waits{};
+    std::vector<vk::PipelineStageFlags> stages{};
+    std::vector<vk::Semaphore> signals{};
+
+    if(last_frame_semaphore) {
+        waits.push_back(last_frame_semaphore);
+        stages.push_back(vk::PipelineStageFlagBits::eBottomOfPipe);
     }
-    
-    ctx.classic_render.render(s);
+
+    signals.push_back(f.transfer_semaphore);
+
+    if(ctx.transfer.flush(waits, stages, signals)) {
+        waits = signals;
+        stages = {vk::PipelineStageFlagBits::eTransfer};
+    }
+
+    signals = {f.compute_semaphore};
+
+    if(ctx.compute.flush(waits, stages, signals)) {
+        waits = signals;
+        stages = {vk::PipelineStageFlagBits::eComputeShader};
+    }
+
+    signals = {f.graphics_semaphore};
+
+    ctx.classic_render.render(waits, stages, signals);
+
+    last_frame_semaphore = f.graphics_semaphore;
 
 }
 
@@ -67,6 +92,8 @@ Renderer::~Renderer() {
     
     for(int i = 0; i<NUM_FRAMES; i++) {
         ctx.device->destroy(per_frame[i].transfer_semaphore);
+        ctx.device->destroy(per_frame[i].compute_semaphore);
+        ctx.device->destroy(per_frame[i].graphics_semaphore);
     }
     
 }

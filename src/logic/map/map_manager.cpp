@@ -9,6 +9,8 @@
 #include "logic/components/position.h"
 #include "logic/components/input.h"
 #include "logic/components/camera.h"
+#include "logic/components/object.h"
+#include "logic/factories/factory_list.h"
 #include <extra/optick/optick.h>
 
 using namespace dy;
@@ -17,9 +19,9 @@ MapManager::MapManager(entt::registry& reg) : reg(reg), map(), generator(reg, *t
     
 }
 
-Chunk* MapManager::getChunk(glm::ivec2 pos) const {
+Chunk* MapManager::getChunk(glm::ivec2 chunk_pos) const {
     try {
-        return map.at(pos).get();
+        return map.at(chunk_pos).get();
     } catch(std::out_of_range&) {
         return nullptr;
     }
@@ -27,23 +29,34 @@ Chunk* MapManager::getChunk(glm::ivec2 pos) const {
 
 Chunk* MapManager::getTileChunk(glm::vec2 pos) const {
     try {
-        return map.at(pos).get();
+        return map.at(getChunkPos(pos)).get();
     } catch(std::out_of_range&) {
         return nullptr;
     }
 }
 
-Chunk* MapManager::generateChunk(glm::ivec2 pos) {
-    if(getChunk(pos) != nullptr) {
-        return getChunk(pos);
+Chunk* MapManager::generateChunk(glm::ivec2 chunk_pos) {
+    if(getChunk(chunk_pos) != nullptr) {
+        return getChunk(chunk_pos);
     }
-    map[pos] = std::make_unique<Chunk>();
-    Chunk* chunk = map[pos].get();
+    map[chunk_pos] = std::make_unique<Chunk>();
+    Chunk* chunk = map[chunk_pos].get();
 
     
-    generator.generateChunk(*chunk, pos);
+    generator.generateChunk(*chunk, chunk_pos);
     
     return chunk;
+}
+
+void MapManager::updateTile(glm::vec2 pos) {
+    Tile* tile = getTile(pos);
+    if(!tile) return;
+    generator.setTileType(*tile, pos);
+    if(tile->object != entt::null && reg.get<Object>(tile->object).type == Object::plant) {
+        dy::destroyObject(reg, tile->object);
+        tile->object = entt::null;
+    }
+    getTileChunk(pos)->setUpdated();
 }
 
 Tile* MapManager::getTile(glm::vec2 pos) const {
@@ -59,12 +72,14 @@ void MapManager::insert(entt::entity entity, glm::vec2 position) {
         dy::log(dy::Level::critical) << "Chunk not generated\n";
         return;
     }
-    reg.emplace<Position>(entity, position);
+    float height = getTile(position)->level;
+    reg.emplace<Position>(entity, position, height);
     chunk->addObject(entity);
 }
 
 void MapManager::move(entt::entity entity, glm::vec2 position) {
     auto& pos = reg.get<Position>(entity);
+    float height = pos.getHeight();
     if(getChunkPos(position) != getChunkPos(pos)) {
         Chunk* old_chunk = getChunk(getChunkPos(pos));
         if(old_chunk == nullptr) {
@@ -79,7 +94,8 @@ void MapManager::move(entt::entity entity, glm::vec2 position) {
         }
         new_chunk->addObject(entity);
     }
-    pos = position;
+    height = getTile(position)->level;
+    reg.replace<Position>(entity, position, height);
 }
 
 void MapManager::remove(entt::entity entity) {
@@ -103,8 +119,7 @@ glm::vec2 MapManager::getMousePosition() const {
     auto& input = reg.ctx<Input>();
     auto& cam = reg.ctx<Camera>();
     
-    return cam.fromScreenSpace(input.mousePos, input.screenSize);
-    
+    return cam.fromScreenSpace(input.mousePos);
 }
 
 struct Distance {

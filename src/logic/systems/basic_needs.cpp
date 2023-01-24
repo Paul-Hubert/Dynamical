@@ -13,7 +13,7 @@ void BasicNeedsSys::init() {
     
 }
 
-void BasicNeedsSys::tick(float dt) {
+void BasicNeedsSys::tick(double dt) {
     
     OPTICK_EVENT();
     

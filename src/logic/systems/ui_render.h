@@ -4,7 +4,7 @@
 #include "renderer/util/vk.h"
 #include "renderer/util/vmapp.h"
 
-#include "imgui.h"
+#include <imgui/imgui.h>
 
 #include "system.h"
 
@@ -38,7 +38,7 @@ public:
     }
 
     void init() override;
-    void tick(float dt) override;
+    void tick(double dt) override;
     
     void createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buffer_memory, vk::DeviceSize& p_buffer_size, size_t new_size,vk::BufferUsageFlagBits usage);
     

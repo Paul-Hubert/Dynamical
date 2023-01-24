@@ -1,6 +1,8 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
+#include "map_configuration.h"
+
 #include "entt/entt.hpp"
 
 #include <string>
@@ -30,6 +32,8 @@ public:
     int vr_mode = 1;
     int spectator_mode = 2;
 
+    std::vector<MapConfiguration> map_configurations;
+
     template <class Archive>
     void serialize(Archive& ar) {
         ar(
@@ -41,7 +45,8 @@ public:
             CEREAL_NVP(server_side),
             CEREAL_NVP(client_side),
             CEREAL_NVP(vr_mode),
-            CEREAL_NVP(spectator_mode)
+            CEREAL_NVP(spectator_mode),
+            CEREAL_NVP(map_configurations)
         );
     }
 
@@ -51,7 +56,7 @@ private:
     #ifndef DYNAMICAL_CONFIG_DIR
         #define DYNAMICAL_CONFIG_DIR "./"
     #endif
-    #define DYNAMICAL_CONFIG_MAGIC "3"
+    #define DYNAMICAL_CONFIG_MAGIC "5"
     #define DYNAMICAL_CONFIG_FILE DYNAMICAL_CONFIG_DIR "config." DYNAMICAL_CONFIG_MAGIC ".json"
 };
 

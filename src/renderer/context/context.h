@@ -5,6 +5,7 @@
 #include "instance.h"
 #include "device.h"
 #include "transfer.h"
+#include "compute.h"
 #include "swapchain.h"
 #include "renderer/classic_render/classic_render.h"
 
@@ -25,10 +26,11 @@ public:
     Instance instance;
     Device device;
     Transfer transfer;
+    Compute compute;
     Swapchain swap;
     ClassicRender classic_render;
     
-    uint32_t frame_index;
+    uint32_t frame_index = 0;
 
 };
 

@@ -1,3 +1,12 @@
 [submodule "lib/FastNoise2"]
 	path = lib/FastNoise2
 	url = https://github.com/Auburn/FastNoise2.git
+[submodule "lib/VulkanMemoryAllocator"]
+	path = lib/VulkanMemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+[submodule "lib/imgui"]
+	path = lib/imgui
+	url = https://github.com/ocornut/imgui
+[submodule "lib/implot"]
+	path = lib/implot
+	url = https://github.com/epezent/implot

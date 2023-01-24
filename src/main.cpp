@@ -6,7 +6,7 @@
 int main(int argc, char **argv) {
     
     //OPTICK_APP("People");
-    
+
     auto game = std::make_unique<dy::Game>(argc, argv);
 
     game->start();

@@ -28,7 +28,7 @@ Swapchain::Swapchain(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     vkGetPhysicalDeviceSurfacePresentModesKHR(static_cast<VkPhysicalDevice> (ctx.device), ctx.win.surface, &num, reinterpret_cast<VkPresentModeKHR*> (presentModes.data()));
     
     vk::SurfaceFormatKHR surfaceformat = chooseSwapSurfaceFormat(formats, vk::Format::eB8G8R8A8Srgb, vk::ColorSpaceKHR::eSrgbNonlinear);
-    presentMode = chooseSwapPresentMode(presentModes, vk::PresentModeKHR::eImmediate);
+    presentMode = chooseSwapPresentMode(presentModes, vk::PresentModeKHR::eFifo);
     extent = chooseSwapExtent(capabilities);
     format = surfaceformat.format;
     colorSpace = surfaceformat.colorSpace;

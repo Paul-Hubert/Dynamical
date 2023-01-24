@@ -4,7 +4,7 @@
 #include "renderer/util/vk.h"
 #include "renderer/util/vmapp.h"
 
-#include "imgui.h"
+#include <imgui/imgui.h>
 
 #include "system.h"
 
@@ -28,23 +28,15 @@ public:
         return "ObjectRender";
     }
 
-    void tick(float dt) override;
+    void tick(double dt) override;
     
 private:
     
-    void initPipeline(vk::RenderPass);
-    
-    vk::DescriptorPool descPool;
-    vk::DescriptorSetLayout descLayout;
+    void initPipeline();
+
     vk::PipelineLayout pipelineLayout;
-    vk::Pipeline graphicsPipeline;
-    
-    struct per_frame {
-        VmaBuffer uniformBuffer;
-        void* uniformPointer;
-        vk::DescriptorSet descSet;
-    };
-    std::vector<per_frame> per_frame;
+    vk::Pipeline objectPipeline;
+    vk::Pipeline particlePipeline;
     
 };
 

@@ -7,8 +7,8 @@ namespace dy {
 
 struct ViewUBO {
 
-    glm::vec2 position;
-    glm::vec2 size;
+    glm::mat4 projection;
+    glm::mat4 view;
     
 };
 
