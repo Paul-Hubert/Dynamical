@@ -90,6 +90,7 @@ void ParticleSimulationSys::tick(double dt) {
     PushConstants cons {};
     cons.new_particle_count = new_particle_count;
     cons.particle_count = particle_count;
+    cons.dt = (float) dt;
 
     new_particle_count = 0;
 

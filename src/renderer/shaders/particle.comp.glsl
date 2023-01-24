@@ -13,7 +13,7 @@ const float STIFFNESS = 1;
 const float SLOT_SIZE = 5;
 
 const float GRAVITY = 9;
-const float FRICTION = 0.9;
+const float FRICTION = 0.98;
 
 const float PARTICLE_MASS = 1;
 const float PARTICLE_MASS_P2 = PARTICLE_MASS*PARTICLE_MASS;
@@ -47,6 +47,7 @@ layout( push_constant ) uniform constants
 {
     uint particle_count;
     uint new_particle_count;
+    float dt;
 };
 
 layout(std430, set = 0, binding = 0) buffer Particles {
@@ -161,17 +162,18 @@ void interaction(uint p_index, inout Particle p, uint other) {
         }
 
         float min_distance = p.sphere.w + o.sphere.w;
-        diff = diff/distance;
+        vec3 norm = diff/distance;
         if(distance < min_distance) {
-            vec3 pusher = diff * (distance-min_distance)/2;
+
+            vec3 vn = dot(p.speed.xyz, norm) * norm;
+            vec3 vno = dot(o.speed.xyz, norm) * norm;
+
+            vec3 pusher = norm * (distance-min_distance)/2;
             o.sphere.xyz += pusher;
             p.sphere.xyz -= pusher;
 
-            vec3 vn = dot(p.speed.xyz, diff) * diff;
-            vec3 vno = dot(o.speed.xyz, diff) * diff;
-
-            p.speed.xyz = p.speed.xyz - vn + vno;
-            o.speed.xyz = o.speed.xyz - vno + vn;
+            p.speed.xyz += -vn + vno;
+            o.speed.xyz += -vno + vn;
 
             p.speed.xyz *= FRICTION;
             o.speed.xyz *= FRICTION;
@@ -317,7 +319,6 @@ void main()
     barrier();
 
 
-    //Gravité, plus tard on ajoutera une force dépendante des autres particules
     neighbours_xyz(particle_index, p, get_indices(p.sphere.xyz));
     p.new_pressure *= -PARTICLE_MASS/p.density;
     p.new_viscosity *= PARTICLE_MASS * VISCOSITY;
@@ -325,7 +326,7 @@ void main()
     p.speed.z -= 0.1;
     p.speed.xyz += 0.0001*(p.new_viscosity + p.new_pressure) / PARTICLE_MASS;
 
-    vec3 new_pos = p.sphere.xyz + p.speed.xyz;
+    vec3 new_pos = p.sphere.xyz + p.speed.xyz*dt;
 
     vec2 pos = new_pos.xy;
 

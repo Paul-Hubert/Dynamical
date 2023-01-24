@@ -27,6 +27,7 @@ const uint32_t max_new_particles = 100;
 struct PushConstants {
     uint32_t particle_count;
     uint32_t new_particle_count;
+    float dt;
 };
 
 class ParticleSimulationSys : public System {
