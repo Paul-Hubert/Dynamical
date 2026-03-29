@@ -10,3 +10,6 @@
 [submodule "lib/implot"]
 	path = lib/implot
 	url = https://github.com/epezent/implot
+[submodule "lib/ai-sdk-cpp"]
+	path = lib/ai-sdk-cpp
+	url = https://github.com/ClickHouse/ai-sdk-cpp

@@ -9,6 +9,8 @@ add_subdirectory(lib/FastNoise2)
 
 add_subdirectory(lib/VulkanMemoryAllocator)
 
+add_subdirectory(lib/ai-sdk-cpp)
+
 include_directories("./src")
 include_directories("./lib")
 
@@ -60,6 +62,9 @@ target_include_directories(dynamical PRIVATE "lib/FastNoise2/include/")
 
 target_link_libraries(dynamical PRIVATE VulkanMemoryAllocator)
 target_include_directories(dynamical PRIVATE "lib/VulkanMemoryAllocator/include/")
+
+target_link_libraries(dynamical PRIVATE ai-sdk-cpp)
+target_include_directories(dynamical PRIVATE "lib/ai-sdk-cpp/include/")
 
 # Copy resources to build
 file(

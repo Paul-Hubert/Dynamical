@@ -10,6 +10,7 @@
     },
     "taskflow",
     "stb",
-    "vulkan"
+    "vulkan",
+    "openssl"
   ]
 }

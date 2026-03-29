@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cmake --build build)"
+      "Bash(cmake --build build)",
+      "Bash(git submodule:*)",
+      "Bash(cmake --preset default)",
+      "Bash(git add:*)"
     ]
   }
 }
