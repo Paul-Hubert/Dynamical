@@ -74,9 +74,10 @@ void InputSys::tick(double dt) {
             input.on.set(Input::EXIT);
             
         } else if(e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
-            try {
-                input.on.set(actionMap.at(e.key.keysym.scancode), e.type == SDL_KEYDOWN);
-            } catch(std::out_of_range&) {}
+            auto it = actionMap.find(e.key.keysym.scancode);
+            if (it != actionMap.end()) {
+                input.on.set(it->second, e.type == SDL_KEYDOWN);
+            }
         } else if(e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) {
             switch(e.button.button) {
                 case SDL_BUTTON_LEFT:

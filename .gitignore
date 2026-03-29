@@ -18,3 +18,4 @@ config.*.json
 /result
 /compile_commands.json
 renderdoc.cap
+CMakeUserPresets.json

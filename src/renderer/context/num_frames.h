@@ -4,7 +4,7 @@
 #include <vector>
 
 namespace dy {
-constexpr uint32_t NUM_FRAMES = 2;
+constexpr uint32_t NUM_FRAMES = 3;
 }
 
 #endif

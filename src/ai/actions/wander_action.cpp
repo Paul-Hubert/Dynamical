@@ -1,5 +1,8 @@
+#define _USE_MATH_DEFINES
+
 #include "wander_action.h"
 
+#include <cmath>
 #include <extra/optick/optick.h>
 
 #include "logic/map/map_manager.h"

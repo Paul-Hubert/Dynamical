@@ -1,0 +1,15 @@
+{
+  "dependencies": [
+    "cereal",
+    "glm",
+    {
+      "name": "sdl2",
+      "features": [
+        "vulkan"
+      ]
+    },
+    "taskflow",
+    "stb",
+    "vulkan"
+  ]
+}

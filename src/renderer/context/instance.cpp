@@ -14,11 +14,9 @@
 using namespace dy;
 
 Instance::Instance(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
-    
+
     auto& settings = reg.ctx<Settings>();
-    
-    vk::DynamicLoader dl;
-    PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+
     VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
     
     uint32_t extensionCount;

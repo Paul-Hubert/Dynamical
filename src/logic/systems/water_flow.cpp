@@ -20,7 +20,7 @@ bool fillNeighbours(entt::registry& reg, MapManager& map, WaterFlow& flow, glm::
             if(abs(x) + abs(y) != 1) continue;
             glm::vec2 adj = pos + glm::vec2(x, y);
 
-            if(flow.set.find(adj) != nullptr) {
+            if(flow.set.find(adj) != flow.set.end()) {
                 continue;
             }
 

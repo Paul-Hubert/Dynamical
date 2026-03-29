@@ -20,19 +20,15 @@ MapManager::MapManager(entt::registry& reg) : reg(reg), map(), generator(reg, *t
 }
 
 Chunk* MapManager::getChunk(glm::ivec2 chunk_pos) const {
-    try {
-        return map.at(chunk_pos).get();
-    } catch(std::out_of_range&) {
-        return nullptr;
+    auto it = map.find(chunk_pos);
+    if (it != map.end()) {
+        return it->second.get();
     }
+    return nullptr;
 }
 
 Chunk* MapManager::getTileChunk(glm::vec2 pos) const {
-    try {
-        return map.at(getChunkPos(pos)).get();
-    } catch(std::out_of_range&) {
-        return nullptr;
-    }
+    return getChunk(getChunkPos(pos));
 }
 
 Chunk* MapManager::generateChunk(glm::ivec2 chunk_pos) {
