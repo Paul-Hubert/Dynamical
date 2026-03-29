@@ -12,7 +12,8 @@ public:
         interruptible = true;
     }
 
-    std::unique_ptr<Action> act_impl(std::unique_ptr<Action> self) override;
+    std::unique_ptr<Action> act_impl(std::unique_ptr<Action> self, double dt) override;
+    std::string describe() const override { return "wandering"; }
 };
 
 }

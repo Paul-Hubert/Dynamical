@@ -17,42 +17,42 @@ using namespace entt::literals;
 
 using namespace dy;
 
-std::unique_ptr<Action> EatAction::act_impl(std::unique_ptr<Action> self) {
-    
+EatAction::EatAction(entt::registry& reg, entt::entity entity, const ActionParams& params)
+    : ActionBase(reg, entity, params)
+{
+    machine_
+        .stage("finding food", [this](double) -> StageStatus {
+            find();
+            if (food_ == Item::null) {
+                this->failure_reason = "no food in inventory";
+                return StageStatus::Failed;
+            }
+            this->reg.emplace<Eat>(this->entity, this->reg, food_);
+            return StageStatus::Complete;
+        })
+        .stage("eating",
+            stage_primitives::wait_until_removed<Eat>(reg, entity));
+}
+
+std::unique_ptr<Action> EatAction::act_impl(std::unique_ptr<Action> self, double dt) {
     OPTICK_EVENT();
-    
-    if(phase == 0) {
-        
-        find();
-        if(food == Item::null) {
-            return nullptr;
-        }
-        reg.emplace<Eat>(entity, reg, food);
-        phase = 1;
-        
-    } else if(phase == 1) {
-        
-        if(!reg.all_of<Eat>(entity)) {
-            
-            return nullptr;
-            
-        }
-        
-    }
-    
-    return self;
-    
+
+    StageStatus status = machine_.tick(dt);
+    return (status == StageStatus::Continue) ? std::move(self) : nullptr;
+}
+
+std::string EatAction::describe() const {
+    return "Eat: " + machine_.current_stage_name();
 }
 
 void EatAction::find() {
-    
-    const Storage& storage = reg.get<Storage>(entity);
 
-    food = Item::null;
+    const Storage& storage = this->reg.get<Storage>(this->entity);
 
-    if(storage.amount(Item::berry) > 0) {
-        food = Item::berry;
+    food_ = Item::null;
+
+    if (storage.amount(Item::berry) > 0) {
+        food_ = Item::berry;
     }
-    
-}
 
+}

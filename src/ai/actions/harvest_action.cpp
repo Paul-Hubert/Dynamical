@@ -16,68 +16,70 @@ using namespace entt::literals;
 
 using namespace dy;
 
-std::unique_ptr<Action> HarvestAction::act_impl(std::unique_ptr<Action> self) {
-    
+HarvestAction::HarvestAction(entt::registry& reg, entt::entity entity, const ActionParams& params)
+    : ActionBase(reg, entity, params)
+{
+    machine_
+        .stage("finding plant", [this](double) -> StageStatus {
+            if (this->reg.all_of<Path>(this->entity))
+                this->reg.remove<Path>(this->entity);
+
+            find();
+
+            if (target_ == entt::null) {
+                this->failure_reason = "no berry bushes available";
+                return StageStatus::Failed;
+            }
+
+            this->reg.emplace<entt::tag<"reserved"_hs>>(target_);
+            return StageStatus::Complete;
+        })
+        .stage("navigating to plant",
+            stage_primitives::wait_until_removed<Path>(reg, entity))
+        .stage("begin harvesting", [this](double) -> StageStatus {
+            this->reg.emplace<Harvest>(this->entity, this->reg, target_);
+            return StageStatus::Complete;
+        })
+        .stage("harvesting",
+            stage_primitives::wait_until_removed<Harvest>(reg, entity));
+}
+
+std::unique_ptr<Action> HarvestAction::act_impl(std::unique_ptr<Action> self, double dt) {
     OPTICK_EVENT();
-    
-    if(phase == 0) {
-        
-        if(reg.all_of<Path>(entity)) {
-            reg.remove<Path>(entity);
-        }
-        
-        find();
-        
-        if(target == entt::null) {
-            return nullptr;
-        }
-        
-        reg.emplace<entt::tag<"reserved"_hs>>(target);
-        
-        phase = 1;
-        
-    }  else if(phase == 1) {
-        
-        if(!reg.all_of<Path>(entity)) {
-            
-            reg.emplace<Harvest>(entity, reg, target);
-            phase = 2;
-            
-        }
-        
-    } else if (phase == 2) {
-        
-        if(!reg.all_of<Harvest>(entity)) {
-            
-            reg.remove<entt::tag<"reserved"_hs>>(target);
-            
-            return nullptr;
-            
-        }
-        
+
+    StageStatus status = machine_.tick(dt);
+
+    if (status == StageStatus::Complete) {
+        reg.remove<entt::tag<"reserved"_hs>>(target_);
+        return nullptr;
     }
-    
+
+    if (status == StageStatus::Failed) {
+        return nullptr;
+    }
+
     return self;
-    
+}
+
+std::string HarvestAction::describe() const {
+    return "Harvest: " + machine_.current_stage_name();
 }
 
 void HarvestAction::find() {
-    
+
     auto& map = reg.ctx<MapManager>();
-    
+
     auto position = reg.get<Position>(entity);
 
-    target = entt::null;
+    target_ = entt::null;
 
     reg.emplace<Path>(entity, map.pathfind(position, [&](glm::vec2 pos) {
         auto object = map.getTile(pos)->object;
-        if(object != entt::null && reg.all_of<Object>(object) && reg.get<Object>(object).id == plant && !reg.all_of<entt::tag<"reserved"_hs>>(object) && !reg.all_of<Harvested>(object)) {
-            target = object;
+        if (object != entt::null && reg.all_of<Object>(object) && reg.get<Object>(object).id == plant_ && !reg.all_of<entt::tag<"reserved"_hs>>(object) && !reg.all_of<Harvested>(object)) {
+            target_ = object;
             return true;
         }
         return false;
     }));
-    
+
 }
-
-

@@ -10,6 +10,9 @@
 #include <logic/components/storage.h>
 #include <logic/components/item.h>
 #include <logic/components/edible.h>
+#include <ai/personality/personality.h>
+#include <ai/personality/personality_generator.h>
+#include <ai/memory/ai_memory.h>
 
 using namespace dy;
 
@@ -64,5 +67,12 @@ entt::entity dy::buildBunny(entt::registry& reg, glm::vec2 position) {
 entt::entity dy::buildHuman(entt::registry& reg, glm::vec2 position, Color color) {
     entt::entity entity = dy::buildAnimal(reg, position, Object::being, Object::human, color);
     reg.emplace<Human>(entity);
+
+    // Phase 2: Assign Personality and AIMemory to all humans
+    PersonalityGenerator gen;
+    Personality personality = gen.generate_random();
+    reg.emplace<Personality>(entity, personality);
+    reg.emplace<AIMemory>(entity);
+
     return entity;
 }

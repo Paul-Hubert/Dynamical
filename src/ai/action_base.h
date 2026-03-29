@@ -32,9 +32,9 @@ public:
     virtual ~ActionBase() = default;
 
     /// Final implementation of act() that dispatches to derived class's act_impl()
-    virtual std::unique_ptr<Action> act(std::unique_ptr<Action> self) override {
+    virtual std::unique_ptr<Action> act(std::unique_ptr<Action> self, double dt) override {
         Derived* derived = static_cast<Derived*>(this);
-        return derived->act_impl(std::move(self));
+        return derived->act_impl(std::move(self), dt);
     }
 
     /// Default deploy() does nothing (can be overridden by derived classes if needed)
@@ -46,7 +46,7 @@ public:
     /// Subclass-defined action implementation
     /// Should return self to continue execution, or nullptr to complete
     /// Note: marked public for CRTP dispatch; subclasses should treat as protected interface
-    virtual std::unique_ptr<Action> act_impl(std::unique_ptr<Action> self) = 0;
+    virtual std::unique_ptr<Action> act_impl(std::unique_ptr<Action> self, double dt) = 0;
 
 protected:
 

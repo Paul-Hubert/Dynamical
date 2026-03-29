@@ -29,9 +29,11 @@
 #include "logic/systems/object_render.h"
 #include "logic/systems/ui_render.h"
 #include "logic/systems/water_flow.h"
+#include "logic/systems/conversation.h"
 
 #include "ai/ai.h"
 #include <ai/action_registry.h>
+#include <ai/conversation/conversation_manager.h>
 
 #include "util/log.h"
 
@@ -51,7 +53,7 @@ Game::Game(int argc, char** argv) {
 }
 
 void Game::start() {
-    
+
     entt::registry& reg = *registry;
 
     Settings& s = reg.ctx<Settings>();
@@ -80,15 +82,17 @@ void Game::start() {
     set->pre_add<AISys>();
     
     set->pre_add<ActionBarSys>();
+    set->pre_add<ConversationSys>();
 
     set->post_add<MapUploadSys>();
     set->post_add<ParticleSimulationSys>();
     set->post_add<MapRenderSys>();
     set->post_add<ObjectRenderSys>();
     set->post_add<UIRenderSys>();
-    
-    
+
+
     reg.set<MapManager>(reg);
+    reg.set<ConversationManager>(reg);
 
     // Initialize action registry with all action descriptors
     ActionRegistry::instance().initialize_descriptors();

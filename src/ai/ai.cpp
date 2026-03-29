@@ -10,6 +10,7 @@
 #include <ai/action_registry.h>
 #include <ai/action_id.h>
 #include <ai/prerequisite_resolver.h>
+#include <ai/memory/ai_memory.h>
 
 #include <logic/map/map_manager.h>
 
@@ -24,21 +25,44 @@ AISys::AISys(entt::registry& reg) : System(reg) {
 }
 
 void AISys::tick(double dt) {
-    
+
     OPTICK_EVENT();
-    
+
     auto view = reg.view<AIC>();
-    
+
     view.each([&](const auto entity, auto& ai) {
-        
+
         if(!ai.action || ai.action->interruptible) {
             decide(entity, ai);
         }
-        
-        ai.action = ai.action->act(std::move(ai.action));
-        
+
+        // Capture describe/failure before act() potentially destroys the action
+        std::string current_desc = ai.action ? ai.action->describe() : "";
+        bool was_active = ai.action != nullptr;
+
+        ai.action = ai.action->act(std::move(ai.action), dt);
+
+        // Action just completed (returned nullptr)
+        if (was_active && !ai.action) {
+            // Phase 2+: write to AIMemory component if present
+            if (reg.all_of<AIMemory>(entity)) {
+                auto& mem = reg.get<AIMemory>(entity);
+                if (!ai.last_failure_reason.empty()) {
+                    mem.add_event("failed_action", ai.last_failure_reason);
+                } else if (!current_desc.empty()) {
+                    mem.add_event("completed_action", current_desc);
+                }
+            }
+            ai.last_failure_reason.clear();
+        }
+
+        // Capture failure_reason on same tick it's set (before next act() call)
+        if (ai.action && !ai.action->failure_reason.empty()) {
+            ai.last_failure_reason = ai.action->failure_reason;
+        }
+
     });
-    
+
 }
 
 void AISys::decide(entt::entity entity, AIC& ai) {
