@@ -31,6 +31,7 @@
 #include "logic/systems/water_flow.h"
 
 #include "ai/ai.h"
+#include <ai/action_registry.h>
 
 #include "util/log.h"
 
@@ -88,7 +89,9 @@ void Game::start() {
     
     
     reg.set<MapManager>(reg);
-    
+
+    // Initialize action registry with all action descriptors
+    ActionRegistry::instance().initialize_descriptors();
 
     // preinit
 

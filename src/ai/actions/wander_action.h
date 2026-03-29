@@ -1,15 +1,18 @@
 #ifndef WANDER_ACTION_H
 #define WANDER_ACTION_H
 
-#include "action.h"
+#include <ai/action_base.h>
 
 namespace dy {
-    
-class WanderAction : public Action {
+
+class WanderAction : public ActionBase<WanderAction> {
 public:
-    WanderAction(entt::registry& reg, entt::entity entity) : Action(reg, entity) {interruptible = true;}
-    std::unique_ptr<Action> deploy(std::unique_ptr<Action> self);
-    std::unique_ptr<Action> act(std::unique_ptr<Action> self) override;
+    WanderAction(entt::registry& reg, entt::entity entity, const ActionParams& params = {})
+        : ActionBase(reg, entity, params) {
+        interruptible = true;
+    }
+
+    std::unique_ptr<Action> act_impl(std::unique_ptr<Action> self) override;
 };
 
 }

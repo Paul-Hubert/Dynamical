@@ -7,6 +7,10 @@
 #include "behaviors/eat_behavior.h"
 #include "behaviors/wander_behavior.h"
 
+#include <ai/action_registry.h>
+#include <ai/action_id.h>
+#include <ai/prerequisite_resolver.h>
+
 #include <logic/map/map_manager.h>
 
 #include <logic/components/basic_needs.h>
@@ -38,12 +42,12 @@ void AISys::tick(double dt) {
 }
 
 void AISys::decide(entt::entity entity, AIC& ai) {
-    
+
     OPTICK_EVENT();
-    
+
     float max_score = 0;
     std::unique_ptr<Behavior> max_behavior;
-    
+
     testBehavior<WanderBehavior>(entity, max_score, max_behavior);
 
     if(reg.all_of<BasicNeeds>(entity)) {
@@ -52,9 +56,13 @@ void AISys::decide(entt::entity entity, AIC& ai) {
 
     if(max_score > ai.score || ai.action == nullptr) {
         ai.score = max_score;
-        ai.action = std::move(max_behavior->action());
+
+        // Resolve prerequisites and create action chain
+        ActionID action_id = max_behavior->get_action_id();
+        ActionParams params;  // Empty for now; will be populated in Phase 2+ for LLM
+        ai.action = PrerequisiteResolver::instance().resolve(action_id, reg, entity, params);
     }
-    
+
 }
 
 AISys::~AISys() {

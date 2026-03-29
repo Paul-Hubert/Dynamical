@@ -16,15 +16,7 @@ using namespace entt::literals;
 
 using namespace dy;
 
-std::unique_ptr<Action> HarvestAction::deploy(std::unique_ptr<Action> self, Object::Identifier plant) {
-    
-    this->plant = plant;
-    
-    return self;
-    
-}
-
-std::unique_ptr<Action> HarvestAction::act(std::unique_ptr<Action> self) {
+std::unique_ptr<Action> HarvestAction::act_impl(std::unique_ptr<Action> self) {
     
     OPTICK_EVENT();
     
@@ -37,7 +29,7 @@ std::unique_ptr<Action> HarvestAction::act(std::unique_ptr<Action> self) {
         find();
         
         if(target == entt::null) {
-            return nextAction();
+            return nullptr;
         }
         
         reg.emplace<entt::tag<"reserved"_hs>>(target);
@@ -59,7 +51,7 @@ std::unique_ptr<Action> HarvestAction::act(std::unique_ptr<Action> self) {
             
             reg.remove<entt::tag<"reserved"_hs>>(target);
             
-            return nextAction();
+            return nullptr;
             
         }
         

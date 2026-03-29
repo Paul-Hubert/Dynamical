@@ -1,21 +1,22 @@
 #ifndef HARVEST_ACTION_H
 #define HARVEST_ACTION_H
 
-#include "action.h"
-
-#include "logic/components/object.h"
+#include <ai/action_base.h>
+#include <logic/components/object.h>
 
 namespace dy {
 
-class HarvestAction : public Action {
+class HarvestAction : public ActionBase<HarvestAction> {
 public:
-    HarvestAction(entt::registry& reg, entt::entity entity) : Action(reg, entity) {}
-    std::unique_ptr<Action> deploy(std::unique_ptr<Action> self, Object::Identifier plant);
-    std::unique_ptr<Action> act(std::unique_ptr<Action> self) override;
+    HarvestAction(entt::registry& reg, entt::entity entity, const ActionParams& params = {})
+        : ActionBase(reg, entity, params) {}
+
+    std::unique_ptr<Action> act_impl(std::unique_ptr<Action> self) override;
+
 private:
     void find();
-    
-    Object::Identifier plant;
+
+    Object::Identifier plant = Object::tree;  // Default; will be set from ActionParams.target_type
     int phase = 0;
     entt::entity target = entt::null;
 };

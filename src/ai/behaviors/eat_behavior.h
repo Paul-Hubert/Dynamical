@@ -10,6 +10,7 @@ public:
     EatBehavior(entt::registry& reg, entt::entity entity) : Behavior(reg, entity) {}
     static float getScore(entt::registry& reg, entt::entity entity);
     std::unique_ptr<Action> action() override;
+    ActionID get_action_id() override { return ActionID::Eat; }
 };
 
 }

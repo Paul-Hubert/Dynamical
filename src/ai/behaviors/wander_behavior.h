@@ -10,7 +10,8 @@ public:
     WanderBehavior(entt::registry& reg, entt::entity entity) : Behavior(reg, entity) {}
     static float getScore(entt::registry& reg, entt::entity entity) {return 1;}
     std::unique_ptr<Action> action() override;
-    
+    ActionID get_action_id() override { return ActionID::Wander; }
+
 };
 
 }

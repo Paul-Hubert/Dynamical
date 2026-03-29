@@ -12,9 +12,9 @@ float EatBehavior::getScore(entt::registry& reg, entt::entity entity) {
 }
 
 std::unique_ptr<Action> EatBehavior::action() {
-    
+
     std::unique_ptr<EatAction> top = std::make_unique<EatAction>(reg, entity);
-    
-    return top->deploy(std::move(top));
-    
+
+    return top;
+
 }

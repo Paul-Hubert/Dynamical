@@ -17,17 +17,7 @@ using namespace entt::literals;
 
 using namespace dy;
 
-std::unique_ptr<Action> EatAction::deploy(std::unique_ptr<Action> self) {
-    
-    std::unique_ptr<HarvestAction> harvester = std::make_unique<HarvestAction>(reg, entity);
-    
-    link(harvester.get(), std::move(self));
-    
-    return harvester->deploy(std::move(harvester), Object::berry_bush);
-    
-}
-
-std::unique_ptr<Action> EatAction::act(std::unique_ptr<Action> self) {
+std::unique_ptr<Action> EatAction::act_impl(std::unique_ptr<Action> self) {
     
     OPTICK_EVENT();
     
@@ -35,7 +25,7 @@ std::unique_ptr<Action> EatAction::act(std::unique_ptr<Action> self) {
         
         find();
         if(food == Item::null) {
-            return nextAction();
+            return nullptr;
         }
         reg.emplace<Eat>(entity, reg, food);
         phase = 1;
@@ -44,7 +34,7 @@ std::unique_ptr<Action> EatAction::act(std::unique_ptr<Action> self) {
         
         if(!reg.all_of<Eat>(entity)) {
             
-            return nextAction();
+            return nullptr;
             
         }
         

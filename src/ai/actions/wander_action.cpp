@@ -11,12 +11,7 @@
 
 using namespace dy;
 
-std::unique_ptr<Action> WanderAction::deploy(std::unique_ptr<Action> self) {
-    
-    return self;
-}
-
-std::unique_ptr<Action> WanderAction::act(std::unique_ptr<Action> self) {
+std::unique_ptr<Action> WanderAction::act_impl(std::unique_ptr<Action> self) {
     
     OPTICK_EVENT();
     
