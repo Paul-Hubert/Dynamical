@@ -6,7 +6,8 @@
       "Bash(cmake --preset default)",
       "Bash(git add:*)",
       "Bash(rm -rf build)",
-      "Bash(mkdir -p build)"
+      "Bash(mkdir -p build)",
+      "Bash(find /c/Users/Paul/Dynamical -name action_bar* -type f)"
     ]
   }
 }

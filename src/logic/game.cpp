@@ -94,8 +94,8 @@ void Game::start() {
     set->post_add<ParticleSimulationSys>();
     set->post_add<MapRenderSys>();
     set->post_add<ObjectRenderSys>();
-    set->post_add<UIRenderSys>();
     set->post_add<SpeechBubbleRenderSys>();
+    set->post_add<UIRenderSys>();
 
 
     reg.set<MapManager>(reg);
