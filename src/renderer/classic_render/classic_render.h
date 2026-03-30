@@ -41,10 +41,10 @@ public:
         VmaBuffer ubo;
         ViewUBO* pointer;
         vk::Semaphore acquireSemaphore;
-        vk::Semaphore presentSemaphore;
     };
     std::vector<per_frame> per_frame;
-    
+    std::vector<vk::Semaphore> per_image_semaphores;
+
 private:
     entt::registry& reg;
     Context& ctx;

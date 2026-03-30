@@ -13,7 +13,7 @@
 using namespace dy;
 
 ClassicRender::ClassicRender(Context& ctx, entt::registry& reg) : reg(reg), ctx(ctx), renderpass(ctx),
-per_frame(NUM_FRAMES) {
+per_frame(NUM_FRAMES), per_image_semaphores(NUM_FRAMES) {
     
     auto bindings = std::vector{
                 vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1,
@@ -56,11 +56,15 @@ per_frame(NUM_FRAMES) {
             }, {});
 
         f.acquireSemaphore = ctx.device->createSemaphore(vk::SemaphoreCreateInfo(vk::SemaphoreCreateFlags{}));
-        f.presentSemaphore = ctx.device->createSemaphore(vk::SemaphoreCreateInfo(vk::SemaphoreCreateFlags{}));
 
         SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eSemaphore, f.acquireSemaphore, "Swapchain_Semaphore_Acquire_F%d", i);
-        SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eSemaphore, f.presentSemaphore, "Swapchain_Semaphore_Present_F%d", i);
 
+    }
+
+    // Create per-image present semaphores
+    for (uint32_t i = 0; i < per_image_semaphores.size(); i++) {
+        per_image_semaphores[i] = ctx.device->createSemaphore(vk::SemaphoreCreateInfo(vk::SemaphoreCreateFlags{}));
+        SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eSemaphore, per_image_semaphores[i], "Swapchain_Semaphore_Present_Image%d", i);
     }
 
 }
@@ -129,11 +133,11 @@ void ClassicRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Pip
     // Submit command buffer
 
     {
-        
+
         waits.push_back(f.acquireSemaphore);
         stages.push_back(vk::PipelineStageFlagBits::eTopOfPipe);
 
-        signals.push_back(f.presentSemaphore);
+        signals.push_back(per_image_semaphores[ctx.swap.current]);
 
         OPTICK_EVENT("submit");
         ctx.device.graphics.submit({ vk::SubmitInfo(
@@ -146,7 +150,7 @@ void ClassicRender::render(std::vector<vk::Semaphore> waits, std::vector<vk::Pip
 
     }
 
-    ctx.swap.present(f.presentSemaphore);
+    ctx.swap.present(per_image_semaphores[ctx.swap.current]);
 
 }
 
@@ -157,7 +161,10 @@ ClassicRender::~ClassicRender() {
     for (int i = 0; i < per_frame.size(); i++) {
         ctx.device->destroy(per_frame[i].fence);
         ctx.device->destroy(per_frame[i].acquireSemaphore);
-        ctx.device->destroy(per_frame[i].presentSemaphore);
+    }
+
+    for (int i = 0; i < per_image_semaphores.size(); i++) {
+        ctx.device->destroy(per_image_semaphores[i]);
     }
 
     ctx.device->destroy(commandPool);
