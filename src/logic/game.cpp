@@ -33,6 +33,7 @@
 
 #include "ai/ai.h"
 #include "ai/speech/speech_bubble_sys.h"
+#include "ai/speech/speech_bubble_render_sys.h"
 #include <ai/action_registry.h>
 #include <ai/conversation/conversation_manager.h>
 #include "llm/llm_manager.h"
@@ -94,6 +95,7 @@ void Game::start() {
     set->post_add<MapRenderSys>();
     set->post_add<ObjectRenderSys>();
     set->post_add<UIRenderSys>();
+    set->post_add<SpeechBubbleRenderSys>();
 
 
     reg.set<MapManager>(reg);
