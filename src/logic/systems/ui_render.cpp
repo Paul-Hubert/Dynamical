@@ -81,10 +81,21 @@ void UIRenderSys::createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buf
 
     Context& ctx = *reg.ctx<Context*>();
 
-    if (buffer)
-        ctx.device->destroyBuffer(buffer);
-    if (buffer_memory)
-        ctx.device->freeMemory(buffer_memory);
+    FrameDataForRender* fd = &g_FramesDataBuffers[ctx.swap.current];
+
+    // Defer destruction of old buffers to avoid destroying while GPU is using them
+    if (buffer) {
+        // Determine which list to use based on usage
+        if (usage == vk::BufferUsageFlagBits::eVertexBuffer) {
+            fd->pendingVertexBuffers.push_back(buffer);
+            if (buffer_memory)
+                fd->pendingVertexMemories.push_back(buffer_memory);
+        } else if (usage == vk::BufferUsageFlagBits::eIndexBuffer) {
+            fd->pendingIndexBuffers.push_back(buffer);
+            if (buffer_memory)
+                fd->pendingIndexMemories.push_back(buffer_memory);
+        }
+    }
 
     buffer = ctx.device->createBuffer(vk::BufferCreateInfo({}, new_size, usage, vk::SharingMode::eExclusive));
 
@@ -104,10 +115,29 @@ void UIRenderSys::createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buf
 }
 
 void UIRenderSys::tick(double dt) {
-    
+
     OPTICK_EVENT();
-    
+
     Context& ctx = *reg.ctx<Context*>();
+
+    // Clean up buffers from frames that are no longer in flight
+    // With NUM_FRAMES=3, when we're on frame N, frame (N - NUM_FRAMES) has completed
+    uint32_t safe_to_destroy_frame = (ctx.swap.current + ctx.swap.num_frames - ctx.swap.num_frames) % ctx.swap.num_frames;
+    FrameDataForRender* safe_fd = &g_FramesDataBuffers[safe_to_destroy_frame];
+
+    for (auto buf : safe_fd->pendingVertexBuffers)
+        ctx.device->destroy(buf);
+    for (auto mem : safe_fd->pendingVertexMemories)
+        ctx.device->free(mem);
+    for (auto buf : safe_fd->pendingIndexBuffers)
+        ctx.device->destroy(buf);
+    for (auto mem : safe_fd->pendingIndexMemories)
+        ctx.device->free(mem);
+
+    safe_fd->pendingVertexBuffers.clear();
+    safe_fd->pendingVertexMemories.clear();
+    safe_fd->pendingIndexBuffers.clear();
+    safe_fd->pendingIndexMemories.clear();
 
     ImGui::Render();
     
@@ -396,27 +426,45 @@ void UIRenderSys::initPipeline(vk::RenderPass renderpass) {
 }
 
 UIRenderSys::~UIRenderSys() {
-    
+
     Context& ctx = *reg.ctx<Context*>();
-    
+
+    // Wait for GPU to finish all frames before destroying resources
+    ctx.device->waitIdle();
+
     ctx.device->destroy(descPool);
-    
+
     ctx.device->destroy(descLayout);
-    
+
     ctx.device->destroy(fontSampler);
-    
+
     ctx.device->destroy(fontView);
-    
+
     for(FrameDataForRender& fd : g_FramesDataBuffers) {
-        ctx.device->destroy(fd.vertexBuffer);
-        ctx.device->destroy(fd.indexBuffer);
-        ctx.device->free(fd.vertexBufferMemory);
-        ctx.device->free(fd.indexBufferMemory);
+        // Destroy current buffers
+        if (fd.vertexBuffer)
+            ctx.device->destroy(fd.vertexBuffer);
+        if (fd.indexBuffer)
+            ctx.device->destroy(fd.indexBuffer);
+        if (fd.vertexBufferMemory)
+            ctx.device->free(fd.vertexBufferMemory);
+        if (fd.indexBufferMemory)
+            ctx.device->free(fd.indexBufferMemory);
+
+        // Destroy any pending buffers
+        for (auto buf : fd.pendingVertexBuffers)
+            ctx.device->destroy(buf);
+        for (auto mem : fd.pendingVertexMemories)
+            ctx.device->free(mem);
+        for (auto buf : fd.pendingIndexBuffers)
+            ctx.device->destroy(buf);
+        for (auto mem : fd.pendingIndexMemories)
+            ctx.device->free(mem);
     }
-    
+
     ctx.device->destroy(graphicsPipeline);
-    
+
     ctx.device->destroy(pipelineLayout);
-    
+
 }
 

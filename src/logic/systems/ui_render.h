@@ -11,6 +11,7 @@
 #include <entt/entt.hpp>
 
 #include <memory>
+#include <vector>
 
 namespace dy {
 
@@ -26,6 +27,12 @@ public:
     vk::DeviceSize    indexBufferSize;
     vk::Buffer        vertexBuffer;
     vk::Buffer        indexBuffer;
+
+    // Buffers pending destruction (to avoid destroying while GPU is using them)
+    std::vector<vk::Buffer> pendingVertexBuffers;
+    std::vector<vk::DeviceMemory> pendingVertexMemories;
+    std::vector<vk::Buffer> pendingIndexBuffers;
+    std::vector<vk::DeviceMemory> pendingIndexMemories;
 };
 
 class UIRenderSys : public System {
