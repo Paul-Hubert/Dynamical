@@ -40,6 +40,10 @@ DEFINE_SYSTEM(MapConfiguratorSys)
 
 DEFINE_SYSTEM(MapEditorSys)
 
+DEFINE_SYSTEM(LLMDebugSys)
+
+DEFINE_SYSTEM(PersonalityInspectorSys)
+
 }
 
 #undef DEFINE_SYSTEM

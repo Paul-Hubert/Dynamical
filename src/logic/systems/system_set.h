@@ -22,6 +22,14 @@ public:
     void post_add() {
         post_systems.push_back(std::make_unique<T>(reg));
     }
+
+    template<typename T>
+    T* get() {
+        for (auto& s : pre_systems) {
+            if (auto* p = dynamic_cast<T*>(s.get())) return p;
+        }
+        return nullptr;
+    }
     
     void preinit();
     

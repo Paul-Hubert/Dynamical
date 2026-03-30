@@ -5,6 +5,8 @@
 
 #include "entt/entt.hpp"
 
+class LLMManager;
+
 namespace dy {
 
 class SystemSet;
@@ -21,6 +23,9 @@ public:
     std::unique_ptr<Renderer> renderer;
 
     std::unique_ptr<SystemSet> set;
+
+private:
+    std::unique_ptr<LLMManager> llm_manager;
 
 };
 

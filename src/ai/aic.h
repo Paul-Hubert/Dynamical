@@ -1,6 +1,7 @@
 #ifndef AIC_H
 #define AIC_H
 
+#include <queue>
 #include <ai/action_id.h>
 #include <ai/actions/action.h>
 
@@ -14,6 +15,13 @@ public:
 
     std::string last_failure_reason;     // Captured from action->failure_reason before destruction
     std::string last_action_description; // Captured from action->describe() before destruction
+
+    // LLM-driven action queue
+    std::queue<std::unique_ptr<Action>> action_queue;
+
+    // LLM state flags
+    uint64_t pending_llm_request_id = 0;  // 0 = no pending request
+    bool waiting_for_llm = false;
 };
 
 }

@@ -4,6 +4,7 @@
 #include <entt/entt.hpp>
 #include "../ai/personality/personality.h"
 #include "../ai/memory/ai_memory.h"
+#include "../logic/components/basic_needs.h"
 
 using namespace dy;
 
@@ -33,7 +34,10 @@ inline PromptContext build_context(entt::registry& reg, entt::entity entity, con
         ctx.memory = &reg.get<AIMemory>(entity);
     }
 
-    // TODO: Populate hunger, energy from BasicNeeds component in Phase 4
+    if (reg.all_of<BasicNeeds>(entity)) {
+        ctx.hunger = reg.get<BasicNeeds>(entity).hunger;
+    }
+
     // TODO: Populate nearby_entities and nearby_resources via spatial queries
 
     return ctx;

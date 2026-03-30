@@ -32,8 +32,10 @@
 #include "logic/systems/conversation.h"
 
 #include "ai/ai.h"
+#include "ai/speech/speech_bubble_sys.h"
 #include <ai/action_registry.h>
 #include <ai/conversation/conversation_manager.h>
+#include "llm/llm_manager.h"
 
 #include "util/log.h"
 
@@ -80,7 +82,10 @@ void Game::start() {
     set->pre_add<EatSys>();
     
     set->pre_add<AISys>();
-    
+    set->pre_add<SpeechBubbleSys>();
+    set->pre_add<LLMDebugSys>();
+    set->pre_add<PersonalityInspectorSys>();
+
     set->pre_add<ActionBarSys>();
     set->pre_add<ConversationSys>();
 
@@ -96,6 +101,18 @@ void Game::start() {
 
     // Initialize action registry with all action descriptors
     ActionRegistry::instance().initialize_descriptors();
+
+    // Initialize LLM manager if enabled
+    if (s.llm.enabled) {
+        llm_manager = std::make_unique<LLMManager>(s.llm.worker_threads);
+        llm_manager->configure(s.llm.provider, s.llm.model, s.llm.api_key);
+        llm_manager->set_rate_limit(static_cast<int>(s.llm.rate_limit_rps));
+        llm_manager->set_cache_enabled(s.llm.caching_enabled);
+        reg.set<LLMManager*>(llm_manager.get());
+        if (auto* ai_sys = set->get<AISys>()) {
+            ai_sys->set_llm_manager(llm_manager.get());
+        }
+    }
 
     // preinit
 
@@ -148,7 +165,8 @@ void Game::start() {
 }
 
 Game::~Game() {
-    
+
+    if (llm_manager) llm_manager->shutdown();
     set->finish();
     renderer->finish();
 

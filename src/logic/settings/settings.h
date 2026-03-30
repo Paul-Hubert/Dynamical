@@ -34,6 +34,27 @@ public:
 
     std::vector<MapConfiguration> map_configurations;
 
+    struct LLMConfig {
+        std::string provider = "ollama";
+        std::string model = "llama2";
+        std::string api_key = "";
+        bool enabled = false;
+        float rate_limit_rps = 5.0f;
+        int worker_threads = 2;
+        bool caching_enabled = false;
+        bool batching_enabled = false;
+        int batch_size = 3;
+
+        template<class Archive>
+        void serialize(Archive& ar) {
+            ar(CEREAL_NVP(provider), CEREAL_NVP(model), CEREAL_NVP(api_key),
+               CEREAL_NVP(enabled), CEREAL_NVP(rate_limit_rps),
+               CEREAL_NVP(worker_threads), CEREAL_NVP(caching_enabled),
+               CEREAL_NVP(batching_enabled), CEREAL_NVP(batch_size));
+        }
+    };
+    LLMConfig llm;
+
     template <class Archive>
     void serialize(Archive& ar) {
         ar(
@@ -46,7 +67,8 @@ public:
             CEREAL_NVP(client_side),
             CEREAL_NVP(vr_mode),
             CEREAL_NVP(spectator_mode),
-            CEREAL_NVP(map_configurations)
+            CEREAL_NVP(map_configurations),
+            CEREAL_NVP(llm)
         );
     }
 
@@ -56,7 +78,7 @@ private:
     #ifndef DYNAMICAL_CONFIG_DIR
         #define DYNAMICAL_CONFIG_DIR "./"
     #endif
-    #define DYNAMICAL_CONFIG_MAGIC "5"
+    #define DYNAMICAL_CONFIG_MAGIC "6"
     #define DYNAMICAL_CONFIG_FILE DYNAMICAL_CONFIG_DIR "config." DYNAMICAL_CONFIG_MAGIC ".json"
 };
 

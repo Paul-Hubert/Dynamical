@@ -4,91 +4,122 @@
 
 **Scope**: Non-critical gameplay feature, but essential for observability and debugging.
 
-**Estimated Scope**: ~1200 lines of new code
+**Estimated Scope**: ~500 lines of new code
 
-**Completion Criteria**: Speech bubbles show entity thoughts, dialogue, and current action. LLM config panel allows provider/model switching. Personality editor visible (read-only in Phase 5).
+**Completion Criteria**: Entity state panel shows action and LLM status per entity. LLM config panel allows provider/model switching at runtime. Personality inspector shows traits for a selected entity.
 
 ---
 
 ## Context: Why This Phase Matters
 
 Without UI feedback, LLM decisions are invisible. Phase 5 adds:
-1. **Speech bubbles** showing entity state, decision, and dialogue
-2. **LLM config panel** for runtime provider switching and stats
+1. **Entity state panel** showing current action, LLM waiting status, and last memory event
+2. **LLM config panel** for runtime provider/model switching and performance toggles
 3. **Personality inspector** for debugging unique entity traits
 
 This phase is **purely visual** — no game logic changes. Can be implemented last if needed.
 
 ---
 
-## 1. Speech Bubble System
+## Architecture Notes
 
-### 1.1 SpeechBubbleSys Header
+### How ImGui works in this codebase
+
+- `UISys::tick()` calls `ImGui::NewFrame()` each pre-tick — any system ticking after it can call `ImGui::Begin/End`
+- `UIRenderSys::tick()` (post-tick) calls `ImGui::Render()` and handles Vulkan upload
+- New UI systems should be added via `set->pre_add<T>()` in `game.cpp`, **after** `UISys` in the pre-tick list
+- All systems inherit from `System(entt::registry& reg)` and store it as `reg`
+
+### System patterns
+
+Two options for new systems:
+
+**Option A** — Use the `DEFINE_SYSTEM` macro in `src/logic/systems/system_list.h`:
+```cpp
+DEFINE_SYSTEM(LLMDebugSys)
+```
+Then implement `preinit/init/tick/finish` in a `.cpp` file.
+
+**Option B** — Write a full class (like `UISys`/`ConversationSys`), place in a relevant subdirectory (`src/ai/speech/`), with explicit constructor taking `entt::registry& reg`.
+
+Phase 5 uses **Option B** for `SpeechBubbleSys` (lives in `src/ai/speech/`) and **Option A** for `LLMDebugSys` (lives alongside other logic systems).
+
+---
+
+## 1. Settings Additions
+
+### 1.1 Add batching fields to `Settings::LLMConfig`
+
+In `src/logic/settings/settings.h`, the `LLMConfig` struct added in Phase 4 needs two more fields for the config panel's batching controls:
+
+```cpp
+struct LLMConfig {
+    // ... existing Phase 4 fields ...
+    bool batching_enabled = false;
+    int batch_size = 3;
+
+    template<class Archive>
+    void serialize(Archive& ar) {
+        ar(/* ... existing ... */
+           CEREAL_NVP(batching_enabled), CEREAL_NVP(batch_size));
+    }
+};
+```
+
+---
+
+## 2. Entity State Panel (`SpeechBubbleSys`)
+
+### 2.1 Header
 
 Create `src/ai/speech/speech_bubble_sys.h`:
 
 ```cpp
 #pragma once
-#include "../../logic/systems/system.h"
+#include "logic/systems/system.h"
 #include <entt/entt.hpp>
 
-struct SpeechBubble {
-    std::string thought;        // What the entity is thinking
-    std::string dialogue;       // What the entity said
-    std::string current_action; // Current action description
-    float lifetime = 3.0f;      // Seconds to display
-    float elapsed = 0.0f;
-};
+namespace dy {
 
 class SpeechBubbleSys : public System {
 public:
-    void tick(float dt) override;
-
-private:
-    void render_bubbles(float dt);
-    void render_bubble_for(entt::entity entity, const SpeechBubble& bubble);
+    SpeechBubbleSys(entt::registry& reg) : System(reg) {}
+    const char* name() override { return "SpeechBubble"; }
+    void tick(double dt) override;
 };
+
+}
 ```
 
-### 1.2 SpeechBubbleSys Implementation
+### 2.2 Implementation
 
 Create `src/ai/speech/speech_bubble_sys.cpp`:
 
 ```cpp
 #include "speech_bubble_sys.h"
-#include "ai_memory.h"
-#include "../aic.h"
-#include "../actions/action.h"
-#include "../personality/personality.h"
-#include "../../logic/components/position.h"
-#include "../../logic/components/object.h"
-#include <imgui.h>
-#include <glm/glm.hpp>
 
-void SpeechBubbleSys::tick(float dt) {
-    auto& reg = get_registry();
+#include <ai/aic.h>
+#include <ai/memory/ai_memory.h>
+#include <ai/personality/personality.h>
+#include <logic/components/position.h>
 
-    // Update speech bubble lifetime
-    auto view = reg.view<SpeechBubble>();
-    for (auto entity : view) {
-        auto& bubble = view.get<SpeechBubble>(entity);
-        bubble.elapsed += dt;
-        if (bubble.elapsed >= bubble.lifetime) {
-            reg.erase<SpeechBubble>(entity);
-        }
-    }
+#include <imgui/imgui.h>
 
-    // Render all active bubbles
+using namespace dy;
+
+void SpeechBubbleSys::tick(double dt) {
+
+    OPTICK_EVENT();
+
     ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
 
     if (ImGui::Begin("Entity States")) {
-        auto ai_view = reg.view<AIC, Position>();
-        for (auto entity : ai_view) {
-            auto& aic = ai_view.get<AIC>(entity);
-            auto& pos = ai_view.get<Position>(entity);
+        auto view = reg.view<AIC, Position>();
+        for (auto entity : view) {
+            auto& aic = view.get<AIC>(entity);
+            auto& pos = view.get<Position>(entity);
 
-            // Create or update speech bubble
             ImGui::BeginGroup();
 
             // Entity name
@@ -102,28 +133,29 @@ void SpeechBubbleSys::tick(float dt) {
 
             ImGui::Separator();
 
-            // State info
-            ImGui::Text("Position: (%.1f, %.1f, %.1f)", pos.x, pos.y, pos.z);
+            // Position: x/y from glm::vec2, height via getter
+            ImGui::Text("Position: (%.1f, %.1f, %.1f)", pos.x, pos.y, pos.getHeight());
 
             // Current action
             if (aic.action) {
                 ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.5f, 1.0f), "Action: %s",
                     aic.action->describe().c_str());
+            } else {
+                ImGui::TextDisabled("Action: (none)");
             }
 
             // LLM status
             if (aic.waiting_for_llm) {
-                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "⏳ Waiting for LLM...");
-            } else if (aic.action_queue.size() > 0) {
-                ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "✓ %lu actions queued",
+                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Waiting for LLM...");
+            } else if (!aic.action_queue.empty()) {
+                ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "%zu actions queued",
                     aic.action_queue.size());
             }
 
-            // Memory/thought
+            // Last memory event
             if (auto* mem = reg.try_get<AIMemory>(entity)) {
                 if (!mem->events.empty()) {
-                    const auto& last_event = mem->events.back();
-                    ImGui::Text("Last event: %s", last_event.description.c_str());
+                    ImGui::Text("Last: %s", mem->events.back().description.c_str());
                 }
             }
 
@@ -135,135 +167,128 @@ void SpeechBubbleSys::tick(float dt) {
 }
 ```
 
----
+### 2.3 Register
 
-## 2. LLM Configuration Panel
-
-### 2.1 LLM Config UI
-
-Add to a new file `src/ui/llm_config_panel.h`:
+In `src/logic/game.cpp`, add after `set->pre_add<AISys>()`:
 
 ```cpp
-#pragma once
-#include "../llm/llm_manager.h"
-#include "../logic/settings.h"
-
-class LLMConfigPanel {
-public:
-    void render(Settings& settings, LLMManager* llm_mgr);
-
-private:
-    static const char* provider_names[];
-    static const char* model_names_for_provider(const std::string& provider);
-    int current_provider_idx = 0;
-    int current_model_idx = 0;
-};
+#include "ai/speech/speech_bubble_sys.h"
+// ...
+set->pre_add<SpeechBubbleSys>();
 ```
 
-### 2.2 LLM Config Implementation
+---
 
-Create `src/ui/llm_config_panel.cpp`:
+## 3. LLM Configuration Panel (`LLMDebugSys`)
+
+### 3.1 Add to `system_list.h`
+
+In `src/logic/systems/system_list.h`, add inside the `namespace dy` block:
 
 ```cpp
-#include "llm_config_panel.h"
-#include <imgui.h>
+DEFINE_SYSTEM(LLMDebugSys)
+```
 
-const char* LLMConfigPanel::provider_names[] = {
-    "Ollama", "LM Studio", "Claude API", "OpenAI", nullptr
-};
+### 3.2 Implementation
 
-const char* LLMConfigPanel::model_names_for_provider(const std::string& provider) {
-    if (provider == "ollama") {
-        return "llama2\0mistral\0neural-chat\0";
-    } else if (provider == "lm_studio") {
-        return "thebloke/mistral\0gpt4all-j\0";
-    } else if (provider == "claude") {
-        return "claude-3-haiku\0claude-3-sonnet\0claude-3-opus\0";
-    } else if (provider == "openai") {
-        return "gpt-3.5-turbo\0gpt-4\0gpt-4-turbo\0";
+Create `src/logic/systems/llm_debug.cpp`:
+
+```cpp
+#include "system_list.h"
+
+#include "logic/settings/settings.h"
+#include "llm/llm_manager.h"
+
+#include <imgui/imgui.h>
+
+using namespace dy;
+
+void LLMDebugSys::preinit() {}
+void LLMDebugSys::init() {}
+void LLMDebugSys::finish() {}
+
+void LLMDebugSys::tick(double dt) {
+
+    OPTICK_EVENT();
+
+    auto& s = reg.ctx<Settings>();
+
+    // LLMManager is stored in Game, not the registry.
+    // Access via registry context pointer set in Game::start().
+    LLMManager* llm_mgr = nullptr;
+    if (auto* ptr = reg.try_ctx<LLMManager*>()) {
+        llm_mgr = *ptr;
     }
-    return "";
-}
 
-void LLMConfigPanel::render(Settings& settings, LLMManager* llm_mgr) {
     ImGui::SetNextWindowPos(ImVec2(420, 10), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(350, 400), ImGuiCond_FirstUseEver);
 
     if (ImGui::Begin("LLM Configuration")) {
-        // Enable/Disable toggle
-        bool llm_enabled = settings.llm.enabled;
-        if (ImGui::Checkbox("Enable LLM", &llm_enabled)) {
-            settings.llm.enabled = llm_enabled;
-        }
+
+        // Enable toggle
+        ImGui::Checkbox("Enable LLM", &s.llm.enabled);
 
         ImGui::Separator();
 
         // Provider selector
-        ImGui::Text("Provider:");
+        static const char* providers[] = { "ollama", "lm_studio", "claude", "openai", nullptr };
+        static const char* provider_labels[] = { "Ollama", "LM Studio", "Claude API", "OpenAI", nullptr };
+
         int provider_idx = 0;
-        if (settings.llm.provider == "ollama") provider_idx = 0;
-        else if (settings.llm.provider == "lm_studio") provider_idx = 1;
-        else if (settings.llm.provider == "claude") provider_idx = 2;
-        else if (settings.llm.provider == "openai") provider_idx = 3;
-
-        if (ImGui::Combo("##provider", &provider_idx, provider_names)) {
-            switch (provider_idx) {
-                case 0: settings.llm.provider = "ollama"; break;
-                case 1: settings.llm.provider = "lm_studio"; break;
-                case 2: settings.llm.provider = "claude"; break;
-                case 3: settings.llm.provider = "openai"; break;
-            }
-            if (llm_mgr) {
-                llm_mgr->configure(settings.llm.provider, settings.llm.model, settings.llm.api_key);
-            }
+        for (int i = 0; providers[i]; ++i) {
+            if (s.llm.provider == providers[i]) { provider_idx = i; break; }
+        }
+        ImGui::Text("Provider:");
+        if (ImGui::Combo("##provider", &provider_idx, provider_labels)) {
+            s.llm.provider = providers[provider_idx];
+            if (llm_mgr) llm_mgr->configure(s.llm.provider, s.llm.model, s.llm.api_key);
         }
 
-        // Model selector
+        // Model input
         ImGui::Text("Model:");
-        static char model_input[256] = "";
-        ImGui::InputText("##model", model_input, sizeof(model_input));
-        if (ImGui::Button("Set Model")) {
-            settings.llm.model = model_input;
-            if (llm_mgr) {
-                llm_mgr->configure(settings.llm.provider, settings.llm.model, settings.llm.api_key);
-            }
+        static char model_buf[256] = "";
+        if (model_buf[0] == '\0') {
+            strncpy_s(model_buf, s.llm.model.c_str(), sizeof(model_buf) - 1);
+        }
+        ImGui::InputText("##model", model_buf, sizeof(model_buf));
+        ImGui::SameLine();
+        if (ImGui::Button("Apply##model")) {
+            s.llm.model = model_buf;
+            if (llm_mgr) llm_mgr->configure(s.llm.provider, s.llm.model, s.llm.api_key);
         }
 
-        // API Key (if needed)
-        if (settings.llm.provider == "claude" || settings.llm.provider == "openai") {
+        // API key (cloud providers only)
+        if (s.llm.provider == "claude" || s.llm.provider == "openai") {
             ImGui::Text("API Key:");
-            static char api_key_input[256] = "";
-            ImGui::InputText("##api_key", api_key_input, sizeof(api_key_input), ImGuiInputTextFlags_Password);
-            if (ImGui::Button("Set API Key")) {
-                settings.llm.api_key = api_key_input;
-                if (llm_mgr) {
-                    llm_mgr->configure(settings.llm.provider, settings.llm.model, settings.llm.api_key);
-                }
+            static char key_buf[256] = "";
+            ImGui::InputText("##apikey", key_buf, sizeof(key_buf), ImGuiInputTextFlags_Password);
+            ImGui::SameLine();
+            if (ImGui::Button("Apply##key")) {
+                s.llm.api_key = key_buf;
+                if (llm_mgr) llm_mgr->configure(s.llm.provider, s.llm.model, s.llm.api_key);
             }
         }
 
         ImGui::Separator();
 
         // Rate limiting
-        ImGui::SliderFloat("Rate Limit (RPS)", &settings.llm.rate_limit_rps, 0.5f, 20.0f);
-        if (llm_mgr) {
-            llm_mgr->set_rate_limit(static_cast<int>(settings.llm.rate_limit_rps));
+        if (ImGui::SliderFloat("Rate Limit (RPS)", &s.llm.rate_limit_rps, 0.5f, 20.0f)) {
+            if (llm_mgr) llm_mgr->set_rate_limit(static_cast<int>(s.llm.rate_limit_rps));
         }
 
-        // Batching toggle
-        ImGui::Checkbox("Enable Batching", &settings.llm.batching_enabled);
-        if (settings.llm.batching_enabled) {
-            ImGui::SliderInt("Batch Size", &settings.llm.batch_size, 2, 8);
+        // Batching (fields added to LLMConfig in section 1.1)
+        if (ImGui::Checkbox("Enable Batching", &s.llm.batching_enabled)) {
+            if (llm_mgr) llm_mgr->set_batching_enabled(s.llm.batching_enabled);
         }
-        if (llm_mgr) {
-            llm_mgr->set_batching_enabled(settings.llm.batching_enabled);
-            llm_mgr->set_batch_size(settings.llm.batch_size);
+        if (s.llm.batching_enabled) {
+            if (ImGui::SliderInt("Batch Size", &s.llm.batch_size, 2, 8)) {
+                if (llm_mgr) llm_mgr->set_batch_size(s.llm.batch_size);
+            }
         }
 
-        // Caching toggle
-        ImGui::Checkbox("Enable Caching", &settings.llm.caching_enabled);
-        if (llm_mgr) {
-            llm_mgr->set_cache_enabled(settings.llm.caching_enabled);
+        // Caching
+        if (ImGui::Checkbox("Enable Caching", &s.llm.caching_enabled)) {
+            if (llm_mgr) llm_mgr->set_cache_enabled(s.llm.caching_enabled);
         }
 
         ImGui::Separator();
@@ -273,76 +298,105 @@ void LLMConfigPanel::render(Settings& settings, LLMManager* llm_mgr) {
             bool available = llm_mgr->is_available();
             ImGui::TextColored(
                 available ? ImVec4(0.5f, 1.0f, 0.5f, 1.0f) : ImVec4(1.0f, 0.5f, 0.5f, 1.0f),
-                "Status: %s",
-                available ? "Connected" : "Disconnected"
+                "Status: %s", available ? "Connected" : "Disconnected"
             );
-
-            ImGui::Text("Current Provider: %s", llm_mgr->get_provider().c_str());
-            ImGui::Text("Current Model: %s", llm_mgr->get_model().c_str());
+        } else {
+            ImGui::TextDisabled("LLM disabled");
         }
 
-        ImGui::Text("Worker Threads: %d", settings.llm.worker_threads);
+        // Save button
+        if (ImGui::Button("Save Settings")) {
+            s.save();
+        }
     }
     ImGui::End();
 }
 ```
 
----
+### 3.3 LLMManager in registry context
 
-## 3. Personality Inspector
-
-### 3.1 Personality UI
-
-Create `src/ui/personality_inspector.h`:
+`LLMDebugSys` needs to reach `LLMManager` at runtime. In `Game::start()`, after creating the manager, also register a pointer in the registry context:
 
 ```cpp
-#pragma once
-#include "../ai/personality/personality.h"
-#include <entt/entt.hpp>
-
-class PersonalityInspector {
-public:
-    void render(entt::registry& reg);
-
-private:
-    entt::entity selected_entity = entt::null;
-};
+// In game.cpp, inside the `if (s.llm.enabled)` block:
+reg.set<LLMManager*>(llm_manager.get());
 ```
 
-### 3.2 Personality Inspector Implementation
+This allows any system to retrieve it via `reg.try_ctx<LLMManager*>()`.
 
-Create `src/ui/personality_inspector.cpp`:
+### 3.4 Register
+
+In `src/logic/game.cpp`, add:
+```cpp
+#include "logic/systems/system_list.h"  // already included
+// ...
+set->pre_add<LLMDebugSys>();
+```
+
+---
+
+## 4. Personality Inspector
+
+### 4.1 Add to `system_list.h`
 
 ```cpp
-#include "personality_inspector.h"
-#include "../ai/aic.h"
-#include <imgui.h>
+DEFINE_SYSTEM(PersonalityInspectorSys)
+```
 
-void PersonalityInspector::render(entt::registry& reg) {
+### 4.2 Implementation
+
+Create `src/logic/systems/personality_inspector.cpp`:
+
+```cpp
+#include "system_list.h"
+
+#include <ai/aic.h>
+#include <ai/personality/personality.h>
+#include <ai/memory/ai_memory.h>
+
+#include <imgui/imgui.h>
+
+using namespace dy;
+
+// Module-level state (static, not in the system struct)
+static entt::entity s_selected = entt::null;
+
+void PersonalityInspectorSys::preinit() {}
+void PersonalityInspectorSys::init() {}
+void PersonalityInspectorSys::finish() {}
+
+void PersonalityInspectorSys::tick(double dt) {
+
+    OPTICK_EVENT();
+
     ImGui::SetNextWindowPos(ImVec2(780, 10), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(350, 400), ImGuiCond_FirstUseEver);
 
     if (ImGui::Begin("Personality Inspector")) {
-        // Entity selector
-        ImGui::Text("Select Entity:");
 
+        // Build entity list
         auto view = reg.view<AIC, Personality>();
-        static int selected_idx = 0;
         std::vector<entt::entity> entities(view.begin(), view.end());
 
-        if (!entities.empty()) {
-            if (ImGui::BeginCombo("##entity_select",
-                fmt::format("Entity #{}", static_cast<uint32_t>(selected_entity)).c_str())) {
+        if (entities.empty()) {
+            ImGui::TextDisabled("No entities with Personality component");
+        } else {
+            // Combo selector
+            std::string preview = (s_selected != entt::null && reg.valid(s_selected))
+                ? "Entity #" + std::to_string(static_cast<uint32_t>(s_selected))
+                : "Select...";
 
-                for (size_t i = 0; i < entities.size(); ++i) {
-                    bool is_selected = (selected_entity == entities[i]);
-                    if (ImGui::Selectable(
-                        fmt::format("Entity #{}##combo", static_cast<uint32_t>(entities[i])).c_str(),
-                        is_selected)) {
-                        selected_entity = entities[i];
-                        selected_idx = i;
+            if (ImGui::BeginCombo("##entity_select", preview.c_str())) {
+                for (auto e : entities) {
+                    std::string label = "Entity #" + std::to_string(static_cast<uint32_t>(e));
+                    if (auto* pers = reg.try_get<Personality>(e)) {
+                        label += " (" + pers->archetype + ")";
                     }
-                    if (is_selected) ImGui::SetItemDefaultFocus();
+                    bool selected = (s_selected == e);
+                    if (ImGui::Selectable(label.c_str(), selected)) {
+                        s_selected = e;
+                    }
+                    if (selected) ImGui::SetItemDefaultFocus();
                 }
                 ImGui::EndCombo();
             }
@@ -350,25 +404,31 @@ void PersonalityInspector::render(entt::registry& reg) {
 
         ImGui::Separator();
 
-        // Display personality details
-        if (selected_entity != entt::null && reg.valid(selected_entity)) {
-            if (auto* pers = reg.try_get<Personality>(selected_entity)) {
-                ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "Archetype: %s",
-                    pers->archetype.c_str());
-                ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "Motivation: %s",
-                    pers->motivation.c_str());
-                ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "Speech Style: %s",
-                    pers->speech_style.c_str());
+        // Display selected entity's personality
+        if (s_selected != entt::null && reg.valid(s_selected)) {
+            if (auto* pers = reg.try_get<Personality>(s_selected)) {
+                ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "Archetype:    %s", pers->archetype.c_str());
+                ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "Motivation:   %s", pers->motivation.c_str());
+                ImGui::TextColored(ImVec4(0.8f, 0.8f, 1.0f, 1.0f), "Speech Style: %s", pers->speech_style.c_str());
+                ImGui::Text("Seed: %u", pers->personality_seed);
 
                 ImGui::Separator();
                 ImGui::Text("Traits:");
                 for (const auto& trait : pers->traits) {
-                    ImGui::Text("  %s: %.2f", trait.name.c_str(), trait.value);
-                    ImGui::ProgressBar(trait.value, ImVec2(-1, 0));
+                    ImGui::Text("  %s (%.2f)", trait.name.c_str(), trait.value);
+                    ImGui::ProgressBar(trait.value, ImVec2(-1.0f, 0.0f));
                 }
+            }
 
-                ImGui::Separator();
-                ImGui::Text("Seed: %u", pers->personality_seed);
+            ImGui::Separator();
+
+            // Recent memory events
+            if (auto* mem = reg.try_get<AIMemory>(s_selected)) {
+                ImGui::Text("Recent Events (%zu):", mem->events.size());
+                int count = 0;
+                for (auto it = mem->events.rbegin(); it != mem->events.rend() && count < 5; ++it, ++count) {
+                    ImGui::TextDisabled("  [%s] %s", it->event_type.c_str(), it->description.c_str());
+                }
             }
         }
     }
@@ -376,127 +436,130 @@ void PersonalityInspector::render(entt::registry& reg) {
 }
 ```
 
----
+### 4.3 Register
 
-## 4. Register Systems
-
-### 4.1 Add to Game Loop
-
-In `src/logic/game.cpp`, register UI systems:
-
+In `src/logic/game.cpp`:
 ```cpp
-#include "speech/speech_bubble_sys.h"
-#include "../ui/llm_config_panel.h"
-#include "../ui/personality_inspector.h"
-
-void Game::start() {
-    // ... existing setup
-
-    // Register UI systems (after all other systems)
-    systems->register_system<SpeechBubbleSys>();
-
-    // ... rest of game initialization
-}
-
-void Game::update_ui() {
-    // Called from renderer after ImGui setup
-    static LLMConfigPanel llm_panel;
-    static PersonalityInspector pers_inspector;
-
-    llm_panel.render(settings, llm_manager.get());
-    pers_inspector.render(registry);
-}
-```
-
-### 4.2 Trigger UI Update from Renderer
-
-In `src/renderer/renderer.cpp` (or wherever ImGui is rendered):
-
-```cpp
-// After ImGui setup
-game->update_ui();  // Call UI rendering
+set->pre_add<PersonalityInspectorSys>();
 ```
 
 ---
 
-## 5. Speech Bubble Creation
+## 5. Speech Bubble Creation on LLM Response
 
-When LLM decision is made or action completes:
+When an LLM response arrives, the decision's `thought` and `dialogue` fields can be surfaced. The `SpeechBubble` component is an optional component for displaying fleeting text (not required for the panels above, but useful for in-world display).
+
+### 5.1 SpeechBubble Component
+
+Define in `src/ai/speech/speech_bubble.h`:
 
 ```cpp
-// In AISys::poll_llm_results() or action completion
-if (auto decision = parser.parse(response.parsed_json); decision.success) {
-    // Create speech bubble
-    auto bubble = SpeechBubble{
-        .thought = decision.thought,
+#pragma once
+#include <string>
+
+namespace dy {
+
+struct SpeechBubble {
+    std::string thought;
+    std::string dialogue;
+    float lifetime = 4.0f;
+    float elapsed = 0.0f;
+};
+
+}
+```
+
+### 5.2 Emit on LLM response
+
+In `AISys::poll_llm_results()` (`src/ai/ai.cpp`), after populating `action_queue`:
+
+```cpp
+// Attach speech bubble with thought/dialogue from LLM response
+if (!decision.thought.empty() || !decision.dialogue.empty()) {
+    reg.emplace_or_replace<SpeechBubble>(entity, SpeechBubble{
+        .thought  = decision.thought,
         .dialogue = decision.dialogue,
-        .current_action = "Planning next actions...",
-        .lifetime = 5.0f
-    };
-    reg.emplace_or_replace<SpeechBubble>(entity, bubble);
+    });
+}
+```
+
+### 5.3 Tick down in `SpeechBubbleSys`
+
+In `SpeechBubbleSys::tick()`, before the panel rendering, decay and erase expired bubbles:
+
+```cpp
+auto bubble_view = reg.view<SpeechBubble>();
+for (auto e : bubble_view) {
+    auto& b = bubble_view.get<SpeechBubble>(e);
+    b.elapsed += static_cast<float>(dt);
+    if (b.elapsed >= b.lifetime) {
+        reg.erase<SpeechBubble>(e);
+    }
 }
 ```
 
 ---
 
-## 6. CMakeLists.txt Updates
+## 6. Final `game.cpp` Additions Summary
 
-```cmake
-target_sources(dynamical PRIVATE
-    src/ai/speech/speech_bubble_sys.h
-    src/ai/speech/speech_bubble_sys.cpp
+```cpp
+// Additional includes
+#include "ai/speech/speech_bubble_sys.h"
 
-    src/ui/llm_config_panel.h
-    src/ui/llm_config_panel.cpp
-    src/ui/personality_inspector.h
-    src/ui/personality_inspector.cpp
-)
+// In start(), after set->pre_add<AISys>():
+set->pre_add<SpeechBubbleSys>();
+set->pre_add<LLMDebugSys>();
+set->pre_add<PersonalityInspectorSys>();
 
-# Ensure ImGui is linked
-target_link_libraries(dynamical PRIVATE imgui)
+// In start(), inside if (s.llm.enabled) block:
+reg.set<LLMManager*>(llm_manager.get());
 ```
 
 ---
 
 ## 7. Testing Checklist
 
-- [ ] SpeechBubbleSys renders without crashing
-- [ ] Entity state updates in real-time on UI
-- [ ] LLM config panel displays current settings
-- [ ] Provider/model changes apply to LLMManager
-- [ ] Rate limit slider affects request rate
-- [ ] Batching toggle works (visual confirmation only)
-- [ ] Personality inspector lists all entities with personalities
-- [ ] Selected entity personality displays correctly
-- [ ] All UI elements are positioned without overlap
-- [ ] No performance regression from UI rendering
+- [ ] Entity state panel renders with position, action name, LLM wait status
+- [ ] "Waiting for LLM..." shown while `waiting_for_llm == true`
+- [ ] Action queue count updates when LLM responds
+- [ ] Last memory event text shows in panel after action completes
+- [ ] LLM config panel shows current provider/model from settings
+- [ ] Provider dropdown reconfigures `LLMManager` immediately
+- [ ] Rate limit slider applies to active `LLMManager`
+- [ ] Batching and caching toggles call correct `LLMManager` methods
+- [ ] Save Settings persists to `config.6.json`
+- [ ] Personality inspector lists all entities with `Personality` component
+- [ ] Traits render as progress bars
+- [ ] Recent memory events (last 5) display correctly
+- [ ] No crash when selected entity is destroyed
+- [ ] No performance regression — UI rendering stays under 1ms/frame
+- [ ] Speech bubbles decay and erase after `lifetime` seconds
 
 ---
 
 ## 8. Optional Enhancements (Post-Phase 5)
 
-- **Thought visualization**: Show entity's reasoning as multi-line text
-- **Action history**: Timeline of past 10 actions
-- **Conversation viewer**: View active conversations between entities
-- **Debug overlay**: Show prompt being sent to LLM (sanitized)
-- **Decision graph**: Visualize prerequisite chains before execution
-- **Stats dashboard**: RPS, cache hit rate, response times
+- **In-world speech bubble rendering**: Project entity world position to screen space, draw ImGui tooltip at that position
+- **Action history**: Timeline of past 10 completed/failed actions in personality inspector
+- **Conversation viewer**: List active conversations and their messages
+- **Prompt preview**: Show (sanitized) prompt being sent to LLM
+- **Stats overlay**: RPS, cache hit rate, avg response time from LLMManager
 
 ---
 
 ## 9. Dependencies
 
-- **Depends on**: Phases 1-4 (all game logic complete)
-- **Independent of**: Action implementations (Phase 6)
-- **Purely visual** — no impact on game logic
+- **Depends on**: Phases 1–4
+- **Independent of**: Phase 6 (action implementations)
+- **Purely visual** — no game logic changes
 
-**Can be skipped or deferred if visual feedback is not critical.**
+**Can be skipped or deferred** if visual feedback is not critical for current development.
 
 ---
 
 ## 10. Next Phase
 
-**Phase 6** implements the actual action skeletons (Mine, Hunt, Build, Sleep, Trade, Talk, Craft, Fish, Explore, Flee) and their corresponding ECS systems.
+**Phase 6** implements the action skeletons (Mine, Hunt, Build, Sleep, Trade, Talk, Craft, Fish, Explore, Flee) and their corresponding ECS systems.
 
 ---
 

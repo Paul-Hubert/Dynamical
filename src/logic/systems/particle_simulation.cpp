@@ -163,7 +163,7 @@ void ParticleSimulationSys::AddParticles() {
         }
     }
  */
-
+    /*
     if(input.leftDown) {
         auto &map = reg.ctx<MapManager>();
 
@@ -189,6 +189,7 @@ void ParticleSimulationSys::AddParticles() {
 
         }
     }
+    */
 
 }
 
