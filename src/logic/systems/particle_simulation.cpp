@@ -1,6 +1,7 @@
 #include "particle_simulation.h"
 
 #include "renderer/context/context.h"
+#include "renderer/util/vk_debug.h"
 
 #include "util/util.h"
 #include "util/log.h"
@@ -19,12 +20,15 @@ ParticleSimulationSys::ParticleSimulationSys(entt::registry& reg) : System(reg) 
         VmaAllocationCreateInfo info {};
         info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
         particleBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(Particle) * max_particles, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eVertexBuffer, vk::SharingMode::eExclusive));
+        SET_VK_NAME(ctx.device, vk::ObjectType::eBuffer, particleBuffer.buffer, "Particle_DataBuffer");
+
         hashmapBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(uint32_t) * 2 * hashmap_slots, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::SharingMode::eExclusive));
+        SET_VK_NAME(ctx.device, vk::ObjectType::eBuffer, hashmapBuffer.buffer, "Particle_HashmapBuffer");
 
         info.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
         info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
         uniformBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(Particle) * max_new_particles, vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive));
-
+        SET_VK_NAME(ctx.device, vk::ObjectType::eBuffer, uniformBuffer.buffer, "Particle_InputBuffer");
 
         VmaAllocationInfo inf;
         vmaGetAllocationInfo(ctx.device, uniformBuffer.allocation, &inf);

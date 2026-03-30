@@ -65,26 +65,26 @@ void Swapchain::setup() {
     }
     
     swapchain = newSwapchain;
-    
+
     DEV_LOAD(vkGetSwapchainImagesKHR)
-    
+
     uint32_t num;
     vkGetSwapchainImagesKHR(ctx.device, static_cast<VkSwapchainKHR> (swapchain), &num, nullptr);
-    
+
     if(num_frames != num) std::cout << "number of frames changed to : " << num << std::endl;
-    
+
     images.resize(num_frames);
     vkGetSwapchainImagesKHR(ctx.device, static_cast<VkSwapchainKHR> (swapchain), &num, reinterpret_cast<VkImage*> (images.data()));
-    
+
     imageViews.resize(num_frames);
     for(uint32_t i = 0; i < imageViews.size(); i++) {
-        
+
         imageViews[i] = ctx.device->createImageView(vk::ImageViewCreateInfo({}, images[i], vk::ImageViewType::e2D, format,
                                     vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
         ));
-        
+
     }
-    
+
 }
 
 void Swapchain::cleanup() {

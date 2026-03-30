@@ -1,6 +1,7 @@
 #include "vmapp.h"
 
 #include "renderer/context/device.h"
+#include "renderer/util/vk_debug.h"
 
 using namespace dy;
 
@@ -43,20 +44,25 @@ VmaBuffer::VmaBuffer(Device& device, const vk::BufferCreateInfo& bufferInfo) {
 }
 
 VmaBuffer::~VmaBuffer() {
-    
+
     if(device != nullptr) {
-        
+
         if(allocation != nullptr) {
             vmaDestroyBuffer(*device, static_cast<VkBuffer>(buffer), allocation);
         } else {
             (*device)->destroy(buffer);
             (*device)->free(memory);
         }
-        
+
     }
-    
+
 }
 
+void VmaBuffer::setDebugName(const char* name) {
+    if(device != nullptr) {
+        SET_VK_NAME(*device, vk::ObjectType::eBuffer, buffer, name);
+    }
+}
 
 VmaImage::VmaImage() : device(nullptr) {
     

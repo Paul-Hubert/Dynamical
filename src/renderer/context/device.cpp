@@ -3,6 +3,7 @@
 #include "loader.inl"
 #include "util/util.h"
 #include "context.h"
+#include "renderer/util/vk_debug.h"
 
 #include <iostream>
 #include <set>
@@ -122,30 +123,29 @@ Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     logical = physical.createDevice(vk::DeviceCreateInfo({}, countF, pqinfo.data(), 0, nullptr, (uint32_t) extensions.size(), extensions.data(), &requiredFeatures));
     
     VULKAN_HPP_DEFAULT_DISPATCHER.init(logical);
-    
+
     Device& device = *this;
-    
-    
-    SET_NAME(vk::ObjectType::eDevice, (VkDevice) logical, main)
-    
+
+    SET_VK_NAME(logical, vk::ObjectType::eDevice, logical, "MainDevice");
+
     graphics = logical.getQueue(g_i, 0);
-    
-    SET_NAME(vk::ObjectType::eQueue, (VkQueue) graphics, graphics)
-    
+
+    SET_VK_NAME(logical, vk::ObjectType::eQueue, graphics, "GraphicsQueue");
+
     if(c_i == g_i) {
         compute = graphics;
     } else {
         compute = logical.getQueue(c_i, 0);
-        SET_NAME(vk::ObjectType::eQueue, (VkQueue) compute, compute)
+        SET_VK_NAME(logical, vk::ObjectType::eQueue, compute, "ComputeQueue");
     }
-    
+
     if(t_i == g_i) {
         transfer = graphics;
     } else if(t_i == c_i) {
         transfer = compute;
     } else {
         transfer = logical.getQueue(t_i, 0);
-        SET_NAME(vk::ObjectType::eQueue, (VkQueue) transfer, transfer)
+        SET_VK_NAME(logical, vk::ObjectType::eQueue, transfer, "TransferQueue");
     }
     
     VmaAllocatorCreateInfo allocatorInfo = {};

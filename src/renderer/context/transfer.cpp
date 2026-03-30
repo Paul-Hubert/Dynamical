@@ -1,6 +1,7 @@
 #include "transfer.h"
 
 #include "context.h"
+#include "renderer/util/vk_debug.h"
 
 #include "util/util.h"
 
@@ -89,6 +90,8 @@ std::shared_ptr<VmaImage> Transfer::createImage(const void* data, size_t real_si
     current.stagingBuffers.push_back(VmaBuffer(ctx.device, &ainfo, binfo));
     auto& stage = current.stagingBuffers.back();
 
+    SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eBuffer, stage.buffer, "Transfer_StagingBuffer_Image_%zu", current.stagingBuffers.size()-1);
+
     VmaAllocationInfo inf;
     vmaGetAllocationInfo(ctx.device, stage.allocation, &inf);
 
@@ -133,6 +136,8 @@ std::shared_ptr<VmaBuffer> Transfer::createBuffer(const void* data, vk::BufferCr
 
         current.stagingBuffers.push_back(VmaBuffer(ctx.device, &ainfo, binfo));
         auto& stage = current.stagingBuffers.back();
+
+        SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eBuffer, stage.buffer, "Transfer_StagingBuffer_Buffer_%zu", current.stagingBuffers.size()-1);
 
         VmaAllocationInfo inf;
         vmaGetAllocationInfo(ctx.device, stage.allocation, &inf);

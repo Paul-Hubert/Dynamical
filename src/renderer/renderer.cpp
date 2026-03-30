@@ -19,8 +19,8 @@ per_frame(NUM_FRAMES) {
     
     for(int i = 0; i<NUM_FRAMES; i++) {
         per_frame[i].transfer_semaphore = ctx.device->createSemaphore({});
-        per_frame[i].compute_semaphore = ctx.device->createSemaphore( {});
-        per_frame[i].graphics_semaphore = ctx.device->createSemaphore( {});
+        per_frame[i].compute_semaphore = ctx.device->createSemaphore({});
+        per_frame[i].graphics_semaphore = ctx.device->createSemaphore({});
     }
 
 }

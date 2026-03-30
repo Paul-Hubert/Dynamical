@@ -1,6 +1,7 @@
 #include "map_render.h"
 
 #include "renderer/context/context.h"
+#include "renderer/util/vk_debug.h"
 
 #include "util/util.h"
 
@@ -35,6 +36,10 @@ MapRenderSys::MapRenderSys(entt::registry& reg) : System(reg) {
     numIndices = indices.size();
 
     indexBuffer = ctx.transfer.createBuffer(indices.data(), vk::BufferCreateInfo({}, indices.size() * sizeof(uint32_t), vk::BufferUsageFlagBits::eIndexBuffer, vk::SharingMode::eExclusive));
+
+    if(indexBuffer) {
+        SET_VK_NAME(ctx.device, vk::ObjectType::eBuffer, indexBuffer->buffer, "Terrain_IndexBuffer");
+    }
 
 }
 

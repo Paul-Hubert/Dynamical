@@ -27,7 +27,7 @@ Instance::Instance(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     std::vector<const char*> layers{};
 
 #ifndef NDEBUG
-    extensions.push_back("VK_EXT_debug_utils");
+    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     layers.push_back("VK_LAYER_KHRONOS_validation");
 #endif
 

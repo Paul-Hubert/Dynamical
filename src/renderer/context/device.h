@@ -11,13 +11,6 @@ namespace dy {
 
 class Context;
 
-#ifndef NDEBUG
-#define SET_NAME(TYPE, HANDLE, STR) \
-ctx.device->setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT(TYPE, (uint64_t) HANDLE, #STR));
-#else
-#define SET_NAME(TYPE, HANDLE, STR)
-#endif
-
 class Device {
 public :
     Device(Context& ctx, entt::registry& reg);

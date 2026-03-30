@@ -1,6 +1,7 @@
 #include "ui_render.h"
 
 #include "renderer/context/context.h"
+#include "renderer/util/vk_debug.h"
 
 #include <imgui/imgui.h>
 
@@ -76,26 +77,30 @@ void UIRenderSys::init() {
     
 }
 
-void UIRenderSys::createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buffer_memory, vk::DeviceSize& p_buffer_size, size_t new_size, vk::BufferUsageFlagBits usage) {
-    
+void UIRenderSys::createOrResizeBuffer(vk::Buffer& buffer, vk::DeviceMemory& buffer_memory, vk::DeviceSize& p_buffer_size, size_t new_size, vk::BufferUsageFlagBits usage, const char* debug_name) {
+
     Context& ctx = *reg.ctx<Context*>();
-    
+
     if (buffer)
         ctx.device->destroyBuffer(buffer);
     if (buffer_memory)
         ctx.device->freeMemory(buffer_memory);
-    
+
     buffer = ctx.device->createBuffer(vk::BufferCreateInfo({}, new_size, usage, vk::SharingMode::eExclusive));
 
+    if (debug_name) {
+        SET_VK_NAME(ctx.device, vk::ObjectType::eBuffer, buffer, debug_name);
+    }
+
     vk::MemoryRequirements req = ctx.device->getBufferMemoryRequirements(buffer);
-    
+
     buffer_memory = ctx.device->allocateMemory(
         vk::MemoryAllocateInfo(req.size,
             ctx.device.getMemoryType(req.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)));
-    
+
     ctx.device->bindBufferMemory(buffer, buffer_memory, 0);
     p_buffer_size = new_size;
-    
+
 }
 
 void UIRenderSys::tick(double dt) {
@@ -120,10 +125,16 @@ void UIRenderSys::tick(double dt) {
     size_t vertex_size = draw_data->TotalVtxCount * sizeof(ImDrawVert);
     size_t index_size = draw_data->TotalIdxCount * sizeof(ImDrawIdx);
     
-    if (!fd->vertexBuffer || fd->vertexBufferSize < vertex_size)
-        createOrResizeBuffer(fd->vertexBuffer, fd->vertexBufferMemory, fd->vertexBufferSize, vertex_size, vk::BufferUsageFlagBits::eVertexBuffer);
-    if (!fd->indexBuffer || fd->indexBufferSize < index_size)
-        createOrResizeBuffer(fd->indexBuffer, fd->indexBufferMemory, fd->indexBufferSize, index_size, vk::BufferUsageFlagBits::eIndexBuffer);
+    if (!fd->vertexBuffer || fd->vertexBufferSize < vertex_size) {
+        char vbuf[64];
+        snprintf(vbuf, sizeof(vbuf), "ImGui_VertexBuffer_F%u", ctx.swap.current);
+        createOrResizeBuffer(fd->vertexBuffer, fd->vertexBufferMemory, fd->vertexBufferSize, vertex_size, vk::BufferUsageFlagBits::eVertexBuffer, vbuf);
+    }
+    if (!fd->indexBuffer || fd->indexBufferSize < index_size) {
+        char ibuf[64];
+        snprintf(ibuf, sizeof(ibuf), "ImGui_IndexBuffer_F%u", ctx.swap.current);
+        createOrResizeBuffer(fd->indexBuffer, fd->indexBufferMemory, fd->indexBufferSize, index_size, vk::BufferUsageFlagBits::eIndexBuffer, ibuf);
+    }
 
     // Upload Vertex and index Data:
     {

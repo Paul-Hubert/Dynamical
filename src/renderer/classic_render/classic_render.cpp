@@ -4,6 +4,7 @@
 
 #include "renderer/context/context.h"
 #include "renderer/context/num_frames.h"
+#include "renderer/util/vk_debug.h"
 
 #include "renderer/util/vk_util.h"
 
@@ -41,6 +42,8 @@ per_frame(NUM_FRAMES) {
         allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
         f.ubo = VmaBuffer(ctx.device, &allocInfo, vk::BufferCreateInfo({}, sizeof(ViewUBO), vk::BufferUsageFlagBits::eUniformBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+
+        SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eBuffer, f.ubo.buffer, "View_UniformBuffer_F%d", i);
 
         VmaAllocationInfo inf;
         vmaGetAllocationInfo(ctx.device, f.ubo.allocation, &inf);

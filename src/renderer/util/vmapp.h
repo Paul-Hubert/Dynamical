@@ -45,16 +45,20 @@ public:
     operator bool() {
         return device != nullptr;
     }
-    
+
+    /// Set a debug name for this buffer (debug builds only)
+    void setDebugName(const char* name);
+    void setDebugName(const std::string& name) { setDebugName(name.c_str()); }
+
     VmaAllocation allocation;
     vk::Buffer buffer;
-    
+
     vk::DeviceSize size;
     vk::DeviceSize offset;
     vk::DeviceMemory memory;
 
     bool ready = false;
-    
+
 private:
     Device* device;
 };

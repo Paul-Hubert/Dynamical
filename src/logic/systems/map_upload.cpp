@@ -1,6 +1,7 @@
 #include "map_upload.h"
 
 #include "renderer/context/context.h"
+#include "renderer/util/vk_debug.h"
 
 #include "imgui.h"
 #include <string.h>
@@ -43,6 +44,8 @@ MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
         info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
         f.stagingBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(Header) + max_chunks * sizeof(RenderChunk), vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive));
 
+        SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eBuffer, f.stagingBuffer.buffer, "MapUpload_StagingBuffer_F%d", i);
+
         VmaAllocationInfo inf;
         vmaGetAllocationInfo(ctx.device, f.stagingBuffer.allocation, &inf);
 
@@ -54,6 +57,8 @@ MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
         VmaAllocationCreateInfo info {};
         info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
         storageBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(Header) + max_stored_chunks * sizeof(RenderChunk), vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive));
+
+        SET_VK_NAME(ctx.device, vk::ObjectType::eBuffer, storageBuffer.buffer, "MapData_StorageBuffer");
 
     }
 
@@ -85,6 +90,8 @@ MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
         info.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
         info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
         f.objectBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(RenderObject) * max_objects, vk::BufferUsageFlagBits::eVertexBuffer, vk::SharingMode::eExclusive));
+
+        SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eBuffer, f.objectBuffer.buffer, "MapUpload_ObjectBuffer_F%d", i);
 
         VmaAllocationInfo inf;
         vmaGetAllocationInfo(ctx.device, f.objectBuffer.allocation, &inf);

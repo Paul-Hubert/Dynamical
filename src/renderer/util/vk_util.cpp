@@ -100,7 +100,7 @@ std::vector<const char*> dy::checkExtensions(std::vector<const char*> extensions
         }
 
         if(!layerFound) {
-            dy::log(dy::warning) << "Instance Extension requested, but not available : " << extensionName << "\n";
+            dy::log(dy::warning) << "Extension requested, but not available : " << extensionName << "\n";
         }
     }
 
