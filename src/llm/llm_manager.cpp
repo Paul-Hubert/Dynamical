@@ -2,6 +2,10 @@
 #include <chrono>
 #include <iostream>
 
+using Queue = std::queue<PendingRequest>;
+using ResultMap = std::map<uint64_t, LLMResponse>;
+using CacheMap = std::map<std::string, json>;
+
 LLMManager::LLMManager(size_t num_workers_) : num_workers(num_workers_) {
     // Start worker threads
     for (size_t i = 0; i < num_workers; ++i) {
@@ -29,7 +33,7 @@ uint64_t LLMManager::submit_request(const std::string& prompt, const std::string
             LLMResponse cached_response;
             cached_response.success = true;
             cached_response.parsed_json = cached_result;
-            result_queue.lock([&](auto& q) { q[id] = cached_response; });
+            static_cast<ResultMap&>(*result_queue)[id] = cached_response;
             return id;
         }
     }
@@ -46,42 +50,44 @@ uint64_t LLMManager::submit_request(const std::string& prompt, const std::string
         if (batch_accumulator.size() >= static_cast<size_t>(batch_size)) {
             // Flush batch
             for (const auto& br : batch_accumulator) {
-                request_queue.lock([&](auto& q) { q.push(br); });
+                static_cast<Queue&>(*request_queue).push(br);
             }
             batch_accumulator.clear();
         }
     } else {
-        request_queue.lock([&](auto& q) { q.push(req); });
+        static_cast<Queue&>(*request_queue).push(req);
     }
 
     return id;
 }
 
 void LLMManager::poll_results(std::function<void(const LLMResponse&)> on_result) {
-    result_queue.lock([&](auto& q) {
-        for (auto it = q.begin(); it != q.end(); ) {
-            on_result(it->second);
-            it = q.erase(it);
-        }
-    });
+    auto lk = *result_queue;
+    auto& q = static_cast<ResultMap&>(lk);
+    for (auto it = q.begin(); it != q.end(); ) {
+        on_result(it->second);
+        it = q.erase(it);
+    }
 }
 
-bool LLMManager::is_result_ready(uint64_t request_id) const {
+bool LLMManager::is_result_ready(uint64_t request_id) {
     bool ready = false;
-    result_queue.lock([&](const auto& q) { ready = q.count(request_id) > 0; });
+    ready = static_cast<ResultMap&>(*result_queue).count(request_id) > 0;
     return ready;
 }
 
 bool LLMManager::try_get_result(uint64_t request_id, LLMResponse& out) {
     bool found = false;
-    result_queue.lock([&](auto& q) {
+    {
+        auto lk = *result_queue;
+        auto& q = static_cast<ResultMap&>(lk);
         auto it = q.find(request_id);
         if (it != q.end()) {
             out = it->second;
             q.erase(it);
             found = true;
         }
-    });
+    }
     return found;
 }
 
@@ -89,21 +95,23 @@ void LLMManager::set_rate_limit(int requests_per_second) {
     rate_limit_rps = requests_per_second;
 }
 
-bool LLMManager::get_cached_result(const std::string& key, json& out) const {
+bool LLMManager::get_cached_result(const std::string& key, json& out) {
     bool found = false;
-    cache.lock([&](const auto& c) {
+    {
+        auto lk = *cache;
+        auto& c = static_cast<CacheMap&>(lk);
         auto it = c.find(key);
         if (it != c.end()) {
             out = it->second;
             found = true;
         }
-    });
+    }
     return found;
 }
 
 void LLMManager::cache_result(const std::string& key, const json& result) {
     if (cache_enabled) {
-        cache.lock([&](auto& c) { c[key] = result; });
+        static_cast<CacheMap&>(*cache)[key] = result;
     }
 }
 
@@ -121,13 +129,15 @@ void LLMManager::worker_thread_main() {
         PendingRequest req;
         bool got_request = false;
 
-        request_queue.lock([&](auto& q) {
+        {
+            auto lk = *request_queue;
+            auto& q = static_cast<Queue&>(lk);
             if (!q.empty()) {
                 req = q.front();
                 q.pop();
                 got_request = true;
             }
-        });
+        }
 
         if (!got_request) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -138,7 +148,7 @@ void LLMManager::worker_thread_main() {
         if (time_since_last_request < (1.0f / rate_limit_rps)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             // Requeue the request
-            request_queue.lock([&](auto& q) { q.push(req); });
+            static_cast<Queue&>(*request_queue).push(req);
             continue;
         }
 
@@ -153,7 +163,7 @@ void LLMManager::worker_thread_main() {
         }
 
         // Store result
-        result_queue.lock([&](auto& q) { q[req.request_id] = response; });
+        static_cast<ResultMap&>(*result_queue)[req.request_id] = response;
 
         time_since_last_request = 0.0f;
     }

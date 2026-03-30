@@ -21,6 +21,16 @@ enum class ActionID {
     Fish,
     Explore,
     Flee,
+    None = 13,
+};
+
+/// Trade offer structure for Trade and Talk actions
+struct TradeOffer {
+    std::string give_item;          // "berry"
+    int give_amount = 1;            // Amount to give
+    std::string want_item;          // "wood"
+    int want_amount = 1;            // Amount to want
+    bool accept = false;            // For acceptance responses
 };
 
 /// Parameters for action execution
@@ -47,14 +57,10 @@ struct ActionParams {
     std::string direction;          // "north", "south", "east", "west"
     float duration = 0.0f;          // Duration in seconds (for Sleep, etc.)
 
-    ActionParams() = default;
-};
+    // Trade offer structure
+    TradeOffer trade_offer;
 
-/// Trade offer structure for Trade and Talk actions
-struct TradeOffer {
-    std::string give;               // "berry x5"
-    std::string want;               // "wood x2"
-    bool accept = false;            // For acceptance responses
+    ActionParams() = default;
 };
 
 } // namespace dy

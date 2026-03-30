@@ -4,7 +4,9 @@
       "Bash(cmake --build build)",
       "Bash(git submodule:*)",
       "Bash(cmake --preset default)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(rm -rf build)",
+      "Bash(mkdir -p build)"
     ]
   }
 }

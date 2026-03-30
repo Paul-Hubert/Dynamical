@@ -79,11 +79,15 @@ std::string PromptBuilder::build_system_prompt(const Personality* personality) {
 
 std::string PromptBuilder::build_available_actions_prompt() {
     const auto& registry = ActionRegistry::instance();
-    const auto& descriptors = registry.get_all();
-
+    static const ActionID all_ids[] = {
+        ActionID::Wander, ActionID::Eat, ActionID::Harvest, ActionID::Mine,
+        ActionID::Hunt, ActionID::Build, ActionID::Sleep, ActionID::Trade,
+        ActionID::Talk, ActionID::Craft, ActionID::Fish, ActionID::Explore, ActionID::Flee
+    };
     std::ostringstream oss;
-    for (const auto* desc : descriptors) {
-        oss << "- " << desc->name << ": " << desc->description << "\n";
+    for (auto id : all_ids) {
+        const ActionDescriptor* desc = registry.get_descriptor(id);
+        if (desc) oss << "- " << desc->name << "\n";
     }
     return oss.str();
 }

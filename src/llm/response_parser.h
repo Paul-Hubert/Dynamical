@@ -6,6 +6,7 @@
 #include "../ai/action_id.h"
 
 using json = nlohmann::json;
+using namespace dy;
 
 struct ParsedAction {
     ActionID action_id;

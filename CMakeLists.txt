@@ -9,6 +9,7 @@ add_subdirectory(lib/FastNoise2)
 
 add_subdirectory(lib/VulkanMemoryAllocator)
 
+set(BUILD_EXAMPLES OFF CACHE BOOL "Disable ai-sdk-cpp examples" FORCE)
 add_subdirectory(lib/ai-sdk-cpp)
 
 include_directories("./src")
@@ -23,6 +24,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ./)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(dynamical PRIVATE -Wall -Wextra -Wno-sign-compare -Wno-unused-variable -Wno-unused-parameter -Wno-class-memaccess -Wno-unused-but-set-variable -Wno-reorder -Wno-missing-field-initializers -Wno-unused-function -Wno-type-limits)
+elseif (MSVC)
+    target_compile_options(dynamical PRIVATE /FS)
 endif()
 
 find_package(Vulkan REQUIRED)
@@ -98,3 +101,9 @@ add_custom_target(
     )
 
 add_dependencies(dynamical shaders)
+
+# Enable testing
+enable_testing()
+
+# Add tests subdirectory
+add_subdirectory(tests)

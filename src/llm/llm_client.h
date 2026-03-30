@@ -2,8 +2,11 @@
 
 #include <string>
 #include <memory>
+#include <optional>
 #include <nlohmann/json.hpp>
 #include <vector>
+#include <ai/openai.h>
+#include <ai/anthropic.h>
 
 using json = nlohmann::json;
 
@@ -43,7 +46,7 @@ public:
     std::string get_model() const { return model; }
 
 private:
-    std::unique_ptr<class ai::Client> client;
+    std::optional<ai::Client> client;
     std::string provider;
     std::string model;
     std::string api_key;

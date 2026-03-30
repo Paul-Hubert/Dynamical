@@ -5,6 +5,8 @@
 #include "../ai/personality/personality.h"
 #include "../ai/memory/ai_memory.h"
 
+using namespace dy;
+
 struct PromptContext {
     entt::entity entity_id;
     const Personality* personality = nullptr;

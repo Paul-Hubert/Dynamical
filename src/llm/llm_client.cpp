@@ -1,5 +1,6 @@
 #include "llm_client.h"
-#include <ai/client.hpp>
+#include <ai/openai.h>
+#include <ai/anthropic.h>
 
 void LLMClient::configure(const std::string& provider_name, const std::string& model_name, const std::string& key) {
     provider = provider_name;
@@ -9,24 +10,23 @@ void LLMClient::configure(const std::string& provider_name, const std::string& m
 }
 
 void LLMClient::build_client() {
-    // Configure based on provider
     if (provider == "ollama") {
-        client = std::make_unique<ai::Client>("http://localhost:11434/v1", "", ai::Provider::OpenAI);
+        client = ai::openai::create_client("", "http://localhost:11434/v1");
     } else if (provider == "lm_studio") {
-        client = std::make_unique<ai::Client>("http://localhost:1234/v1", "", ai::Provider::OpenAI);
+        client = ai::openai::create_client("", "http://localhost:1234/v1");
     } else if (provider == "claude") {
-        client = std::make_unique<ai::Client>("https://api.anthropic.com", api_key, ai::Provider::Anthropic);
+        client = ai::anthropic::create_client(api_key);
     } else if (provider == "openai") {
-        client = std::make_unique<ai::Client>("https://api.openai.com/v1", api_key, ai::Provider::OpenAI);
+        client = ai::openai::create_client(api_key);
     } else {
-        // Assume OpenAI-compatible
-        client = std::make_unique<ai::Client>(provider, api_key, ai::Provider::OpenAI);
+        // Assume OpenAI-compatible custom URL
+        client = ai::openai::create_client(api_key, provider);
     }
 }
 
 bool LLMClient::is_available() const {
     // Simple health check: just check if client is configured
-    if (!client) return false;
+    if (!client.has_value()) return false;
     try {
         // A real implementation would do a lightweight health check
         // For now, assume client is available if configured
@@ -39,28 +39,21 @@ bool LLMClient::is_available() const {
 LLMResponse LLMClient::request(const LLMRequest& req) {
     LLMResponse response;
 
-    if (!client) {
+    if (!client.has_value()) {
         response.success = false;
         response.error_message = "LLM client not configured";
         return response;
     }
 
     try {
-        // Build the request using ai-sdk-cpp
-        auto messages = std::vector<ai::Message>{
-            ai::Message{.role = "system", .content = req.system_prompt},
-            ai::Message{.role = "user", .content = req.prompt}
-        };
+        ai::GenerateOptions opts(model, req.system_prompt, req.prompt);
+        opts.max_tokens = req.max_tokens;
+        opts.temperature = static_cast<double>(req.temperature);
 
-        auto completion_options = ai::CreateCompletionOptions{
-            .max_tokens = static_cast<size_t>(req.max_tokens),
-            .temperature = req.temperature
-        };
+        auto result = client->generate_text(opts);
 
-        auto response_obj = client->CreateCompletion(model, messages, completion_options);
-
-        if (response_obj && !response_obj->choices.empty()) {
-            response.raw_text = response_obj->choices[0].message.content;
+        if (result) {
+            response.raw_text = result.text;
             response.success = true;
 
             // Try to parse as JSON
@@ -71,7 +64,7 @@ LLMResponse LLMClient::request(const LLMRequest& req) {
             }
         } else {
             response.success = false;
-            response.error_message = "Empty response from LLM";
+            response.error_message = result.error_message();
         }
     } catch (const std::exception& e) {
         response.success = false;

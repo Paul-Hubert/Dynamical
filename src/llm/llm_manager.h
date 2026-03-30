@@ -9,6 +9,8 @@
 #include <memory>
 #include <map>
 
+using namespace dy;
+
 struct PendingRequest {
     uint64_t request_id;
     std::string prompt;
@@ -36,7 +38,7 @@ public:
     void poll_results(std::function<void(const LLMResponse&)> on_result);
 
     // Check if a request is done
-    bool is_result_ready(uint64_t request_id) const;
+    bool is_result_ready(uint64_t request_id);
 
     // Get result if ready
     bool try_get_result(uint64_t request_id, LLMResponse& out);
@@ -50,7 +52,7 @@ public:
 
     // Caching
     void set_cache_enabled(bool enabled) { cache_enabled = enabled; }
-    bool get_cached_result(const std::string& key, json& out) const;
+    bool get_cached_result(const std::string& key, json& out);
     void cache_result(const std::string& key, const json& result);
 
     // Health check
@@ -77,6 +79,9 @@ private:
     bool batching_enabled = false;
     int batch_size = 3;
     std::vector<PendingRequest> batch_accumulator;
+
+    // Caching
+    bool cache_enabled = false;
 
     // Shutdown flag
     std::atomic<bool> should_shutdown = false;
