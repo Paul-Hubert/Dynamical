@@ -32,13 +32,14 @@ void DecisionCache::put(const std::string& key, const json& decision) {
 
 int DecisionCache::discretize_hunger(float hunger) const {
     // 0-3=low, 4-6=med, 7-10=high
-    if (hunger < 3.5f) return 0;
-    if (hunger < 6.5f) return 1;
+    if (hunger < 4.0f) return 0;
+    if (hunger < 7.0f) return 1;
     return 2;
 }
 
 int DecisionCache::discretize_energy(float energy) const {
-    if (energy < 3.5f) return 0;
-    if (energy < 6.5f) return 1;
+    // 0-3=low, 4-6=med, 7-10=high
+    if (energy < 4.0f) return 0;
+    if (energy < 7.0f) return 1;
     return 2;
 }

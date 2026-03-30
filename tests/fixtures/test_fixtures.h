@@ -9,6 +9,7 @@
 // Phase 2 components
 #include <ai/personality/personality.h>
 #include <ai/memory/ai_memory.h>
+#include <ai/action_registry.h>
 
 using json = nlohmann::json;
 using namespace dy;
@@ -138,6 +139,10 @@ class Phase3TestFixture : public ::testing::Test {
 protected:
     Phase3TestFixture() = default;
     virtual ~Phase3TestFixture() = default;
+
+    static void SetUpTestSuite() {
+        dy::ActionRegistry::instance().initialize_descriptors();
+    }
 
     /// Create a test registry
     entt::registry& create_test_registry() {

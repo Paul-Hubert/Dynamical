@@ -24,8 +24,8 @@ add_executable(dynamical_tests
     ../src/llm/decision_cache.cpp
     # AI dependencies
     ../src/ai/action_registry.cpp
-    ../src/ai/action_registry_init.cpp
     ../src/ai/memory/ai_memory.cpp
+    fixtures/action_registry_init_stub.cpp
 )
 
 # Link libraries
@@ -54,6 +54,14 @@ target_include_directories(dynamical_tests PRIVATE ${CMAKE_SOURCE_DIR}/lib/FastN
 
 # Ensure ai-sdk-cpp is properly configured for tests
 target_compile_definitions(dynamical_tests PRIVATE AI_SDK_HAS_OPENAI=1 AI_SDK_HAS_ANTHROPIC=1)
+
+# Copy runtime DLLs from ai-sdk-cpp dependencies next to the test executable
+add_custom_command(TARGET dynamical_tests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:zlib>
+        $<TARGET_FILE_DIR:dynamical_tests>
+    COMMENT "Copying zlib DLL to test output directory"
+)
 
 # Add test target
 add_test(NAME AllTests COMMAND dynamical_tests)
