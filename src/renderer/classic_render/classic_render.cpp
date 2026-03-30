@@ -58,6 +58,9 @@ per_frame(NUM_FRAMES) {
         f.acquireSemaphore = ctx.device->createSemaphore(vk::SemaphoreCreateInfo(vk::SemaphoreCreateFlags{}));
         f.presentSemaphore = ctx.device->createSemaphore(vk::SemaphoreCreateInfo(vk::SemaphoreCreateFlags{}));
 
+        SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eSemaphore, f.acquireSemaphore, "Swapchain_Semaphore_Acquire_F%d", i);
+        SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eSemaphore, f.presentSemaphore, "Swapchain_Semaphore_Present_F%d", i);
+
     }
 
 }

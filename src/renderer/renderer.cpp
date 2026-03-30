@@ -3,6 +3,7 @@
 #include <iostream>
 #include "util/util.h"
 #include "util/log.h"
+#include "util/vk_debug.h"
 
 #include "context/num_frames.h"
 
@@ -21,6 +22,10 @@ per_frame(NUM_FRAMES) {
         per_frame[i].transfer_semaphore = ctx.device->createSemaphore({});
         per_frame[i].compute_semaphore = ctx.device->createSemaphore({});
         per_frame[i].graphics_semaphore = ctx.device->createSemaphore({});
+
+        SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eSemaphore, per_frame[i].transfer_semaphore, "Transfer_Semaphore_F%d", i);
+        SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eSemaphore, per_frame[i].compute_semaphore, "Compute_Semaphore_F%d", i);
+        SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eSemaphore, per_frame[i].graphics_semaphore, "Graphics_Semaphore_F%d", i);
     }
 
 }
