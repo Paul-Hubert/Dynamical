@@ -98,6 +98,16 @@ void AISys::poll_llm_results() {
 
         LLMResponse response;
         if (llm_manager->try_get_result(ai.pending_llm_request_id, response)) {
+            uint64_t request_id = ai.pending_llm_request_id;
+            std::string name = "Entity#" + std::to_string(static_cast<uint32_t>(entity));
+            if (reg.all_of<Personality>(entity)) {
+                auto& pers = reg.get<Personality>(entity);
+                name = pers.archetype + " #" + std::to_string(static_cast<uint32_t>(entity));
+            }
+
+            dy::log(dy::Level::debug) << "[AI Entity] " << name << " received LLM response for request ID " << request_id
+                                      << " (Success: " << (response.success ? "true" : "false") << ")\n";
+
             ai.waiting_for_llm = false;
             ai.pending_llm_request_id = 0;
 
@@ -143,6 +153,8 @@ void AISys::submit_llm_request(entt::entity entity, AIC& ai) {
     uint64_t id = llm_manager->submit_request(prompt, sys_prompt);
     ai.pending_llm_request_id = id;
     ai.waiting_for_llm = true;
+
+    dy::log(dy::Level::debug) << "[AI Entity] " << name << " submitted LLM request ID " << id << "\n";
 }
 
 void AISys::decide(entt::entity entity, AIC& ai) {

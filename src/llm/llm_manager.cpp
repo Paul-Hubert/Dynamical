@@ -1,6 +1,7 @@
 #include "llm_manager.h"
 #include <chrono>
 #include <iostream>
+#include "util/log.h"
 
 using Queue = std::queue<PendingRequest>;
 using ResultMap = std::map<uint64_t, LLMResponse>;
@@ -24,6 +25,8 @@ void LLMManager::configure(const std::string& provider, const std::string& model
 uint64_t LLMManager::submit_request(const std::string& prompt, const std::string& system_prompt) {
     uint64_t id = next_request_id++;
 
+    dy::log(dy::Level::debug) << "[LLM Queue] Request ID " << id << " submitted to queue\n";
+
     // Check cache first
     std::string cache_key = prompt.substr(0, std::min(size_t(100), prompt.length()));
     if (cache_enabled) {
@@ -34,6 +37,7 @@ uint64_t LLMManager::submit_request(const std::string& prompt, const std::string
             cached_response.success = true;
             cached_response.parsed_json = cached_result;
             static_cast<ResultMap&>(*result_queue)[id] = cached_response;
+            dy::log(dy::Level::debug) << "[LLM Cache] Request ID " << id << " served from cache\n";
             return id;
         }
     }
@@ -152,6 +156,9 @@ void LLMManager::worker_thread_main() {
             continue;
         }
 
+        dy::log(dy::Level::debug) << "[LLM Worker] Processing request ID " << req.request_id
+                                  << " (Provider: " << client.get_provider() << ", Model: " << client.get_model() << ")\n";
+
         // Make the request
         LLMRequest llm_req{.prompt = req.prompt, .system_prompt = req.system_prompt};
         LLMResponse response = client.request(llm_req);
@@ -164,6 +171,9 @@ void LLMManager::worker_thread_main() {
 
         // Store result
         static_cast<ResultMap&>(*result_queue)[req.request_id] = response;
+
+        dy::log(dy::Level::debug) << "[LLM Worker] Completed request ID " << req.request_id
+                                  << " (Success: " << (response.success ? "true" : "false") << ")\n";
 
         time_since_last_request = 0.0f;
     }

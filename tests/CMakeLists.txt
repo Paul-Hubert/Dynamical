@@ -22,6 +22,8 @@ add_executable(dynamical_tests
     ../src/llm/response_parser.cpp
     ../src/llm/prompt_builder.cpp
     ../src/llm/decision_cache.cpp
+    # Utility files
+    ../src/util/log.cpp
     # AI dependencies
     ../src/ai/action_registry.cpp
     ../src/ai/memory/ai_memory.cpp
