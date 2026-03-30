@@ -17,9 +17,9 @@ include_directories("./lib")
 
 file(GLOB_RECURSE sources ./src/main.cpp ./src/*.cpp ./src/*.h)
 
-add_executable(dynamical ${sources})
-
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ./)
+
+add_executable(dynamical ${sources})
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined -g")
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -77,6 +77,13 @@ file(
 
 add_custom_command(TARGET dynamical POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources" "${PROJECT_BINARY_DIR}/resources"
+)
+
+add_custom_command(TARGET dynamical POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:zlib>
+        $<TARGET_FILE_DIR:dynamical>
+    COMMENT "Copying zlib DLL to output directory"
 )
 
 ### COMPILE SHADERS

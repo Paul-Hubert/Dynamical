@@ -8,6 +8,11 @@ LLMDecisionResult ResponseParser::parse(const json& response_json) {
         result.thought = response_json.value("thought", "");
         result.dialogue = response_json.value("dialogue", "");
 
+        if (!response_json.contains("actions")) {
+            result.success = false;
+            return result;
+        }
+
         const auto& actions_array = response_json.at("actions");
         if (!actions_array.is_array()) {
             result.success = false;
