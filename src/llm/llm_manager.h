@@ -57,6 +57,7 @@ public:
 
     // Health check
     bool is_available() const { return client.is_available(); }
+    int get_workers_alive() const { return workers_alive; }
 
     // Shutdown (called at game exit)
     void shutdown();
@@ -73,7 +74,7 @@ private:
 
     // Rate limiting
     int rate_limit_rps = 5;  // Requests per second
-    float time_since_last_request = 0.0f;
+    std::chrono::steady_clock::time_point last_request_time;
 
     // Batching
     bool batching_enabled = false;
@@ -85,6 +86,9 @@ private:
 
     // Shutdown flag
     std::atomic<bool> should_shutdown = false;
+
+    // Worker health tracking
+    std::atomic<int> workers_alive = 0;
 
     uint64_t next_request_id = 1;
 

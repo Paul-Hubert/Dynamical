@@ -14,7 +14,7 @@ void LLMClient::build_client() {
     if (provider == "ollama") {
         client = ai::openai::create_client("", "http://localhost:11434/v1");
     } else if (provider == "lm_studio") {
-        client = ai::openai::create_client("", "http://localhost:1234/v1");
+        client = ai::openai::create_client("", "http://localhost:1234");
     } else if (provider == "claude") {
         client = ai::anthropic::create_client(api_key);
     } else if (provider == "openai") {

@@ -7,10 +7,14 @@ using Queue = std::queue<PendingRequest>;
 using ResultMap = std::map<uint64_t, LLMResponse>;
 using CacheMap = std::map<std::string, json>;
 
-LLMManager::LLMManager(size_t num_workers_) : num_workers(num_workers_) {
+LLMManager::LLMManager(size_t num_workers_)
+    : num_workers(num_workers_),
+      last_request_time(std::chrono::steady_clock::now()) {
     // Start worker threads
+    dy::log(dy::Level::info) << "[LLM] Starting " << num_workers << " worker thread(s)\n";
     for (size_t i = 0; i < num_workers; ++i) {
         workers.emplace_back(&LLMManager::worker_thread_main, this);
+        dy::log(dy::Level::debug) << "[LLM] Spawned worker thread " << i << "\n";
     }
 }
 
@@ -129,52 +133,71 @@ void LLMManager::shutdown() {
 }
 
 void LLMManager::worker_thread_main() {
-    while (!should_shutdown) {
-        PendingRequest req;
-        bool got_request = false;
+    workers_alive++;
+    dy::log(dy::Level::debug) << "[LLM Worker] Thread started (total alive: " << workers_alive << ")\n";
 
-        {
-            auto lk = *request_queue;
-            auto& q = static_cast<Queue&>(lk);
-            if (!q.empty()) {
-                req = q.front();
-                q.pop();
-                got_request = true;
+    try {
+        while (!should_shutdown) {
+            PendingRequest req;
+            bool got_request = false;
+
+            {
+                auto lk = *request_queue;
+                auto& q = static_cast<Queue&>(lk);
+                if (!q.empty()) {
+                    req = q.front();
+                    q.pop();
+                    got_request = true;
+                }
             }
+
+            if (!got_request) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
+
+            // Apply rate limiting (check elapsed time since last request)
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration<double>(now - last_request_time).count();
+            double min_interval = 1.0 / static_cast<double>(rate_limit_rps);
+
+            if (elapsed < min_interval) {
+                // Need to wait more time
+                int wait_ms = static_cast<int>((min_interval - elapsed) * 1000) + 1;
+                std::this_thread::sleep_for(std::chrono::milliseconds(wait_ms));
+                // Requeue the request to try again
+                static_cast<Queue&>(*request_queue).push(req);
+                continue;
+            }
+
+            dy::log(dy::Level::debug) << "[LLM Worker] Processing request ID " << req.request_id
+                                      << " (Provider: " << client.get_provider() << ", Model: " << client.get_model() << ")\n";
+
+            // Make the request
+            LLMRequest llm_req{.prompt = req.prompt, .system_prompt = req.system_prompt};
+            LLMResponse response = client.request(llm_req);
+
+            // Update timing after successful request
+            last_request_time = std::chrono::steady_clock::now();
+
+            // Cache result if successful
+            if (response.success && cache_enabled) {
+                std::string cache_key = req.prompt.substr(0, std::min(size_t(100), req.prompt.length()));
+                cache_result(cache_key, response.parsed_json);
+            }
+
+            // Store result
+            static_cast<ResultMap&>(*result_queue)[req.request_id] = response;
+
+            dy::log(dy::Level::debug) << "[LLM Worker] Completed request ID " << req.request_id
+                                      << " (Success: " << (response.success ? "true" : "false") << ")\n";
         }
-
-        if (!got_request) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            continue;
-        }
-
-        // Apply rate limiting
-        if (time_since_last_request < (1.0f / rate_limit_rps)) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            // Requeue the request
-            static_cast<Queue&>(*request_queue).push(req);
-            continue;
-        }
-
-        dy::log(dy::Level::debug) << "[LLM Worker] Processing request ID " << req.request_id
-                                  << " (Provider: " << client.get_provider() << ", Model: " << client.get_model() << ")\n";
-
-        // Make the request
-        LLMRequest llm_req{.prompt = req.prompt, .system_prompt = req.system_prompt};
-        LLMResponse response = client.request(llm_req);
-
-        // Cache result if successful
-        if (response.success && cache_enabled) {
-            std::string cache_key = req.prompt.substr(0, std::min(size_t(100), req.prompt.length()));
-            cache_result(cache_key, response.parsed_json);
-        }
-
-        // Store result
-        static_cast<ResultMap&>(*result_queue)[req.request_id] = response;
-
-        dy::log(dy::Level::debug) << "[LLM Worker] Completed request ID " << req.request_id
-                                  << " (Success: " << (response.success ? "true" : "false") << ")\n";
-
-        time_since_last_request = 0.0f;
+    } catch (const std::exception& e) {
+        dy::log(dy::Level::error) << "[LLM Worker] Exception in worker thread: " << e.what() << "\n";
+    } catch (...) {
+        dy::log(dy::Level::error) << "[LLM Worker] Unknown exception in worker thread\n";
     }
+
+    workers_alive--;
+    dy::log(dy::Level::debug) << "[LLM Worker] Thread exiting (total alive: " << workers_alive << ")\n";
 }
