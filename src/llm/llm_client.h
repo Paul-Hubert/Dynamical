@@ -3,6 +3,7 @@
 #include <string>
 #include <memory>
 #include <optional>
+#include <cstdint>
 #include <nlohmann/json.hpp>
 #include <vector>
 #include <ai/openai.h>
@@ -15,6 +16,7 @@ struct LLMRequest {
     std::string system_prompt;
     int max_tokens = 512;
     float temperature = 0.7f;
+    std::optional<int> seed;  // nullopt = let the provider pick randomly
 };
 
 struct LLMResponse {

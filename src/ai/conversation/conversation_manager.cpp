@@ -34,7 +34,9 @@ Conversation* ConversationManager::find_conversation(entt::entity a, entt::entit
     return nullptr;
 }
 
-void ConversationManager::add_message(Conversation* conv, entt::entity sender, const std::string& text) {
+void ConversationManager::add_message(Conversation* conv, entt::entity sender,
+                                      const std::string& text,
+                                      const std::string& sender_name) {
     if (!conv) return;
 
     ConversationMessage msg;
@@ -42,16 +44,12 @@ void ConversationManager::add_message(Conversation* conv, entt::entity sender, c
     msg.text = text;
     msg.timestamp = get_timestamp();
     msg.read = false;
-
-    // Set sender name
-    msg.sender_name = "Entity#" + std::to_string(static_cast<uint32_t>(sender));
+    msg.sender_name = sender_name.empty()
+        ? "Entity#" + std::to_string(static_cast<uint32_t>(sender))
+        : sender_name;
 
     conv->messages.push_back(msg);
     conv->last_message_at = get_timestamp();
-
-    if (conv->messages.size() >= static_cast<size_t>(conv->max_messages)) {
-        conclude_conversation(conv);
-    }
 }
 
 void ConversationManager::conclude_conversation(Conversation* conv) {

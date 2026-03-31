@@ -209,3 +209,20 @@ auto request_id = llm_manager->request_decision(context);
 aic.pending_llm_request_id = request_id;
 aic.waiting_for_llm = true;
 ```
+
+### Item::ID Pattern (Phase 6+)
+**File**: `src/logic/components/item.h`
+
+Items are defined once in the `DY_ITEMS(X)` X-macro. The enum, string table, and compile-time hash map all derive from it — adding an item is one line.
+
+```cpp
+// To add a new item — one line in DY_ITEMS(X):
+X(my_item, "my_item")
+
+// Usage:
+Item::to_string(Item::wood)           // → "wood"        O(1) array index, constexpr
+Item::from_string("stone_pickaxe")    // → Item::stone_pickaxe  O(1) hash lookup, constexpr
+Item::from_string("unknown")          // → Item::null
+```
+
+`from_string` uses a `constexpr` open-addressing hash table (FNV-1a, prime-sized at compile time via `detail::next_prime`). Use `Item::from_string` when mapping `ActionParams` string fields (e.g. `resource`, `recipe`) to `Item::ID` values.

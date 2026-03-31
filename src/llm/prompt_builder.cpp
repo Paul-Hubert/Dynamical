@@ -7,16 +7,19 @@ std::string PromptBuilder::build_decision_prompt(const PromptContext& ctx) {
 
     oss << "You are " << ctx.entity_name << ", an AI entity in a simulation world.\n\n";
 
-    // Personality (from Phase 2)
-    if (ctx.personality) {
-        oss << "=== YOUR PERSONALITY ===\n";
-        oss << format_personality(ctx.personality) << "\n\n";
+    // Identity
+    if (!ctx.personality_type.empty()) {
+        oss << "=== YOUR IDENTITY ===\n";
+        oss << "Name: " << ctx.entity_name << "\n";
+        oss << "Personality: " << ctx.personality_type;
+        if (!ctx.personality_description.empty())
+            oss << " — " << ctx.personality_description;
+        oss << "\n\n";
     }
 
     // Current state
     oss << "=== YOUR STATE ===\n";
-    oss << "Hunger: " << ctx.hunger << "/10\n";
-    oss << "Energy: " << ctx.energy << "/10\n\n";
+    oss << "Hunger: " << ctx.hunger << "/10\n\n";
 
     // Memory and unread messages
     if (ctx.memory) {
@@ -29,9 +32,18 @@ std::string PromptBuilder::build_decision_prompt(const PromptContext& ctx) {
         }
     }
 
-    // Nearby entities and resources
-    if (!ctx.nearby_entities.empty()) {
-        oss << "=== NEARBY ENTITIES ===\n" << ctx.nearby_entities << "\n\n";
+    // Active conversation history
+    if (!ctx.conversation_history.empty()) {
+        oss << "=== ACTIVE CONVERSATION ===\n";
+        if (!ctx.conversation_partner.empty())
+            oss << "You are speaking with: " << ctx.conversation_partner << "\n";
+        oss << ctx.conversation_history << "\n";
+        oss << "You are mid-conversation. Choose Talk to continue it, or another action to end it.\n\n";
+    }
+
+    // Nearby people
+    if (!ctx.nearby_human_names.empty()) {
+        oss << "=== NEARBY PEOPLE ===\n" << ctx.nearby_human_names << "\n\n";
     }
 
     if (!ctx.nearby_resources.empty()) {
@@ -51,55 +63,31 @@ std::string PromptBuilder::build_decision_prompt(const PromptContext& ctx) {
     oss << "    {\"action\": \"ActionName\", \"param1\": \"value1\", ...},\n";
     oss << "    ...\n";
     oss << "  ],\n";
-    oss << "  \"dialogue\": \"optional spoken thought\"\n";
     oss << "}\n\n";
 
-    oss << "You will execute actions in order. Choose 2-5 actions.\n";
+    oss << "You will execute actions in order. Choose 1-5 actions.\n";
 
     return oss.str();
 }
 
-std::string PromptBuilder::build_system_prompt(const Personality* personality) {
-    std::ostringstream oss;
-
-    if (!personality) {
+std::string PromptBuilder::build_system_prompt(const std::string& personality_type,
+                                               const std::string& personality_description) {
+    if (personality_type.empty()) {
         return "You are an AI entity in a simulation. Make decisions based on your state and personality.";
     }
-
-    oss << "You are a " << personality->archetype << " with the following traits:\n";
-    for (const auto& trait : personality->traits) {
-        oss << "- " << trait.name << ": " << trait.value << "\n";
-    }
-    oss << "\nYour motivation is: " << personality->motivation << "\n";
-    oss << "Your speech style is: " << personality->speech_style << "\n";
+    std::ostringstream oss;
+    oss << "You are a " << personality_type << ".\n";
+    if (!personality_description.empty())
+        oss << personality_description << "\n";
     oss << "\nAlways respond as JSON. Make decisions that align with your personality.";
-
     return oss.str();
 }
 
 std::string PromptBuilder::build_available_actions_prompt() {
-    const auto& registry = ActionRegistry::instance();
-    static const ActionID all_ids[] = {
-        ActionID::Wander, ActionID::Eat, ActionID::Harvest, ActionID::Mine,
-        ActionID::Hunt, ActionID::Build, ActionID::Sleep, ActionID::Trade,
-        ActionID::Talk, ActionID::Craft, ActionID::Fish, ActionID::Explore, ActionID::Flee
-    };
     std::ostringstream oss;
-    for (auto id : all_ids) {
-        const ActionDescriptor* desc = registry.get_descriptor(id);
-        if (desc) oss << "- " << desc->name << "\n";
-    }
-    return oss.str();
-}
-
-std::string PromptBuilder::format_personality(const Personality* p) const {
-    std::ostringstream oss;
-    oss << "Archetype: " << p->archetype << "\n";
-    oss << "Motivation: " << p->motivation << "\n";
-    oss << "Speech Style: " << p->speech_style << "\n";
-    oss << "Traits:\n";
-    for (const auto& trait : p->traits) {
-        oss << "  - " << trait.name << " (" << trait.value << ")\n";
+    for (std::size_t i = 0; i < k_action_count; ++i) {
+        if (k_action_implemented[i])
+            oss << "- " << k_action_names[i] << "\n";
     }
     return oss.str();
 }
@@ -110,18 +98,14 @@ std::string PromptBuilder::format_memory(const AIMemory* mem) const {
     }
 
     std::ostringstream oss;
-    // Show recent events (prioritize unseen ones from Phase 2)
     int count = 0;
     for (int i = static_cast<int>(mem->events.size()) - 1; i >= 0 && count < 5; --i) {
         const auto& evt = mem->events[i];
-        // Prioritize unseen events to LLM, but include context
         std::string marker = evt.seen_by_llm ? "[cached] " : "[new] ";
         oss << "- " << marker << "[" << evt.event_type << "] " << evt.description;
         oss << " (" << evt.timestamp << ")\n";
         count++;
     }
-
-    // Note: In Phase 4, after LLM processes, call mem->mark_all_seen()
     return oss.str();
 }
 

@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <map>
+#include <optional>
 
 using namespace dy;
 
@@ -15,6 +16,8 @@ struct PendingRequest {
     uint64_t request_id;
     std::string prompt;
     std::string system_prompt;
+    float temperature = 0.7f;
+    std::optional<int> seed;
     std::function<void(uint64_t, const LLMResponse&)> callback;  // Game thread callback
 };
 
@@ -32,7 +35,8 @@ public:
     void configure(const std::string& provider, const std::string& model, const std::string& api_key = "");
 
     // Submit async request (non-blocking)
-    uint64_t submit_request(const std::string& prompt, const std::string& system_prompt);
+    uint64_t submit_request(const std::string& prompt, const std::string& system_prompt,
+                            float temperature = 0.7f, std::optional<int> seed = std::nullopt);
 
     // Poll for results (call from game thread each frame)
     void poll_results(std::function<void(const LLMResponse&)> on_result);

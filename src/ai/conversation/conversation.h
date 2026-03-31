@@ -35,7 +35,6 @@ struct Conversation {
     // Metadata
     std::string started_at;
     std::string last_message_at;
-    int max_messages = 6;       // Auto-conclude after N messages
 
     bool is_active() const { return state == ConversationState::Active; }
     bool is_between(entt::entity a, entt::entity b) const;
@@ -43,7 +42,7 @@ struct Conversation {
 
     template <class Archive>
     void serialize(Archive& ar) {
-        ar(participant_a, participant_b, messages, state, started_at, last_message_at, max_messages);
+        ar(participant_a, participant_b, messages, state, started_at, last_message_at);
     }
 };
 

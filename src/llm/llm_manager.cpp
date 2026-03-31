@@ -26,7 +26,8 @@ void LLMManager::configure(const std::string& provider, const std::string& model
     client.configure(provider, model, api_key);
 }
 
-uint64_t LLMManager::submit_request(const std::string& prompt, const std::string& system_prompt) {
+uint64_t LLMManager::submit_request(const std::string& prompt, const std::string& system_prompt,
+                                    float temperature, std::optional<int> seed) {
     uint64_t id = next_request_id++;
 
     dy::log(dy::Level::debug) << "[LLM Queue] Request ID " << id << " submitted to queue\n";
@@ -50,6 +51,8 @@ uint64_t LLMManager::submit_request(const std::string& prompt, const std::string
         .request_id = id,
         .prompt = prompt,
         .system_prompt = system_prompt,
+        .temperature = temperature,
+        .seed = seed,
         .callback = nullptr
     };
 
@@ -174,7 +177,12 @@ void LLMManager::worker_thread_main() {
                                       << " (Provider: " << client.get_provider() << ", Model: " << client.get_model() << ")\n";
 
             // Make the request
-            LLMRequest llm_req{.prompt = req.prompt, .system_prompt = req.system_prompt};
+            LLMRequest llm_req{
+                .prompt = req.prompt,
+                .system_prompt = req.system_prompt,
+                .temperature = req.temperature,
+                .seed = req.seed
+            };
             LLMResponse response = client.request(llm_req);
 
             // Update timing after successful request

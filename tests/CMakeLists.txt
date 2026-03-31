@@ -27,6 +27,7 @@ add_executable(dynamical_tests
     # AI dependencies
     ../src/ai/action_registry.cpp
     ../src/ai/memory/ai_memory.cpp
+    ../src/ai/conversation/conversation_manager.cpp
     fixtures/action_registry_init_stub.cpp
 )
 

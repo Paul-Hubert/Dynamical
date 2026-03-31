@@ -1,27 +1,51 @@
 #ifndef ACTION_ID_H
 #define ACTION_ID_H
 
+#include <array>
+#include <string_view>
 #include <string>
 #include <entt/entt.hpp>
+
+// Single source of truth for all action types.
+// X(id, name_string, implemented)
+// To expose an action to the LLM: flip false → true.
+#define DY_ACTIONS(X)               \
+    X(Wander,  "Wander",  true)     \
+    X(Eat,     "Eat",     true)     \
+    X(Harvest, "Harvest", true)     \
+    X(Mine,    "Mine",    false)    \
+    X(Hunt,    "Hunt",    false)    \
+    X(Build,   "Build",   false)    \
+    X(Sleep,   "Sleep",   false)    \
+    X(Trade,   "Trade",   false)    \
+    X(Talk,    "Talk",    true)     \
+    X(Craft,   "Craft",   false)    \
+    X(Fish,    "Fish",    false)    \
+    X(Explore, "Explore", false)    \
+    X(Flee,    "Flee",    false)
 
 namespace dy {
 
 /// Enumeration of all possible action types
-enum class ActionID {
-    Wander,
-    Eat,
-    Harvest,
-    Mine,
-    Hunt,
-    Build,
-    Sleep,
-    Trade,
-    Talk,
-    Craft,
-    Fish,
-    Explore,
-    Flee,
-    None = 13,
+enum class ActionID : int {
+#define X(id, str, impl) id,
+    DY_ACTIONS(X)
+#undef X
+    None  // sentinel; value == number of real actions
+};
+
+static constexpr std::size_t k_action_count = static_cast<std::size_t>(ActionID::None);
+
+static constexpr std::array<std::string_view, k_action_count> k_action_names = {
+#define X(id, str, impl) str,
+    DY_ACTIONS(X)
+#undef X
+};
+
+static constexpr std::array<bool, k_action_count> k_action_implemented = {
+#define X(id, str, impl) impl,
+    DY_ACTIONS(X)
+#undef X
 };
 
 /// Trade offer structure for Trade and Talk actions

@@ -4,6 +4,7 @@
 #include "logic/components/position.h"
 #include "logic/components/selection.h"
 #include "logic/components/renderable.h"
+#include "logic/components/camera.h"
 
 #include "util/log.h"
 
@@ -22,6 +23,8 @@ void SelectionSys::tick(double dt) {
     OPTICK_EVENT();
     
     auto& selection = reg.ctx<Selection>();
+
+    auto& cam = reg.ctx<Camera>();
     
     auto& input = reg.ctx<Input>();
     
@@ -30,7 +33,7 @@ void SelectionSys::tick(double dt) {
         
         glm::vec2 pos = map.getMousePosition();
 
-        Chunk* chunk = map.getChunk(map.getChunkPos(pos));
+        Chunk* chunk = map.getTileChunk(pos);
         if(chunk == nullptr) return;
         
         bool selected = false;

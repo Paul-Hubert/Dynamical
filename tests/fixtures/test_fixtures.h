@@ -6,8 +6,8 @@
 #include <string>
 #include <memory>
 
-// Phase 2 components
-#include <ai/personality/personality.h>
+// Components
+#include <ai/identity/entity_identity.h>
 #include <ai/memory/ai_memory.h>
 #include <ai/action_registry.h>
 
@@ -150,23 +150,18 @@ protected:
         return test_registry;
     }
 
-    /// Create a test entity with Personality and AIMemory
+    /// Create a test entity with EntityIdentity and AIMemory
     entt::entity create_test_entity(const std::string& name = "TestEntity") {
         auto& reg = create_test_registry();
         entt::entity entity = reg.create();
 
-        // Create and assign Personality
-        Personality personality;
-        personality.archetype = "explorer";
-        personality.speech_style = "casual";
-        personality.motivation = "knowledge";
-        personality.personality_seed = 12345;
-        personality.traits = {
-            {"curiosity", 0.8f, "Very curious about the world"},
-            {"courage", 0.7f, "Brave and willing to take risks"},
-            {"friendliness", 0.6f, "Gets along with others"}
-        };
-        reg.emplace<Personality>(entity, personality);
+        // Create and assign EntityIdentity (ready=true for test purposes)
+        EntityIdentity identity;
+        identity.name                    = name;
+        identity.personality_type        = "explorer";
+        identity.personality_description = "Driven by curiosity, always seeking knowledge and new experiences.";
+        identity.ready                   = true;
+        reg.emplace<EntityIdentity>(entity, identity);
 
         // Create and assign AIMemory
         AIMemory memory;
@@ -178,10 +173,10 @@ protected:
         return entity;
     }
 
-    /// Get personality from entity
-    Personality* get_personality(entt::registry& reg, entt::entity entity) {
-        if (reg.all_of<Personality>(entity)) {
-            return &reg.get<Personality>(entity);
+    /// Get identity from entity
+    EntityIdentity* get_identity(entt::registry& reg, entt::entity entity) {
+        if (reg.all_of<EntityIdentity>(entity)) {
+            return &reg.get<EntityIdentity>(entity);
         }
         return nullptr;
     }

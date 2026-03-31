@@ -10,6 +10,8 @@
 #include "llm/prompt_builder.h"
 #include "llm/response_parser.h"
 
+#include "ai/identity/entity_identity.h"
+
 namespace dy {
 
 class AISys : public System {
@@ -30,7 +32,9 @@ private:
 
     void decide(entt::entity entity, AIC& ai);
     void poll_llm_results();
+    void poll_identity_results();
     void submit_llm_request(entt::entity entity, AIC& ai);
+    void submit_identity_request(entt::entity entity, EntityIdentity& identity);
 
     template<typename T>
     void testBehavior(entt::entity entity, float& max_score, std::unique_ptr<Behavior>& max_behavior) {

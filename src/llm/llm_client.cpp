@@ -70,6 +70,7 @@ LLMResponse LLMClient::request(const LLMRequest& req) {
         ai::GenerateOptions opts(model, req.system_prompt, req.prompt);
         opts.max_tokens = req.max_tokens;
         opts.temperature = static_cast<double>(req.temperature);
+        if (req.seed.has_value()) opts.seed = req.seed.value();
 
         auto result = client->generate_text(opts);
 

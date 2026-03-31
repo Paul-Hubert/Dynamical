@@ -21,8 +21,9 @@ public:
     // Find active conversation between two entities
     Conversation* find_conversation(entt::entity a, entt::entity b);
 
-    // Add a message to a conversation
-    void add_message(Conversation* conv, entt::entity sender, const std::string& text);
+    // Add a message to a conversation (sender_name defaults to "Entity#id" if empty)
+    void add_message(Conversation* conv, entt::entity sender, const std::string& text,
+                     const std::string& sender_name = "");
 
     // Conclude a conversation
     void conclude_conversation(Conversation* conv);

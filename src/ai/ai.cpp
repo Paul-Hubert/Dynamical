@@ -12,13 +12,16 @@
 #include <ai/action_id.h>
 #include <ai/prerequisite_resolver.h>
 #include <ai/memory/ai_memory.h>
-#include <ai/personality/personality.h>
+#include <ai/identity/entity_identity.h>
 
+#include <ai/conversation/conversation_manager.h>
 #include <logic/map/map_manager.h>
 
 #include <logic/components/basic_needs.h>
 #include <logic/components/position.h>
 #include <logic/components/path.h>
+
+#include <random>
 
 using namespace dy;
 
@@ -39,6 +42,19 @@ void AISys::tick(double dt) {
 
     view.each([&](const auto entity, auto& ai) {
 
+        // Identity gate — block decision prompt until identity is ready
+        if (reg.all_of<EntityIdentity>(entity)) {
+            auto& identity = reg.get<EntityIdentity>(entity);
+            if (!identity.ready) {
+                if (identity.pending_request_id == 0
+                    && llm_manager && llm_manager->is_available()) {
+                    submit_identity_request(entity, identity);
+                }
+                decide(entity, ai);  // wander/eat while waiting
+                return;
+            }
+        }
+
         if (!ai.action || ai.action->interruptible) {
             if (!ai.action_queue.empty()) {
                 // Consume next action from LLM queue
@@ -47,7 +63,8 @@ void AISys::tick(double dt) {
             } else if (!ai.waiting_for_llm) {
                 bool can_use_llm = llm_manager
                     && llm_manager->is_available()
-                    && reg.all_of<Personality>(entity);
+                    && reg.all_of<EntityIdentity>(entity)
+                    && reg.get<EntityIdentity>(entity).ready;
 
                 if (can_use_llm) {
                     submit_llm_request(entity, ai);
@@ -89,7 +106,72 @@ void AISys::tick(double dt) {
 
 }
 
+void AISys::poll_identity_results() {
+    auto view = reg.view<EntityIdentity>();
+    for (auto entity : view) {
+        if (!reg.valid(entity)) continue;
+        auto& identity = view.get<EntityIdentity>(entity);
+        if (identity.ready || identity.pending_request_id == 0) continue;
+
+        LLMResponse response;
+        if (!llm_manager->try_get_result(identity.pending_request_id, response)) continue;
+
+        identity.pending_request_id = 0;
+
+        if (!response.success) {
+            dy::log(dy::Level::warning) << "[AI Identity] Generation failed for entity "
+                                     << static_cast<uint32_t>(entity)
+                                     << " — will retry next tick\n";
+            continue;  // pending_request_id=0 triggers retry next tick
+        }
+
+        auto& j = response.parsed_json;
+        if (j.is_object()) {
+            identity.name                    = j.value("name", "Unknown");
+            identity.personality_type        = j.value("personality_type", "wanderer");
+            identity.personality_description = j.value("personality_description", "");
+        } else {
+            identity.name             = "Unknown";
+            identity.personality_type = "wanderer";
+        }
+        identity.ready = true;
+
+        dy::log(dy::Level::info) << "[AI Identity] Entity "
+                                 << static_cast<uint32_t>(entity)
+                                 << " is now \"" << identity.name
+                                 << "\" (" << identity.personality_type << ")\n";
+    }
+}
+
+void AISys::submit_identity_request(entt::entity entity, EntityIdentity& identity) {
+    const std::string prompt =
+        "Generate a unique identity for a human character in a survival world.\n"
+        "Return a JSON object with exactly these fields:\n"
+        "{\n"
+        "  \"name\": \"<single first name, e.g. Mira, Torven, Selja>\",\n"
+        "  \"personality_type\": \"<one-word qualifier, e.g. trader, hermit, socialite, warrior, scholar, wanderer, craftsman>\",\n"
+        "  \"personality_description\": \"<one vivid sentence describing their core personality, quirks, and motivations>\"\n"
+        "}\n"
+        "Be creative and vary names and archetypes. Return only the JSON object, no extra text.";
+
+    const std::string system_prompt =
+        "You are a creative fiction writer generating brief character identities for a medieval survival simulation. "
+        "Respond only with a valid JSON object. No markdown fences, no explanation.";
+
+    // High temperature + random seed maximises name/personality variety across entities
+    static std::mt19937 rng{std::random_device{}()};
+    int seed = static_cast<int>(rng());
+    identity.pending_request_id = llm_manager->submit_request(prompt, system_prompt, 1.0f, seed);
+
+    dy::log(dy::Level::debug) << "[AI Identity] Submitted identity request "
+                              << identity.pending_request_id << " for entity "
+                              << static_cast<uint32_t>(entity) << "\n";
+}
+
 void AISys::poll_llm_results() {
+    // Identity results must be polled first
+    poll_identity_results();
+
     auto view = reg.view<AIC>();
     for (auto entity : view) {
         if (!reg.valid(entity)) continue;
@@ -100,9 +182,9 @@ void AISys::poll_llm_results() {
         if (llm_manager->try_get_result(ai.pending_llm_request_id, response)) {
             uint64_t request_id = ai.pending_llm_request_id;
             std::string name = "Entity#" + std::to_string(static_cast<uint32_t>(entity));
-            if (reg.all_of<Personality>(entity)) {
-                auto& pers = reg.get<Personality>(entity);
-                name = pers.archetype + " #" + std::to_string(static_cast<uint32_t>(entity));
+            if (reg.all_of<EntityIdentity>(entity)) {
+                const auto& eid = reg.get<EntityIdentity>(entity);
+                if (eid.ready) name = eid.name;
             }
 
             dy::log(dy::Level::debug) << "[AI Entity] " << name << " received LLM response for request ID " << request_id
@@ -129,6 +211,16 @@ void AISys::poll_llm_results() {
                 reg.get<AIMemory>(entity).mark_all_seen();
             }
 
+            // If entity chose something other than Talk, conclude any active conversation
+            bool chose_talk = !decision.actions.empty() &&
+                              decision.actions[0].action_id == ActionID::Talk;
+            if (!chose_talk) {
+                if (auto* conv_mgr = reg.try_ctx<ConversationManager>()) {
+                    for (auto* conv : conv_mgr->get_active_for(entity))
+                        conv_mgr->conclude_conversation(conv);
+                }
+            }
+
             if (!decision.thought.empty() || !decision.dialogue.empty()) {
                 reg.emplace_or_replace<SpeechBubble>(entity, SpeechBubble{
                     .thought  = decision.thought,
@@ -140,21 +232,17 @@ void AISys::poll_llm_results() {
 }
 
 void AISys::submit_llm_request(entt::entity entity, AIC& ai) {
-    std::string name = "Entity#" + std::to_string(static_cast<uint32_t>(entity));
-    if (reg.all_of<Personality>(entity)) {
-        auto& pers = reg.get<Personality>(entity);
-        name = pers.archetype + " #" + std::to_string(static_cast<uint32_t>(entity));
-    }
-
-    PromptContext ctx = build_context(reg, entity, name);
+    PromptContext ctx = build_context(reg, entity);
     std::string prompt = prompt_builder.build_decision_prompt(ctx);
-    std::string sys_prompt = prompt_builder.build_system_prompt(ctx.personality);
+    std::string sys_prompt = prompt_builder.build_system_prompt(
+        ctx.personality_type, ctx.personality_description);
 
     uint64_t id = llm_manager->submit_request(prompt, sys_prompt);
     ai.pending_llm_request_id = id;
     ai.waiting_for_llm = true;
 
-    dy::log(dy::Level::debug) << "[AI Entity] " << name << " submitted LLM request ID " << id << "\n";
+    dy::log(dy::Level::debug) << "[AI Entity] " << ctx.entity_name
+                              << " submitted LLM request ID " << id << "\n";
 }
 
 void AISys::decide(entt::entity entity, AIC& ai) {
