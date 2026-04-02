@@ -110,6 +110,21 @@ public:
                                     const std::string& personality_description);
     std::string build_available_actions_prompt();
 
+    // Dedicated dialogue prompt: asks the speaker for their next line.
+    // Includes the full conversation history so the LLM never repeats itself.
+    // Response JSON: { "thought": "...", "reply": "...", "done": false }
+    std::string build_dialogue_prompt(const std::string& personality_type,
+                                      const std::string& personality_description,
+                                      const std::string& speaker_name,
+                                      const std::string& partner_name,
+                                      const std::vector<ConversationMessage>& history);
+
+    // Summary prompt: asks a neutral narrator to condense the conversation.
+    // Response JSON: { "summary": "..." }
+    std::string build_summary_prompt(const std::string& name_a,
+                                     const std::string& name_b,
+                                     const std::vector<ConversationMessage>& history);
+
 private:
     std::string format_memory(const AIMemory* mem) const;
     std::string format_unread_messages(const AIMemory* mem) const;

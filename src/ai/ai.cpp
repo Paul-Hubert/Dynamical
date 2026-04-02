@@ -42,6 +42,15 @@ void AISys::tick(double dt) {
 
     view.each([&](const auto entity, auto& ai) {
 
+        // Conversation responders are managed by the initiator's TalkAction.
+        // Don't submit LLM requests or assign new actions while they're passive.
+        if (reg.all_of<ConversationResponder>(entity)) {
+            if (ai.action) {
+                ai.action = ai.action->act(std::move(ai.action), dt);
+            }
+            return;
+        }
+
         // Identity gate — block decision prompt until identity is ready
         if (reg.all_of<EntityIdentity>(entity)) {
             auto& identity = reg.get<EntityIdentity>(entity);
@@ -160,7 +169,7 @@ void AISys::submit_identity_request(entt::entity entity, EntityIdentity& identit
 
     // High temperature + random seed maximises name/personality variety across entities
     static std::mt19937 rng{std::random_device{}()};
-    int seed = static_cast<int>(rng());
+    int seed = static_cast<int>(rng() & 0x7FFFFFFFu);  // >= 0, satisfies provider seed >= -1
     identity.pending_request_id = llm_manager->submit_request(prompt, system_prompt, 1.0f, seed);
 
     dy::log(dy::Level::debug) << "[AI Identity] Submitted identity request "
@@ -209,16 +218,6 @@ void AISys::poll_llm_results() {
 
             if (reg.all_of<AIMemory>(entity)) {
                 reg.get<AIMemory>(entity).mark_all_seen();
-            }
-
-            // If entity chose something other than Talk, conclude any active conversation
-            bool chose_talk = !decision.actions.empty() &&
-                              decision.actions[0].action_id == ActionID::Talk;
-            if (!chose_talk) {
-                if (auto* conv_mgr = reg.try_ctx<ConversationManager>()) {
-                    for (auto* conv : conv_mgr->get_active_for(entity))
-                        conv_mgr->conclude_conversation(conv);
-                }
             }
 
             if (!decision.thought.empty() || !decision.dialogue.empty()) {

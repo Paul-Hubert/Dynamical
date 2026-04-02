@@ -3,6 +3,8 @@
 #include <iostream>
 #include "util/log.h"
 
+using namespace dy;
+
 using Queue = std::queue<PendingRequest>;
 using ResultMap = std::map<uint64_t, LLMResponse>;
 using CacheMap = std::map<std::string, json>;

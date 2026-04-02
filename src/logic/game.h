@@ -5,7 +5,7 @@
 
 #include "entt/entt.hpp"
 
-class LLMManager;
+namespace dy { class LLMManager; }
 
 namespace dy {
 

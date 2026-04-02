@@ -46,4 +46,11 @@ struct Conversation {
     }
 };
 
+/// Marks an entity as the passive participant in an active conversation.
+/// The initiator's TalkAction drives both sides of the dialogue.
+/// Removed automatically when the conversation concludes.
+struct ConversationResponder {
+    entt::entity initiator = entt::null;
+};
+
 } // namespace dy

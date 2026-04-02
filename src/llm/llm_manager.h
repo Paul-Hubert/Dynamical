@@ -10,7 +10,7 @@
 #include <map>
 #include <optional>
 
-using namespace dy;
+namespace dy {
 
 struct PendingRequest {
     uint64_t request_id;
@@ -98,3 +98,5 @@ private:
 
     void worker_thread_main();
 };
+
+} // namespace dy
