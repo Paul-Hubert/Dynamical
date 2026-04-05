@@ -53,6 +53,8 @@ namespace dy {
             Header* stagingPointer;
             VmaBuffer objectBuffer;
             RenderObject* objectPointer;
+            VmaBuffer buildingBuffer;
+            RenderBuilding* buildingPointer;
         };
         std::vector<per_frame> per_frame;
 

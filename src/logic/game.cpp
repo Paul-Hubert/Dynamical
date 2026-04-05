@@ -30,6 +30,7 @@
 #include "logic/systems/ui_render.h"
 #include "logic/systems/water_flow.h"
 #include "logic/systems/conversation.h"
+#include "logic/systems/building_render.h"
 
 #include "ai/ai.h"
 #include "ai/speech/speech_bubble_sys.h"
@@ -80,6 +81,7 @@ void Game::start() {
     set->pre_add<PatherSys>();
     set->pre_add<BasicNeedsSys>();
     set->pre_add<HarvestSys>();
+    set->pre_add<MineSys>();
     set->pre_add<EatSys>();
     
     set->pre_add<AISys>();
@@ -94,6 +96,7 @@ void Game::start() {
     set->post_add<ParticleSimulationSys>();
     set->post_add<MapRenderSys>();
     set->post_add<ObjectRenderSys>();
+    set->post_add<BuildingRenderSys>();
     set->post_add<SpeechBubbleRenderSys>();
     set->post_add<UIRenderSys>();
 

@@ -4,6 +4,7 @@
 #include <ai/actions/harvest_action.h>
 #include <logic/components/storage.h>
 #include <logic/components/item.h>
+#include <logic/components/building.h>
 #include <ai/actions/mine_action.h>
 #include <ai/actions/build_action.h>
 #include <ai/actions/craft_action.h>
@@ -92,12 +93,31 @@ void ActionRegistry::initialize_descriptors() {
         register_descriptor(desc);
     }
 
-    // Build - no prerequisites (skeleton)
+    // Build - needs building materials
     {
         ActionDescriptor desc{
             .id = ActionID::Build,
             .name = "Build",
-            .prerequisites = {},
+            .prerequisites = {
+                {
+                    .description = "needs building materials",
+                    .is_satisfied = [](auto& r, auto e) {
+                        if (!r.template all_of<Storage>(e)) return false;
+                        auto& s = r.template get<Storage>(e);
+                        // Use smallest template's dynamic cost as minimum threshold
+                        auto& smallest = get_building_templates()[Building::small_building];
+                        return s.amount(Item::wood) >= smallest.wood_cost()
+                            && s.amount(Item::stone) >= smallest.stone_cost();
+                    },
+                    .resolve_action = [](auto& r, auto e) {
+                        auto& smallest = get_building_templates()[Building::small_building];
+                        if (!r.template all_of<Storage>(e)) return ActionID::Harvest;
+                        auto& s = r.template get<Storage>(e);
+                        if (s.amount(Item::wood) < smallest.wood_cost()) return ActionID::Harvest;
+                        return ActionID::Mine;
+                    }
+                }
+            },
             .create = [](entt::registry& r, entt::entity e, const ActionParams& p) {
                 return std::make_unique<BuildAction>(r, e, p);
             }

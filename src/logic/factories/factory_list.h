@@ -8,6 +8,7 @@
 #include "util/color.h"
 
 #include "logic/components/object.h"
+#include "logic/components/building.h"
 
 #define DEFINE_FACTORY(NAME, ...) \
 entt::entity build##NAME(entt::registry& reg, __VA_ARGS__);
@@ -27,6 +28,8 @@ DEFINE_FACTORY(Animal, glm::vec2 position, Object::Type type, Object::Identifier
 DEFINE_FACTORY(Bunny, glm::vec2 position)
 
 DEFINE_FACTORY(Human, glm::vec2 position, Color color)
+
+DEFINE_FACTORY(Building, Building::Type type, glm::ivec2 origin, entt::entity owner, const std::vector<glm::ivec2>& tiles, glm::ivec2 door_tile)
 
 void destroy(entt::registry& reg, entt::entity entity);
 

@@ -11,6 +11,9 @@ enum Level { trace, debug, info, warning, error, critical };
 
 std::ostream& log(Level l = Level::trace);
 
+void set_log_level(Level l);
+Level get_log_level();
+
 }
 
 #endif

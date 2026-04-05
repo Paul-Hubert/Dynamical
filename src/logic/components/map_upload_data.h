@@ -35,6 +35,13 @@ struct RenderObject {
     glm::vec4 color;
 };
 
+struct RenderBuilding {
+    glm::vec4 position;     // world x, y, z (terrain height), rotation_y
+    glm::vec4 dimensions;   // width, depth, wall_height, roof_height
+    glm::vec4 wall_color;   // RGBA
+    glm::vec4 roof_color;   // RGBA
+};
+
 struct Particle {
     glm::vec4 sphere;
     glm::vec4 color;
@@ -56,6 +63,8 @@ struct MapUploadData {
     int num_chunks;
     vk::Buffer objectBuffer;
     int num_objects;
+    vk::Buffer buildingBuffer;
+    int num_buildings;
     vk::Buffer particleBuffer;
     int num_particles;
 };

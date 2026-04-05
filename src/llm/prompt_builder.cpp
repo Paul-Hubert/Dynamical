@@ -47,6 +47,21 @@ std::string PromptBuilder::build_decision_prompt(const PromptContext& ctx) {
         oss << "=== NEARBY RESOURCES ===\n" << ctx.nearby_resources << "\n\n";
     }
 
+    // Nearby buildings
+    if (!ctx.nearby_buildings.empty()) {
+        oss << "=== NEARBY BUILDINGS ===\n" << ctx.nearby_buildings << "\n\n";
+    }
+
+    // Village needs
+    if (!ctx.village_needs.empty()) {
+        oss << "=== VILLAGE STATUS ===\n" << ctx.village_needs << "\n\n";
+    }
+
+    // Buildable options
+    if (!ctx.buildable_options.empty()) {
+        oss << "=== BUILDING OPTIONS ===\n" << ctx.buildable_options << "\n\n";
+    }
+
     // Available actions
     oss << "=== AVAILABLE ACTIONS ===\n";
     oss << build_available_actions_prompt() << "\n\n";
@@ -83,8 +98,20 @@ std::string PromptBuilder::build_system_prompt(const std::string& personality_ty
 std::string PromptBuilder::build_available_actions_prompt() {
     std::ostringstream oss;
     for (std::size_t i = 0; i < k_action_count; ++i) {
-        if (k_action_implemented[i])
-            oss << "- " << k_action_names[i] << "\n";
+        if (k_action_implemented[i]) {
+            oss << "- " << k_action_names[i];
+
+            // Add action-specific descriptions
+            if (std::string(k_action_names[i]) == "Mine") {
+                oss << ": Mine stone from nearby stone terrain. Yields stone resources. Can be repeated infinitely.";
+            }
+            if (std::string(k_action_names[i]) == "Build") {
+                oss << ": Construct a building. Types: small_building, medium_building, large_building. "
+                    << "Requires wood and stone (cost scales with size). "
+                    << "Example: {\"action\": \"Build\", \"params\": {\"structure\": \"medium_building\"}}";
+            }
+            oss << "\n";
+        }
     }
     return oss.str();
 }

@@ -21,10 +21,13 @@
 #include "logic/components/camera.h"
 #include "logic/components/renderable.h"
 #include "logic/components/map_upload_data.h"
+#include "logic/components/building.h"
+#include "logic/components/position.h"
 
 using namespace dy;
 
 constexpr int max_objects = 20000;
+constexpr int max_buildings = 2000;
 
 MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
 
@@ -97,6 +100,15 @@ MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
         vmaGetAllocationInfo(ctx.device, f.objectBuffer.allocation, &inf);
 
         f.objectPointer = reinterpret_cast<RenderObject*> (inf.pMappedData);
+
+        // Building buffer
+        f.buildingBuffer = VmaBuffer(ctx.device, &info, vk::BufferCreateInfo({}, sizeof(RenderBuilding) * max_buildings, vk::BufferUsageFlagBits::eVertexBuffer, vk::SharingMode::eExclusive));
+
+        SET_VK_NAME_FMT(ctx.device, vk::ObjectType::eBuffer, f.buildingBuffer.buffer, "MapUpload_BuildingBuffer_F%d", i);
+
+        vmaGetAllocationInfo(ctx.device, f.buildingBuffer.allocation, &inf);
+
+        f.buildingPointer = reinterpret_cast<RenderBuilding*> (inf.pMappedData);
     }
 }
 
@@ -134,6 +146,10 @@ void MapUploadSys::tick(double dt) {
 
     data.objectBuffer = f.objectBuffer.buffer;
 
+    auto buildingBuffer = f.buildingPointer;
+
+    data.buildingBuffer = f.buildingBuffer.buffer;
+
     auto& map = reg.ctx<MapManager>();
     auto& camera = reg.ctx<Camera>();
 
@@ -170,6 +186,7 @@ void MapUploadSys::tick(double dt) {
 
     data.num_chunks = 0;
     data.num_objects = 0;
+    data.num_buildings = 0;
 
     for(int x = corner_pos.x; x <= end_pos.x; x++) {
         for(int y = corner_pos.y; y <= end_pos.y; y++) {
@@ -249,6 +266,42 @@ void MapUploadSys::tick(double dt) {
 
     for(int i = 0; i<stored_chunks.size(); i++) {
         stored_chunks[i].used = false;
+    }
+
+    // Upload buildings
+    for (auto [entity, building, position] : reg.view<Building, Position>().each()) {
+        if (data.num_buildings < max_buildings) {
+            auto& building_tmpl = get_building_templates()[building.type];
+
+            float terrain_height = 0.0f;
+            int height_count = 0;
+            for (const auto& tile_pos : building.occupied_tiles) {
+                if (auto* tile = map.getTile(glm::vec2(tile_pos))) {
+                    terrain_height += tile->level;
+                    height_count++;
+                }
+            }
+            if (height_count > 0) {
+                terrain_height /= height_count;
+            }
+
+            buildingBuffer[data.num_buildings].position = glm::vec4(position.x, position.y, terrain_height, 0.0f);
+
+            float wall_height = building_tmpl.wall_height * building.construction_progress;
+            float roof_height = building_tmpl.roof_height * building.construction_progress;
+            buildingBuffer[data.num_buildings].dimensions = glm::vec4(
+                static_cast<float>(building_tmpl.footprint.x),
+                static_cast<float>(building_tmpl.footprint.y),
+                wall_height,
+                roof_height
+            );
+
+            // Wood color for walls, darker for roof
+            buildingBuffer[data.num_buildings].wall_color = glm::vec4(0.55f, 0.35f, 0.17f, 1.0f);
+            buildingBuffer[data.num_buildings].roof_color = glm::vec4(0.45f, 0.28f, 0.14f, 1.0f);
+
+            data.num_buildings++;
+        }
     }
 
     transfer.copyBuffer(f.stagingBuffer, storageBuffer, regions);

@@ -32,7 +32,11 @@ public:
     Type terrain = nothing;
     float level = 0;
     entt::entity object = entt::null;
-    
+
+    // Building occupancy
+    entt::entity building = entt::null;   // building occupying this tile
+    enum BuildingRole : int { no_building, wall_tile, floor_tile, door_tile } building_role = no_building;
+
 };
 
 }

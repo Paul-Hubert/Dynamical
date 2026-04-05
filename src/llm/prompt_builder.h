@@ -10,6 +10,9 @@
 #include "../logic/components/basic_needs.h"
 #include "../logic/components/position.h"
 #include "../logic/components/object.h"
+#include "../logic/components/building.h"
+#include "../logic/components/storage.h"
+#include "../logic/components/item.h"
 #include <glm/glm.hpp>
 
 using namespace dy;
@@ -26,6 +29,9 @@ struct PromptContext {
     std::string nearby_resources;
     std::string conversation_history;
     std::string conversation_partner; // name of active conversation partner
+    std::string nearby_buildings;     // buildings within 30 tiles
+    std::string village_needs;        // housing shortages, etc.
+    std::string buildable_options;    // building types the entity can afford
 };
 
 // Helper: Build PromptContext from entity (identity must be ready)
@@ -97,6 +103,70 @@ inline PromptContext build_context(entt::registry& reg, entt::entity entity) {
             for (int i = start; i < (int)msgs.size(); ++i)
                 oss << msgs[i].sender_name << ": " << msgs[i].text << "\n";
             ctx.conversation_history = oss.str();
+        }
+    }
+
+    // Nearby buildings (within 30 tiles)
+    if (reg.all_of<Position>(entity)) {
+        const auto& my_pos = reg.get<Position>(entity);
+        std::ostringstream buildings_oss;
+        bool first = true;
+        int total_residents = 0;
+        int total_capacity = 0;
+
+        for (auto [e, building] : reg.view<Building>().each()) {
+            glm::vec2 building_center(0, 0);
+            if (reg.all_of<Position>(e)) {
+                const auto& bpos = reg.get<Position>(e);
+                building_center = glm::vec2(bpos.x, bpos.y);
+            }
+            float dist = glm::distance(glm::vec2(my_pos.x, my_pos.y), building_center);
+            if (dist > 30.0f) continue;
+
+            const auto& tmpl = get_building_templates()[building.type];
+            if (!first) buildings_oss << ", ";
+            buildings_oss << tmpl.name << " (" << tmpl.capacity << " capacity, "
+                         << building.residents.size() << " residents, "
+                         << (int)dist << " tiles away)";
+            first = false;
+
+            total_residents += building.residents.size();
+            total_capacity += tmpl.capacity;
+        }
+        ctx.nearby_buildings = buildings_oss.str();
+
+        // Compute village needs
+        std::ostringstream needs_oss;
+        int shortage = std::max(0, total_residents - total_capacity);
+        if (shortage > 0) {
+            needs_oss << "Village needs: " << shortage << " more housing (" << shortage << " entities without homes)";
+        } else {
+            needs_oss << "Village housing sufficient";
+        }
+        ctx.village_needs = needs_oss.str();
+    }
+
+    // Buildable options (based on storage)
+    if (reg.all_of<Storage>(entity)) {
+        const auto& storage = reg.get<Storage>(entity);
+        std::ostringstream options_oss;
+        bool first = true;
+
+        for (const auto& tmpl : get_building_templates()) {
+            int wood_have = storage.amount(Item::wood);
+            int stone_have = storage.amount(Item::stone);
+            if (wood_have >= tmpl.wood_cost() && stone_have >= tmpl.stone_cost()) {
+                if (!first) options_oss << ", ";
+                options_oss << tmpl.name << " (" << tmpl.wood_cost() << " wood, "
+                           << tmpl.stone_cost() << " stone)";
+                first = false;
+            }
+        }
+
+        if (first) {
+            ctx.buildable_options = "No buildings affordable with current materials";
+        } else {
+            ctx.buildable_options = "You can build: " + options_oss.str();
         }
     }
 
