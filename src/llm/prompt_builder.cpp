@@ -72,7 +72,7 @@ std::string PromptBuilder::build_decision_prompt(const PromptContext& ctx) {
     oss << "{\n";
     oss << "  \"thought\": \"brief reasoning\",\n";
     oss << "  \"actions\": [\n";
-    oss << "    {\"action\": \"ActionName\", \"param1\": \"value1\", ...},\n";
+    oss << "    {\"action\": \"ActionName\", \"key\": \"value\", ...},\n";
     oss << "    ...\n";
     oss << "  ],\n";
     oss << "}\n\n";
@@ -101,14 +101,24 @@ std::string PromptBuilder::build_available_actions_prompt() {
         if (k_action_implemented[i]) {
             oss << "- " << k_action_names[i];
 
-            // Add action-specific descriptions
-            if (std::string(k_action_names[i]) == "Mine") {
-                oss << ": Mine stone from nearby stone terrain. Yields stone resources. Can be repeated infinitely.";
-            }
-            if (std::string(k_action_names[i]) == "Build") {
-                oss << ": Construct a building. Types: small_building, medium_building, large_building. "
-                    << "Requires wood and stone (cost scales with size). "
-                    << "Example: {\"action\": \"Build\", \"params\": {\"structure\": \"medium_building\"}}";
+            // Add action-specific descriptions with correct JSON keys
+            const std::string name(k_action_names[i]);
+            if (name == "Wander") {
+                oss << ": Walk to a random nearby location. No extra keys.";
+            } else if (name == "Eat") {
+                oss << ": Eat food from inventory. No extra keys.";
+            } else if (name == "Harvest") {
+                oss << ": Harvest berries from a nearby bush. No extra keys.";
+            } else if (name == "Mine") {
+                oss << ": Mine stone from nearby stone terrain. No extra keys.";
+            } else if (name == "Chop") {
+                oss << ": Chop a nearby tree for wood. No extra keys.";
+            } else if (name == "Build") {
+                oss << ": Construct a building. Key \"structure\": one of \"small_building\", \"medium_building\", \"large_building\". "
+                    << "Example: {\"action\": \"Build\", \"structure\": \"small_building\"}";
+            } else if (name == "Talk") {
+                oss << ": Talk to someone nearby. Key \"target_name\": name of person. Optional key \"message\": what to say. "
+                    << "Example: {\"action\": \"Talk\", \"target_name\": \"Elowen\", \"message\": \"Hello!\"}";
             }
             oss << "\n";
         }

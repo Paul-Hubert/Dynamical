@@ -105,8 +105,8 @@ void AISys::tick(double dt) {
             ai.last_failure_reason.clear();
         }
 
-        // Clear draining flag only when queue is fully consumed and last action is done
-        if (ai.draining_llm_queue && ai.action_queue.empty() && !ai.action) {
+        // Clear draining flag when queue is fully consumed and either no action remains or current action is interruptible
+        if (ai.draining_llm_queue && ai.action_queue.empty() && (!ai.action || ai.action->interruptible)) {
             ai.draining_llm_queue = false;
         }
 

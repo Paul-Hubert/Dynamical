@@ -69,7 +69,7 @@ void MapManager::insert(entt::entity entity, glm::vec2 position) {
         return;
     }
     float height = getTile(position)->level;
-    reg.emplace<Position>(entity, position, height);
+    reg.emplace_or_replace<Position>(entity, position, height);
     chunk->addObject(entity);
 }
 

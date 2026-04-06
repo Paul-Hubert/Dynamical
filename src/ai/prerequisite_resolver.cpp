@@ -1,7 +1,6 @@
 #include <ai/prerequisite_resolver.h>
 #include <ai/action_registry.h>
 #include <ai/actions/action.h>
-#include "util/log.h"
 
 namespace dy {
 
@@ -45,14 +44,8 @@ std::unique_ptr<Action> PrerequisiteResolver::resolve_impl(
     // Return the first unsatisfied prerequisite's action (recursively resolved).
     // The AI will re-evaluate after each action completes, so only one step is needed at a time.
     for (const auto& prereq : descriptor->prerequisites) {
-        bool satisfied = prereq.is_satisfied(reg, entity);
-        dy::log() << "[Build/Prereq] action=" << static_cast<int>(target)
-            << " prereq='" << prereq.description << "': "
-            << (satisfied ? "satisfied" : "UNSATISFIED") << "\n";
-        if (!satisfied) {
+        if (!prereq.is_satisfied(reg, entity)) {
             ActionID prereq_id = prereq.resolve_action(reg, entity);
-            dy::log() << "[Build/Prereq] Resolving sub-action "
-                << static_cast<int>(prereq_id) << " (depth " << depth + 1 << ")\n";
             return resolve_impl(prereq_id, reg, entity, {}, depth + 1, visited);
         }
     }
