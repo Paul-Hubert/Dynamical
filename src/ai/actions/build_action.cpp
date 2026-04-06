@@ -2,6 +2,7 @@
 
 #include <extra/optick/optick.h>
 
+#include "util/log.h"
 #include "logic/map/map_manager.h"
 #include "logic/components/storage.h"
 #include "logic/components/item.h"
@@ -11,6 +12,7 @@
 #include "logic/components/object.h"
 #include "logic/components/construction.h"
 #include "ai/memory/ai_memory.h"
+#include "logic/factories/factory_list.h"
 
 using namespace entt::literals;
 using namespace dy;
@@ -18,11 +20,16 @@ using namespace dy;
 BuildAction::BuildAction(entt::registry& reg, entt::entity entity, const ActionParams& params)
     : ActionBase(reg, entity, params)
 {
+    dy::log() << "[Build] Entity " << static_cast<uint32_t>(entity)
+        << " created BuildAction for '" << params.structure << "'\n";
+
     machine_
         .stage("checking resources", [this, &params = this->params](double) -> StageStatus {
             // Parse structure type from params
             if (params.structure.empty()) {
                 this->failure_reason = "unknown building type";
+                dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                    << " resource check FAILED: " << this->failure_reason << "\n";
                 return StageStatus::Failed;
             }
 
@@ -36,13 +43,17 @@ BuildAction::BuildAction(entt::registry& reg, entt::entity entity, const ActionP
             }
 
             if (building_template_ == nullptr) {
-                this->failure_reason = "unknown building type";
+                this->failure_reason = "unknown building type '" + params.structure + "'";
+                dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                    << " resource check FAILED: " << this->failure_reason << "\n";
                 return StageStatus::Failed;
             }
 
             // Check storage has enough materials
             if (!this->reg.all_of<Storage>(this->entity)) {
                 this->failure_reason = "no storage";
+                dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                    << " resource check FAILED: " << this->failure_reason << "\n";
                 return StageStatus::Failed;
             }
 
@@ -53,28 +64,48 @@ BuildAction::BuildAction(entt::registry& reg, entt::entity entity, const ActionP
             int wood_have = storage.amount(Item::wood);
             int stone_have = storage.amount(Item::stone);
 
+            dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                << " resource check: wood " << wood_have << "/" << wood_needed
+                << " stone " << stone_have << "/" << stone_needed << "\n";
+
             if (wood_have < wood_needed) {
                 this->failure_reason = "need " + std::to_string(wood_needed - wood_have) + " more wood";
+                dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                    << " resource check FAILED: " << this->failure_reason << "\n";
                 return StageStatus::Failed;
             }
 
             if (stone_have < stone_needed) {
                 this->failure_reason = "need " + std::to_string(stone_needed - stone_have) + " more stone";
+                dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                    << " resource check FAILED: " << this->failure_reason << "\n";
                 return StageStatus::Failed;
             }
 
+            dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                << " resource check PASSED\n";
             return StageStatus::Complete;
         })
         .stage("finding site", [this](double) -> StageStatus {
             auto& map = this->reg.ctx<MapManager>();
             auto position = this->reg.get<Position>(this->entity);
 
+            dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                << " searching for site (pos " << position.x << "," << position.y << ")\n";
+
             placement_result_ = find_building_site(this->reg, map, glm::vec2(position.x, position.y), *building_template_);
 
             if (!placement_result_.success) {
                 this->failure_reason = "no suitable building location nearby";
+                dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                    << " site search FAILED\n";
                 return StageStatus::Failed;
             }
+
+            dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                << " site search FOUND origin(" << placement_result_.origin.x << ","
+                << placement_result_.origin.y << ") door(" << placement_result_.door_position.x
+                << "," << placement_result_.door_position.y << ") tiles=" << placement_result_.tiles.size() << "\n";
 
             // Remove trees/bushes on the footprint
             for (const auto& tile_pos : placement_result_.tiles) {
@@ -82,7 +113,7 @@ BuildAction::BuildAction(entt::registry& reg, entt::entity entity, const ActionP
                 if (tile && tile->object != entt::null && this->reg.all_of<Object>(tile->object)) {
                     auto& obj = this->reg.get<Object>(tile->object);
                     if (obj.type == Object::plant) {
-                        this->reg.destroy(tile->object);
+                        dy::destroyObject(this->reg, tile->object);
                         tile->object = entt::null;
                         auto chunk = map.getTileChunk(glm::vec2(tile_pos));
                         if (chunk) chunk->setUpdated(true);
@@ -111,6 +142,10 @@ BuildAction::BuildAction(entt::registry& reg, entt::entity entity, const ActionP
             glm::vec2 door_world_pos(placement_result_.door_position);
             auto position = this->reg.get<Position>(this->entity);
 
+            dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                << " navigating to door at (" << placement_result_.door_position.x
+                << "," << placement_result_.door_position.y << ")\n";
+
             this->reg.emplace<Path>(
                 this->entity,
                 map.pathfind(glm::vec2(position.x, position.y), [&](glm::vec2 pos) {
@@ -124,6 +159,9 @@ BuildAction::BuildAction(entt::registry& reg, entt::entity entity, const ActionP
         .stage("constructing", [this, &params = this->params](double) -> StageStatus {
             // Deduct materials
             auto& storage = this->reg.get<Storage>(this->entity);
+            dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                << " deducting " << building_template_->wood_cost() << " wood, "
+                << building_template_->stone_cost() << " stone\n";
             storage.remove(Item{Item::wood, building_template_->wood_cost()});
             storage.remove(Item{Item::stone, building_template_->stone_cost()});
 
@@ -185,12 +223,26 @@ BuildAction::BuildAction(entt::registry& reg, entt::entity entity, const ActionP
             // Tag builder as constructing
             this->reg.emplace<entt::tag<"constructing"_hs>>(this->entity);
 
+            dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                << " created building entity " << static_cast<uint32_t>(building_entity_)
+                << " at (" << footprint_center.x << "," << footprint_center.y << ")"
+                << " tiles=" << placement_result_.tiles.size() << "\n";
+
             return StageStatus::Complete;
         })
         .stage("building", [this, &params = this->params](double dt) -> StageStatus {
             auto& building = this->reg.get<Building>(building_entity_);
 
+            float prev_progress = building.construction_progress;
             building.construction_progress += static_cast<float>(dt) * 0.2f;  // 5 seconds to complete
+
+            // Log on each 25% threshold crossed
+            int prev_quarter = static_cast<int>(prev_progress * 4.0f);
+            int curr_quarter = static_cast<int>(building.construction_progress * 4.0f);
+            if (curr_quarter > prev_quarter) {
+                dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                    << " construction progress " << static_cast<int>(building.construction_progress * 100.0f) << "%\n";
+            }
 
             if (building.construction_progress >= 1.0f) {
                 building.construction_progress = 1.0f;
@@ -208,8 +260,12 @@ BuildAction::BuildAction(entt::registry& reg, entt::entity entity, const ActionP
                     memory.add_event("action_completed", "Built a " + params.structure + " at (" +
                                    std::to_string(static_cast<int>(center.x)) + "," +
                                    std::to_string(static_cast<int>(center.y)) + ")");
+                    dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                        << " memory event recorded: built " << params.structure << "\n";
                 }
 
+                dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+                    << " construction COMPLETE for building " << static_cast<uint32_t>(building_entity_) << "\n";
                 return StageStatus::Complete;
             }
 
@@ -223,10 +279,14 @@ std::unique_ptr<Action> BuildAction::act_impl(std::unique_ptr<Action> self, doub
     StageStatus status = machine_.tick(dt);
 
     if (status == StageStatus::Complete) {
+        dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+            << " action COMPLETE\n";
         return nullptr;
     }
 
     if (status == StageStatus::Failed) {
+        dy::log() << "[Build] Entity " << static_cast<uint32_t>(this->entity)
+            << " action FAILED: " << this->failure_reason << "\n";
         cleanup_reserved_tiles();
         return nullptr;
     }

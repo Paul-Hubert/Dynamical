@@ -81,6 +81,7 @@ void Game::start() {
     set->pre_add<PatherSys>();
     set->pre_add<BasicNeedsSys>();
     set->pre_add<HarvestSys>();
+    set->pre_add<ChopSys>();
     set->pre_add<MineSys>();
     set->pre_add<EatSys>();
     

@@ -13,8 +13,10 @@
 #include <ai/actions/sleep_action.h>
 #include <ai/actions/explore_action.h>
 #include <ai/actions/flee_action.h>
+#include <ai/actions/chop_action.h>
 #include <ai/actions/hunt_action.h>
 #include <ai/actions/fish_action.h>
+#include "util/log.h"
 
 namespace dy {
 
@@ -80,6 +82,19 @@ void ActionRegistry::initialize_descriptors() {
         register_descriptor(desc);
     }
 
+    // Chop - no prerequisites
+    {
+        ActionDescriptor desc{
+            .id = ActionID::Chop,
+            .name = "Chop",
+            .prerequisites = {},
+            .create = [](entt::registry& r, entt::entity e, const ActionParams& p) {
+                return std::make_unique<ChopAction>(r, e, p);
+            }
+        };
+        register_descriptor(desc);
+    }
+
     // Hunt - no prerequisites (skeleton)
     {
         ActionDescriptor desc{
@@ -102,18 +117,28 @@ void ActionRegistry::initialize_descriptors() {
                 {
                     .description = "needs building materials",
                     .is_satisfied = [](auto& r, auto e) {
-                        if (!r.template all_of<Storage>(e)) return false;
+                        if (!r.template all_of<Storage>(e)) {
+                            dy::log() << "[Build/Prereq] is_satisfied: entity "
+                                << static_cast<uint32_t>(e) << " has no Storage -> FAIL\n";
+                            return false;
+                        }
                         auto& s = r.template get<Storage>(e);
                         // Use smallest template's dynamic cost as minimum threshold
                         auto& smallest = get_building_templates()[Building::small_building];
-                        return s.amount(Item::wood) >= smallest.wood_cost()
+                        bool result = s.amount(Item::wood) >= smallest.wood_cost()
                             && s.amount(Item::stone) >= smallest.stone_cost();
+                        dy::log() << "[Build/Prereq] is_satisfied: entity "
+                            << static_cast<uint32_t>(e)
+                            << " wood " << s.amount(Item::wood) << "/" << smallest.wood_cost()
+                            << " stone " << s.amount(Item::stone) << "/" << smallest.stone_cost()
+                            << " -> " << (result ? "PASS" : "FAIL") << "\n";
+                        return result;
                     },
                     .resolve_action = [](auto& r, auto e) {
                         auto& smallest = get_building_templates()[Building::small_building];
-                        if (!r.template all_of<Storage>(e)) return ActionID::Harvest;
+                        if (!r.template all_of<Storage>(e)) return ActionID::Chop;
                         auto& s = r.template get<Storage>(e);
-                        if (s.amount(Item::wood) < smallest.wood_cost()) return ActionID::Harvest;
+                        if (s.amount(Item::wood) < smallest.wood_cost()) return ActionID::Chop;
                         return ActionID::Mine;
                     }
                 }

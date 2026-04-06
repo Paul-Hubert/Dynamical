@@ -14,6 +14,7 @@
     X(Eat,     "Eat",     true)     \
     X(Harvest, "Harvest", true)     \
     X(Mine,    "Mine",    true)    \
+    X(Chop,    "Chop",    true)    \
     X(Hunt,    "Hunt",    false)    \
     X(Build,   "Build",   true)    \
     X(Sleep,   "Sleep",   false)    \

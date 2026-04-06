@@ -77,7 +77,6 @@ void AISys::tick(double dt) {
 
                 if (can_use_llm) {
                     submit_llm_request(entity, ai);
-                    decide(entity, ai);  // wander/eat while waiting
                 } else {
                     decide(entity, ai);
                 }

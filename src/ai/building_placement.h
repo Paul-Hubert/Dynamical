@@ -6,6 +6,7 @@
 #include "logic/components/building.h"
 #include "logic/map/map_manager.h"
 #include "logic/map/tile.h"
+#include "util/log.h"
 
 namespace dy {
 
@@ -24,8 +25,14 @@ inline PlacementResult find_building_site(
 ) {
     PlacementResult result{false, {0, 0}, {0, 0}, {}};
 
+    dy::log() << "[Build/Placement] Searching for '" << tmpl.name
+        << "' (" << tmpl.footprint.x << "x" << tmpl.footprint.y << ")"
+        << " near (" << entity_pos.x << "," << entity_pos.y << ")\n";
+
     glm::ivec2 entity_tile = map.floor(entity_pos);
     int max_radius = 30;
+
+    int rejected_null = 0, rejected_terrain = 0, rejected_occupied = 0, rejected_steep = 0;
 
     // Find nearest existing building for clustering bonus
     float nearest_building_dist = std::numeric_limits<float>::max();
@@ -64,6 +71,7 @@ inline PlacementResult find_building_site(
                         Tile* tile = map.getTile(world_pos);
                         if (tile == nullptr) {
                             all_valid = false;
+                            rejected_null++;
                             break;
                         }
 
@@ -72,12 +80,14 @@ inline PlacementResult find_building_site(
                         if (speed_it == Tile::terrain_speed.end() || speed_it->second <= 0.0f ||
                             tile->terrain == Tile::water || tile->terrain == Tile::stone) {
                             all_valid = false;
+                            rejected_terrain++;
                             break;
                         }
 
                         // Check not already occupied by building
                         if (tile->building != entt::null || tile->building_role != Tile::no_building) {
                             all_valid = false;
+                            rejected_occupied++;
                             break;
                         }
 
@@ -100,7 +110,7 @@ inline PlacementResult find_building_site(
                     }
                 }
 
-                if (height_variance > 1.0f) continue; // Reject steep terrain
+                if (height_variance > 1.0f) { rejected_steep++; continue; } // Reject steep terrain
 
                 // Count adjacent buildings for clustering bonus
                 for (int bx = -1; bx <= tmpl.footprint.x; bx++) {
@@ -144,10 +154,20 @@ inline PlacementResult find_building_site(
                 }
             }
 
+            dy::log() << "[Build/Placement] Rejected candidates:"
+                << " null=" << rejected_null << " terrain=" << rejected_terrain
+                << " occupied=" << rejected_occupied << " steep=" << rejected_steep << "\n";
+            dy::log() << "[Build/Placement] FOUND origin("
+                << result.origin.x << "," << result.origin.y << ")"
+                << " adjacency=" << best_adjacency << "\n";
+
             return result;
         }
     }
 
+    dy::log() << "[Build/Placement] NO SITE FOUND. Rejected candidates:"
+        << " null=" << rejected_null << " terrain=" << rejected_terrain
+        << " occupied=" << rejected_occupied << " steep=" << rejected_steep << "\n";
     return result;  // No valid site found
 }
 
