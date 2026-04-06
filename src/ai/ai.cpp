@@ -69,7 +69,7 @@ void AISys::tick(double dt) {
                 // Consume next action from LLM queue
                 ai.action = std::move(ai.action_queue.front());
                 ai.action_queue.pop();
-            } else if (!ai.waiting_for_llm) {
+            } else if (!ai.waiting_for_llm && !ai.draining_llm_queue) {
                 bool can_use_llm = llm_manager
                     && llm_manager->is_available()
                     && reg.all_of<EntityIdentity>(entity)
@@ -103,6 +103,11 @@ void AISys::tick(double dt) {
                 }
             }
             ai.last_failure_reason.clear();
+        }
+
+        // Clear draining flag only when queue is fully consumed and last action is done
+        if (ai.draining_llm_queue && ai.action_queue.empty() && !ai.action) {
+            ai.draining_llm_queue = false;
         }
 
         // Capture failure_reason on same tick it's set (before next act() call)
@@ -213,6 +218,10 @@ void AISys::poll_llm_results() {
                 if (action) {
                     ai.action_queue.push(std::move(action));
                 }
+            }
+
+            if (!ai.action_queue.empty()) {
+                ai.draining_llm_queue = true;
             }
 
             if (reg.all_of<AIMemory>(entity)) {

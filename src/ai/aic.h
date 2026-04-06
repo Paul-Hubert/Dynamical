@@ -22,6 +22,7 @@ public:
     // LLM state flags
     uint64_t pending_llm_request_id = 0;  // 0 = no pending request
     bool waiting_for_llm = false;
+    bool draining_llm_queue = false;  // true while consuming actions from an LLM response
 };
 
 }

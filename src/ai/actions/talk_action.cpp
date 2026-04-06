@@ -189,6 +189,7 @@ TalkAction::TalkAction(entt::registry& reg, entt::entity entity, const ActionPar
                     aic->action = nullptr;
                     while (!aic->action_queue.empty()) aic->action_queue.pop();
                     aic->waiting_for_llm        = false;
+                    aic->draining_llm_queue     = false;
                     aic->pending_llm_request_id = 0;
                 }
             }
