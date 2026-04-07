@@ -33,6 +33,9 @@ void DevMenuSys::tick(double dt) {
         ImGui::RadioButton("Berry Bush", &option, 3);
         ImGui::RadioButton("Bunny", &option, 4);
         ImGui::RadioButton("Human", &option, 2);
+        ImGui::RadioButton("Small House", &option, 5);
+        ImGui::RadioButton("Medium House", &option, 6);
+        ImGui::RadioButton("Large House", &option, 7);
         if(option > 0) {
             if(input.leftClick) {
                 auto& map = reg.ctx<MapManager>();
@@ -46,6 +49,12 @@ void DevMenuSys::tick(double dt) {
                     dy::buildBerryBush(reg, pos);
                 }else if(option == 4) {
                     dy::buildBunny(reg, pos);
+                }else if(option == 5) {
+                    dy::buildHouse(reg, pos, Building::small_building);
+                }else if(option == 6) {
+                    dy::buildHouse(reg, pos, Building::medium_building);
+                }else if(option == 7) {
+                    dy::buildHouse(reg, pos, Building::large_building);
                 }
                 
             }

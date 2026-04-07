@@ -203,7 +203,7 @@ void MapUploadSys::tick(double dt) {
 
             if(data.num_objects < max_objects) {
                 for (auto entity: chunk->getObjects()) {
-                    if (reg.all_of<Renderable>(entity)) {
+                    if (reg.all_of<Renderable>(entity) && !reg.all_of<Building>(entity)) {
                         auto &position = reg.get<Position>(entity);
                         auto &renderable = reg.get<Renderable>(entity);
                         objectBuffer[data.num_objects].sphere.x = position.x;

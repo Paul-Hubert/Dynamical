@@ -1,5 +1,6 @@
 #include "factory_list.h"
 
+#include <cmath>
 #include "logic/components/position.h"
 #include "logic/components/renderable.h"
 #include "logic/components/human.h"
@@ -71,6 +72,21 @@ entt::entity dy::buildHuman(entt::registry& reg, glm::vec2 position, Color color
     reg.emplace<AIMemory>(entity);
 
     return entity;
+}
+
+entt::entity dy::buildHouse(entt::registry& reg, glm::vec2 position, Building::Type type) {
+    auto& tmpl = get_building_templates()[type];
+    glm::ivec2 origin(static_cast<int>(std::floor(position.x)), static_cast<int>(std::floor(position.y)));
+
+    std::vector<glm::ivec2> tiles;
+    for (int x = 0; x < tmpl.footprint.x; x++) {
+        for (int y = 0; y < tmpl.footprint.y; y++) {
+            tiles.push_back(origin + glm::ivec2(x, y));
+        }
+    }
+
+    glm::ivec2 door_tile = origin + tmpl.door_offset();
+    return dy::buildBuilding(reg, type, origin, entt::null, tiles, door_tile);
 }
 
 entt::entity dy::buildBuilding(entt::registry& reg, Building::Type type, glm::ivec2 origin,

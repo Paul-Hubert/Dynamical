@@ -31,6 +31,8 @@ DEFINE_FACTORY(Human, glm::vec2 position, Color color)
 
 DEFINE_FACTORY(Building, Building::Type type, glm::ivec2 origin, entt::entity owner, const std::vector<glm::ivec2>& tiles, glm::ivec2 door_tile)
 
+DEFINE_FACTORY(House, glm::vec2 position, Building::Type type)
+
 void destroy(entt::registry& reg, entt::entity entity);
 
 void destroyObject(entt::registry& reg, entt::entity object);

@@ -6,8 +6,8 @@ layout(location = 1) in flat vec3 frag_normal;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    // Phong lighting with fixed sun direction
-    vec3 sun_dir = normalize(vec3(1, -1, 1));
+    // Phong lighting with fixed sun direction (Z-up: sun from upper-left)
+    vec3 sun_dir = normalize(vec3(1, 1, -1));
     vec3 normal = normalize(frag_normal);
 
     // Ambient + diffuse

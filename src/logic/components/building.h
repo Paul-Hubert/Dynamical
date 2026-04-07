@@ -29,8 +29,8 @@ struct BuildingTemplate {
 inline const std::array<BuildingTemplate, 3>& get_building_templates() {
     static const std::array<BuildingTemplate, 3> templates = {{
         {"small_building",  {2, 2}, 1.2f, 0.8f, 1},
-        {"medium_building", {3, 3}, 1.5f, 1.0f, 2},
-        {"large_building",  {4, 5}, 2.0f, 1.2f, 4},
+        {"medium_building", {3, 3}, 1.5f, 1.2f, 2},
+        {"large_building",  {4, 5}, 2.0f, 2.0f, 4},
     }};
     return templates;
 }
