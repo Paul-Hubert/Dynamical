@@ -98,32 +98,43 @@ void MapGenerator::generateTerrain(Chunk& chunk, glm::ivec2 pos, int lod_level,
         }
     }
 
-    // Third pass: basic tile type assignment (height-based only, no neighbor lookup)
+    // Third pass: tile type assignment with chunk-local slope detection for stone
     for (int i = 0; i < Chunk::size; i++) {
         for (int j = 0; j < Chunk::size; j++) {
             Tile& tile = chunk.get(glm::ivec2(i, j));
             tile.terrain = Tile::nothing;
-            if (tile.level < 0) tile.terrain = Tile::water;
-            else if (tile.level < 1) tile.terrain = Tile::sand;
-            else tile.terrain = Tile::grass;
+            if (tile.level < 0) {
+                tile.terrain = Tile::water;
+            } else if (tile.level < 1) {
+                tile.terrain = Tile::sand;
+            } else {
+                tile.terrain = Tile::grass;
+
+                // Slope detection using chunk-local neighbors
+                constexpr glm::ivec2 offsets[] = {{-1,0}, {1,0}, {0,1}, {0,-1}};
+                float derivative_sum = 0;
+                int neighbours_count = 0;
+                for (auto& off : offsets) {
+                    int ni = i + off.x;
+                    int nj = j + off.y;
+                    if (ni >= 0 && ni < Chunk::size && nj >= 0 && nj < Chunk::size) {
+                        derivative_sum += std::abs(chunk.get(glm::ivec2(ni, nj)).level - tile.level);
+                        neighbours_count++;
+                    }
+                }
+                if (neighbours_count > 0 && derivative_sum / neighbours_count > 1) {
+                    tile.terrain = Tile::stone;
+                }
+            }
         }
     }
 }
 
-// Main-thread only: neighbor-based tile type refinement + entity spawning
+// Main-thread only: entity spawning (trees, bushes, water flow)
 void MapGenerator::finalizeChunk(Chunk& chunk, glm::ivec2 pos) {
     OPTICK_EVENT();
 
-    // Refine tile types using neighbor slope detection
-    for (int i = 0; i < Chunk::size; i++) {
-        for (int j = 0; j < Chunk::size; j++) {
-            glm::ivec2 position = pos * Chunk::size + glm::ivec2(i, j);
-            Tile& tile = chunk.get(glm::ivec2(i, j));
-            setTileType(tile, position);
-        }
-    }
-
-    // Spawn entities (trees, bushes, water flow)
+    // Spawn entities
     for (int i = 0; i < Chunk::size; i++) {
         for (int j = 0; j < Chunk::size; j++) {
             glm::vec2 position = pos * Chunk::size + glm::ivec2(i, j);
