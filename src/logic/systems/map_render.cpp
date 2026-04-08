@@ -9,56 +9,75 @@
 
 using namespace dy;
 
+static std::shared_ptr<VmaBuffer> createIndexBufferForGrid(Context& ctx, int gridSize, int& outNumIndices) {
+    std::vector<int> indices;
+    int gridVertexSize = gridSize + 1;
+
+    for (int x = 0; x < gridSize; x++) {
+        for (int y = 0; y < gridSize; y++) {
+            int vertex_index = x + y * gridVertexSize;
+            indices.push_back(vertex_index);
+            indices.push_back(vertex_index + 1);
+            indices.push_back(vertex_index + gridVertexSize);
+            indices.push_back(vertex_index + 1);
+            indices.push_back(vertex_index + gridVertexSize + 1);
+            indices.push_back(vertex_index + gridVertexSize);
+        }
+    }
+
+    outNumIndices = indices.size();
+    return ctx.transfer.createBuffer(indices.data(),
+        vk::BufferCreateInfo({}, indices.size() * sizeof(uint32_t),
+            vk::BufferUsageFlagBits::eIndexBuffer, vk::SharingMode::eExclusive));
+}
+
 MapRenderSys::MapRenderSys(entt::registry& reg) : System(reg) {
 
     Context& ctx = *reg.ctx<Context*>();
 
     initPipeline();
 
-    std::vector<int> indices;
+    // Create index buffers for each LOD level
+    int grid_sizes[] = {32, 16, 8};
+    const char* names[] = {"Terrain_IndexBuffer_LOD0", "Terrain_IndexBuffer_LOD1", "Terrain_IndexBuffer_LOD2"};
 
-    float gridSize = Chunk::size + 1;
-
-    for(int x = 0; x < Chunk::size; x++) {
-        for(int y = 0; y < Chunk::size; y++) {
-
-            int vertex_index = x + y * gridSize;
-            indices.push_back(vertex_index);
-            indices.push_back(vertex_index + 1);
-            indices.push_back(vertex_index + gridSize);
-            indices.push_back(vertex_index + 1);
-            indices.push_back(vertex_index + gridSize + 1);
-            indices.push_back(vertex_index + gridSize);
-
+    for (int i = 0; i < 3; i++) {
+        lod_levels[i].grid_size = grid_sizes[i];
+        lod_levels[i].indexBuffer = createIndexBufferForGrid(ctx, grid_sizes[i], lod_levels[i].numIndices);
+        if (lod_levels[i].indexBuffer) {
+            SET_VK_NAME(ctx.device, vk::ObjectType::eBuffer, lod_levels[i].indexBuffer->buffer, names[i]);
         }
     }
-
-    numIndices = indices.size();
-
-    indexBuffer = ctx.transfer.createBuffer(indices.data(), vk::BufferCreateInfo({}, indices.size() * sizeof(uint32_t), vk::BufferUsageFlagBits::eIndexBuffer, vk::SharingMode::eExclusive));
-
-    if(indexBuffer) {
-        SET_VK_NAME(ctx.device, vk::ObjectType::eBuffer, indexBuffer->buffer, "Terrain_IndexBuffer");
-    }
-
 }
 
 void MapRenderSys::tick(double dt) {
-    
+
     OPTICK_EVENT();
 
     Context& ctx = *reg.ctx<Context*>();
 
     MapUploadData& data = reg.ctx<MapUploadData>();
-    
+
     ctx.classic_render.command.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
-    
+
     ctx.classic_render.command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, { ctx.classic_render.per_frame[ctx.frame_index].set, data.mapSet}, nullptr);
 
-    ctx.classic_render.command.bindIndexBuffer(indexBuffer->buffer, 0, vk::IndexType::eUint32);
+    // Draw each LOD level with its own index buffer, grid_size push constant, and instance range
+    int lod_counts[] = {data.num_chunks_lod0, data.num_chunks_lod1, data.num_chunks_lod2};
+    int first_instance = 0;
 
-    ctx.classic_render.command.drawIndexed(numIndices, data.num_chunks, 0, 0, 0);
+    for (int i = 0; i < 3; i++) {
+        if (lod_counts[i] <= 0) {
+            continue;
+        }
 
+        int grid_size = lod_levels[i].grid_size;
+        ctx.classic_render.command.pushConstants(pipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, sizeof(int), &grid_size);
+        ctx.classic_render.command.bindIndexBuffer(lod_levels[i].indexBuffer->buffer, 0, vk::IndexType::eUint32);
+        ctx.classic_render.command.drawIndexed(lod_levels[i].numIndices, lod_counts[i], 0, 0, first_instance);
+
+        first_instance += lod_counts[i];
+    }
 }
 
 void MapRenderSys::initPipeline() {
@@ -66,19 +85,19 @@ void MapRenderSys::initPipeline() {
     Context& ctx = *reg.ctx<Context*>();
 
     MapUploadData& data = reg.ctx<MapUploadData>();
-    
+
     // PIPELINE INFO
-    
+
     auto vertShaderCode = dy::readFile("resources/shaders/maprender.vert.glsl.spv");
     auto fragShaderCode = dy::readFile("resources/shaders/maprender.frag.glsl.spv");
-    
+
     VkShaderModuleCreateInfo moduleInfo = {};
     moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    
+
     moduleInfo.codeSize = vertShaderCode.size();
     moduleInfo.pCode = reinterpret_cast<const uint32_t*>(vertShaderCode.data());
     VkShaderModule vertShaderModule = static_cast<VkShaderModule> (ctx.device->createShaderModule(moduleInfo));
-    
+
     moduleInfo.codeSize = fragShaderCode.size();
     moduleInfo.pCode = reinterpret_cast<const uint32_t*>(fragShaderCode.data());
     VkShaderModule fragShaderModule = static_cast<VkShaderModule> (ctx.device->createShaderModule(moduleInfo));
@@ -96,9 +115,9 @@ void MapRenderSys::initPipeline() {
     fragShaderStageInfo.pName = "main";
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
-    
+
     // VERTEX INPUT
-    
+
     auto vertexInputBindings = std::vector<vk::VertexInputBindingDescription> {};
     // Inpute attribute bindings describe shader attribute locations and memory layouts
     auto vertexInputAttributs = std::vector<vk::VertexInputAttributeDescription> {};
@@ -164,8 +183,8 @@ void MapRenderSys::initPipeline() {
     colorBlending.blendConstants[1] = 0.0f;
     colorBlending.blendConstants[2] = 0.0f;
     colorBlending.blendConstants[3] = 0.0f;
-    
-    
+
+
     VkPipelineDepthStencilStateCreateInfo depthStencil = {};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_TRUE;
@@ -185,13 +204,13 @@ void MapRenderSys::initPipeline() {
     dynInfo.pDynamicStates = &states[0];
 
     auto layouts = std::vector<vk::DescriptorSetLayout> {ctx.classic_render.view_layout, data.mapLayout};
-    
-    auto range = vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, 4 * sizeof(float));
-    
+
+    auto range = vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(int));
+
     pipelineLayout = ctx.device->createPipelineLayout(vk::PipelineLayoutCreateInfo(
         {}, (uint32_t) layouts.size(), layouts.data(), 1, &range
     ));
-    
+
     VkGraphicsPipelineCreateInfo pipelineInfo = {};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.stageCount = 2;
@@ -218,11 +237,11 @@ void MapRenderSys::initPipeline() {
 MapRenderSys::~MapRenderSys() {
 
     Context& ctx = *reg.ctx<Context*>();
-    
+
     ctx.device->destroy(graphicsPipeline);
-    
+
     ctx.device->destroy(pipelineLayout);
-    
+
 }
 
 

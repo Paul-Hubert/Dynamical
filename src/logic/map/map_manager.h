@@ -9,13 +9,15 @@
 #include <glm/gtx/hash.hpp>
 
 #include <memory>
+#include <future>
+#include <vector>
 
 #include "chunk.h"
 
 #include "map_generator.h"
 
 namespace dy {
-    
+
 class MapManager {
 public:
     MapManager(entt::registry& reg);
@@ -25,13 +27,19 @@ public:
     Tile* getTile(glm::vec2 pos) const;
     Chunk* generateChunk(glm::ivec2 pos);
     void updateTile(glm::vec2 pos);
-    
+
+    // Async chunk generation
+    void requestChunkAsync(glm::ivec2 pos, int lod_level);
+    void pollReady();
+    void processFinalizationQueue(int budget);
+    bool isChunkPending(glm::ivec2 pos) const;
+
     const std::vector<glm::vec2> pathfind(glm::vec2 start, std::function<bool(glm::vec2)> predicate, int iteration_limit = std::numeric_limits<int>::max()) const;
-    
+
     void insert(entt::entity entity, glm::vec2 position);
     void move(entt::entity entity, glm::vec2 position);
     void remove(entt::entity entity);
-    
+
     glm::ivec2 getChunkPos(glm::vec2 pos) const {
         return floor(pos / (float) Chunk::size);
     }
@@ -39,18 +47,26 @@ public:
     glm::ivec2 getTilePos(glm::vec2 pos) const {
         return floor(pos) - getChunkPos(pos) * Chunk::size;
     }
-    
+
     glm::ivec2 floor(glm::vec2 pos) const {
         return glm::floor(pos);
     }
-    
+
     glm::vec2 getMousePosition() const;
 
     ~MapManager();
 private:
     entt::registry& reg;
-    std::unordered_map<glm::vec2, std::unique_ptr<Chunk>> map;
+    std::unordered_map<glm::ivec2, std::unique_ptr<Chunk>> map;
     MapGenerator generator;
+
+    // Async infrastructure
+    struct PendingChunk {
+        std::future<std::unique_ptr<Chunk>> future;
+        int lod_level;
+    };
+    std::unordered_map<glm::ivec2, PendingChunk> pending_chunks;
+    std::vector<glm::ivec2> finalization_queue;
 };
 
 }

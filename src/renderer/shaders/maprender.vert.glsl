@@ -11,6 +11,10 @@ out gl_PerVertex {
     vec4 gl_Position;
 };
 
+layout(push_constant) uniform PushConstants {
+    int grid_size;  // 32, 16, or 8
+};
+
 layout(set = 0, binding = 0) uniform Camera {
     mat4 projection;
     mat4 view;
@@ -28,8 +32,7 @@ struct KeyValue {
 
 layout(std430, set = 1, binding = 0) readonly buffer Map {
     vec4 colors[NUM_TYPES];
-    ivec2 corner_indices;
-    uint chunk_length;
+    ivec2 chunk_positions[MAX_CHUNKS];
     KeyValue chunk_indices[MAX_CHUNKS];
     Tile tiles[];
 };
@@ -69,7 +72,7 @@ Tile getTile(vec2 pos) {
     if(index == -1) {
         return Tile(0, 0);
     }
-    
+
     ivec2 tile_space = ipos - chunk_pos * CHUNK_SIZE;
 
     Tile tile = tiles[index * CHUNK_SIZE * CHUNK_SIZE + tile_space.x * CHUNK_SIZE + tile_space.y];
@@ -77,7 +80,7 @@ Tile getTile(vec2 pos) {
     if(tile.type == 5) {
         tile.height = 0.0f;
     }
-    
+
     return tile;
 
 }
@@ -93,17 +96,19 @@ float rand(vec2 co){
 
 void main() {
 
-    int gridSize = CHUNK_SIZE + 1;
-    ivec2 vertex_coords = ivec2(gl_VertexIndex%gridSize, int(gl_VertexIndex/gridSize));
-    ivec2 chunk_coords = ivec2(int(gl_InstanceIndex/chunk_length), gl_InstanceIndex%chunk_length);
-    v_pos = (corner_indices + chunk_coords) * CHUNK_SIZE + vertex_coords;
-    
+    int step = CHUNK_SIZE / grid_size;
+    int gridVertexSize = grid_size + 1;
+    ivec2 vertex_coords = ivec2(gl_VertexIndex % gridVertexSize, int(gl_VertexIndex / gridVertexSize)) * step;
+
+    ivec2 chunk_pos = chunk_positions[gl_InstanceIndex];
+    v_pos = chunk_pos * CHUNK_SIZE + vertex_coords;
+
     Tile tile = getTile(v_pos);
-    
-    float dhdx = getTile(v_pos - vec2(1,0)).height - getTile(v_pos + vec2(1,0)).height;
-    float dhdy = getTile(v_pos - vec2(0,1)).height - getTile(v_pos + vec2(0,1)).height;
-    v_normal = normalize(vec3(dhdx, dhdy, -1));
+
+    float dhdx = getTile(v_pos - vec2(step,0)).height - getTile(v_pos + vec2(step,0)).height;
+    float dhdy = getTile(v_pos - vec2(0,step)).height - getTile(v_pos + vec2(0,step)).height;
+    v_normal = normalize(vec3(dhdx / (2.0 * step), dhdy / (2.0 * step), -1));
 
     gl_Position = camera.projection * camera.view * vec4(v_pos, tile.height, 1.0f);
-    
+
 }
