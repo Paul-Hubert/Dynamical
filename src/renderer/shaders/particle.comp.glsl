@@ -79,8 +79,7 @@ struct Tile {
 
 layout(std430, set = 1, binding = 0) readonly buffer Map {
     vec4 colors[NUM_TYPES];
-    ivec2 corner_indices;
-    uint chunk_length;
+    ivec2 chunk_positions[MAX_CHUNKS];
     KeyValue chunk_indices[MAX_CHUNKS];
     Tile tiles[];
 };

@@ -43,10 +43,12 @@ public:
         return updated;
     }
     
+    int lod_level = 0; // 0 = full 32x32, 1 = 16x16, 2 = 8x8
+
 private:
     Tile tiles[size][size];
     std::unordered_set<entt::entity> objects;
-    
+
     bool updated = false;
     
 };
