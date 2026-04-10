@@ -26,7 +26,8 @@ struct KeyValue {
 
 layout(std430, set = 1, binding = 0) readonly buffer Map {
     vec4 colors[NUM_TYPES];
-    ivec2 chunk_positions[MAX_CHUNKS];
+    ivec2 corner_indices;
+    uint chunk_length;
     KeyValue chunk_indices[MAX_CHUNKS];
     Tile tiles[];
 };
@@ -87,9 +88,24 @@ float rand(vec2 co){
 
 void main() {
 
+/*
+    vec3 color = vec3(0);
+    float max = 0;
+
+    for(int i = 0; i<NUM_TYPES; i++) {
+        if(v_types[i] > max) {
+            max = v_types[i];
+            color = colors[i].rgb;
+        }
+    }
+    
+    outColor = vec4(color, 1);
+    outColor = vec4(v_color, 1);
+*/
+
     vec2 pos = v_pos;
     ivec2 ipos = ifloor(pos);
-
+    
     Tile tile = getTile(pos);
     vec2 rond = round(pos);
     vec2 dist = rond - pos;
@@ -97,7 +113,7 @@ void main() {
     Tile xadj = getTile(vec2(diag.x, pos.y));
     Tile yadj = getTile(vec2(pos.x, diag.y));
     Tile dadj = getTile(diag);
-
+    
     int trespass = 0;
     if(xadj.type == yadj.type) {
         if(tile.type != dadj.type) {trespass = 1;}
@@ -107,17 +123,17 @@ void main() {
             if(ran >= 0) trespass = 1;
         }
     }
-
+    
     if(trespass == 1 && length(pos - (ifloor(pos) + 0.5)) > 0.5)
             tile.type = xadj.type;
-
+    
     vec4 color = colors[tile.type];
-
+    
     outColor = color;
-
+    
     const vec3 sun_dir = normalize(vec3(1, -1, 1));
 
     vec3 normal = -normalize(v_normal);
-
+    
     outColor.rgb *= max(dot(normal, sun_dir), 0.0) * 0.9 + 0.1;
 }

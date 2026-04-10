@@ -21,7 +21,8 @@ struct KeyValue {
 
 struct Header {
     glm::vec4 colors[Tile::Type::max];
-    glm::ivec2 chunk_positions[max_chunks]; // per-instance chunk positions, grouped by LOD
+    glm::ivec2 corner_indices;
+    uint32_t chunk_length;
     KeyValue chunk_indices[max_chunks];
 };
 
@@ -60,9 +61,6 @@ struct MapUploadData {
     vk::DescriptorSetLayout mapLayout;
     vk::DescriptorSet mapSet;
     int num_chunks;
-    int num_chunks_lod0 = 0;
-    int num_chunks_lod1 = 0;
-    int num_chunks_lod2 = 0;
     vk::Buffer objectBuffer;
     int num_objects;
     vk::Buffer buildingBuffer;

@@ -25,28 +25,23 @@ class MapRenderSys : public System {
 public:
     MapRenderSys(entt::registry& reg);
     ~MapRenderSys() override;
-
+    
     const char* name() override {
         return "MapRender";
     }
 
     void tick(double dt) override;
-
+    
 private:
-
+    
     void initPipeline();
 
-    // Per-LOD index buffers and index counts
-    struct LODLevel {
-        int grid_size;
-        int numIndices;
-        std::shared_ptr<dy::VmaBuffer> indexBuffer;
-    };
-    LODLevel lod_levels[3]; // LOD 0 (32), LOD 1 (16), LOD 2 (8)
+    int numIndices;
+    std::shared_ptr<dy::VmaBuffer> indexBuffer;
 
     vk::PipelineLayout pipelineLayout;
     vk::Pipeline graphicsPipeline;
-
+    
 };
 
 }

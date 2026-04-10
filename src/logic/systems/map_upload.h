@@ -22,13 +22,7 @@
 
 namespace dy {
 
-// LOD distance thresholds (in chunks from camera center)
-constexpr int lod0_distance = 3;
-constexpr int lod1_distance = 6;
 
-// Per-frame budgets
-constexpr int max_async_requests_per_frame = 8;
-constexpr int max_finalizations_per_frame = 4;
 
 
     class Context;
@@ -51,8 +45,6 @@ constexpr int max_finalizations_per_frame = 4;
         int find_storage_slot();
         uint32_t hash(glm::ivec2 chunk_pos);
         void insert_chunk(Header* header, glm::ivec2 chunk_pos, int index);
-
-        int computeLOD(glm::ivec2 chunk_pos, glm::ivec2 camera_chunk) const;
 
         vk::DescriptorPool descPool;
 

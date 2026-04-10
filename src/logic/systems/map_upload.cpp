@@ -112,19 +112,12 @@ MapUploadSys::MapUploadSys(entt::registry& reg) : System(reg) {
     }
 }
 
-int MapUploadSys::computeLOD(glm::ivec2 chunk_pos, glm::ivec2 camera_chunk) const {
-    int dist = std::max(std::abs(chunk_pos.x - camera_chunk.x), std::abs(chunk_pos.y - camera_chunk.y));
-    if (dist <= lod0_distance) return 0;
-    if (dist <= lod1_distance) return 1;
-    return 2;
-}
-
 void MapUploadSys::tick(double dt) {
 
     OPTICK_EVENT();
 
     Context& ctx = *reg.ctx<Context*>();
-
+    
     MapUploadData& data = reg.ctx<MapUploadData>();
 
     auto& f = per_frame[ctx.frame_index];
@@ -160,11 +153,6 @@ void MapUploadSys::tick(double dt) {
     auto& map = reg.ctx<MapManager>();
     auto& camera = reg.ctx<Camera>();
 
-    // 1. Poll async chunk generation and process finalization queue
-    map.pollReady();
-    map.processFinalizationQueue(max_finalizations_per_frame);
-
-    // 2. Calculate visible chunk bounds
     auto screen_size = camera.getScreenSize();
     screen_size.y *= 2;
 
@@ -191,101 +179,33 @@ void MapUploadSys::tick(double dt) {
     auto corner_pos = min_pos;
     auto end_pos = max_pos;
 
-    // Camera center for LOD and distance sorting
-    glm::ivec2 camera_chunk = map.getChunkPos(camera.getCenter());
+    //end_pos.y += abs(end_pos.y - corner_pos.y);
 
-    // 3. Collect all visible chunk positions and sort by distance from camera
-    struct ChunkEntry {
-        glm::ivec2 pos;
-        int lod;
-        int dist;
-    };
-    std::vector<ChunkEntry> visible_chunks;
-    visible_chunks.reserve((end_pos.x - corner_pos.x + 1) * (end_pos.y - corner_pos.y + 1));
-
-    for (int x = corner_pos.x; x <= end_pos.x; x++) {
-        for (int y = corner_pos.y; y <= end_pos.y; y++) {
-            glm::ivec2 pos(x, y);
-            int lod = computeLOD(pos, camera_chunk);
-            int dist = std::max(std::abs(x - camera_chunk.x), std::abs(y - camera_chunk.y));
-            visible_chunks.push_back({pos, lod, dist});
-        }
-    }
-
-    std::sort(visible_chunks.begin(), visible_chunks.end(),
-              [](const ChunkEntry& a, const ChunkEntry& b) { return a.dist < b.dist; });
-
-    // 4. Process visible chunks with async generation budgets
-    // Group by LOD: fill chunk_positions with LOD 0 first, then LOD 1, then LOD 2
-    struct ProcessedChunk {
-        glm::ivec2 pos;
-        int lod;
-        Chunk* chunk;
-    };
-    std::vector<ProcessedChunk> lod0_chunks, lod1_chunks, lod2_chunks;
+    header->corner_indices = corner_pos;
+    header->chunk_length = end_pos.y - corner_pos.y + 1;
 
     data.num_chunks = 0;
     data.num_objects = 0;
     data.num_buildings = 0;
-    data.num_chunks_lod0 = 0;
-    data.num_chunks_lod1 = 0;
-    data.num_chunks_lod2 = 0;
 
-    int async_requests_this_frame = 0;
+    for(int x = corner_pos.x; x <= end_pos.x; x++) {
+        for(int y = corner_pos.y; y <= end_pos.y; y++) {
 
-    for (auto& entry : visible_chunks) {
-        auto chunk_pos = entry.pos;
-        int lod = entry.lod;
-
-        Chunk* chunk = map.getChunk(chunk_pos);
-
-        if (chunk == nullptr) {
-            // Not generated yet — request async if budget allows
-            if (!map.isChunkPending(chunk_pos) && async_requests_this_frame < max_async_requests_per_frame) {
-                map.requestChunkAsync(chunk_pos, lod);
-                async_requests_this_frame++;
-            }
-            continue; // invisible until ready
-        }
-
-        // Check if chunk needs LOD upgrade (was generated at lower resolution, now closer)
-        if (chunk->lod_level > lod) {
-            // Request re-generation at higher resolution
-            if (!map.isChunkPending(chunk_pos) && async_requests_this_frame < max_async_requests_per_frame) {
-                map.requestChunkAsync(chunk_pos, lod);
-                async_requests_this_frame++;
-            }
-            // Continue rendering old LOD data in the meantime
-        }
-
-        // Categorize by LOD for grouped draw calls
-        switch (lod) {
-            case 0: lod0_chunks.push_back({chunk_pos, lod, chunk}); break;
-            case 1: lod1_chunks.push_back({chunk_pos, lod, chunk}); break;
-            default: lod2_chunks.push_back({chunk_pos, lod, chunk}); break;
-        }
-    }
-
-    // 5. Fill chunk_positions and upload tile data, grouped by LOD
-    // Instance indices: [LOD0 chunks][LOD1 chunks][LOD2 chunks]
-    int instance_index = 0;
-
-    auto processChunkGroup = [&](std::vector<ProcessedChunk>& group) -> int {
-        int count = 0;
-        for (auto& pc : group) {
             OPTICK_EVENT("MapUploadSys::tick::chunk");
 
-            if (instance_index >= max_chunks) break;
+            auto chunk_pos = glm::ivec2(x, y);
 
-            // Set chunk position for this instance
-            header->chunk_positions[instance_index] = pc.pos;
+            Chunk* chunk = map.getChunk(chunk_pos);
+            if(chunk == nullptr) chunk = map.generateChunk(chunk_pos);
+
 
             // Add Objects from chunk
-            if (data.num_objects < max_objects) {
-                for (auto entity : pc.chunk->getObjects()) {
+
+            if(data.num_objects < max_objects) {
+                for (auto entity: chunk->getObjects()) {
                     if (reg.all_of<Renderable>(entity) && !reg.all_of<Building>(entity)) {
-                        auto& position = reg.get<Position>(entity);
-                        auto& renderable = reg.get<Renderable>(entity);
+                        auto &position = reg.get<Position>(entity);
+                        auto &renderable = reg.get<Renderable>(entity);
                         objectBuffer[data.num_objects].sphere.x = position.x;
                         objectBuffer[data.num_objects].sphere.y = position.y;
                         objectBuffer[data.num_objects].sphere.z = position.getHeight() + 0.5f;
@@ -294,24 +214,30 @@ void MapUploadSys::tick(double dt) {
 
                         data.num_objects++;
 
-                        if (data.num_objects >= max_objects) break;
+                        if(data.num_objects >= max_objects) {
+                            break;
+                        }
                     }
                 }
             }
 
-            // Upload tile data to GPU
-            bool stored = false;
-            int index = find_stored_chunk(pc.pos);
-            if (index != -1) stored = true;
+            // Add chunk data
 
-            if (!stored) {
+            bool stored = false;
+
+            int index = find_stored_chunk(chunk_pos);
+
+            if(index != -1) stored = true;
+
+            if(!stored) {
+
                 index = find_storage_slot();
 
-                RenderChunk* rchunk = reinterpret_cast<RenderChunk*>(header + 1);
+                RenderChunk* rchunk = reinterpret_cast<RenderChunk*>(header+1);
 
-                for (int i = 0; i < Chunk::size; i++) {
-                    for (int j = 0; j < Chunk::size; j++) {
-                        Tile& tile = pc.chunk->get(glm::ivec2(i, j));
+                for(int i = 0; i<Chunk::size; i++) {
+                    for(int j = 0; j<Chunk::size; j++) {
+                        Tile& tile = chunk->get(glm::vec2(i,j));
                         rchunk[staging_counter].tiles[i * Chunk::size + j] = {tile.terrain, tile.level};
                     }
                 }
@@ -319,27 +245,24 @@ void MapUploadSys::tick(double dt) {
                 regions.push_back(vk::BufferCopy(sizeof(Header) + staging_counter * sizeof(RenderChunk), sizeof(Header) + index * sizeof(RenderChunk), sizeof(RenderChunk)));
 
                 staging_counter++;
-                pc.chunk->setUpdated(false);
+
+                chunk->setUpdated(false);
+
             }
 
-            insert_chunk(header, pc.pos, index);
+            insert_chunk(header, chunk_pos, index);
 
             StoredChunk& sc = stored_chunks[index];
-            sc.position = pc.pos;
+
+            sc.position = chunk_pos;
             sc.stored = true;
-            sc.chunk = pc.chunk;
+            sc.chunk = chunk;
             sc.used = true;
-
+            
             data.num_chunks++;
-            instance_index++;
-            count++;
-        }
-        return count;
-    };
 
-    data.num_chunks_lod0 = processChunkGroup(lod0_chunks);
-    data.num_chunks_lod1 = processChunkGroup(lod1_chunks);
-    data.num_chunks_lod2 = processChunkGroup(lod2_chunks);
+        }
+    }
 
     for(int i = 0; i<stored_chunks.size(); i++) {
         stored_chunks[i].used = false;
@@ -382,7 +305,7 @@ void MapUploadSys::tick(double dt) {
     }
 
     transfer.copyBuffer(f.stagingBuffer, storageBuffer, regions);
-
+    
     ImGui::End();
 
 }
@@ -441,6 +364,7 @@ int MapUploadSys::find_storage_slot() {
     StoredChunk& sc = stored_chunks[storage_counter];
     while(sc.stored
             && (sc.used
+            /*|| (sc.position.x >= corner_pos.x && sc.position.x <= end_pos.x && sc.position.y >= corner_pos.y && sc.position.y <= end_pos.y)*/
             )) {
         storage_counter = (storage_counter+1)%stored_chunks.size();
         sc = stored_chunks[storage_counter];
