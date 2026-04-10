@@ -212,10 +212,10 @@ void AISys::poll_llm_results() {
             if (!decision.success) continue;
 
             for (const auto& parsed : decision.actions) {
-                auto action = PrerequisiteResolver::instance().resolve(
+                auto chain = PrerequisiteResolver::instance().resolve(
                     parsed.action_id, reg, entity, parsed.params
                 );
-                if (action) {
+                for (auto& action : chain) {
                     ai.action_queue.push(std::move(action));
                 }
             }
@@ -270,8 +270,14 @@ void AISys::decide(entt::entity entity, AIC& ai) {
 
         // Resolve prerequisites and create action chain
         ActionID action_id = max_behavior->get_action_id();
-        ActionParams params;  // Empty for now; will be populated in Phase 2+ for LLM
-        ai.action = PrerequisiteResolver::instance().resolve(action_id, reg, entity, params);
+        ActionParams params;
+        auto chain = PrerequisiteResolver::instance().resolve(action_id, reg, entity, params);
+        if (!chain.empty()) {
+            ai.action = std::move(chain.front());
+            for (size_t i = 1; i < chain.size(); ++i) {
+                ai.action_queue.push(std::move(chain[i]));
+            }
+        }
     }
 
 }

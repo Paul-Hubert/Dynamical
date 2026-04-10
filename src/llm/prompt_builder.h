@@ -13,6 +13,7 @@
 #include "../logic/components/building.h"
 #include "../logic/components/storage.h"
 #include "../logic/components/item.h"
+#include "../ai/crafting/recipe_registry.h"
 #include <glm/glm.hpp>
 
 using namespace dy;
@@ -32,6 +33,8 @@ struct PromptContext {
     std::string nearby_buildings;     // buildings within 30 tiles
     std::string village_needs;        // housing shortages, etc.
     std::string buildable_options;    // building types the entity can afford
+    std::string inventory;            // current items in Storage
+    std::string craftable_recipes;    // recipes and their ingredients
 };
 
 // Helper: Build PromptContext from entity (identity must be ready)
@@ -168,6 +171,38 @@ inline PromptContext build_context(entt::registry& reg, entt::entity entity) {
         } else {
             ctx.buildable_options = "You can build: " + options_oss.str();
         }
+
+        // Inventory
+        std::ostringstream inv_oss;
+        bool inv_first = true;
+        for (int i = 0; i < static_cast<int>(Item::COUNT); ++i) {
+            auto id = static_cast<Item::ID>(i);
+            if (id == Item::null) continue;
+            int amt = storage.amount(id);
+            if (amt > 0) {
+                if (!inv_first) inv_oss << ", ";
+                inv_oss << Item::to_string(id) << " x" << amt;
+                inv_first = false;
+            }
+        }
+        ctx.inventory = inv_first ? "Empty" : inv_oss.str();
+    }
+
+    // Craftable recipes
+    {
+        const auto& recipes = RecipeRegistry::instance().all();
+        std::ostringstream recipes_oss;
+        for (const auto& recipe : recipes) {
+            recipes_oss << "- " << recipe.name << ": ";
+            bool first_input = true;
+            for (auto& [item, amt] : recipe.inputs) {
+                if (!first_input) recipes_oss << " + ";
+                recipes_oss << Item::to_string(item) << " x" << amt;
+                first_input = false;
+            }
+            recipes_oss << " -> " << Item::to_string(recipe.output) << " x" << recipe.output_amount << "\n";
+        }
+        ctx.craftable_recipes = recipes_oss.str();
     }
 
     return ctx;

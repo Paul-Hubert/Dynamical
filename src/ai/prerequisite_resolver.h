@@ -2,6 +2,7 @@
 #define PREREQUISITE_RESOLVER_H
 
 #include <memory>
+#include <vector>
 #include <set>
 #include <entt/entt.hpp>
 #include <ai/action_id.h>
@@ -28,18 +29,12 @@ class PrerequisiteResolver {
 public:
     static PrerequisiteResolver& instance();
 
-    /// Main entry point: resolve prerequisites and return head of chain
-    /// If no prerequisites needed, returns the target action directly
+    /// Main entry point: resolve prerequisites and return the full action chain.
+    /// Prerequisite actions come first, target action is always last.
     ///
-    /// Parameters:
-    ///   - ActionID target: the action to execute (after prerequisites)
-    ///   - entt::registry& reg: game registry for component access
-    ///   - entt::entity entity: the entity performing the action
-    ///   - const ActionParams& params: action parameters
-    ///   - int max_depth: maximum recursion depth to prevent cycles (default: 5)
-    ///
-    /// Returns: unique_ptr to head of action chain (first prerequisite or target action)
-    std::unique_ptr<Action> resolve(
+    /// Returns: vector of actions — prerequisites in order, then the target action.
+    ///          Single-element vector if no prerequisites are needed.
+    std::vector<std::unique_ptr<Action>> resolve(
         ActionID target,
         entt::registry& reg,
         entt::entity entity,
@@ -55,13 +50,13 @@ private:
     PrerequisiteResolver& operator=(const PrerequisiteResolver&) = delete;
 
     /// Implementation of resolve with visited set tracking
-    std::unique_ptr<Action> resolve_impl(
+    std::vector<std::unique_ptr<Action>> resolve_impl(
         ActionID target,
         entt::registry& reg,
         entt::entity entity,
         const ActionParams& params,
         int depth,
-        std::set<int>& visited  // Uses int for ActionID comparison
+        std::set<int>& visited
     );
 };
 

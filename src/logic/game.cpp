@@ -36,6 +36,7 @@
 #include "ai/speech/speech_bubble_sys.h"
 #include "ai/speech/speech_bubble_render_sys.h"
 #include <ai/action_registry.h>
+#include <ai/crafting/recipe_registry.h>
 #include <ai/conversation/conversation_manager.h>
 #include "llm/llm_manager.h"
 
@@ -84,7 +85,8 @@ void Game::start() {
     set->pre_add<ChopSys>();
     set->pre_add<MineSys>();
     set->pre_add<EatSys>();
-    
+    set->pre_add<CraftSys>();
+
     set->pre_add<AISys>();
     set->pre_add<SpeechBubbleSys>();
     set->pre_add<LLMDebugSys>();
@@ -107,6 +109,7 @@ void Game::start() {
 
     // Initialize action registry with all action descriptors
     ActionRegistry::instance().initialize_descriptors();
+    RecipeRegistry::instance().initialize();
 
     // Initialize LLM manager if enabled
     if (s.llm.enabled) {

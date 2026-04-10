@@ -17,11 +17,11 @@ struct ActionPrerequisite {
 
     /// Lambda checking if prerequisite is satisfied
     /// Returns true if prerequisite is already met, false otherwise
-    std::function<bool(entt::registry&, entt::entity)> is_satisfied;
+    std::function<bool(entt::registry&, entt::entity, const ActionParams&)> is_satisfied;
 
     /// Lambda returning the ActionID to resolve this prerequisite
     /// Called only if is_satisfied() returns false
-    std::function<ActionID(entt::registry&, entt::entity)> resolve_action;
+    std::function<ActionID(entt::registry&, entt::entity, const ActionParams&)> resolve_action;
 };
 
 /// Describes an action type: how to create it, what prerequisites it has, etc.

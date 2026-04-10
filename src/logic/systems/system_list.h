@@ -48,6 +48,8 @@ DEFINE_SYSTEM(LLMDebugSys)
 
 DEFINE_SYSTEM(PersonalityInspectorSys)
 
+DEFINE_SYSTEM(CraftSys)
+
 }
 
 #undef DEFINE_SYSTEM

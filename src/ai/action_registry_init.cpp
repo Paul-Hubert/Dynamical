@@ -16,6 +16,7 @@
 #include <ai/actions/chop_action.h>
 #include <ai/actions/hunt_action.h>
 #include <ai/actions/fish_action.h>
+#include <ai/crafting/recipe_registry.h>
 #include "util/log.h"
 
 namespace dy {
@@ -42,11 +43,11 @@ void ActionRegistry::initialize_descriptors() {
             .prerequisites = {
                 {
                     .description = "needs food source",
-                    .is_satisfied = [](auto& r, auto e) {
+                    .is_satisfied = [](auto& r, auto e, const auto&) {
                         if (!r.template all_of<Storage>(e)) return false;
                         return r.template get<Storage>(e).amount(Item::berry) > 0;
                     },
-                    .resolve_action = [](auto& r, auto e) { return ActionID::Harvest; }
+                    .resolve_action = [](auto&, auto, const auto&) { return ActionID::Harvest; }
                 }
             },
             .create = [](entt::registry& r, entt::entity e, const ActionParams& p) {
@@ -108,39 +109,31 @@ void ActionRegistry::initialize_descriptors() {
         register_descriptor(desc);
     }
 
-    // Build - needs building materials
+    // Build - needs wood and stone (checked independently so both can be queued)
     {
         ActionDescriptor desc{
             .id = ActionID::Build,
             .name = "Build",
             .prerequisites = {
                 {
-                    .description = "needs building materials",
-                    .is_satisfied = [](auto& r, auto e) {
-                        if (!r.template all_of<Storage>(e)) {
-                            dy::log() << "[Build/Prereq] is_satisfied: entity "
-                                << static_cast<uint32_t>(e) << " has no Storage -> FAIL\n";
-                            return false;
-                        }
+                    .description = "needs wood",
+                    .is_satisfied = [](auto& r, auto e, const auto&) {
+                        if (!r.template all_of<Storage>(e)) return false;
                         auto& s = r.template get<Storage>(e);
-                        // Use smallest template's dynamic cost as minimum threshold
                         auto& smallest = get_building_templates()[Building::small_building];
-                        bool result = s.amount(Item::wood) >= smallest.wood_cost()
-                            && s.amount(Item::stone) >= smallest.stone_cost();
-                        dy::log() << "[Build/Prereq] is_satisfied: entity "
-                            << static_cast<uint32_t>(e)
-                            << " wood " << s.amount(Item::wood) << "/" << smallest.wood_cost()
-                            << " stone " << s.amount(Item::stone) << "/" << smallest.stone_cost()
-                            << " -> " << (result ? "PASS" : "FAIL") << "\n";
-                        return result;
+                        return s.amount(Item::wood) >= smallest.wood_cost();
                     },
-                    .resolve_action = [](auto& r, auto e) {
-                        auto& smallest = get_building_templates()[Building::small_building];
-                        if (!r.template all_of<Storage>(e)) return ActionID::Chop;
+                    .resolve_action = [](auto&, auto, const auto&) { return ActionID::Chop; }
+                },
+                {
+                    .description = "needs stone",
+                    .is_satisfied = [](auto& r, auto e, const auto&) {
+                        if (!r.template all_of<Storage>(e)) return false;
                         auto& s = r.template get<Storage>(e);
-                        if (s.amount(Item::wood) < smallest.wood_cost()) return ActionID::Chop;
-                        return ActionID::Mine;
-                    }
+                        auto& smallest = get_building_templates()[Building::small_building];
+                        return s.amount(Item::stone) >= smallest.stone_cost();
+                    },
+                    .resolve_action = [](auto&, auto, const auto&) { return ActionID::Mine; }
                 }
             },
             .create = [](entt::registry& r, entt::entity e, const ActionParams& p) {
@@ -189,12 +182,65 @@ void ActionRegistry::initialize_descriptors() {
         register_descriptor(desc);
     }
 
-    // Craft - no prerequisites (skeleton)
+    // Craft - prerequisites check recipe ingredients
     {
         ActionDescriptor desc{
             .id = ActionID::Craft,
             .name = "Craft",
-            .prerequisites = {},
+            .prerequisites = {
+                {
+                    .description = "needs wood",
+                    .is_satisfied = [](auto& r, auto e, const auto& p) {
+                        const auto* recipe = RecipeRegistry::instance().find(p.recipe);
+                        if (!recipe) return true; // unknown recipe — let action stage fail with message
+                        if (!r.template all_of<Storage>(e)) return false;
+                        auto& s = r.template get<Storage>(e);
+                        for (auto& [item, amt] : recipe->inputs)
+                            if (item == Item::wood && s.amount(Item::wood) < amt) return false;
+                        return true;
+                    },
+                    .resolve_action = [](auto&, auto, const auto&) { return ActionID::Chop; }
+                },
+                {
+                    .description = "needs stone",
+                    .is_satisfied = [](auto& r, auto e, const auto& p) {
+                        const auto* recipe = RecipeRegistry::instance().find(p.recipe);
+                        if (!recipe) return true;
+                        if (!r.template all_of<Storage>(e)) return false;
+                        auto& s = r.template get<Storage>(e);
+                        for (auto& [item, amt] : recipe->inputs)
+                            if (item == Item::stone && s.amount(Item::stone) < amt) return false;
+                        return true;
+                    },
+                    .resolve_action = [](auto&, auto, const auto&) { return ActionID::Mine; }
+                },
+                {
+                    .description = "needs meat",
+                    .is_satisfied = [](auto& r, auto e, const auto& p) {
+                        const auto* recipe = RecipeRegistry::instance().find(p.recipe);
+                        if (!recipe) return true;
+                        if (!r.template all_of<Storage>(e)) return false;
+                        auto& s = r.template get<Storage>(e);
+                        for (auto& [item, amt] : recipe->inputs)
+                            if (item == Item::meat && s.amount(Item::meat) < amt) return false;
+                        return true;
+                    },
+                    .resolve_action = [](auto&, auto, const auto&) { return ActionID::Hunt; }
+                },
+                {
+                    .description = "needs fish",
+                    .is_satisfied = [](auto& r, auto e, const auto& p) {
+                        const auto* recipe = RecipeRegistry::instance().find(p.recipe);
+                        if (!recipe) return true;
+                        if (!r.template all_of<Storage>(e)) return false;
+                        auto& s = r.template get<Storage>(e);
+                        for (auto& [item, amt] : recipe->inputs)
+                            if (item == Item::fish && s.amount(Item::fish) < amt) return false;
+                        return true;
+                    },
+                    .resolve_action = [](auto&, auto, const auto&) { return ActionID::Fish; }
+                }
+            },
             .create = [](entt::registry& r, entt::entity e, const ActionParams& p) {
                 return std::make_unique<CraftAction>(r, e, p);
             }

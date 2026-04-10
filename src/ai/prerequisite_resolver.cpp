@@ -9,7 +9,7 @@ PrerequisiteResolver& PrerequisiteResolver::instance() {
     return instance;
 }
 
-std::unique_ptr<Action> PrerequisiteResolver::resolve(
+std::vector<std::unique_ptr<Action>> PrerequisiteResolver::resolve(
     ActionID target,
     entt::registry& reg,
     entt::entity entity,
@@ -20,7 +20,7 @@ std::unique_ptr<Action> PrerequisiteResolver::resolve(
     return resolve_impl(target, reg, entity, params, 0, visited);
 }
 
-std::unique_ptr<Action> PrerequisiteResolver::resolve_impl(
+std::vector<std::unique_ptr<Action>> PrerequisiteResolver::resolve_impl(
     ActionID target,
     entt::registry& reg,
     entt::entity entity,
@@ -30,27 +30,34 @@ std::unique_ptr<Action> PrerequisiteResolver::resolve_impl(
 ) {
     int target_id = static_cast<int>(target);
 
+    // Cycle or depth guard — just return the target action directly
     if (depth > 5 || visited.count(target_id)) {
-        return ActionRegistry::instance().create_action(target, reg, entity, params);
+        std::vector<std::unique_ptr<Action>> chain;
+        chain.push_back(ActionRegistry::instance().create_action(target, reg, entity, params));
+        return chain;
     }
 
     visited.insert(target_id);
 
     const ActionDescriptor* descriptor = ActionRegistry::instance().get_descriptor(target);
     if (!descriptor) {
-        return nullptr;
+        return {};
     }
 
-    // Return the first unsatisfied prerequisite's action (recursively resolved).
-    // The AI will re-evaluate after each action completes, so only one step is needed at a time.
+    // Build chain: all unsatisfied prerequisite actions first, then the target action last.
+    std::vector<std::unique_ptr<Action>> chain;
+
     for (const auto& prereq : descriptor->prerequisites) {
-        if (!prereq.is_satisfied(reg, entity)) {
-            ActionID prereq_id = prereq.resolve_action(reg, entity);
-            return resolve_impl(prereq_id, reg, entity, {}, depth + 1, visited);
+        if (!prereq.is_satisfied(reg, entity, params)) {
+            ActionID prereq_id = prereq.resolve_action(reg, entity, params);
+            auto sub_chain = resolve_impl(prereq_id, reg, entity, {}, depth + 1, visited);
+            for (auto& a : sub_chain) chain.push_back(std::move(a));
         }
     }
 
-    return ActionRegistry::instance().create_action(target, reg, entity, params);
+    // Always append the target action — this is what was previously lost
+    chain.push_back(ActionRegistry::instance().create_action(target, reg, entity, params));
+    return chain;
 }
 
 } // namespace dy

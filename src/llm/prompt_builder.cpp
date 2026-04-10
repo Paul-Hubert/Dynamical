@@ -57,9 +57,19 @@ std::string PromptBuilder::build_decision_prompt(const PromptContext& ctx) {
         oss << "=== VILLAGE STATUS ===\n" << ctx.village_needs << "\n\n";
     }
 
+    // Inventory
+    if (!ctx.inventory.empty()) {
+        oss << "=== YOUR INVENTORY ===\n" << ctx.inventory << "\n\n";
+    }
+
     // Buildable options
     if (!ctx.buildable_options.empty()) {
         oss << "=== BUILDING OPTIONS ===\n" << ctx.buildable_options << "\n\n";
+    }
+
+    // Craftable recipes
+    if (!ctx.craftable_recipes.empty()) {
+        oss << "=== CRAFTABLE RECIPES ===\n" << ctx.craftable_recipes << "\n";
     }
 
     // Available actions
@@ -119,6 +129,9 @@ std::string PromptBuilder::build_available_actions_prompt() {
             } else if (name == "Talk") {
                 oss << ": Talk to someone nearby. Key \"target_name\": name of person. Optional key \"message\": what to say. "
                     << "Example: {\"action\": \"Talk\", \"target_name\": \"Elowen\", \"message\": \"Hello!\"}";
+            } else if (name == "Craft") {
+                oss << ": Craft an item from materials. Key \"recipe\": one of \"plank\", \"wooden_sword\", \"stone_pickaxe\", \"cooked_meat\", \"cooked_fish\". "
+                    << "Example: {\"action\": \"Craft\", \"recipe\": \"wooden_sword\"}";
             }
             oss << "\n";
         }

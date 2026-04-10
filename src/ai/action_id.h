@@ -20,7 +20,7 @@
     X(Sleep,   "Sleep",   false)    \
     X(Trade,   "Trade",   false)    \
     X(Talk,    "Talk",    true)     \
-    X(Craft,   "Craft",   false)    \
+    X(Craft,   "Craft",   true)     \
     X(Fish,    "Fish",    false)    \
     X(Explore, "Explore", false)    \
     X(Flee,    "Flee",    false)
