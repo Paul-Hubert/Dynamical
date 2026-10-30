@@ -24,6 +24,8 @@ public:
     std::shared_ptr<VmaBuffer> createBuffer(const void* data, vk::BufferCreateInfo info);
     
     void check();
+
+    bool isEmpty() const { return empty; }
     
     ~Transfer();
     

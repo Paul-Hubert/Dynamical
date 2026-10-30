@@ -18,27 +18,19 @@ public: \
 
 namespace dy {
 
-DEFINE_SYSTEM(CameraSys)
-
 DEFINE_SYSTEM(TimeSys)
 
-DEFINE_SYSTEM(DevMenuSys)
+// Free flying desktop camera
+DEFINE_SYSTEM(PlayerControlSys)
 
-DEFINE_SYSTEM(ChunkGenerationSys)
+// VR locomotion and controller models
+DEFINE_SYSTEM(VRControlSys)
 
-DEFINE_SYSTEM(PatherSys)
+// Demo glTF objects placed on the marching cubes terrain
+DEFINE_SYSTEM(SceneSys)
 
-DEFINE_SYSTEM(BasicNeedsSys)
-
-DEFINE_SYSTEM(HarvestSys)
-
-DEFINE_SYSTEM(EatSys)
-
-DEFINE_SYSTEM(ActionBarSys)
-
-DEFINE_SYSTEM(MapConfiguratorSys)
-
-DEFINE_SYSTEM(MapEditorSys)
+// ImGui window : renderer toggles, grass parameters, VR state, chunk statistics
+DEFINE_SYSTEM(DebugMenuSys)
 
 }
 

@@ -1,8 +1,6 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#include "map_configuration.h"
-
 #include "entt/entt.hpp"
 
 #include <string>
@@ -29,10 +27,12 @@ public:
     bool server_side = false;
     bool client_side = false;
 
+    // 0 : desktop only, 1 : VR alongside the desktop window when an OpenXR headset is available
     int vr_mode = 1;
     int spectator_mode = 2;
 
-    std::vector<MapConfiguration> map_configurations;
+    // Marching cubes chunks are loaded within this distance of the cameras, in world units
+    int view_distance = 768;
 
     template <class Archive>
     void serialize(Archive& ar) {
@@ -46,7 +46,7 @@ public:
             CEREAL_NVP(client_side),
             CEREAL_NVP(vr_mode),
             CEREAL_NVP(spectator_mode),
-            CEREAL_NVP(map_configurations)
+            CEREAL_NVP(view_distance)
         );
     }
 
@@ -56,7 +56,7 @@ private:
     #ifndef DYNAMICAL_CONFIG_DIR
         #define DYNAMICAL_CONFIG_DIR "./"
     #endif
-    #define DYNAMICAL_CONFIG_MAGIC "5"
+    #define DYNAMICAL_CONFIG_MAGIC "6"
     #define DYNAMICAL_CONFIG_FILE DYNAMICAL_CONFIG_DIR "config." DYNAMICAL_CONFIG_MAGIC ".json"
 };
 

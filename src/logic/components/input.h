@@ -28,6 +28,10 @@ public:
         ROTATE_LEFT,
         ANGLE_UP,
         ANGLE_DOWN,
+        UP,
+        DOWN,
+        SPRINT,
+        VR_RIG,
         END_ENUM,
     };
 
@@ -35,6 +39,7 @@ public:
     std::bitset<Action::END_ENUM> on;
     glm::ivec2 mousePos;
     glm::ivec2 mouseWheel;
+    glm::ivec2 mouseDelta; // relative motion this frame
     glm::ivec2 screenSize;
     
     bool mouseLeft = false;

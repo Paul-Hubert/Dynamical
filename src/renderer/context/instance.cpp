@@ -3,7 +3,9 @@
 #include "loader.inl"
 
 #include <SDL_vulkan.h>
+#include <algorithm>
 #include <iostream>
+#include <string>
 #include <util/util.h>
 
 #include "context.h"
@@ -14,8 +16,6 @@
 using namespace dy;
 
 Instance::Instance(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
-
-    auto& settings = reg.ctx<Settings>();
 
     VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
     
@@ -31,13 +31,26 @@ Instance::Instance(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     layers.push_back("VK_LAYER_KHRONOS_validation");
 #endif
 
+    // Vulkan 1.1 for subgroup operations in the marching cubes shader
+    uint32_t version = VK_API_VERSION_1_1;
+
+    // OpenXR decides part of the instance extensions and the api version
+    std::vector<std::string> xr_extensions;
+    if(ctx.vr.enabled()) {
+        xr_extensions = ctx.vr.vulkanInstanceExtensions();
+        for(auto& ext : xr_extensions) {
+            if(std::find_if(extensions.begin(), extensions.end(), [&](const char* e) { return ext == e; }) == extensions.end()) {
+                extensions.push_back(ext.c_str());
+            }
+        }
+        version = ctx.vr.vulkanApiVersion(version);
+    }
+
     layers = checkLayers(layers, vk::enumerateInstanceLayerProperties());
     
     extensions = checkExtensions(extensions, vk::enumerateInstanceExtensionProperties());
 
-    uint32_t version = VK_MAKE_VERSION(1,1,0);
-
-    vk::ApplicationInfo appInfo("People", VK_MAKE_VERSION(1, 0, 0), "Dynamical", VK_MAKE_VERSION(1, 0, 0), version);
+    vk::ApplicationInfo appInfo("Dynamical", VK_MAKE_VERSION(1, 0, 0), "Dynamical", VK_MAKE_VERSION(1, 0, 0), version);
 
 
     instance = vk::createInstance(vk::InstanceCreateInfo({}, &appInfo, (uint32_t) layers.size(), layers.data(), (uint32_t) extensions.size(), extensions.data()));

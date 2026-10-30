@@ -21,6 +21,12 @@ public:
     bool flush(std::vector<vk::Semaphore> waits, std::vector<vk::PipelineStageFlags> stages, std::vector<vk::Semaphore> signals);
     vk::CommandBuffer getCommandBuffer();
 
+    bool isEmpty() const { return empty; }
+
+    // Index of the command buffer being recorded, its previous use has completed on the GPU
+    uint32_t ringIndex() const { return index; }
+    uint32_t ringSize() const { return (uint32_t) per_frame.size(); }
+
     ~Compute();
 
 private:

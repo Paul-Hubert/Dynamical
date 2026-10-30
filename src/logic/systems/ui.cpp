@@ -21,9 +21,12 @@ UISys::UISys(entt::registry& reg) : System(reg) {
     g_MouseCursors[ImGuiMouseCursor_ResizeNWSE] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE);
     g_MouseCursors[ImGuiMouseCursor_Hand] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
     
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
+    // Usually already created by the renderer's UI pass, which needs it to build the font atlas
+    if(!ImGui::GetCurrentContext()) {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGui::StyleColorsDark();
+    }
     
 }
 
@@ -31,7 +34,7 @@ void UISys::tick(double dt) {
     
     OPTICK_EVENT();
     
-    auto& input = reg.ctx<Input>();
+    auto& input = reg.ctx().get<Input>();
     
     ImGuiIO& io = ImGui::GetIO();
 

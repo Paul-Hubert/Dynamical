@@ -20,23 +20,28 @@ ClRenderpass::ClRenderpass(Context& ctx) : frames(ctx.swap.num_frames), ctx(ctx)
             vk::AttachmentDescription({}, depthFormat, vk::SampleCountFlagBits::e1,
                                       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
                                       vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
-                                      vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthAttachmentStencilReadOnlyOptimal
+                                      vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal
             )
     };
 
     vk::AttachmentReference colorRef(0, vk::ImageLayout::eColorAttachmentOptimal);
-    vk::AttachmentReference depthRef(1, vk::ImageLayout::eDepthAttachmentStencilReadOnlyOptimal);
+    vk::AttachmentReference depthRef(1, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
     std::vector<vk::SubpassDescription> subpasses {
             vk::SubpassDescription({}, vk::PipelineBindPoint::eGraphics, 0, nullptr, 1, &colorRef, nullptr,
                                    &depthRef, 0, nullptr)
     };
 
+    // Waits for the acquired image and for the previous use of the depth buffer
     std::vector<vk::SubpassDependency> dependencies {
-
+        vk::SubpassDependency(VK_SUBPASS_EXTERNAL, 0,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
+            vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests | vk::PipelineStageFlagBits::eLateFragmentTests,
+            vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+            vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite)
     };
 
-    renderpass = ctx.device->createRenderPass( vk::RenderPassCreateInfo({}, (uint32_t) attachments.size(), attachments.data(), (uint32_t) subpasses.size(), subpasses.data(), 0, nullptr));
+    renderpass = ctx.device->createRenderPass( vk::RenderPassCreateInfo({}, attachments, subpasses, dependencies));
 
     for (int i = 0; i < frames.size(); i++) {
         auto& f = frames[i];

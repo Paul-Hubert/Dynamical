@@ -8,7 +8,7 @@
 using namespace dy;
 
 void TimeSys::preinit() {
-    reg.set<Time>();
+    reg.ctx().emplace<Time>();
 }
 
 void TimeSys::init() {
@@ -19,9 +19,9 @@ void TimeSys::tick(double dt) {
     
     OPTICK_EVENT();
     
-    auto& time = reg.ctx<Time>();
+    auto& time = reg.ctx().get<Time>();
     
-    auto& input = reg.ctx<Input>();
+    auto& input = reg.ctx().get<Input>();
     if(input.on[Input::PAUSE]) {
         if(time.speed_modifier == 0) time.speed_modifier = time.last_speed_modifier;
         else time.speed_modifier = 0;
@@ -57,6 +57,7 @@ void TimeSys::tick(double dt) {
         ImGui::Text("%f ms", dt*1000.);
         ImGui::Text("%f fps", 1./dt);
     }
+    ImGui::End();
     
 }
 

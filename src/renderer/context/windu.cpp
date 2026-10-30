@@ -8,6 +8,7 @@
 #include <SDL_vulkan.h>
 #include "renderer/util/vk.h"
 #include "context.h"
+#include "logic/settings/settings.h"
 
 using namespace dy;
 
@@ -17,10 +18,15 @@ Windu::Windu(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
 
 
 
+    auto& settings = reg.ctx().get<Settings>();
+
+    int w = settings.window_width > 0 ? settings.window_width : 1280;
+    int h = settings.window_height > 0 ? settings.window_height : 720;
+
     window = SDL_CreateWindow("Dynamical",
                               SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                              -1, -1,
-                              SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP
+                              w, h,
+                              SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | (settings.fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0)
              );
     
     if (window == nullptr) {

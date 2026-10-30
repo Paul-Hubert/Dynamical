@@ -1,0 +1,82 @@
+#include "system_list.h"
+
+#include <imgui/imgui.h>
+
+#include "logic/components/camera.h"
+#include "logic/components/input.h"
+#include "logic/components/render_settings.h"
+#include "logic/components/vr.h"
+#include "logic/settings/settings.h"
+#include "logic/terrain/chunk.h"
+
+#include "renderer/terrain/terrain_sys.h"
+
+using namespace dy;
+
+void DebugMenuSys::preinit() {
+
+}
+
+void DebugMenuSys::init() {
+
+}
+
+void DebugMenuSys::tick(double dt) {
+
+    OPTICK_EVENT();
+
+    auto& settings = reg.ctx().get<Settings>();
+    auto& render = reg.ctx().get<RenderSettings>();
+    auto& camera = reg.ctx().get<Camera>();
+
+    ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
+    if(ImGui::Begin("Dynamical")) {
+
+        ImGui::Text("%.2f ms, %.0f fps", dt * 1000., 1. / dt);
+        ImGui::Text("Camera %.1f %.1f %.1f", camera.position.x, camera.position.y, camera.position.z);
+        ImGui::TextDisabled("WASD + Space/Ctrl to fly, right mouse to look, wheel for speed, Shift to sprint");
+
+        if(ImGui::CollapsingHeader("Terrain", ImGuiTreeNodeFlags_DefaultOpen)) {
+            size_t total = reg.view<ChunkC>().size();
+            size_t generated = reg.view<ChunkGenerated>().size();
+            size_t meshed = reg.view<ChunkReady>().size();
+            ImGui::Text("Chunks : %zu loaded, %zu generated, %zu meshed", total, generated, meshed);
+            ImGui::SliderInt("View distance", &settings.view_distance, 256, 2048);
+            ImGui::Checkbox("Terrain", &render.terrain);
+            ImGui::SameLine();
+            ImGui::Checkbox("Grass", &render.grass);
+            ImGui::SameLine();
+            ImGui::Checkbox("Models", &render.models);
+        }
+
+        if(ImGui::CollapsingHeader("Grass")) {
+            auto& grass = render.grass_params;
+            ImGui::SliderFloat("Tile size", &grass.tile_size, 0.01f, 1.f);
+            ImGui::SliderFloat("Height", &grass.height, 0.01f, 5.f);
+            ImGui::SliderFloat3("Base normal", &grass.base_normal[0], -1.f, 1.f);
+            ImGui::SliderFloat("Noise frequency", &grass.noise_frequency, 0.0001f, 1.f, "%.5g", ImGuiSliderFlags_Logarithmic);
+            ImGui::SliderFloat("Noise amplitude", &grass.noise_amplitude, 0.0001f, 1.f, "%.5g", ImGuiSliderFlags_Logarithmic);
+        }
+
+        if(ImGui::CollapsingHeader("VR", ImGuiTreeNodeFlags_DefaultOpen)) {
+            auto* vr = reg.ctx().find<VRInput>();
+            if(!vr || !vr->enabled) {
+                ImGui::Text("No OpenXR headset (vr_mode=%d)", settings.vr_mode);
+            } else {
+                ImGui::Text("Session %s, %s", vr->session_running ? "running" : "idle", vr->focused ? "focused" : "not focused");
+                auto& rig = reg.ctx().get<VRRig>();
+                ImGui::Text("Play area %.1f %.1f %.1f", rig.position.x, rig.position.y, rig.position.z);
+                if(ImGui::Button("Move play area to camera (R)")) {
+                    reg.ctx().get<Input>().on.set(Input::VR_RIG);
+                }
+            }
+        }
+
+    }
+    ImGui::End();
+
+}
+
+void DebugMenuSys::finish() {
+
+}

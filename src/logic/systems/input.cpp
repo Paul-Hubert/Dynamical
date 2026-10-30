@@ -16,7 +16,11 @@ std::unordered_map<SDL_Scancode, Input::Action> actionMap = {
     {SDL_SCANCODE_S, Input::BACKWARD},
     {SDL_SCANCODE_A, Input::LEFT},
     {SDL_SCANCODE_D, Input::RIGHT},
-    {SDL_SCANCODE_SPACE, Input::PAUSE},
+    {SDL_SCANCODE_P, Input::PAUSE},
+    {SDL_SCANCODE_SPACE, Input::UP},
+    {SDL_SCANCODE_LCTRL, Input::DOWN},
+    {SDL_SCANCODE_LSHIFT, Input::SPRINT},
+    {SDL_SCANCODE_R, Input::VR_RIG},
     {SDL_SCANCODE_M, Input::MENU},
     {SDL_SCANCODE_K, Input::DEBUG},
     {SDL_SCANCODE_BACKSPACE, Input::BACKSPACE},
@@ -29,7 +33,7 @@ std::unordered_map<SDL_Scancode, Input::Action> actionMap = {
 
 InputSys::InputSys(entt::registry& reg) : System(reg) {
     
-    reg.set<Input>();
+    reg.ctx().emplace<Input>();
     
 }
 
@@ -39,12 +43,13 @@ void InputSys::tick(double dt) {
 
     OPTICK_EVENT();
     
-    Input& input = reg.ctx<Input>();
+    Input& input = reg.ctx().get<Input>();
     
     input.leftClick = input.rightClick = input.middleClick = false;
     input.mouseWheel = glm::ivec2(0,0);
+    input.mouseDelta = glm::ivec2(0,0);
     
-    Context& ctx = *reg.ctx<Context*>();
+    Context& ctx = *reg.ctx().get<Context*>();
     
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
@@ -94,6 +99,10 @@ void InputSys::tick(double dt) {
                     break;
             }
             
+        } else if(e.type == SDL_MOUSEMOTION) {
+
+            input.mouseDelta += glm::ivec2(e.motion.xrel, e.motion.yrel);
+
         } else if(e.type == SDL_MOUSEWHEEL) {
             
             input.mouseWheel.x = e.wheel.x;

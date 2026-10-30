@@ -28,7 +28,11 @@ Swapchain::Swapchain(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     vkGetPhysicalDeviceSurfacePresentModesKHR(static_cast<VkPhysicalDevice> (ctx.device), ctx.win.surface, &num, reinterpret_cast<VkPresentModeKHR*> (presentModes.data()));
     
     vk::SurfaceFormatKHR surfaceformat = chooseSwapSurfaceFormat(formats, vk::Format::eB8G8R8A8Srgb, vk::ColorSpaceKHR::eSrgbNonlinear);
-    presentMode = chooseSwapPresentMode(presentModes, vk::PresentModeKHR::eFifo);
+    // With a headset, the desktop window must not throttle the loop to the monitor refresh rate
+    presentMode = chooseSwapPresentMode(presentModes, ctx.vr.enabled() ? vk::PresentModeKHR::eMailbox : vk::PresentModeKHR::eFifo);
+    if(ctx.vr.enabled() && presentMode == vk::PresentModeKHR::eFifo) {
+        presentMode = chooseSwapPresentMode(presentModes, vk::PresentModeKHR::eImmediate);
+    }
     extent = chooseSwapExtent(capabilities);
     format = surfaceformat.format;
     colorSpace = surfaceformat.colorSpace;
@@ -72,6 +76,7 @@ void Swapchain::setup() {
     vkGetSwapchainImagesKHR(ctx.device, static_cast<VkSwapchainKHR> (swapchain), &num, nullptr);
     
     if(num_frames != num) std::cout << "number of frames changed to : " << num << std::endl;
+    num_frames = num;
     
     images.resize(num_frames);
     vkGetSwapchainImagesKHR(ctx.device, static_cast<VkSwapchainKHR> (swapchain), &num, reinterpret_cast<VkImage*> (images.data()));
@@ -112,12 +117,9 @@ Swapchain::~Swapchain() {
 
 uint32_t Swapchain::acquire(vk::Semaphore signal) {
     
+    // The window is not resizable, a suboptimal swapchain is still presentable
     auto resultvalue = ctx.device->acquireNextImageKHR(swapchain, std::numeric_limits<uint64_t>::max(), signal, nullptr);
     current = resultvalue.value;
-    
-    if(resultvalue.result == vk::Result::eSuboptimalKHR) {
-        throw vk::OutOfDateKHRError("Suboptimal swapchain");
-    }
 
     return current;
     
@@ -127,10 +129,7 @@ void Swapchain::present(vk::Semaphore wait) {
     
     // This will display the image
     auto result = ctx.device.graphics.presentKHR(vk::PresentInfoKHR((wait ? 1 : 0), &wait, 1, &swapchain, &current));
-    
-    if(result == vk::Result::eSuboptimalKHR) {
-        throw vk::OutOfDateKHRError("Suboptimal swapchain");
-    }
+    (void) result;
     
 }
 

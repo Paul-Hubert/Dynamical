@@ -7,6 +7,9 @@
 #include <iostream>
 #include <set>
 #include <string>
+#include <algorithm>
+
+#include "util/log.h"
 
 #include "renderer/util/vk_util.h"
 #include "logic/settings/settings.h"
@@ -38,20 +41,55 @@ bool checkDeviceExtensions(std::vector<const char*> extensionNames, std::vector<
 
 Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     
-    auto& settings = reg.ctx<Settings>();
-    
     vk::PhysicalDeviceFeatures requiredFeatures = vk::PhysicalDeviceFeatures();
     //requiredFeatures.samplerAnisotropy = true;
-    //requiredFeatures.shaderStorageImageMultisample = true;
     // HERE : enable needed features (if present in 'features')
 
     std::vector<const char*> extensions;
 
     extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
-    std::vector<vk::PhysicalDevice> p_devices = ctx.instance->enumeratePhysicalDevices();
+    std::vector<std::string> xr_extensions;
 
-    physical = p_devices[0];
+    if(ctx.vr.enabled()) {
+
+        // The headset is plugged into a specific GPU, OpenXR tells us which one
+        physical = vk::PhysicalDevice(ctx.vr.vulkanPhysicalDevice(ctx.instance));
+
+        xr_extensions = ctx.vr.vulkanDeviceExtensions();
+        for(auto& ext : xr_extensions) {
+            if(std::find_if(extensions.begin(), extensions.end(), [&](const char* e) { return ext == e; }) == extensions.end()) {
+                extensions.push_back(ext.c_str());
+            }
+        }
+
+    }
+
+    if(!physical) {
+        std::vector<vk::PhysicalDevice> p_devices = ctx.instance->enumeratePhysicalDevices();
+        uint32_t best = 0;
+        for(auto& p : p_devices) {
+            uint32_t score = getScore(p);
+            if(score > best) {
+                best = score;
+                physical = p;
+            }
+        }
+    }
+
+    if(!physical) {
+        throw std::runtime_error("No Vulkan device available");
+    }
+
+    {
+        auto props = physical.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceSubgroupProperties>();
+        auto& subgroup = props.get<vk::PhysicalDeviceSubgroupProperties>();
+        dy::log(dy::info) << "GPU : " << props.get<vk::PhysicalDeviceProperties2>().properties.deviceName.data() << "\n";
+        auto needed = vk::SubgroupFeatureFlagBits::eArithmetic | vk::SubgroupFeatureFlagBits::eBallot;
+        if(!(subgroup.supportedStages & vk::ShaderStageFlagBits::eCompute) || (subgroup.supportedOperations & needed) != needed) {
+            dy::log(dy::warning) << "GPU lacks compute subgroup arithmetic/ballot, marching cubes will not work\n";
+        }
+    }
 
     extensions = checkExtensions(extensions, physical.enumerateDeviceExtensionProperties());
     
@@ -156,6 +194,15 @@ Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     
 }
 
+
+uint32_t Device::getScore(vk::PhysicalDevice& device) {
+    auto props = device.getProperties();
+    if(props.apiVersion < VK_API_VERSION_1_1) return 0;
+    uint32_t score = 1;
+    if(props.deviceType == vk::PhysicalDeviceType::eDiscreteGpu) score += 1000;
+    else if(props.deviceType == vk::PhysicalDeviceType::eIntegratedGpu) score += 100;
+    return score;
+}
 
 uint32_t Device::getMemoryType(uint32_t typeBits, vk::MemoryPropertyFlags properties) {
     auto memoryProperties = physical.getMemoryProperties();

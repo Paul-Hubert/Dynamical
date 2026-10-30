@@ -1,107 +1,47 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include "position.h"
-#include "util/log.h"
+
+#include <cmath>
 
 namespace dy {
 
+// Free flying camera of the desktop window, a context variable driven by PlayerControlSys.
+// World is Y up, yaw 0 looks toward -Z.
 class Camera {
 public:
 
-    glm::vec3 getCenter() {
-        return center;
+    glm::vec3 position = glm::vec3(0.f, 150.f, 0.f);
+    float yaw = 0.f;
+    float pitch = -0.4f;
+
+    float fov = glm::radians(70.f);
+    float near_plane = 0.1f;
+    float far_plane = 3000.f;
+
+    bool sprinting = false;
+
+    glm::vec3 forward() const {
+        return glm::vec3(-std::sin(yaw) * std::cos(pitch), std::sin(pitch), -std::cos(yaw) * std::cos(pitch));
     }
 
-    glm::vec2 getSize() {
-        return size;
-    }
-    
-    float getRotation() {
-        return rotation;
-    }
-    
-    float getAngle() {
-        return angle;
-    }
-    
-    glm::vec2 getScreenSize() {
-        return screen_size;
+    glm::vec3 right() const {
+        return glm::vec3(std::cos(yaw), 0.f, -std::sin(yaw));
     }
 
-    glm::mat4 getProjection() {
-        if(projection_update) {
-            projection_update = false;
-            projection = createProjection();
-        }
+    glm::mat4 getView() const {
+        return glm::lookAt(position, position + forward(), glm::vec3(0.f, 1.f, 0.f));
+    }
+
+    // Vulkan clip space : depth in [0, 1] and Y pointing down
+    glm::mat4 getProjection(float aspect) const {
+        glm::mat4 projection = glm::perspectiveRH_ZO(fov, aspect, near_plane, far_plane);
+        projection[1][1] *= -1.f;
         return projection;
     }
 
-    glm::mat4 getView() {
-        if(view_update) {
-            view_update = false;
-            view = createView();
-        }
-        return view;
-    }
-
-    glm::mat4 createProjection();
-
-    glm::mat4 createView();
-
-    void setCenter(glm::vec3 center) {
-        this->center = center;
-        view_update = true;
-    }
-
-    void setScreenSize(glm::vec2 screen_size) {
-        this->screen_size = screen_size;
-        projection_update = true;
-    }
-
-    void setSize(glm::vec2 size) {
-        this->size = size;
-        projection_update = true;
-    }
-    
-    void setRotation(float rotation) {
-        this->rotation = rotation;
-        view_update = true;
-    }
-    
-    void setAngle(float angle) {
-        this->angle = angle;
-        view_update = true;
-    }
-
-    glm::vec2 fromWorldSpace(glm::vec3 position);
-    
-    glm::vec3 fromScreenSpace(glm::vec2 screen_position);
-    
-    glm::vec2 fromWorldSize(glm::vec2 world_size) {
-        return world_size * screen_size / size;
-    }
-    
-    glm::vec2 fromScreenSize(glm::vec2 pixel_size) {
-        return pixel_size / screen_size * size;
-    }
-
-private:
-
-    glm::vec3 center;
-    glm::vec2 size;
-    glm::vec2 screen_size;
-    glm::mat4 projection;
-    bool projection_update = true;
-    glm::mat4 view;
-    bool view_update = true;
-    float rotation;
-    float angle;
-    
 };
 
 }

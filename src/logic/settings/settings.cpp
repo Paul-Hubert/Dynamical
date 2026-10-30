@@ -50,6 +50,8 @@ if(key == #T) T = value;
             ARGUMENT(username, value)
             ARGUMENT(server_side, value == "true")
             ARGUMENT(client_side, value == "true")
+            ARGUMENT(vr_mode, std::atoi(value.c_str()))
+            ARGUMENT(view_distance, std::atoi(value.c_str()))
     }
 
 #undef ARGUMENT

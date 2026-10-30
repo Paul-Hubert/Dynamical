@@ -5,11 +5,13 @@
 #include "extra/optick/optick.h"
 
 #include "renderer/renderer.h"
+#include "renderer/terrain/terrain_sys.h"
 #include "systems/system_set.h"
 
 #include "systems/system_list.h"
-
-#include "factories/factory_list.h"
+#include "systems/chunk_systems.h"
+#include "systems/input.h"
+#include "systems/ui.h"
 
 #include "util/entt_util.h"
 
@@ -17,25 +19,7 @@
 
 #include "logic/components/input.h"
 
-#include "logic/systems/input.h"
-
-#include "logic/systems/ui.h"
-
-#include "logic/systems/selection.h"
-
-#include "logic/systems/map_upload.h"
-#include "logic/systems/particle_simulation.h"
-#include "logic/systems/map_render.h"
-#include "logic/systems/object_render.h"
-#include "logic/systems/ui_render.h"
-#include "logic/systems/water_flow.h"
-
-#include "ai/ai.h"
-
 #include "util/log.h"
-
-#include "logic/map/map_manager.h"
-
 
 #include <chrono>
 
@@ -46,53 +30,36 @@ using namespace dy;
 Game::Game(int argc, char** argv) {
     registry = std::make_unique<entt::registry>();
     entt::registry& reg = *registry;
-    Settings& s = reg.set<Settings>(argc, argv);
+    reg.ctx().emplace<Settings>(argc, argv);
+    reg.ctx().emplace<tf::Executor>();
 }
 
 void Game::start() {
-    
+
     entt::registry& reg = *registry;
 
-    Settings& s = reg.ctx<Settings>();
-
+    // Creates the Vulkan context, OpenXR session, both render targets and the scene passes
     renderer = std::make_unique<Renderer>(reg);
 
     set = std::make_unique<SystemSet>(reg);
 
     set->pre_add<InputSys>();
     set->pre_add<UISys>();
-    set->pre_add<CameraSys>();
     set->pre_add<TimeSys>();
-    set->pre_add<DevMenuSys>();
-    set->pre_add<MapConfiguratorSys>();
-    set->pre_add<SelectionSys>();
-    set->pre_add<MapEditorSys>();
-    
-    //set->pre_add<ChunkGenerationSys>();
-    set->pre_add<WaterFlowSys>();
-    
-    set->pre_add<PatherSys>();
-    set->pre_add<BasicNeedsSys>();
-    set->pre_add<HarvestSys>();
-    set->pre_add<EatSys>();
-    
-    set->pre_add<AISys>();
-    
-    set->pre_add<ActionBarSys>();
 
-    set->post_add<MapUploadSys>();
-    set->post_add<ParticleSimulationSys>();
-    set->post_add<MapRenderSys>();
-    set->post_add<ObjectRenderSys>();
-    set->post_add<UIRenderSys>();
-    
-    
-    reg.set<MapManager>(reg);
-    
+    set->pre_add<PlayerControlSys>();
+    set->pre_add<VRControlSys>();
+    set->pre_add<DebugMenuSys>();
+
+    set->pre_add<ChunkManagerSys>();
+    set->pre_add<ChunkGeneratorSys>();
+    set->pre_add<SceneSys>();
+
+    // Records the marching cubes dispatches into this frame's compute command buffer
+    set->post_add<TerrainSys>();
+
 
     // preinit
-
-    tf::Executor& executor = reg.set<tf::Executor>();
 
     renderer->preinit();
 
@@ -101,11 +68,11 @@ void Game::start() {
 
     // init
 
-    renderer->init();
-
     set->init();
 
-    Input& input = reg.ctx<Input>();
+    renderer->init();
+
+    Input& input = reg.ctx().get<Input>();
 
     // start loop
 
@@ -128,21 +95,23 @@ void Game::start() {
         double dt = std::chrono::duration_cast<std::chrono::nanoseconds>(clock::now() - start).count() / 1000000000.0;
         start = clock::now();
 
-        //log(Level::info) << "FPS : " << 1/dt << "\n";
-
         set->pre_tick(dt);
 
         set->post_tick(dt);
 
         renderer->render();
-        
+
     }
 
 }
 
 Game::~Game() {
-    
-    set->finish();
-    renderer->finish();
+
+    if(set) set->finish();
+    if(renderer) renderer->finish();
+
+    // Systems own GPU resources (terrain buffers) : destroy them while the device exists
+    set.reset();
+    renderer.reset();
 
 }

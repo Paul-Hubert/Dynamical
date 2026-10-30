@@ -5,9 +5,20 @@
 
 #include "context/context.h"
 #include "classic_render/classic_render.h"
+#include "vr_render/vr_render.h"
+#include "scene_pass.h"
+
+#include <chrono>
+#include <memory>
+#include <vector>
 
 namespace dy {
-    
+
+// Owns the two render targets (desktop window and headset) and the scene passes they share.
+//
+// Frame : prepare() waits the frame fence, acquires the desktop image and begins the OpenXR frame.
+// Systems tick (marching cubes compute is recorded there). render() then submits
+// transfer -> compute -> graphics, the desktop and VR command buffers being recorded in parallel.
 class Renderer {
 public:
     Renderer(entt::registry& reg);
@@ -17,20 +28,28 @@ public:
     void render();
     void finish();
     ~Renderer();
-    
+
+    Context& getContext() { return ctx; }
+
 private:
     entt::registry& reg;
     Context ctx;
-    
+
+    std::unique_ptr<ClassicRender> classic;
+    std::unique_ptr<VRRender> vr;
+
+    std::vector<std::unique_ptr<ScenePass>> passes;
+    std::vector<ScenePass*> pass_list;
+
     struct per_frame {
+        vk::Fence fence;
         vk::Semaphore transfer_semaphore;
         vk::Semaphore compute_semaphore;
-        vk::Semaphore graphics_semaphore;
     };
     std::vector<per_frame> per_frame;
 
-    vk::Semaphore last_frame_semaphore = VK_NULL_HANDLE;
-    
+    std::chrono::steady_clock::time_point start_time;
+
 };
 
 }

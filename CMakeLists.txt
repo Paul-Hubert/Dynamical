@@ -4,6 +4,8 @@ set(CMAKE_CXX_STANDARD 20)
 
 project(dynamical)
 
+option(DYNAMICAL_BUILD_TOOLS "Build offline tools (grass raycast baker)" OFF)
+
 set(FASTNOISE2_NOISETOOL OFF CACHE BOOL "Build Noise Tool" FORCE)
 add_subdirectory(lib/FastNoise2)
 
@@ -23,6 +25,11 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(dynamical PRIVATE -Wall -Wextra -Wno-sign-compare -Wno-unused-variable -Wno-unused-parameter -Wno-class-memaccess -Wno-unused-but-set-variable -Wno-reorder -Wno-missing-field-initializers -Wno-unused-function -Wno-type-limits)
 endif()
 
+if (MSVC)
+    target_compile_options(dynamical PRIVATE /bigobj /utf-8)
+    target_compile_definitions(dynamical PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
+endif()
+
 find_package(Vulkan REQUIRED)
 target_link_libraries(dynamical PRIVATE Vulkan::Vulkan)
 
@@ -30,18 +37,30 @@ find_package(SDL2 REQUIRED)
 include_directories(${SDL2_INCLUDE_DIR})
 target_link_libraries(dynamical PRIVATE ${SDL2_LIBRARIES})
 
+find_package(EnTT CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE EnTT::EnTT)
+
+find_package(OpenXR CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE OpenXR::headers OpenXR::openxr_loader)
+
+find_package(nlohmann_json CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE nlohmann_json::nlohmann_json)
+
+find_path(STB_INCLUDE_DIRS "stb_image.h")
+target_include_directories(dynamical PRIVATE ${STB_INCLUDE_DIRS})
+
 find_path(CEREAL_INCLUDE_DIRS "cereal")
 target_include_directories(dynamical PRIVATE ${CEREAL_INCLUDE_DIRS})
 
-find_path(GLM_INCLUDE_DIR "glm")
+find_path(GLM_INCLUDE_DIRS "glm")
 target_include_directories(dynamical PRIVATE ${GLM_INCLUDE_DIRS})
 
-find_path(TASKFLOW_INCLUDE_DIR "taskflow")
+find_path(TASKFLOW_INCLUDE_DIRS "taskflow")
 target_include_directories(dynamical PRIVATE ${TASKFLOW_INCLUDE_DIRS})
 
 target_include_directories(dynamical PRIVATE "lib/imgui")
 target_sources(
-  dynamical PRIVATE	 
+  dynamical PRIVATE
   "lib/imgui/imgui.cpp"
   "lib/imgui/imgui_demo.cpp"
   "lib/imgui/imgui_draw.cpp"
@@ -68,7 +87,7 @@ file(
 )
 
 add_custom_command(TARGET dynamical POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources" "${PROJECT_BINARY_DIR}/resources"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/resources" "${PROJECT_BINARY_DIR}/resources"
 )
 
 ### COMPILE SHADERS
@@ -82,7 +101,8 @@ foreach(GLSL ${GLSL_SOURCE_FILES})
   add_custom_command(
     OUTPUT ${SPIRV}
     COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/resources/shaders/"
-    COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV} -g
+    # vulkan1.1 is needed for the subgroup operations in the marching cubes shader
+    COMMAND ${GLSL_VALIDATOR} -V --target-env vulkan1.1 ${GLSL} -o ${SPIRV} -g
     DEPENDS ${GLSL})
   list(APPEND SPIRV_BINARY_FILES ${SPIRV})
 endforeach(GLSL)
@@ -93,3 +113,10 @@ add_custom_target(
     )
 
 add_dependencies(dynamical shaders)
+
+### TOOLS
+if (DYNAMICAL_BUILD_TOOLS)
+    # Bakes resources/raycast_data.bin, the lookup texture used by the grass shader
+    add_executable(raycast tools/raycast/main.cpp)
+    target_include_directories(raycast PRIVATE "./src" ${CEREAL_INCLUDE_DIRS} ${GLM_INCLUDE_DIRS})
+endif()
