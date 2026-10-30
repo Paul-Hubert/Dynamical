@@ -22,40 +22,44 @@ TerrainGenerator::TerrainGenerator(int seed) : seed(seed) {
 
 }
 
-bool TerrainGenerator::generate(glm::ivec3 pos, std::vector<float>& values, float& mean) const {
+void TerrainGenerator::sample(glm::ivec3 start, glm::ivec3 count, std::vector<float>& values) const {
 
-    constexpr int n = chunk::values;
+    std::vector<float> heights((size_t) count.x * count.z);
+    surface->GenUniformGrid2D(heights.data(), start.x, start.z, count.x, count.z, height_frequency * chunk::cube_size, seed);
 
-    // Noise grids are indexed in samples, first sample sits one cube before the chunk origin
-    glm::ivec3 start = pos * chunk::cubes - chunk::border;
+    std::vector<float> detail((size_t) count.x * count.y * count.z);
+    overhang->GenUniformGrid3D(detail.data(), start.x, start.y, start.z, count.x, count.y, count.z, overhang_frequency * chunk::cube_size, seed + 1);
 
-    std::vector<float> heights(n * n);
-    surface->GenUniformGrid2D(heights.data(), start.x, start.z, n, n, height_frequency * chunk::cube_size, seed);
+    values.resize((size_t) count.x * count.y * count.z);
 
-    std::vector<float> detail((size_t) n * n * n);
-    overhang->GenUniformGrid3D(detail.data(), start.x, start.y, start.z, n, n, n, overhang_frequency * chunk::cube_size, seed + 1);
-
-    values.resize(chunk::num_values);
-
-    bool positive = false, negative = false;
-    double sum = 0.;
-
-    for(int x = 0; x < n; x++) {
-        for(int z = 0; z < n; z++) {
-            float height = base_level + height_amplitude * heights[z * n + x];
-            for(int y = 0; y < n; y++) {
+    for(int x = 0; x < count.x; x++) {
+        for(int z = 0; z < count.z; z++) {
+            float height = base_level + height_amplitude * heights[(size_t) z * count.x + x];
+            for(int y = 0; y < count.y; y++) {
                 float world_y = (float) ((start.y + y) * chunk::cube_size);
                 // FastNoise grids are x fastest, then y, then z
-                float value = height - world_y + overhang_amplitude * detail[((size_t) z * n + y) * n + x];
-                values[chunk::index(x, y, z)] = value;
-                positive |= value > 0.f;
-                negative |= value <= 0.f;
-                sum += value;
+                float noise = detail[((size_t) z * count.y + y) * count.x + x];
+                values[((size_t) x * count.z + z) * count.y + y] = height - world_y + overhang_amplitude * noise;
             }
         }
     }
 
-    mean = (float) (sum / (double) chunk::num_values);
+}
+
+bool TerrainGenerator::generate(glm::ivec3 pos, std::vector<float>& values, float& mean) const {
+
+    // Noise grids are indexed in samples, first sample sits one cube before the chunk origin
+    sample(pos * chunk::cubes - chunk::border, glm::ivec3(chunk::values), values);
+
+    bool positive = false, negative = false;
+    double sum = 0.;
+    for(float value : values) {
+        positive |= value > 0.f;
+        negative |= value <= 0.f;
+        sum += value;
+    }
+
+    mean = (float) (sum / (double) values.size());
 
     return positive && negative;
 

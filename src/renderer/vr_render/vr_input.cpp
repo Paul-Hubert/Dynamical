@@ -179,9 +179,13 @@ void VRActions::sync(XrTime time) {
         xrCheckResult(xrGetActionStateVector2f(ctx.vr.session, &get_info, &stick_state));
         hand.thumbstick = stick_state.isActive ? glm::vec2(stick_state.currentState.x, stick_state.currentState.y) : glm::vec2(0.f);
 
+        XrSpaceVelocity velocity { XR_TYPE_SPACE_VELOCITY };
         XrSpaceLocation location { XR_TYPE_SPACE_LOCATION };
+        location.next = &velocity;
         if(XR_SUCCEEDED(xrLocateSpace(handSpaces[i], ctx.vr.space, time, &location))) {
             hand.pose = toPose(location);
+            hand.linear_velocity = (velocity.velocityFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT)
+                ? glm::vec3(velocity.linearVelocity.x, velocity.linearVelocity.y, velocity.linearVelocity.z) : glm::vec3(0.f);
         } else {
             hand.pose.valid = false;
         }

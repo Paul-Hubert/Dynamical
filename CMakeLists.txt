@@ -40,6 +40,9 @@ target_link_libraries(dynamical PRIVATE ${SDL2_LIBRARIES})
 find_package(EnTT CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE EnTT::EnTT)
 
+find_package(Jolt CONFIG REQUIRED)
+target_link_libraries(dynamical PRIVATE Jolt::Jolt)
+
 find_package(OpenXR CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE OpenXR::headers OpenXR::openxr_loader)
 

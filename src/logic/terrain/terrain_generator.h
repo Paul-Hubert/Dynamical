@@ -19,6 +19,10 @@ public:
     // Returns false if every sample has the same sign (no surface), with mean set.
     bool generate(glm::ivec3 pos, std::vector<float>& values, float& mean) const;
 
+    // Samples any box of the density grid : start is a global sample index (world position / cube size),
+    // values are laid out [x][z][y] like chunk volumes. Chunks and physics colliders get identical values.
+    void sample(glm::ivec3 start, glm::ivec3 count, std::vector<float>& values) const;
+
     // Height of the heightfield part of the surface, good enough to place things on the ground
     float surfaceHeight(float x, float z) const;
 

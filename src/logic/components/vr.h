@@ -38,6 +38,7 @@ struct VRInput {
 
     struct Hand {
         VRPose pose;
+        glm::vec3 linear_velocity = glm::vec3(0.f); // stage space, m/s
         float trigger = 0.f;
         float grip = 0.f;
         glm::vec2 thumbstick = glm::vec2(0.f);

@@ -5,6 +5,8 @@
 #include "logic/components/camera.h"
 #include "logic/components/input.h"
 #include "logic/components/render_settings.h"
+#include "logic/components/rigid_body.h"
+#include "logic/scene_spawn.h"
 #include "logic/components/vr.h"
 #include "logic/settings/settings.h"
 #include "logic/terrain/chunk.h"
@@ -47,6 +49,21 @@ void DebugMenuSys::tick(double dt) {
             ImGui::Checkbox("Grass", &render.grass);
             ImGui::SameLine();
             ImGui::Checkbox("Models", &render.models);
+        }
+
+        if(ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen)) {
+            if(auto* stats = reg.ctx().find<PhysicsStats>()) {
+                ImGui::Text("Bodies : %u (%u active)", stats->bodies, stats->active_bodies);
+                ImGui::Text("Terrain colliders : %u cells, %u triangles", stats->terrain_cells, stats->terrain_triangles);
+                ImGui::Text("Step %.2f ms x%d, colliders %.2f ms", stats->step_ms, stats->steps_last_frame, stats->colliders_ms);
+            }
+            ImGui::TextDisabled("Left click throws a box");
+            if(ImGui::Button("Drop 50 boxes")) {
+                for(int i = 0; i < 50; i++) {
+                    glm::vec3 offset((i % 5) * 1.5f - 3.f, 10.f + (i / 25) * 1.5f, ((i / 5) % 5) * 1.5f - 3.f);
+                    spawnBox(reg, camera.position + camera.forward() * 15.f + offset, 1.f, glm::vec4(0.9f, 0.5f + 0.01f * i, 0.2f, 1.f));
+                }
+            }
         }
 
         if(ImGui::CollapsingHeader("Grass")) {

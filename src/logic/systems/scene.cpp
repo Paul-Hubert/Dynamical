@@ -4,7 +4,13 @@
 #include <filesystem>
 #include <memory>
 
+#include <imgui/imgui.h>
+
+#include "logic/scene_spawn.h"
+#include "logic/components/camera.h"
+#include "logic/components/input.h"
 #include "logic/components/model_renderable.h"
+#include "logic/components/rigid_body.h"
 #include "logic/components/transform.h"
 #include "logic/terrain/terrain_generator.h"
 
@@ -15,6 +21,24 @@
 
 using namespace dy;
 
+static const char* box_path = "./resources/models/box.gltf";
+
+entt::entity dy::spawnBox(entt::registry& reg, glm::vec3 position, float size, glm::vec4 color, glm::vec3 velocity) {
+
+    entt::entity model = reg.ctx().get<ModelManager>().load(box_path);
+    if(model == entt::null) return entt::null;
+
+    // The box model is a unit cube centered on its origin
+    auto entity = reg.create();
+    reg.emplace<Transform>(entity, position, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(size));
+    reg.emplace<ModelRenderable>(entity, model, color);
+    auto& body = reg.emplace<RigidBody>(entity);
+    body.half_extent = glm::vec3(size * 0.5f);
+    body.initial_velocity = velocity;
+    return entity;
+
+}
+
 void SceneSys::preinit() {
 
 }
@@ -24,22 +48,21 @@ void SceneSys::init() {
     auto& models = reg.ctx().get<ModelManager>();
     auto& generator = *reg.ctx().get<std::shared_ptr<TerrainGenerator>>();
 
-    // A ring of boxes around the spawn point
-    entt::entity box = models.load("./resources/models/box.gltf");
-    if(box != entt::null) {
-        for(int i = 0; i < 12; i++) {
-            float angle = i * 2.f * 3.14159f / 12.f;
-            float size = 1.f + (i % 4);
-            glm::vec3 position(std::cos(angle) * 25.f, 0.f, std::sin(angle) * 25.f);
-            position.y = generator.surfaceHeight(position.x, position.z) + size * 0.5f;
+    // A ring of boxes dropped around the spawn point
+    for(int i = 0; i < 12; i++) {
+        float angle = i * 2.f * 3.14159f / 12.f;
+        float size = 1.f + (i % 4);
+        glm::vec3 position(std::cos(angle) * 25.f, 0.f, std::sin(angle) * 25.f);
+        position.y = generator.surfaceHeight(position.x, position.z) + size + 4.f;
 
-            auto entity = reg.create();
-            reg.emplace<Transform>(entity, position, glm::angleAxis(angle, glm::vec3(0.f, 1.f, 0.f)), glm::vec3(size));
-            reg.emplace<ModelRenderable>(entity, box, glm::vec4(0.5f + 0.5f * std::cos(angle), 0.5f + 0.5f * std::sin(angle), 0.6f, 1.f));
+        auto entity = spawnBox(reg, position, size, glm::vec4(0.5f + 0.5f * std::cos(angle), 0.5f + 0.5f * std::sin(angle), 0.6f, 1.f));
+        if(entity != entt::null) {
+            reg.get<Transform>(entity).rotation = glm::angleAxis(angle, glm::normalize(glm::vec3(1.f, 1.f, 0.f)));
         }
     }
 
-    // Every other glTF dropped in resources/models, lined up behind the spawn point, about 4 units tall
+    // Every other glTF dropped in resources/models, lined up behind the spawn point, about 4 units tall,
+    // with a box collider around its bounds
     std::error_code error;
     float x = -20.f;
     for(auto& file : std::filesystem::directory_iterator("./resources/models", error)) {
@@ -55,17 +78,31 @@ void SceneSys::init() {
         float scale = 4.f / height;
 
         glm::vec3 position(x, 0.f, 15.f);
-        position.y = generator.surfaceHeight(position.x, position.z) - mesh.min.y * scale;
+        position.y = generator.surfaceHeight(position.x, position.z) - mesh.min.y * scale + 2.f;
 
         auto entity = reg.create();
         reg.emplace<Transform>(entity, position, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(scale));
         reg.emplace<ModelRenderable>(entity, model);
+        auto& body = reg.emplace<RigidBody>(entity);
+        body.half_extent = (mesh.max - mesh.min) * 0.5f * scale;
+        body.offset = (mesh.max + mesh.min) * 0.5f * scale;
         x += 8.f;
     }
 
 }
 
 void SceneSys::tick(double dt) {
+
+    // Left click throws a box from the desktop camera
+    auto& input = reg.ctx().get<Input>();
+    if(input.leftClick && !ImGui::GetIO().WantCaptureMouse) {
+        auto& camera = reg.ctx().get<Camera>();
+        glm::vec3 forward = camera.forward();
+        static int count = 0;
+        count++;
+        glm::vec4 color(0.4f + 0.6f * ((count * 37) % 100) / 100.f, 0.4f + 0.6f * ((count * 61) % 100) / 100.f, 0.4f + 0.6f * ((count * 83) % 100) / 100.f, 1.f);
+        spawnBox(reg, camera.position + forward * 3.f, 1.f, color, forward * 25.f);
+    }
 
 }
 

@@ -3,6 +3,7 @@
     "cereal",
     "entt",
     "glm",
+    "joltphysics",
     "nlohmann-json",
     {
       "name": "openxr-loader",

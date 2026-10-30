@@ -6,6 +6,7 @@
 
 #include "renderer/renderer.h"
 #include "renderer/terrain/terrain_sys.h"
+#include "physics/physics_sys.h"
 #include "systems/system_set.h"
 
 #include "systems/system_list.h"
@@ -54,6 +55,9 @@ void Game::start() {
     set->pre_add<ChunkManagerSys>();
     set->pre_add<ChunkGeneratorSys>();
     set->pre_add<SceneSys>();
+
+    // Fixed step Jolt simulation, writes the Transforms of dynamic bodies before rendering
+    set->pre_add<PhysicsSys>();
 
     // Records the marching cubes dispatches into this frame's compute command buffer
     set->post_add<TerrainSys>();

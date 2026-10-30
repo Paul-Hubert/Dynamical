@@ -2,7 +2,9 @@
 
 #include <memory>
 
+#include "logic/scene_spawn.h"
 #include "logic/components/model_renderable.h"
+#include "logic/components/rigid_body.h"
 #include "logic/components/transform.h"
 #include "logic/components/vr.h"
 #include "logic/terrain/terrain_generator.h"
@@ -48,6 +50,10 @@ void VRControlSys::init() {
         hands.hands[i] = reg.create();
         reg.emplace<Transform>(hands.hands[i], glm::vec3(0.f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(0.f));
         reg.emplace<ModelRenderable>(hands.hands[i], box, colors[i]);
+        // Kinematic : the hands push dynamic bodies around
+        auto& body = reg.emplace<RigidBody>(hands.hands[i]);
+        body.motion = RigidBody::Motion::Kinematic;
+        body.half_extent = glm::vec3(hand_size * 0.5f);
     }
 
 }
@@ -86,15 +92,13 @@ void VRControlSys::tick(double dt) {
             rig.yaw -= turn * turn_speed * (float) dt;
         }
 
-        // Right trigger : drop a box from the hand
-        if(input->hands[VRInput::right].trigger_pressed && input->hands[VRInput::right].pose.valid) {
-            entt::entity box = reg.ctx().get<ModelManager>().get("./resources/models/box.gltf");
-            if(box != entt::null) {
-                glm::vec3 position = glm::vec3(rig.transform() * glm::vec4(input->hands[VRInput::right].pose.position, 1.f));
-                auto entity = reg.create();
-                reg.emplace<Transform>(entity, position, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(0.3f));
-                reg.emplace<ModelRenderable>(entity, box, glm::vec4(1.f, 0.8f, 0.3f, 1.f));
-            }
+        // Right trigger : spawn a box in the hand, thrown with the hand velocity
+        auto& right = input->hands[VRInput::right];
+        if(right.trigger_pressed && right.pose.valid) {
+            glm::mat4 world_from_stage = rig.transform();
+            glm::vec3 position = glm::vec3(world_from_stage * glm::vec4(right.pose.position + right.pose.rotation * glm::vec3(0.f, 0.f, -0.2f), 1.f));
+            glm::vec3 velocity = glm::mat3(world_from_stage) * right.linear_velocity;
+            spawnBox(reg, position, 0.3f, glm::vec4(1.f, 0.8f, 0.3f, 1.f), velocity * 1.5f);
         }
 
     }

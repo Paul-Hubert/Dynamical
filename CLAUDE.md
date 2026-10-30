@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Dynamical is a C++20 Vulkan engine with a marching cubes voxel world (GPU meshing), raymarched grass, glTF models, and OpenXR VR rendering alongside the desktop window. It uses an ECS architecture powered by EnTT.
+Dynamical is a C++20 Vulkan engine with a marching cubes voxel world (GPU meshing), raymarched grass, glTF models, Jolt physics, and OpenXR VR rendering alongside the desktop window. It uses an ECS architecture powered by EnTT.
 
 The previous 2D tile map simulation (tile rendering, heightmap world, SPH particles, AI) is archived in `archive/tilemap/` (not compiled).
 
@@ -51,21 +51,26 @@ Entry point is `src/main.cpp` → `Game::start()`. The game loop runs: `renderer
 - `ChunkManagerSys` streams chunk entities around the desktop camera and VR rig; `ChunkGeneratorSys` fills `ChunkVolume` with `TerrainGenerator` (FastNoise2) on the taskflow executor
 - `TerrainSys` (post tick) records the marching cubes compute shader into the compute command buffer; meshes stay on the GPU (vertex buffer + indirect draw per chunk slot, slots recycled after `NUM_FRAMES + 1` frames)
 
+### Physics (`src/physics/`)
+- Jolt 5.5, fixed 60 Hz step (`PhysicsSys`, pre tick after gameplay systems), `Transform`s of dynamic bodies interpolated between the last two steps
+- Entities get a body by adding `RigidBody` (box or sphere, dynamic / kinematic / static) next to a `Transform`; destroying the entity or removing the component removes the body. Kinematic bodies follow their `Transform` (VR hands)
+- **Terrain colliders** (`terrain_colliders.cpp`): the world is cut in cells of 16³ marching cubes; cells overlapping a body's swept bounds this frame are meshed on the CPU (`logic/terrain/marching_cubes.cpp`, shared vertices so Jolt can detect internal edges) and added as static `MeshShape` bodies before the step, in sorted order; cells on the predicted path (1 s) are prefetched on taskflow; idle cells are evicted after 5 s of simulation. Densities come from the loaded chunk volume or straight from `TerrainGenerator::sample`, so collision works without rendering or streaming
+- Dynamic bodies use `LinearCast` motion quality and enhanced internal edge removal
+
 ### Models (`src/renderer/model/`)
 - glTF 2.0 through tinygltf (`gltf_loader.cpp`), flattened into one vertex/index buffer with node transforms baked in. `ModelManager` (context variable) caches files; instances are entities with `Transform` + `ModelRenderable`
 
 ### VR
 - `vr_mode` setting: 0 desktop only, 1 VR alongside the desktop when an OpenXR headset is found (falls back silently otherwise)
-- `VRActions` (renderer side) writes controller and head poses to the `VRInput` context variable; `VRControlSys` does locomotion (left stick), turning (right stick), and spawns boxes with the right trigger
+- `VRActions` (renderer side) writes controller and head poses to the `VRInput` context variable; `VRControlSys` does locomotion (left stick), turning (right stick), throws boxes with the right trigger (hand velocity), and drives the kinematic hand bodies
 
 ### Configuration
 - Settings serialized to `./config.6.json` via Cereal (JSON), overridable with `key=value` arguments
 
 ## Key Dependencies
 
-**vcpkg**: cereal, entt, glm, nlohmann-json, openxr-loader[vulkan], sdl2[vulkan], stb, taskflow, tinygltf (pinned to 3.0.0#1 in `overrides`: the 3.0.0#0 port hash no longer matches GitHub's tarball), vulkan
+**vcpkg**: cereal, entt, glm, joltphysics, nlohmann-json, openxr-loader[vulkan], sdl2[vulkan], stb, taskflow, tinygltf (pinned to 3.0.0#1 in `overrides`: the 3.0.0#0 port hash no longer matches GitHub's tarball), vulkan
 
-Physics : Bullet (used on the old `vr` branch) is not ported, Jolt is the planned replacement (see the physical-agents docs on the `docs/physical-agents` branch).
 **Git submodules** (`lib/`): FastNoise2, VulkanMemoryAllocator, ImGui, ImPlot
 
 ## Code Conventions
