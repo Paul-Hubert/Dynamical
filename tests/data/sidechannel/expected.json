@@ -1,0 +1,117 @@
+{
+ "env_float": [
+  {
+   "key": "targetSpeed",
+   "type": "float",
+   "value": 1.36
+  }
+ ],
+ "env_uniform": [
+  {
+   "key": "randomSpeed",
+   "type": "sampler",
+   "sampler": "uniform",
+   "seed": 7,
+   "args": [
+    0.5,
+    1.5
+   ]
+  }
+ ],
+ "env_gaussian": [
+  {
+   "key": "pushForce",
+   "type": "sampler",
+   "sampler": "gaussian",
+   "seed": 3,
+   "args": [
+    100.0,
+    12.5
+   ]
+  }
+ ],
+ "env_multirange": [
+  {
+   "key": "slopeAngle",
+   "type": "sampler",
+   "sampler": "multirange",
+   "seed": 11,
+   "args": [
+    -10.0,
+    -5.0,
+    5.0,
+    10.0
+   ]
+  }
+ ],
+ "engine_config": [
+  {
+   "type": 0,
+   "values": [
+    84,
+    84
+   ]
+  },
+  {
+   "type": 1,
+   "values": [
+    5
+   ]
+  },
+  {
+   "type": 2,
+   "values": [
+    20.0
+   ]
+  },
+  {
+   "type": 3,
+   "values": [
+    -1
+   ]
+  },
+  {
+   "type": 4,
+   "values": [
+    60
+   ]
+  }
+ ],
+ "stats": [
+  {
+   "key": "Root/Speed",
+   "value": 1.25,
+   "aggregation": 0
+  },
+  {
+   "key": "Death/Rate",
+   "value": 0.5,
+   "aggregation": 1
+  },
+  {
+   "key": "Collision/Count",
+   "value": 3.0,
+   "aggregation": 2
+  },
+  {
+   "key": "Bot Joint/RLeg",
+   "value": 0.75,
+   "aggregation": 3
+  }
+ ],
+ "mixed": [
+  {
+   "channel": "engine",
+   "type": 2,
+   "values": [
+    20.0
+   ]
+  },
+  {
+   "channel": "env",
+   "key": "targetSpeed",
+   "type": "float",
+   "value": 1.36
+  }
+ ]
+}
