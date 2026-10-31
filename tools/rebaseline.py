@@ -50,8 +50,9 @@ def main():
 
     changelog = GOLDEN / "CHANGELOG.md"
     if not changelog.exists():
-        changelog.write_text("# Golden changes\n\nEvery golden added or replaced, with the reason. Newest last.\n\n"
-                             "| Date | Golden | Change | Base commit | Reason |\n|---|---|---|---|---|\n", encoding="utf-8")
+        with changelog.open("w", encoding="utf-8", newline="\n") as f:
+            f.write("# Golden changes\n\nEvery golden added or replaced, with the reason. Newest last.\n\n"
+                    "| Date | Golden | Change | Base commit | Reason |\n|---|---|---|---|---|\n")
     with changelog.open("a", encoding="utf-8", newline="\n") as f:
         f.write(f"| {datetime.date.today().isoformat()} | `{target.relative_to(GOLDEN).as_posix()}` | {action} | {sha} | {args.reason} |\n")
 

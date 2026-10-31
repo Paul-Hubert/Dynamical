@@ -39,6 +39,23 @@ Tests: T1.1, T1.3, T1.4, T1.5, T1.6 (unit), T1.2 (unit, import table), T1.7 (sce
 | P1 check | done | b37f099 | scripted input in capture scripts (interactive checklist item) |
 | P1 gate | done | (exit gate commit) | unit 22, scenario 1, gpu 7; report `reports/P1.md` |
 
+## P2 — Worlds, Jolt 5.6, flat ground
+
+Tests: T2.1, T2.2, T2.4, T2.5 (unit), S2.1–S2.4 (scenario), B2.1 (bench), V2.1, V2.2 (gpu).
+
+| Step | Status | Commit | Note |
+|---|---|---|---|
+| P2.1 | done | (this commit) | Jolt 5.6.0 overlay; drift explained, goldens re-recorded |
+| P2.2 | | | `JoltRuntime` |
+| P2.3 | | | `PhysicsConfig`, `PhysicsWorld` in the ctx |
+| P2.4 | | | `PhysicsSys` split |
+| P2.5 | | | layers |
+| P2.6 | | | worlds, `TrainHost` bench, `WorldStepper` |
+| P2.7 | | | `Ground`, combine callbacks, capsules |
+| P2.8 | | | `WorldView` |
+| P2.9 | | | test scenes |
+| P2.10 | | | `benchmarks.md` |
+
 ## Last failure
 
 (none)
