@@ -1,1 +1,8 @@
-{ "format_version": 1, "name": "null" }
+{
+  "format_version": 1,
+  "name": "null",
+  "variables": {
+    "agents":            { "type": "int", "default": 25 },
+    "episode_decisions": { "type": "int", "default": 1000 }
+  }
+}
