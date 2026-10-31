@@ -1,0 +1,19 @@
+{
+  "variables": {
+    "boxes":         { "type": "int", "default": 50 },
+    "capsule_every": { "type": "int", "default": 5 }
+  },
+  "templates": {
+    "box_world": {
+      "physics": { "threads": 1, "max_bodies": 256, "max_body_pairs": 2048, "max_contacts": 2048, "temp_bytes": 4194304,
+                   "friction_combine": "max", "restitution_combine": "min", "penetration_slop": 0.001, "allow_sleeping": false },
+      "clock": { "physics_hz": 60 },
+      "fixed": [
+        { "name": "BoxDrop", "params": { "count": "${boxes}", "spacing": 2.0, "height": [0.3, 1.0], "half_extent": [0.15, 0.3],
+                                         "capsule_every": "${capsule_every}" } },
+        "RigidBody", "PhysicsStep"
+      ],
+      "entities": [ { "prefab": "ground_flat", "Ground": { "size": [24, 1, 24] } } ]
+    }
+  }
+}

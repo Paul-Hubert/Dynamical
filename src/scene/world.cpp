@@ -79,6 +79,7 @@ PhysicsConfig dy::physicsConfig(const WorldDef& def) {
         f.read("temp_bytes", temp_bytes);
         f.read("gravity", c.gravity);
         f.read("substeps", c.substeps);
+        f.read("allow_sleeping", c.allow_sleeping);
         f.readEnum("friction_combine", c.friction, combine_names);
         f.readEnum("restitution_combine", c.restitution, combine_names);
         f.read("velocity_steps", velocity_steps);

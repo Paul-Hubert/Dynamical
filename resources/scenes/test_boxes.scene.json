@@ -1,0 +1,10 @@
+{
+  "format_version": 1,
+  "name": "test_boxes",
+  "include": ["common/box_world.json"],
+  "variables": {
+    "num_worlds":    { "type": "int", "default": 25 },
+    "capsule_every": { "type": "int", "default": 0 }
+  },
+  "worlds": [ { "template": "box_world", "count": "${num_worlds}" } ]
+}

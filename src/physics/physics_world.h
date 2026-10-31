@@ -80,6 +80,7 @@ struct PhysicsConfig {
     uint32_t temp_bytes = 16 * 1024 * 1024;
     glm::vec3 gravity = glm::vec3(0.f, -9.81f, 0.f);
     int substeps = 1;                   // our own sub-stepping (PhysicsStep); Jolt's collision steps stay 1
+    bool allow_sleeping = true;         // agent and test worlds: off (physics.md)
     Combine friction = Combine::Geometric;
     Combine restitution = Combine::Geometric;
     // JPH::PhysicsSettings overrides, Jolt's defaults when unset

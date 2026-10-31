@@ -34,3 +34,5 @@ boxes; nothing else in the image changes. Evidence:
 | 2026-10-31 | `images/base_spawn.png` | replaced | de8e4fb | Jolt 5.6 friction model (see Jolt 5.6 drift note above) |
 | 2026-10-31 | `images/base_ring.png` | replaced | de8e4fb | Jolt 5.6 friction model (see Jolt 5.6 drift note above) |
 | 2026-10-31 | `base_probe.csv` | replaced | de8e4fb | Jolt 5.6 friction model (see Jolt 5.6 drift note above) |
+| 2026-10-31 | `images/worlds_boxes.png` | added | cf3b065 | new golden (P2 V2.1): 4 box worlds at frame 300 |
+| 2026-10-31 | `images/worlds_boxes_close.png` | added | cf3b065 | new golden (P2 V2.1): close-up of world 3, capsule orientation |

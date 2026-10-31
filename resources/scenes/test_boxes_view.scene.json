@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "name": "test_boxes_view",
+  "include": ["common/desktop.json", "common/box_world.json"],
+  "variables": { "num_worlds": { "type": "int", "default": 4 } },
+  "renderer": { "passes": ["model", "ui"], "vr": false },
+  "host": {
+    "pre": [
+      "Input", "UI", "PlayerControl", "DebugMenu",
+      { "name": "FixedCamera", "params": { "pos": [0, 38, 50], "look_at": [0, -2, 2] } },
+      "WorldStepper"
+    ],
+    "post": [ { "name": "WorldView", "params": { "worlds": "all", "spacing": 28.0 } } ]
+  },
+  "worlds": [ { "template": "box_world", "count": "${num_worlds}" } ]
+}

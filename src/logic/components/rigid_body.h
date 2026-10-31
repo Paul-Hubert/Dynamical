@@ -25,6 +25,7 @@ public:
 
     float friction = 0.6f;
     float restitution = 0.1f;
+    float angular_damping = 0.05f;             // Jolt's default
 
     glm::vec3 initial_velocity = glm::vec3(0.f);
     glm::vec3 initial_angular_velocity = glm::vec3(0.f);

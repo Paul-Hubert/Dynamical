@@ -28,6 +28,9 @@ class Capture {
 public:
     Capture(entt::registry& reg, const RunArgs& args);
 
+    // The scene a script names ("scene", default base) and its "vars"; false if the script cannot be read
+    static bool readScene(const std::string& script, std::string& scene, std::vector<std::pair<std::string, std::string>>& vars);
+
     bool failed() const { return !error.empty(); }
     bool done() const { return next >= shots.size(); }
 

@@ -184,7 +184,16 @@ if (DYNAMICAL_TESTS)
                 --golden ${CMAKE_SOURCE_DIR}/tests/golden/base_probe.csv -- scene=base probe_entities=RigidBody probe_every=60 ticks=900)
         add_test(NAME "P1 check: scripted input flies the camera, throws a box and toggles the grass"
             COMMAND ${VISUAL_TEST} shots --exe $<TARGET_FILE:dynamical> --script ${CAPTURES}/base_interactive.capture.json --out ${ARTIFACTS}/P1/interactive)
+        add_test(NAME "V2.1 test_boxes_view at frame 300 matches its golden"
+            COMMAND ${VISUAL_TEST} golden ${VISUAL_EXES} --script ${CAPTURES}/worlds_boxes.capture.json --out ${ARTIFACTS}/P2/captures)
+        add_test(NAME "V2.2 base captures after the Jolt 5.6 bump match the documented re-baseline"
+            COMMAND ${VISUAL_TEST} golden ${VISUAL_EXES} --script ${CAPTURES}/base.capture.json --out ${ARTIFACTS}/P2/base)
+        add_test(NAME "P2 check: scripted clicks pause and single-step WorldStepper"
+            COMMAND ${VISUAL_TEST} shots --exe $<TARGET_FILE:dynamical> --script ${CAPTURES}/worlds_stepper.capture.json --out ${ARTIFACTS}/P2/stepper)
         set_tests_properties(
+            "V2.1 test_boxes_view at frame 300 matches its golden"
+            "V2.2 base captures after the Jolt 5.6 bump match the documented re-baseline"
+            "P2 check: scripted clicks pause and single-step WorldStepper"
             "P1 check: scripted input flies the camera, throws a box and toggles the grass"
             "V1.1 base scene captures match the P0 goldens"
             "S1.1 base scene probe matches the P0 probe"

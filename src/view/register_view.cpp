@@ -11,6 +11,7 @@
 #include "view/systems/ui.h"
 #include "view/world_stepper.h"
 #include "view/world_view.h"
+#include "view/fixed_camera.h"
 
 using namespace dy;
 
@@ -27,6 +28,8 @@ void dy::registerViewSystems() {
     registerSystem("BoxThrower", systemInfo<BoxThrowerSys>(SystemScope::Host, true));
     registerSystem("Terrain", systemInfo<TerrainSys>(SystemScope::Host, true));
     registerSystem("WorldStepper", systemInfo<WorldStepperSys>(SystemScope::Host, true));
+    registerSystem("FixedCamera", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<FixedCameraSys>(reg, params); },
+        SystemScope::Host, true });
     registerSystem("WorldView", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<WorldViewSys>(reg, params); },
         SystemScope::Host, true });
 

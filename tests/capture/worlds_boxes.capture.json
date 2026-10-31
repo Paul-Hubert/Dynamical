@@ -1,0 +1,7 @@
+{
+  "scene": "test_boxes_view",
+  "shots": [
+    { "frame": 300, "name": "worlds_boxes", "camera": { "pos": [12, 30, 40], "look_at": [8, -4, 4] } },
+    { "frame": 301, "name": "worlds_boxes_close", "camera": { "pos": [14, 5, 24], "look_at": [14, 0, 15] } }
+  ]
+}

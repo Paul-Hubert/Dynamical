@@ -151,6 +151,8 @@ void RigidBodySys::tick(double dt) {
         JPH::BodyCreationSettings settings(result.Get(), JPH::RVec3(toJolt(transform.position)), toJolt(glm::normalize(transform.rotation)), motion, layer);
         settings.mFriction = body.friction;
         settings.mRestitution = body.restitution;
+        settings.mAngularDamping = body.angular_damping;
+        settings.mAllowSleeping = world->config().allow_sleeping;
         if(body.motion == RigidBody::Motion::Dynamic) {
             settings.mLinearVelocity = toJolt(body.initial_velocity);
             settings.mAngularVelocity = toJolt(body.initial_angular_velocity);

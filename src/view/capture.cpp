@@ -38,12 +38,6 @@ Capture::Capture(entt::registry& reg, const RunArgs& args) : reg(reg), directory
     try {
         nlohmann::json script = nlohmann::json::parse(file);
 
-        std::string scene = script.value("scene", "base");
-        if(scene != "base") {
-            error = "capture script " + args.capture + ": scene '" + scene + "' does not exist (only base)";
-            return;
-        }
-
         for(auto& j : script.at("shots")) {
             Shot shot;
             shot.frame = j.at("frame").get<uint64_t>();
@@ -89,6 +83,21 @@ Capture::Capture(entt::registry& reg, const RunArgs& args) : reg(reg), directory
     std::error_code ec;
     std::filesystem::create_directories(directory, ec);
 
+}
+
+bool Capture::readScene(const std::string& path, std::string& scene, std::vector<std::pair<std::string, std::string>>& vars) {
+    std::ifstream file(path);
+    if(!file) return false;
+    try {
+        nlohmann::json script = nlohmann::json::parse(file);
+        scene = script.value("scene", "base");
+        if(script.contains("vars")) {
+            for(auto& [name, value] : script["vars"].items()) vars.emplace_back(name, value.is_string() ? value.get<std::string>() : value.dump());
+        }
+        return true;
+    } catch(const std::exception&) {
+        return false;
+    }
 }
 
 void Capture::sendInput(uint64_t frame) {

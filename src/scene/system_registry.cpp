@@ -7,6 +7,7 @@
 #include "logic/components/model_ref.h"
 #include "logic/components/rigid_body.h"
 #include "logic/components/transform.h"
+#include "logic/systems/box_drop.h"
 #include "logic/systems/chunk_systems.h"
 #include "physics/physics_sys.h"
 
@@ -50,6 +51,7 @@ void registerSimComponents() {
             f.read("offset", b.offset);
             f.read("friction", b.friction);
             f.read("restitution", b.restitution);
+            f.read("angular_damping", b.angular_damping);
             f.read("initial_velocity", b.initial_velocity);
             f.read("initial_angular_velocity", b.initial_angular_velocity);
             f.finish();
@@ -59,7 +61,7 @@ void registerSimComponents() {
             auto& b = reg.get<RigidBody>(e);
             return nlohmann::json { { "motion", motion_names[(int) b.motion] }, { "shape", shape_names[(int) b.shape] },
                 { "half_extent", toJson(b.half_extent) }, { "offset", toJson(b.offset) }, { "friction", b.friction },
-                { "restitution", b.restitution }, { "initial_velocity", toJson(b.initial_velocity) },
+                { "restitution", b.restitution }, { "angular_damping", b.angular_damping }, { "initial_velocity", toJson(b.initial_velocity) },
                 { "initial_angular_velocity", toJson(b.initial_angular_velocity) } };
         }
     });
@@ -119,6 +121,8 @@ void dy::registerSimSystems() {
     registerSystem("TerrainColliders", systemInfo<TerrainCollidersSys>(SystemScope::Host));
     registerSystem("Physics", systemInfo<PhysicsSys>(SystemScope::Host));
     registerSystem("PhysicsStep", systemInfo<PhysicsStepSys>(SystemScope::World));
+    registerSystem("BoxDrop", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<BoxDropSys>(reg, params); },
+        SystemScope::World });
 
     registerSimComponents();
 

@@ -1,0 +1,15 @@
+{
+  "scene": "test_boxes_view",
+  "input": [
+    { "frame": 98, "mouse": [27, 433] },
+    { "frame": 100, "button": "left", "down": true, "mouse": [27, 433] },
+    { "frame": 102, "button": "left", "down": false, "mouse": [27, 433] },
+    { "frame": 118, "mouse": [102, 433] },
+    { "frame": 120, "button": "left", "down": true, "mouse": [102, 433] },
+    { "frame": 122, "button": "left", "down": false, "mouse": [102, 433] }
+  ],
+  "shots": [
+    { "frame": 110, "name": "stepper_paused", "camera": { "pos": [14, 5, 24], "look_at": [14, 0, 15] } },
+    { "frame": 130, "name": "stepper_stepped", "camera": { "pos": [14, 5, 24], "look_at": [14, 0, 15] } }
+  ]
+}

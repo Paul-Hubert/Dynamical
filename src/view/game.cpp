@@ -68,7 +68,22 @@ int Game::start() {
     SceneDef scene;
     try {
         const RunArgs& args = reg.ctx().get<RunArgs>();
-        scene = loadScene(args.scene.empty() ? "base" : args.scene, args.vars, SceneLoadOptions {});
+        std::string name = args.scene;
+        auto vars = args.vars;
+        // A capture script names its scene; the command line may repeat it, not contradict it
+        if(!args.capture.empty()) {
+            std::string script_scene;
+            std::vector<std::pair<std::string, std::string>> script_vars;
+            if(Capture::readScene(args.capture, script_scene, script_vars)) {
+                if(!name.empty() && name != script_scene) {
+                    dy::log(dy::error) << "scene=" << name << " but the capture script runs " << script_scene << "\n";
+                    return 1;
+                }
+                name = script_scene;
+                vars.insert(vars.begin(), script_vars.begin(), script_vars.end());
+            }
+        }
+        scene = loadScene(name.empty() ? "base" : name, vars, SceneLoadOptions {});
     } catch(const SceneError& e) {
         dy::log(dy::error) << "Scene: " << e.what() << "\n";
         return 1;
