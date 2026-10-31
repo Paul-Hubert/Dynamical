@@ -22,6 +22,7 @@ worlds, a JSON scene system, a headless training executable that the unchanged t
 | 9 | [mlagents-bridge.md](mlagents-bridge.md) | Launch contract, handshake, step loop, side channels, env params, process behaviour |
 | 10 | [inference-and-replay.md](inference-and-replay.md) | ONNX Runtime, `walker_view`, eval mode, demo recorder, replays |
 | 11 | [testing.md](testing.md) | Test target, oracle tests, gates, benchmarks |
+| — | [jolt-readouts.md](jolt-readouts.md) | **Reference**: Jolt 5.5 constraint and contact impulse access, drive semantics, the three patches |
 | — | [unity-analysis.md](unity-analysis.md) | **Reference**: what the noToes Unity code computes, with file:line sources |
 | 12 | [diagram.md](diagram.md) | Spec and Claude Design prompt for the implementation-plan diagram |
 

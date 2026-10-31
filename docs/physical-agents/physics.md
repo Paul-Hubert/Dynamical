@@ -63,7 +63,9 @@ The `BodyDef` is already in the engine frame: the Unity importer converted it
      UA §5);
    - `mMaxAngularVelocity` 20 rad/s, explicit (Jolt's default is ~47). Scaled bodies take theirs from
      the params file (H173: 20.9044);
-   - sleeping off; `LinearCast` motion quality;
+   - sleeping off; `Discrete` motion quality (CCD changes velocities outside constraint impulses and
+     would break the energy and contact books; walking speeds on a thick floor box do not need it;
+     [jolt-readouts.md](jolt-readouts.md#4-friction-without-patching-momentum-balance));
    - layer `AGENT`; collision group `{ragdoll filter, agent id, segment index}`.
 4. **Constraints** (next section). Pivot = child bone origin.
 5. **No self-collision:** a `GroupFilterTable` disabling every pair.
@@ -106,7 +108,9 @@ One `SwingTwistConstraint` per joint, in `LocalToBodyCOM` space, pivot at the ch
   joint. This is the closest Jolt match to Unity's isotropic SLERP spring–damper.
 - **Torque limit** from `maxTorque` (200000 means effectively unlimited).
 - **Targets** per tick from `HeldDrive`: `SetTargetOrientationCS(q)` with q = swing · twist relative to
-  rest, and the motor target angular velocity from the ω actions.
+  rest, and the motor target angular velocity from the ω actions. **Stock Jolt position motors ignore
+  the target angular velocity** (they damp toward zero). Patch P-B makes the damper act on
+  `ω_rel − ω_target`, as Unity's SLERP drive does ([jolt-readouts.md](jolt-readouts.md#2-drive-semantics-position-motors-ignore-the-target-angular-velocity)).
 - **Force mode.** Torque is not scaled by inertia, as in Unity's force-mode drive.
 - **Gain scale.** Jolt motor stiffness and damping are not Unity spring units, so M2 re-derives a
   scale factor (`drive_gain_scale` in the params) from step-response tests. The default mean gains
@@ -121,8 +125,11 @@ One `SwingTwistConstraint` per joint, in `LocalToBodyCOM` space, pivot at the ch
   friction 1 and restitution 0, so μ = 1 everywhere (UA §1.2).
 - **`Contacts` system.** Per segment it records ground contact on/off, the contact point and the normal
   and friction impulse. Per foot it also records the **full contact wrench**:
-  - from the solver's post-step impulses if Jolt 5.5 exposes them (*verify*);
-  - otherwise from the foot's momentum balance (total GRF is exact; Jolt doc §8).
+  - per contact point from patch P-C (Jolt computes normal and friction impulses per collision step
+    but keeps them private);
+  - and, without the patch or as a cross-check, from the foot's momentum balance. That is exact for
+    the total, and on flat ground its horizontal part is the friction
+    ([jolt-readouts.md](jolt-readouts.md#3-contact-impulses-after-the-solve)).
 - **Stance** for DeVita uses the normal force threshold `0.05·m·g`.
 - **Foot penetration** is logged as a stat.
 
@@ -155,8 +162,11 @@ M2 checks (Jolt doc §8):
 2. ground reaction force from momentum;
 3. closure residual under 1–2 %.
 
-*Verify* the Jolt 5.5 accessors: the `SwingTwistConstraint` motor and limit lambdas, and whether they
-can be read per sub-step. If not, use `collision_steps = 1` and sub-step in our own loop.
+**Verified for Jolt 5.5** ([jolt-readouts.md](jolt-readouts.md)):
+- motor, limit and point lambdas are public and hold the impulse of the last collision step;
+- the recorder sub-steps itself (`Update(h_sub, 1)`) and reads them after each call;
+- motor axes are rebuilt from public data;
+- limit axes need patch P-A.
 
 ## Physics settings
 
@@ -168,7 +178,7 @@ can be read per sub-step. If not, use `collision_steps = 1` and sub-step in our 
 | Friction | μ 1, max combine | Reproduced |
 | Max angular velocity | 20 rad/s (per body version) | Reproduced explicitly |
 | Angular damping | 0 (body-version field) | Intent; 0 for energy closure |
-| CCD | `LinearCast` | Equivalent |
+| CCD | `Discrete` for agents | Changed on purpose (exact books); revisit if feet tunnel |
 | Sleeping | off | Irrelevant |
 | Self-collision | off | Reproduced |
 
@@ -176,5 +186,7 @@ can be read per sub-step. If not, use `collision_steps = 1` and sub-step in our 
 
 - vcpkg `joltphysics` 5.5 is already in use. The consumer's compile definitions must match the port
   (`JPH_*` flags propagated by `Jolt::Jolt`).
-- Cross-platform determinism (`CROSS_PLATFORM_DETERMINISTIC`) needs an overlay port if the stock port
-  does not expose it. It is optional while training is Windows-only.
+- **A vcpkg overlay port** (`ports/joltphysics`, 5.5.0) carries patches P-A (limit axes), P-B (target
+  velocity in position motors) and P-C (contact impulse listener)
+  ([jolt-readouts.md](jolt-readouts.md#5-recommended-setup)). The same overlay can set
+  cross-platform determinism (`CROSS_PLATFORM_DETERMINISTIC`), which the stock port may not expose. It is optional while training is Windows-only.
