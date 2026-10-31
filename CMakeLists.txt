@@ -105,9 +105,13 @@ endif()
 
 ### HEADLESS TRAINING EXECUTABLE (TrainingEnv.exe: the trainer globs <path>.exe)
 if (DYNAMICAL_TRAIN)
+    # Train-side code in a library so the tests link it too
     file(GLOB_RECURSE TRAIN_SOURCES CONFIGURE_DEPENDS ./src/train/*.cpp)
-    add_executable(dynamical_train src/train_main.cpp ${TRAIN_SOURCES})
-    target_link_libraries(dynamical_train PRIVATE dynamical_sim)
+    add_library(dynamical_train_core STATIC ${TRAIN_SOURCES})
+    target_link_libraries(dynamical_train_core PUBLIC dynamical_sim)
+
+    add_executable(dynamical_train src/train_main.cpp)
+    target_link_libraries(dynamical_train PRIVATE dynamical_train_core)
     set_target_properties(dynamical_train PROPERTIES OUTPUT_NAME ${DYNAMICAL_TRAIN_NAME})
 
     # Deployed layout: the executable with resources/{scenes,prefabs,agents} next to it
@@ -135,6 +139,9 @@ if (DYNAMICAL_TESTS)
     add_executable(dynamical_tests ${test_sources})
     target_include_directories(dynamical_tests PRIVATE tests)
     target_link_libraries(dynamical_tests PRIVATE dynamical_sim doctest::doctest imgdiff_core)
+    if (DYNAMICAL_TRAIN)
+        target_link_libraries(dynamical_tests PRIVATE dynamical_train_core)
+    endif()
 
     # doctest test suites (unit, scenario, protocol) become CTest labels
     doctest_discover_tests(dynamical_tests ADD_LABELS 1 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -145,6 +152,12 @@ if (DYNAMICAL_TESTS)
         add_test(NAME "T1.2 dynamical_train imports no vulkan-1, SDL2 or openxr_loader DLL"
             COMMAND ${CMAKE_COMMAND} -DEXE=$<TARGET_FILE:dynamical_train> -DDUMPBIN=${DUMPBIN} -P ${CMAKE_SOURCE_DIR}/tests/import_table.cmake)
         set_tests_properties("T1.2 dynamical_train imports no vulkan-1, SDL2 or openxr_loader DLL" PROPERTIES LABELS unit)
+    endif()
+
+    if (DYNAMICAL_TRAIN)
+        add_test(NAME "T1.7 dynamical_train from another directory writes relative outputs there and no config.6.json"
+            COMMAND ${CMAKE_COMMAND} -DEXE=$<TARGET_FILE:dynamical_train> -DWORK=${CMAKE_BINARY_DIR}/artifacts/P1/train_cwd -P ${CMAKE_SOURCE_DIR}/tests/train_cwd.cmake)
+        set_tests_properties("T1.7 dynamical_train from another directory writes relative outputs there and no config.6.json" PROPERTIES LABELS scenario)
     endif()
 
     # Visual and probe tests run dynamical: they need a GPU (label gpu, not run in CI)

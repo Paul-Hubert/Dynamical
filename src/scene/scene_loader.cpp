@@ -198,6 +198,10 @@ private:
 
     void checkTopLevel(const SourceFile& f) {
         checkKeys(f.content, { "format_version", "name", "include", "variables", "renderer", "host", "templates", "worlds", "resolved_from" }, f.display, "");
+        // Before any system check: a rendered scene in dynamical_train fails for that reason, not for its view systems
+        if(!options.allow_renderer && f.content.contains("renderer")) {
+            throw SceneError(f.display, "/renderer", "dynamical_train does not render: a renderer block is not allowed");
+        }
         if(auto it = f.content.find("resolved_from"); it != f.content.end()) {
             checkKeys(*it, { "scene", "includes" }, f.display, "/resolved_from");
             for(auto& include : it->value("includes", json::array())) {
