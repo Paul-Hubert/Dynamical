@@ -18,7 +18,8 @@ Tests: T0.1 (unit), V0.1, V0.2 (gpu), S0.1 (probe, gpu until P1 splits the libra
 | P0.7 | done | 2552513 | imgdiff, rebaseline, phase_report |
 | P0.8 | done | 5d57f76 | probe |
 | P0.9 | done | 9605a57 | CI |
-| P0.10 | done | (this commit) | master baseline |
+| P0.10 | done | dc2b31a | master baseline |
+| P0 gate | done | (exit gate commit) | unit 10/10, gpu 4/4; report `reports/P0.md` |
 
 ## Last failure
 
