@@ -1,0 +1,15 @@
+# T1.2: the headless executable imports no graphics, window or headset DLL.
+# cmake -DEXE=<TrainingEnv.exe> -DDUMPBIN=<dumpbin.exe> -P import_table.cmake
+execute_process(COMMAND "${DUMPBIN}" /dependents "${EXE}" OUTPUT_VARIABLE out RESULT_VARIABLE result)
+if (NOT result EQUAL 0)
+    message(FATAL_ERROR "dumpbin failed (${result})")
+endif()
+message("${out}")
+foreach(dll vulkan-1.dll SDL2.dll openxr_loader.dll)
+    string(TOLOWER "${out}" lower)
+    string(TOLOWER "${dll}" dll_lower)
+    string(FIND "${lower}" "${dll_lower}" found)
+    if (NOT found EQUAL -1)
+        message(FATAL_ERROR "${EXE} imports ${dll}")
+    endif()
+endforeach()

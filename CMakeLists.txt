@@ -138,6 +138,14 @@ if (DYNAMICAL_TESTS)
     # doctest test suites (unit, scenario, protocol) become CTest labels
     doctest_discover_tests(dynamical_tests ADD_LABELS 1 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+    if (DYNAMICAL_TRAIN AND MSVC)
+        get_filename_component(MSVC_BIN "${CMAKE_LINKER}" DIRECTORY)
+        find_program(DUMPBIN dumpbin HINTS "${MSVC_BIN}")
+        add_test(NAME "T1.2 dynamical_train imports no vulkan-1, SDL2 or openxr_loader DLL"
+            COMMAND ${CMAKE_COMMAND} -DEXE=$<TARGET_FILE:dynamical_train> -DDUMPBIN=${DUMPBIN} -P ${CMAKE_SOURCE_DIR}/tests/import_table.cmake)
+        set_tests_properties("T1.2 dynamical_train imports no vulkan-1, SDL2 or openxr_loader DLL" PROPERTIES LABELS unit)
+    endif()
+
     # Visual and probe tests run dynamical: they need a GPU (label gpu, not run in CI)
     if (DYNAMICAL_BUILD_VIEWER)
         find_package(Python3 COMPONENTS Interpreter REQUIRED)
