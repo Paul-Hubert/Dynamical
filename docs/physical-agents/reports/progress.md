@@ -54,7 +54,8 @@ Tests: T2.1, T2.2, T2.4, T2.5 (unit), S2.1–S2.4 (scenario), B2.1 (bench), V2.1
 | P2.7 | done | b100b06 | `Ground`, combine callbacks, capsules |
 | P2.8 | done | cf3b065 | `WorldView` |
 | P2.9 | done | 46d0b48 | test scenes |
-| P2.10 | done | (this commit) | `benchmarks.md` |
+| P2.10 | done | 0eaba61 | `benchmarks.md` |
+| P2 gate | done | (exit gate commit) | unit 28, scenario 5, gpu 10; report `reports/P2.md` |
 
 ## Last failure
 
