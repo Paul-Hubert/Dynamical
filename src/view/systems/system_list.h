@@ -26,8 +26,14 @@ DEFINE_SYSTEM(PlayerControlSys)
 // VR locomotion and controller models
 DEFINE_SYSTEM(VRControlSys)
 
-// Demo glTF objects placed on the marching cubes terrain
-DEFINE_SYSTEM(SceneSys)
+// base: a ring of boxes dropped on the marching cubes terrain (init)
+DEFINE_SYSTEM(BoxRingSys)
+
+// base: the glTF files of resources/models lined up behind the spawn point (init)
+DEFINE_SYSTEM(ModelLineupSys)
+
+// base: left click throws a box from the desktop camera
+DEFINE_SYSTEM(BoxThrowerSys)
 
 // ImGui window : renderer toggles, grass parameters, VR state, chunk statistics
 DEFINE_SYSTEM(DebugMenuSys)

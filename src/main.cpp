@@ -1,4 +1,6 @@
 #include "view/game.h"
+#include "view/register_view.h"
+#include "scene/system_registry.h"
 
 #include <filesystem>
 #include <memory>
@@ -35,6 +37,9 @@ int main(int argc, char **argv) {
     //OPTICK_APP("People");
 
     find_resources();
+
+    dy::registerSimSystems();
+    dy::registerViewSystems();
 
     auto game = std::make_unique<dy::Game>(argc, argv);
 

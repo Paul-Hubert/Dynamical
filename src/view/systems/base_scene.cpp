@@ -21,13 +21,15 @@
 
 using namespace dy;
 
-void SceneSys::preinit() {
+// base: master's SceneSys split in three. Box heights come from the TerrainGenerator, which
+// ChunkGeneratorSys creates in preinit
+
+void BoxRingSys::preinit() {
 
 }
 
-void SceneSys::init() {
+void BoxRingSys::init() {
 
-    auto& models = reg.ctx().get<ModelManager>();
     auto& generator = *reg.ctx().get<std::shared_ptr<TerrainGenerator>>();
 
     // A ring of boxes dropped around the spawn point
@@ -43,8 +45,27 @@ void SceneSys::init() {
         }
     }
 
-    // Every other glTF dropped in resources/models, lined up behind the spawn point, about 4 units tall,
-    // with a box collider around its bounds
+}
+
+void BoxRingSys::tick(double dt) {
+
+}
+
+void BoxRingSys::finish() {
+
+}
+
+void ModelLineupSys::preinit() {
+
+}
+
+void ModelLineupSys::init() {
+
+    auto& models = reg.ctx().get<ModelManager>();
+    auto& generator = *reg.ctx().get<std::shared_ptr<TerrainGenerator>>();
+
+    // Every other glTF dropped in resources/models (not its subfolders), lined up behind the spawn point,
+    // about 4 units tall, with a box collider around its bounds
     std::error_code error;
     float x = -20.f;
     for(auto& file : std::filesystem::directory_iterator("./resources/models", error)) {
@@ -73,7 +94,23 @@ void SceneSys::init() {
 
 }
 
-void SceneSys::tick(double dt) {
+void ModelLineupSys::tick(double dt) {
+
+}
+
+void ModelLineupSys::finish() {
+
+}
+
+void BoxThrowerSys::preinit() {
+
+}
+
+void BoxThrowerSys::init() {
+
+}
+
+void BoxThrowerSys::tick(double dt) {
 
     // Left click throws a box from the desktop camera
     auto& input = reg.ctx().get<Input>();
@@ -88,6 +125,6 @@ void SceneSys::tick(double dt) {
 
 }
 
-void SceneSys::finish() {
+void BoxThrowerSys::finish() {
 
 }

@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "name": "base",
+  "include": ["common/desktop.json"],
+
+  "renderer": { "passes": ["terrain", "grass", "model", "ui"], "vr": true },
+
+  "host": {
+    "pre": [
+      "Input", "UI", "Time", "PlayerControl", "VRControl", "DebugMenu",
+      "ChunkManager", "ChunkGenerator", "BoxRing", "ModelLineup", "BoxThrower",
+      "Physics"
+    ],
+    "post": ["Terrain"]
+  }
+}

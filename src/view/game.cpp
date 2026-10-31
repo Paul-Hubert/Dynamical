@@ -5,14 +5,9 @@
 #include "extra/optick/optick.h"
 
 #include "renderer/renderer.h"
-#include "renderer/terrain/terrain_sys.h"
-#include "physics/physics_sys.h"
 #include "logic/systems/system_set.h"
-
-#include "view/systems/system_list.h"
-#include "logic/systems/chunk_systems.h"
-#include "view/systems/input.h"
-#include "view/systems/ui.h"
+#include "scene/scene_def.h"
+#include "scene/system_registry.h"
 
 #include "util/entt_util.h"
 
@@ -68,28 +63,28 @@ int Game::start() {
 
     entt::registry& reg = *registry;
 
+    // The scene lists the passes and the host systems (base: master's Game::start)
+    SceneDef scene;
+    try {
+        const RunArgs& args = reg.ctx().get<RunArgs>();
+        scene = loadScene(args.scene.empty() ? "base" : args.scene, args.vars, SceneLoadOptions {});
+    } catch(const SceneError& e) {
+        dy::log(dy::error) << "Scene: " << e.what() << "\n";
+        return 1;
+    }
+    if(!scene.renderer) {
+        dy::log(dy::error) << "Scene " << scene.file << " has no renderer block: run it with dynamical_train\n";
+        return 1;
+    }
+
     // Creates the Vulkan context, OpenXR session, both render targets and the scene passes
-    renderer = std::make_unique<Renderer>(reg, RendererDef { { "terrain", "grass", "model", "ui" }, true });
+    if(!scene.renderer->vr) reg.ctx().get<Settings>().vr_mode = 0;
+    renderer = std::make_unique<Renderer>(reg, *scene.renderer);
 
     set = std::make_unique<SystemSet>(reg);
 
-    set->pre_add<InputSys>();
-    set->pre_add<UISys>();
-    set->pre_add<TimeSys>();
-
-    set->pre_add<PlayerControlSys>();
-    set->pre_add<VRControlSys>();
-    set->pre_add<DebugMenuSys>();
-
-    set->pre_add<ChunkManagerSys>();
-    set->pre_add<ChunkGeneratorSys>();
-    set->pre_add<SceneSys>();
-
-    // Fixed step Jolt simulation, writes the Transforms of dynamic bodies before rendering
-    set->pre_add<PhysicsSys>();
-
-    // Records the marching cubes dispatches into this frame's compute command buffer
-    set->post_add<TerrainSys>();
+    for(auto& e : scene.host_pre) set->add(SystemSet::List::Pre, findSystem(e.name)->make(reg, e.params), e.phase, e.name);
+    for(auto& e : scene.host_post) set->add(SystemSet::List::Post, findSystem(e.name)->make(reg, e.params), e.phase, e.name);
 
 
     // preinit

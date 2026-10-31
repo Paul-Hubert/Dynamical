@@ -164,7 +164,14 @@ if (DYNAMICAL_TESTS)
         add_test(NAME "S0.1 base probe is deterministic"
             COMMAND ${VISUAL_TEST} probe --exe $<TARGET_FILE:dynamical> --out ${ARTIFACTS}/P0/probe --runs 2 --tol 1e-6
                 -- probe_entities=RigidBody probe_every=60 ticks=900)
+        add_test(NAME "V1.1 base scene captures match the P0 goldens"
+            COMMAND ${VISUAL_TEST} golden ${VISUAL_EXES} --script ${CAPTURES}/base.capture.json --out ${ARTIFACTS}/P1/captures)
+        add_test(NAME "S1.1 base scene probe matches the P0 probe"
+            COMMAND ${VISUAL_TEST} probe --exe $<TARGET_FILE:dynamical> --out ${ARTIFACTS}/P1/probe --runs 1 --tol 1e-5
+                --golden ${CMAKE_SOURCE_DIR}/tests/golden/base_probe.csv -- scene=base probe_entities=RigidBody probe_every=60 ticks=900)
         set_tests_properties(
+            "V1.1 base scene captures match the P0 goldens"
+            "S1.1 base scene probe matches the P0 probe"
             "V0.1 base captures are deterministic"
             "V0.2 base captures match the goldens"
             "P0 check: imgdiff fails on a capture with the camera moved by 0.1 m"
