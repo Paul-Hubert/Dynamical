@@ -21,6 +21,22 @@ Tests: T0.1 (unit), V0.1, V0.2 (gpu), S0.1 (probe, gpu until P1 splits the libra
 | P0.10 | done | dc2b31a | master baseline |
 | P0 gate | done | (exit gate commit) | unit 10/10, gpu 4/4; report `reports/P0.md` |
 
+## P1 — Library split and scene system
+
+Tests: T1.1, T1.3, T1.4, T1.5, T1.6 (unit), T1.2 (unit, import table), T1.7 (scenario), S1.1, V1.1 (gpu).
+
+| Step | Status | Commit | Note |
+|---|---|---|---|
+| P1.1 | done | (this commit) | `vulkan.h` out of `system.h` |
+| P1.2 | | | `TimeSys` to the executable |
+| P1.3 | | | CMake targets and library-boundary moves |
+| P1.4 | | | T1.1 header boundary |
+| P1.5 | | | scene core, registries, prefabs |
+| P1.6 | | | `SystemSet` fixed lane |
+| P1.7 | | | renderer pass list from the scene |
+| P1.8 | | | `base.scene.json` |
+| P1.9 | | | `train_main.cpp` |
+
 ## Last failure
 
 (none)

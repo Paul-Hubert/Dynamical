@@ -5,7 +5,6 @@
 
 #include <iostream>
 
-#include "vulkan/vulkan.h"
 #include "extra/optick/optick.h"
 
 namespace dy {
