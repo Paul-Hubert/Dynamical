@@ -23,6 +23,7 @@
 #include "logic/components/input.h"
 
 #include "util/log.h"
+#include "scene/probe.h"
 #include "view/capture.h"
 
 #include <algorithm>
@@ -118,6 +119,15 @@ int Game::start() {
     }
     std::vector<uint8_t> pixels;
 
+    std::unique_ptr<Probe> probe;
+    if(!args.probe.empty()) {
+        probe = std::make_unique<Probe>(args);
+        if(probe->failed()) {
+            dy::log(dy::error) << probe->error << "\n";
+            return 1;
+        }
+    }
+
     // start loop
 
     using clock = std::chrono::high_resolution_clock;
@@ -149,6 +159,8 @@ int Game::start() {
         set->pre_tick(dt);
 
         set->post_tick(dt);
+
+        if(probe) probe->sample(reg, frame_clock.frame);
 
         bool shoot = capture && capture->due(frame_clock.frame) && renderer->requestCapture();
 
