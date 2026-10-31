@@ -22,14 +22,6 @@ using namespace dy;
 
 namespace {
 
-// Last two simulated poses of a dynamic body, the Transform is interpolated between them
-struct PhysicsPose {
-    glm::vec3 prev_position;
-    glm::vec3 position;
-    glm::quat prev_rotation;
-    glm::quat rotation;
-};
-
 JPH::BodyID bodyId(const RigidBody& body) {
     return JPH::BodyID(body.body);
 }
@@ -47,23 +39,43 @@ float millis(clock::time_point start) {
     return std::chrono::duration<float, std::milli>(clock::now() - start).count();
 }
 
+// Wall-clock timings are shown in the debug menu: fixed-clock runs (captures, probes) report 0
+bool deterministic(entt::registry& reg) {
+    auto* args = reg.ctx().find<RunArgs>();
+    return args && args->deterministic();
 }
 
-PhysicsSys::PhysicsSys(entt::registry& reg) : System(reg) {
+FixedStepClock& fixedStepClock(entt::registry& reg) {
+    if(auto* c = reg.ctx().find<FixedStepClock>()) return *c;
+    return reg.ctx().emplace<FixedStepClock>();
+}
+
+PhysicsStats& physicsStats(entt::registry& reg) {
+    if(auto* s = reg.ctx().find<PhysicsStats>()) return *s;
+    return reg.ctx().emplace<PhysicsStats>();
+}
 
 }
 
-void PhysicsSys::preinit() {
+int FixedStepClock::stepsFor(double dt) const {
+    return std::min((int) ((accumulator + std::min(dt, 0.25)) / fixed_dt), max_steps);
+}
+
+
+
+// RigidBody
+
+void RigidBodySys::preinit() {
 
     world = &physicsWorld(reg);
-    terrain = std::make_unique<TerrainColliders>(reg, *world);
-
-    reg.ctx().emplace<PhysicsStats>();
-    reg.on_destroy<RigidBody>().connect<&PhysicsSys::destroyBody>(this);
+    physicsStats(reg);
+    reg.on_destroy<RigidBody>().connect<&RigidBodySys::destroyBody>(this);
 
 }
 
-void PhysicsSys::createBodies() {
+void RigidBodySys::tick(double dt) {
+
+    OPTICK_EVENT();
 
     auto& bodies = world->bodies();
     std::vector<entt::entity> failed;
@@ -131,7 +143,7 @@ void PhysicsSys::createBodies() {
 
 }
 
-void PhysicsSys::destroyBody(entt::registry& reg, entt::entity entity) {
+void RigidBodySys::destroyBody(entt::registry& reg, entt::entity entity) {
 
     auto& body = reg.get<RigidBody>(entity);
     JPH::BodyID id = bodyId(body);
@@ -143,17 +155,56 @@ void PhysicsSys::destroyBody(entt::registry& reg, entt::entity entity) {
 
 }
 
-void PhysicsSys::updateTerrain(int steps) {
+void RigidBodySys::finish() {
 
-    // Bounds of the moving bodies over the coming steps, and further ahead for prefetching
+    reg.on_destroy<RigidBody>().disconnect(this);
+
+    for(auto [entity, body] : reg.view<RigidBody>().each()) {
+        if(body.created() && !bodyId(body).IsInvalid()) {
+            world->bodies().RemoveBody(bodyId(body));
+            world->bodies().DestroyBody(bodyId(body));
+        }
+        body.body = JPH::BodyID().GetIndexAndSequenceNumber();
+    }
+
+}
+
+RigidBodySys::~RigidBodySys() {
+    reg.on_destroy<RigidBody>().disconnect(this);
+    world = nullptr;
+}
+
+
+
+// TerrainColliders
+
+TerrainCollidersSys::TerrainCollidersSys(entt::registry& reg) : System(reg) {
+
+}
+
+void TerrainCollidersSys::preinit() {
+    terrain = std::make_unique<TerrainColliders>(reg, physicsWorld(reg));
+    physicsStats(reg);
+}
+
+void TerrainCollidersSys::tick(double dt) {
+
+    OPTICK_EVENT();
+
+    auto& clock = fixedStepClock(reg);
+    int steps = clock.stepsFor(dt);
+    if(steps <= 0) return;
+
+    auto start = clock::now();
+
+    // Bounds of the moving bodies over the coming steps, and further ahead for prefetching. No background
+    // prefetch in fixed-clock runs: colliders are only built synchronously, when required
     std::vector<Bounds> required, prefetch;
+    const bool fixed_clock = deterministic(reg);
 
-    const auto& lock_interface = world->system().GetBodyLockInterfaceNoLock();
-    const float frame_time = steps * fixed_dt;
-
-    // No background prefetch in fixed-clock runs: colliders are only built synchronously, when required
-    auto* args = reg.ctx().find<RunArgs>();
-    const bool deterministic = args && args->deterministic();
+    auto& world = physicsWorld(reg);
+    const auto& lock_interface = world.system().GetBodyLockInterfaceNoLock();
+    const float frame_time = steps * FixedStepClock::fixed_dt;
 
     for(auto [entity, body] : reg.view<RigidBody>().each()) {
         if(body.motion != RigidBody::Motion::Dynamic || !body.created()) continue;
@@ -167,34 +218,53 @@ void PhysicsSys::updateTerrain(int steps) {
         glm::vec3 velocity = toGlm(b.GetLinearVelocity());
 
         required.push_back(grow(bounds, velocity * frame_time, 1.f));
-        if(!deterministic) prefetch.push_back(grow(bounds, velocity * lookahead, 4.f));
+        if(!fixed_clock) prefetch.push_back(grow(bounds, velocity * lookahead, 4.f));
     }
 
-    terrain->update(required, prefetch, sim_time);
+    terrain->update(required, prefetch, clock.sim_time);
 
+    auto& stats = physicsStats(reg);
+    stats.colliders_ms = fixed_clock ? 0.f : millis(start);
+    stats.terrain_cells = terrain->activeCells();
+    stats.terrain_triangles = terrain->triangles();
+
+}
+
+void TerrainCollidersSys::finish() {
+    terrain->clear();
+}
+
+TerrainCollidersSys::~TerrainCollidersSys() {
+    terrain.reset();
+}
+
+
+
+// Physics (base)
+
+void PhysicsSys::preinit() {
+    world = &physicsWorld(reg);
+    fixedStepClock(reg);
+    physicsStats(reg);
 }
 
 void PhysicsSys::tick(double dt) {
 
     OPTICK_EVENT();
 
-    auto& stats = reg.ctx().get<PhysicsStats>();
+    auto& stats = physicsStats(reg);
+    auto& clock = fixedStepClock(reg);
     auto& bodies = world->bodies();
+    const float fixed_dt = FixedStepClock::fixed_dt;
 
-    createBodies();
-
-    accumulator += std::min(dt, 0.25);
-    int steps = std::min((int) (accumulator / fixed_dt), max_steps);
+    int steps = clock.stepsFor(dt);
+    clock.accumulator += std::min(dt, 0.25);
 
     stats.steps_last_frame = steps;
 
     if(steps > 0) {
 
         auto start = clock::now();
-        updateTerrain(steps);
-        stats.colliders_ms = millis(start);
-
-        start = clock::now();
 
         for(int s = 0; s < steps; s++) {
 
@@ -205,7 +275,7 @@ void PhysicsSys::tick(double dt) {
             }
 
             world->step(fixed_dt);
-            sim_time += fixed_dt;
+            clock.sim_time += fixed_dt;
 
             for(auto [entity, body, pose] : reg.view<RigidBody, PhysicsPose>().each()) {
                 if(!body.created()) continue;
@@ -220,23 +290,18 @@ void PhysicsSys::tick(double dt) {
 
         }
 
-        stats.step_ms = millis(start);
+        stats.step_ms = deterministic(reg) ? 0.f : millis(start);
 
-        // Wall-clock timings are shown in the debug menu, keep fixed-clock captures reproducible
-        if(auto* args = reg.ctx().find<RunArgs>(); args && args->deterministic()) {
-            stats.step_ms = stats.colliders_ms = 0.f;
-        }
-
-        accumulator -= steps * fixed_dt;
-        if(accumulator > fixed_dt) {
+        clock.accumulator -= steps * fixed_dt;
+        if(clock.accumulator > fixed_dt) {
             // Too slow to keep up : let the simulation fall behind instead of spiraling
-            accumulator = 0.;
+            clock.accumulator = 0.;
         }
 
     }
 
     // Render between the last two steps
-    float alpha = (float) (accumulator / fixed_dt);
+    float alpha = (float) (clock.accumulator / fixed_dt);
     std::vector<entt::entity> fallen;
     for(auto [entity, transform, pose] : reg.view<Transform, PhysicsPose>().each()) {
         transform.position = glm::mix(pose.prev_position, pose.position, alpha);
@@ -249,32 +314,45 @@ void PhysicsSys::tick(double dt) {
 
     stats.bodies = world->system().GetNumBodies();
     stats.active_bodies = world->system().GetNumActiveBodies(JPH::EBodyType::RigidBody);
-    stats.terrain_cells = terrain->activeCells();
-    stats.terrain_triangles = terrain->triangles();
 
 }
 
-void PhysicsSys::finish() {
 
-    reg.on_destroy<RigidBody>().disconnect(this);
 
-    for(auto [entity, body] : reg.view<RigidBody>().each()) {
-        if(body.created() && !bodyId(body).IsInvalid()) {
-            world->bodies().RemoveBody(bodyId(body));
-            world->bodies().DestroyBody(bodyId(body));
-        }
-        body.body = JPH::BodyID().GetIndexAndSequenceNumber();
+// PhysicsStep (worlds)
+
+void PhysicsStepSys::preinit() {
+    world = &physicsWorld(reg);
+}
+
+void PhysicsStepSys::tick(double h) {
+
+    OPTICK_EVENT();
+
+    auto& bodies = world->bodies();
+    const int substeps = std::max(1, world->config().substeps);
+    const float step = (float) (h / substeps);
+
+    for(auto [entity, transform, body] : reg.view<Transform, RigidBody>().each()) {
+        if(body.motion != RigidBody::Motion::Kinematic || !body.created()) continue;
+        bodies.MoveKinematic(bodyId(body), JPH::RVec3(toJolt(transform.position)), toJolt(glm::normalize(transform.rotation)), (float) h);
     }
 
-    terrain->clear();
+    for(int s = 0; s < substeps; s++) {
+        world->step(step);
+    }
 
-}
-
-PhysicsSys::~PhysicsSys() {
-
-    reg.on_destroy<RigidBody>().disconnect(this);
-
-    terrain.reset();
-    world = nullptr;
+    for(auto [entity, transform, body, pose] : reg.view<Transform, RigidBody, PhysicsPose>().each()) {
+        if(!body.created()) continue;
+        JPH::RVec3 position;
+        JPH::Quat rotation;
+        bodies.GetPositionAndRotation(bodyId(body), position, rotation);
+        pose.prev_position = pose.position;
+        pose.prev_rotation = pose.rotation;
+        pose.position = toGlm(JPH::Vec3(position));
+        pose.rotation = toGlm(rotation);
+        transform.position = pose.position;
+        transform.rotation = pose.rotation;
+    }
 
 }

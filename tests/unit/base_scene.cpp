@@ -9,7 +9,7 @@ using namespace dy;
 
 TEST_SUITE("unit") {
 
-TEST_CASE("T1.5 base resolves to master's system order as registry names") {
+TEST_CASE("T2.4 base system list after the PhysicsSys split (T1.5 updated)") {
 
     test::registerViewSystemStubs();
 
@@ -20,10 +20,12 @@ TEST_CASE("T1.5 base resolves to master's system order as registry names") {
     for(auto& e : def.host_pre) set.add(SystemSet::List::Pre, findSystem(e.name)->make(reg, e.params), e.phase, e.name);
     for(auto& e : def.host_post) set.add(SystemSet::List::Post, findSystem(e.name)->make(reg, e.params), e.phase, e.name);
 
-    // master's Game::start, with SceneSys replaced by BoxRing, ModelLineup, BoxThrower where it was
+    // master's Game::start, SceneSys replaced by BoxRing, ModelLineup, BoxThrower where it was (T1.5), and
+    // PhysicsSys split into RigidBody, TerrainColliders, Physics (P2)
     CHECK(set.names(SystemSet::List::Pre) == std::vector<std::string> {
         "Input", "UI", "Time", "PlayerControl", "VRControl", "DebugMenu",
-        "ChunkManager", "ChunkGenerator", "BoxRing", "ModelLineup", "BoxThrower", "Physics" });
+        "ChunkManager", "ChunkGenerator", "BoxRing", "ModelLineup", "BoxThrower",
+        "RigidBody", "TerrainColliders", "Physics" });
     CHECK(set.names(SystemSet::List::Post) == std::vector<std::string> { "Terrain" });
 
     REQUIRE(def.renderer);

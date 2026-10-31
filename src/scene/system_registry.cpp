@@ -97,7 +97,10 @@ void dy::registerSimSystems() {
 
     registerSystem("ChunkManager", systemInfo<ChunkManagerSys>(SystemScope::Host));
     registerSystem("ChunkGenerator", systemInfo<ChunkGeneratorSys>(SystemScope::Host));
+    registerSystem("RigidBody", systemInfo<RigidBodySys>(SystemScope::Both));
+    registerSystem("TerrainColliders", systemInfo<TerrainCollidersSys>(SystemScope::Host));
     registerSystem("Physics", systemInfo<PhysicsSys>(SystemScope::Host));
+    registerSystem("PhysicsStep", systemInfo<PhysicsStepSys>(SystemScope::World));
 
     registerSimComponents();
 
