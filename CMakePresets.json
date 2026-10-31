@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "configurePresets": [
     {
       "name": "vcpkg",
@@ -8,6 +8,43 @@
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
       }
+    },
+    {
+      "name": "ci",
+      "inherits": "vcpkg",
+      "description": "No viewer: needs neither the Vulkan SDK nor glslangValidator",
+      "binaryDir": "${sourceDir}/build/ci",
+      "cacheVariables": {
+        "DYNAMICAL_BUILD_VIEWER": "OFF",
+        "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "vcpkg-relwithdebinfo",
+      "configurePreset": "vcpkg",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci",
+      "configuration": "RelWithDebInfo"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "vcpkg-relwithdebinfo",
+      "configurePreset": "vcpkg",
+      "configuration": "RelWithDebInfo",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci",
+      "configuration": "RelWithDebInfo",
+      "output": { "outputOnFailure": true },
+      "filter": { "include": { "label": "unit|scenario|protocol" } }
     }
   ]
 }

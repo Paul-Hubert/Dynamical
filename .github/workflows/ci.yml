@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      # vcpkg binary cache kept in the GitHub Actions cache (the x-gha provider is gone from vcpkg)
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg-cache,readwrite
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: vcpkg at the manifest baseline
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$env:VCPKG_ROOT"
+          git -C "$env:VCPKG_ROOT" checkout b5d1a94fb7f88fd835e360fd23a45a09ceedbf48
+          & "$env:VCPKG_ROOT/bootstrap-vcpkg.bat" -disableMetrics
+          New-Item -ItemType Directory -Force vcpkg-cache | Out-Null
+
+      - uses: actions/cache@v4
+        with:
+          path: vcpkg-cache
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'ports/**') }}
+          restore-keys: vcpkg-${{ runner.os }}-
+
+      - name: Configure
+        run: cmake --preset ci
+
+      - name: Build
+        run: cmake --build --preset ci --parallel
+
+      - name: Test (unit, scenario, protocol)
+        run: ctest --preset ci

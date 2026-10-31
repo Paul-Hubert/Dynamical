@@ -6,23 +6,33 @@
     "glm",
     "joltphysics",
     "nlohmann-json",
-    {
-      "name": "openxr-loader",
-      "features": [
-        "vulkan"
-      ]
-    },
-    {
-      "name": "sdl2",
-      "features": [
-        "vulkan"
-      ]
-    },
     "stb",
-    "taskflow",
-    "tinygltf",
-    "vulkan"
+    "taskflow"
   ],
+  "default-features": [
+    "viewer"
+  ],
+  "features": {
+    "viewer": {
+      "description": "dynamical: Vulkan, SDL2, OpenXR and glTF",
+      "dependencies": [
+        {
+          "name": "openxr-loader",
+          "features": [
+            "vulkan"
+          ]
+        },
+        {
+          "name": "sdl2",
+          "features": [
+            "vulkan"
+          ]
+        },
+        "tinygltf",
+        "vulkan"
+      ]
+    }
+  },
   "overrides": [
     {
       "name": "tinygltf",

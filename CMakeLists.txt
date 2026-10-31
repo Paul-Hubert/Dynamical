@@ -4,15 +4,20 @@ set(CMAKE_CXX_STANDARD 20)
 
 project(dynamical)
 
+option(DYNAMICAL_BUILD_VIEWER "Build dynamical (Vulkan, SDL, OpenXR, shaders)" ON)   # OFF in CI
 option(DYNAMICAL_BUILD_TOOLS "Build offline tools (grass raycast baker)" OFF)
 
 set(FASTNOISE2_NOISETOOL OFF CACHE BOOL "Build Noise Tool" FORCE)
 add_subdirectory(lib/FastNoise2)
 
-add_subdirectory(lib/VulkanMemoryAllocator)
-
 include_directories("./src")
 include_directories("./lib")
+
+find_path(STB_INCLUDE_DIRS "stb_image.h")
+
+if (DYNAMICAL_BUILD_VIEWER)
+
+add_subdirectory(lib/VulkanMemoryAllocator)
 
 file(GLOB_RECURSE sources ./src/main.cpp ./src/*.cpp ./src/*.h)
 
@@ -49,7 +54,6 @@ target_link_libraries(dynamical PRIVATE OpenXR::headers OpenXR::openxr_loader)
 find_package(nlohmann_json CONFIG REQUIRED)
 target_link_libraries(dynamical PRIVATE nlohmann_json::nlohmann_json)
 
-find_path(STB_INCLUDE_DIRS "stb_image.h")
 target_include_directories(dynamical PRIVATE ${STB_INCLUDE_DIRS})
 
 find_path(CEREAL_INCLUDE_DIRS "cereal")
@@ -116,6 +120,8 @@ add_custom_target(
     )
 
 add_dependencies(dynamical shaders)
+
+endif()
 
 ### IMAGE COMPARISON (visual tests)
 add_library(imgdiff_core STATIC tools/imgdiff/imgdiff.cpp tools/imgdiff/stb_impl.cpp)
