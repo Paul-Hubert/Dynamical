@@ -30,6 +30,12 @@ def main():
     means = [statistics.mean(runs[n]) for n in envs]
     sds = [statistics.stdev(runs[n]) if len(runs[n]) > 1 else 0.0 for n in envs]
     ax.errorbar(envs, means, yerr=sds, color="#1f3f8f", marker="o", capsize=4, label="TrainingEnv.exe mode=null (mean ± sd)", zorder=4)
+    # Supplementary: the walker's PPO network and batch (bench_null.py --tag _walker), when measured
+    walker = ROOT / "build" / "artifacts" / "P3" / "bench_null_walker.csv"
+    if walker.exists():
+        wrows = [r for r in csv.DictReader(open(walker)) if r["steps_per_s"] not in ("", "None")]
+        ax.scatter([int(r["envs"]) for r in wrows], [float(r["steps_per_s"]) for r in wrows], color="#dd8452", marker="s", s=40,
+                   label="mode=null, the walker's PPO settings without GAIL", zorder=4)
     ax.axhline(UNITY_REFERENCE, color="#c44e52", linestyle="--", label="Unity build, 20 envs (≈424 steps/s)")
     ax.set_xlabel("envs (TrainingEnv.exe processes, 25 agents each)")
     ax.set_ylabel("trainer steps/s")
@@ -37,7 +43,7 @@ def main():
     ax.set_xticks(envs)
     ax.set_ylim(bottom=0)
     ax.grid(alpha=0.3)
-    ax.legend(loc="lower right")
+    ax.legend(loc="center", fontsize=8)
     out = ROOT / "build" / "artifacts" / "P3" / "plots"
     out.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()

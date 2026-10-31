@@ -70,7 +70,9 @@ Tests: P3.1–P3.5 (protocol), L3.1 (slow, `tools/train_smoke.py`), B3.1 (`tools
 | P3.5 | done | efcd032 | log file sink, CTRL_C |
 | P3.6 | done | 1d901b9 | `mode=null` |
 | P3.7 | done | e063bd0 | `MockTrainer` |
-| P3.8 | done | (this commit) | `train_smoke.py` |
+| P3.8 | done | ba64243 | `train_smoke.py` |
+
+| P3 gate | done | (exit gate commit) | unit 28, scenario 5, protocol 8, gpu 10, slow 1; B3.1 and the M0 note in benchmarks.md; report `reports/P3.md` |
 
 P3.1–P3.7 were written together while gRPC built; each commit holds its step's files, and only the P3.7 commit
 builds on its own (the CMake of P3.1 already names the later sources).

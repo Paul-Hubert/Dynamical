@@ -35,6 +35,8 @@ def main():
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--steps", type=int, default=60000)
     parser.add_argument("--env", default=str(ROOT / "build" / "RelWithDebInfo" / "TrainingEnv"))
+    parser.add_argument("--config", default=str(ROOT / "tests" / "data" / "null_ppo.yaml"))
+    parser.add_argument("--tag", default="", help="suffix of the run ids and the CSV name")
     parser.add_argument("--append", action="store_true", help="append the summary to benchmarks.md")
     args = parser.parse_args()
 
@@ -43,15 +45,15 @@ def main():
     rows = []
     for n in args.envs:
         for r in range(args.runs):
-            run_id = f"bench_null_{n}env_{r}"
+            run_id = f"bench_null{args.tag}_{n}env_{r}"
             code, text, seconds = run_trainer(args.env, n, args.steps, out / "bench", run_id, 6005 + 100 * r + n,
-                                              ROOT / "tests" / "data" / "null_ppo.yaml", timeout=3600)
+                                              args.config, timeout=3600)
             (out / "bench" / f"{run_id}.console.txt").write_text(text)
             steps_per_s, points = rate(text)
             print(f"{n} envs, run {r}: exit {code}, {steps_per_s} steps/s over {len(points)} summaries, {seconds:.0f} s wall", flush=True)
             rows.append({"envs": n, "run": r, "exit": code, "steps_per_s": steps_per_s, "summaries": len(points), "wall_s": round(seconds, 1)})
 
-    with open(out / "bench_null.csv", "w", newline="") as f:
+    with open(out / f"bench_null{args.tag}.csv", "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)

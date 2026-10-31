@@ -188,6 +188,15 @@ if (DYNAMICAL_TESTS)
         add_test(NAME "T1.7 dynamical_train from another directory writes relative outputs there and no config.6.json"
             COMMAND ${CMAKE_COMMAND} -DEXE=$<TARGET_FILE:dynamical_train> -DWORK=${CMAKE_BINARY_DIR}/artifacts/P1/train_cwd -P ${CMAKE_SOURCE_DIR}/tests/train_cwd.cmake)
         set_tests_properties("T1.7 dynamical_train from another directory writes relative outputs there and no config.6.json" PROPERTIES LABELS scenario)
+
+        # [slow] the real trainer, when build/venv holds the fork's ML-Agents (tools/setup_venv.py)
+        set(VENV_PYTHON ${CMAKE_BINARY_DIR}/venv/Scripts/python.exe)
+        if (EXISTS ${VENV_PYTHON})
+            add_test(NAME "L3.1 mlagents-learn trains 2000 steps against TrainingEnv.exe mode=null"
+                COMMAND ${VENV_PYTHON} ${CMAKE_SOURCE_DIR}/tools/train_smoke.py --steps 2000
+                    --env $<TARGET_FILE_DIR:dynamical_train>/${DYNAMICAL_TRAIN_NAME} --results ${CMAKE_BINARY_DIR}/artifacts/P3/smoke)
+            set_tests_properties("L3.1 mlagents-learn trains 2000 steps against TrainingEnv.exe mode=null" PROPERTIES LABELS slow RUN_SERIAL TRUE)
+        endif()
     endif()
 
     # Visual and probe tests run dynamical: they need a GPU (label gpu, not run in CI)

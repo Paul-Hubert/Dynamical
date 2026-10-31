@@ -1,0 +1,25 @@
+# The walker's PPO settings (Unity repo mlagents-config/default-training.yaml) without GAIL, which needs demos:
+# the trainer's cost per step at the real network size, against TrainingEnv.exe mode=null (B3.1 supplementary).
+behaviors:
+  HeidelBotBehavior:
+    trainer_type: ppo
+    hyperparameters:
+      batch_size: 5000
+      buffer_size: 50000
+      learning_rate: 3.0e-4
+      beta: 4.0e-5
+      epsilon: 0.2
+      num_epoch: 2
+    network_settings:
+      deterministic: false
+      normalize: true
+      hidden_units: 512
+      num_layers: 3
+    reward_signals:
+      extrinsic:
+        strength: 1
+        gamma: 0.95
+    threaded: false
+    max_steps: 400000
+    time_horizon: 200
+    summary_freq: 10000
