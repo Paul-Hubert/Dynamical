@@ -1,0 +1,1 @@
+{ "host": { "pre": [ { "name": "TestHost", "params": { "x": "${nope}" } } ] } }

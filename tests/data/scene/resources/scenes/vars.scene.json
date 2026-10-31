@@ -1,0 +1,31 @@
+{
+  // comments are allowed
+  "format_version": 1,
+  "name": "vars",
+  "include": ["common/frag.json", "common/desktop.json"],
+  "variables": {
+    "n":      { "type": "int",    "default": 4 },
+    "speed":  { "type": "float",  "default": 1.5 },
+    "on":     { "type": "bool",   "default": true },
+    "label":  { "type": "string", "default": "abc" },
+    "params": { "type": "string", "default": "params/test.params.json" }
+  },
+  "renderer": { "passes": ["terrain", "model", "ui"], "vr": false },
+  "host": {
+    "pre": [
+      "TestInput",
+      { "name": "TestHost", "params": { "n": "${n}", "speed": "${speed}", "on": "${on}", "label": "run_${label}_${n}",
+                                        "rate": "${params}#physics_hz", "nested": "${params}#/clock/control_hz" } },
+      "TestUI"
+    ],
+    "post": ["TestBoth"]
+  },
+  "templates": {
+    "t": {
+      "physics": { "threads": 1 },
+      "fixed": ["TestWorld@act", "TestBoth", "TestWorld@observe"],
+      "entities": [ { "prefab": "crate", "RigidBody": { "friction": 0.25 } } ]
+    }
+  },
+  "worlds": [ { "template": "t", "count": "${n}", "systems": { "replace": { "TestWorld@act": "TestBoth@act" } } } ]
+}

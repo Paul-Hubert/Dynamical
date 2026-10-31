@@ -8,7 +8,7 @@
 // The simulation library must stay free of graphics, window and headset code (architecture.md)
 TEST_SUITE("unit") {
 
-TEST_CASE("T1.1 header boundary: dynamical_sim sources name no vulkan, SDL, imgui, openxr or renderer/") {
+TEST_CASE("T1.1 header boundary: dynamical_sim sources name no vulkan SDL imgui openxr or renderer/") {
 
     const char* dirs[] = { "src/logic", "src/physics", "src/scene", "src/util", "src/agent" };
     const char* words[] = { "vulkan", "SDL", "imgui", "openxr", "renderer/" };

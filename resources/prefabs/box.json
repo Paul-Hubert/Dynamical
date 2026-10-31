@@ -1,0 +1,5 @@
+{
+  "Transform": {},
+  "RigidBody": { "motion": "dynamic", "shape": "box", "half_extent": [0.5, 0.5, 0.5] },
+  "ModelRef": { "path": "models/box.gltf" }
+}

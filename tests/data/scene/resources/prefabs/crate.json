@@ -1,0 +1,1 @@
+{ "extends": "base_box", "RigidBody": { "half_extent": [0.25, 0.25, 0.25] } }

@@ -6,7 +6,7 @@ using namespace dy;
 
 TEST_SUITE("unit") {
 
-TEST_CASE("RunArgs parses scene, process, capture and probe keys") {
+TEST_CASE("RunArgs parses scene process capture and probe keys") {
     auto r = parseRunArgs({ "scene=base", "var.num_worlds=4", "mode=bench", "threads=8", "ticks=600", "episodes=3",
         "capture=tests/capture/base.capture.json", "capture_dir=out", "window_hidden=false", "exit_after_capture=0",
         "probe=p.csv", "probe_entities=RigidBody", "probe_every=30" });

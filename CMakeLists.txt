@@ -133,6 +133,7 @@ if (DYNAMICAL_TESTS)
 
     file(GLOB_RECURSE test_sources CONFIGURE_DEPENDS ./tests/*.cpp)
     add_executable(dynamical_tests ${test_sources})
+    target_include_directories(dynamical_tests PRIVATE tests)
     target_link_libraries(dynamical_tests PRIVATE dynamical_sim doctest::doctest imgdiff_core)
 
     # doctest test suites (unit, scenario, protocol) become CTest labels

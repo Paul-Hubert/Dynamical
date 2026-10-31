@@ -1,0 +1,1 @@
+{ "templates": { "t": { "entities": [ { "RigidBody": { "half_extent": [1, 2] } } ] } } }

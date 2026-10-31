@@ -1,0 +1,1 @@
+{ "Transform": {}, "RigidBody": { "shape": "box", "friction": 1.0 }, "ModelRef": { "path": "models/box.gltf" } }

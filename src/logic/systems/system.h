@@ -3,11 +3,16 @@
 
 #include "entt/entt.hpp"
 
+#include <cstdint>
 #include <iostream>
 
 #include "extra/optick/optick.h"
 
 namespace dy {
+
+// When a system of a world's fixed lane runs within a decision window (simulation.md):
+// Every tick, Act on the first tick only, Observe on the last tick only
+enum class Phase : uint8_t { Every, Act, Observe };
     
 class System {
 public:

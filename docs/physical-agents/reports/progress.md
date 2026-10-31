@@ -30,8 +30,8 @@ Tests: T1.1, T1.3, T1.4, T1.5, T1.6 (unit), T1.2 (unit, import table), T1.7 (sce
 | P1.1 | done | 80b9934 | `vulkan.h` out of `system.h` |
 | P1.2 | done | 9a001d1 | `TimeSys` to the executable |
 | P1.3 | done | 853ed19 | CMake targets and library-boundary moves |
-| P1.4 | done | (this commit) | T1.1 header boundary |
-| P1.5 | | | scene core, registries, prefabs |
+| P1.4 | done | 6748c55 | T1.1 header boundary |
+| P1.5 | done | (this commit) | scene core, registries, prefabs |
 | P1.6 | | | `SystemSet` fixed lane |
 | P1.7 | | | renderer pass list from the scene |
 | P1.8 | | | `base.scene.json` |
