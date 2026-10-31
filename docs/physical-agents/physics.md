@@ -104,13 +104,13 @@ One `SwingTwistConstraint` per joint, in `LocalToBodyCOM` space, pivot at the ch
 
 ### Drives
 
-- **Motors.** Swing and twist motors in `EMotorState::Position`, sharing one stiffness and damping per
+- **Motors.** Swing and twist motors in `EMotorState::PositionAndVelocity`, sharing one stiffness and damping per
   joint. This is the closest Jolt match to Unity's isotropic SLERP spring–damper.
 - **Torque limit** from `maxTorque` (200000 means effectively unlimited).
 - **Targets** per tick from `HeldDrive`: `SetTargetOrientationCS(q)` with q = swing · twist relative to
-  rest, and the motor target angular velocity from the ω actions. **Stock Jolt position motors ignore
-  the target angular velocity** (they damp toward zero). Patch P-B makes the damper act on
-  `ω_rel − ω_target`, as Unity's SLERP drive does ([jolt-readouts.md](jolt-readouts.md#2-drive-semantics-position-motors-ignore-the-target-angular-velocity)).
+  rest, and the motor target angular velocity from the ω actions. Motor state
+  **`EMotorState::PositionAndVelocity`** (Jolt 5.6.0): the damper acts on `ω_rel − ω_target`, as Unity's
+  SLERP drive does. Plain `Position` ignores the target velocity; on 5.5 this needed patch P-B ([jolt-readouts.md](jolt-readouts.md#2-drive-semantics-position-motors-ignore-the-target-angular-velocity)).
 - **Force mode.** Torque is not scaled by inertia, as in Unity's force-mode drive.
 - **Gain scale.** Jolt motor stiffness and damping are not Unity spring units, so M2 re-derives a
   scale factor (`drive_gain_scale` in the params) from step-response tests. The default mean gains
@@ -162,7 +162,7 @@ M2 checks (Jolt doc §8):
 2. ground reaction force from momentum;
 3. closure residual under 1–2 %.
 
-**Verified for Jolt 5.5** ([jolt-readouts.md](jolt-readouts.md)):
+**Verified for Jolt 5.5 and upstream 5.6** ([jolt-readouts.md](jolt-readouts.md)):
 - motor, limit and point lambdas are public and hold the impulse of the last collision step;
 - the recorder sub-steps itself (`Update(h_sub, 1)`) and reads them after each call;
 - motor axes are rebuilt from public data;
@@ -184,9 +184,10 @@ M2 checks (Jolt doc §8):
 
 ## Jolt build
 
-- vcpkg `joltphysics` 5.5 is already in use. The consumer's compile definitions must match the port
+- vcpkg `joltphysics` 5.5 is in use today. The consumer's compile definitions must match the port
   (`JPH_*` flags propagated by `Jolt::Jolt`).
-- **A vcpkg overlay port** (`ports/joltphysics`, 5.5.0) carries patches P-A (limit axes), P-B (target
-  velocity in position motors) and P-C (contact impulse listener)
+- **Jolt 5.6.0** (vcpkg baseline bump) with a vcpkg overlay port (`ports/joltphysics`) carrying patches
+  P-A (limit axes) and P-C (post-solve contact impulse listener, written for 5.6's per-manifold friction).
+  GPU compute options off
   ([jolt-readouts.md](jolt-readouts.md#5-recommended-setup)). The same overlay can set
   cross-platform determinism (`CROSS_PLATFORM_DETERMINISTIC`), which the stock port may not expose. It is optional while training is Windows-only.

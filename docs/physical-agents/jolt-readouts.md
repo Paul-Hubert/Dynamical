@@ -1,4 +1,4 @@
-# Jolt 5.5 readouts: constraint forces, contact impulses, friction
+# Jolt readouts: constraint forces, contact impulses, friction (5.5 verified, 5.6 upstream checked)
 
 *Verified 2026-10-31 against the Jolt source vcpkg builds:
 `$VCPKG_ROOT/buildtrees/joltphysics/src/v5.5.0-ca68e48c31.clean/Jolt/`. Paths below are relative to
@@ -13,6 +13,36 @@
 | Contact impulses (normal + 2 friction axes) after the solve | **Computed, but not exposed.** Stored in private caches | A post-solve callback or accessor (~30 lines) |
 | Friction recoverable without the patch | **Yes, per body, as a total.** Foot momentum balance minus joint impulses gives the full contact impulse; on flat ground its horizontal part is friction | Per contact point with the patch |
 | Unity-like SLERP damping toward a target angular velocity | **No.** Position motors ignore the target velocity | One argument (2 lines) |
+
+## 0. Upstream status: Jolt master and v5.6.0
+
+*Checked 2026-10-31 against `jrouwe/JoltPhysics` master @ `bb3e363` (2026-10-30, version 5.6.1
+unreleased) and the release notes for **v5.6.0** (tag `e77f175`). vcpkg master ships `joltphysics`
+**5.6.0#1**; this repo's baseline still pins 5.5.0.*
+
+| Need | Upstream | Consequence |
+|---|---|---|
+| Target angular velocity in position motors (P-B) | **In v5.6.0:** `EMotorState::PositionAndVelocity` gives `F = k·(target − current) + c·(ω_target − ω)` (`MotorSettings.h`). `SwingTwistConstraint` passes `-mTargetAngularVelocity[i]` as the bias (`SwingTwistConstraint.cpp:298`, `:340`). It is enabled when the spring has stiffness **or** damping, so a zero spring with non-zero damping still damps toward the target, as Unity does when the spring action is −1. Same soft-constraint math as derived in §2 | **P-B is not needed on 5.6.0.** Use `PositionAndVelocity` |
+| Limit-axis accessors (P-A) | Not present. The axes are still private members of `SwingTwistConstraintPart` | P-A is still needed |
+| Post-solve contact impulses (P-C) | Not present. `ContactListener` still has only Validate / Added / Persisted / Removed. `PhysicsSystem` exposes no contact manager. The lambdas still go only into private caches via `sStoreAppliedImpulses` | P-C is still needed |
+| `EstimateCollisionResponse` | A public helper that **estimates** contact impulses from a manifold, called in `OnContactAdded`, before the solve. In 5.6 it returns 2 linear + 1 angular friction impulse | Not a post-solve readout; unusable for exact books |
+| Upstream friction model | **Changed in v5.6.0.** Friction is no longer per contact point. Per manifold there are 2 linear constraints plus 1 angular (torsional) constraint at the **average contact point**, bounded by μ·Σλ_n and μ·Σ(r_i·λ_n,i). Cached as `mFrictionLambda[2]` + `mAngularFrictionLambda` per manifold (`ContactConstraintManager.h:306-307`) | The P-C payload becomes: per point `λ_n` and position; per manifold the two friction lambdas, the angular friction lambda, the average point and the tangents. The momentum balance (§4) is unaffected. The model resembles PhysX's patch friction (Unity used improved patch friction), which is good for feet |
+
+**Other 5.6.0 changes that matter:**
+- 5.6.0 adds GPU compute interfaces (`JPH_USE_DX12`, `JPH_USE_VK`, `JPH_USE_MTL`, `JPH_USE_CPU_COMPUTE`)
+  and GPU hair. Build the port with these **off**; the engine owns its own Vulkan device.
+- The friction-model change shifts the simulation slightly (APIChanges, 20260531).
+- **Master only (unreleased):** `PhysicsSettings::mDeterministicSimulation` is removed (the simulation
+  is always deterministic), and the warm-start impulse ratio is clamped for uneven time steps.
+
+**Recommendation.**
+- **Move to 5.6.0 before M2.** This is a vcpkg baseline bump, plus an overlay only for the remaining
+  patches.
+- Use `PositionAndVelocity` and drop P-B.
+- Write P-A and P-C against 5.6.0's per-manifold friction layout.
+- Propose P-C upstream as a post-solve contact callback. The same request covers P-A.
+- Master's base scene only uses `RigidBody` boxes and spheres plus terrain mesh colliders, so the bump
+  should be source-compatible. Re-run S1's `base` check after it.
 
 ## 1. Joint constraint impulses per sub-step
 
