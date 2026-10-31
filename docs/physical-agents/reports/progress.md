@@ -27,8 +27,8 @@ Tests: T1.1, T1.3, T1.4, T1.5, T1.6 (unit), T1.2 (unit, import table), T1.7 (sce
 
 | Step | Status | Commit | Note |
 |---|---|---|---|
-| P1.1 | done | (this commit) | `vulkan.h` out of `system.h` |
-| P1.2 | | | `TimeSys` to the executable |
+| P1.1 | done | 80b9934 | `vulkan.h` out of `system.h` |
+| P1.2 | done | (this commit) | `TimeSys` to the executable |
 | P1.3 | | | CMake targets and library-boundary moves |
 | P1.4 | | | T1.1 header boundary |
 | P1.5 | | | scene core, registries, prefabs |

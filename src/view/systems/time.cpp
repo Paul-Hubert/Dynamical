@@ -1,6 +1,6 @@
-#include "system_list.h"
+#include "logic/systems/system_list.h"
 
-#include "logic/components/time.h"
+#include "view/components/time.h"
 #include "logic/components/input.h"
 
 #include <imgui/imgui.h>
