@@ -117,6 +117,25 @@ add_custom_target(
 
 add_dependencies(dynamical shaders)
 
+### TESTS
+option(DYNAMICAL_TESTS "Build the tests" ON)
+if (DYNAMICAL_TESTS)
+    enable_testing()
+    find_package(doctest CONFIG REQUIRED)
+    include(${doctest_DIR}/doctest.cmake)
+
+    file(GLOB_RECURSE test_sources ./tests/*.cpp)
+    add_executable(dynamical_tests ${test_sources})
+    target_link_libraries(dynamical_tests PRIVATE doctest::doctest)
+    if (MSVC)
+        target_compile_options(dynamical_tests PRIVATE /bigobj /utf-8)
+        target_compile_definitions(dynamical_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
+    endif()
+
+    # doctest test suites (unit, scenario, protocol) become CTest labels
+    doctest_discover_tests(dynamical_tests ADD_LABELS 1 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()
+
 ### TOOLS
 if (DYNAMICAL_BUILD_TOOLS)
     # Bakes resources/raycast_data.bin, the lookup texture used by the grass shader

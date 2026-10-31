@@ -1,6 +1,7 @@
 {
   "dependencies": [
     "cereal",
+    "doctest",
     "entt",
     "glm",
     "joltphysics",
