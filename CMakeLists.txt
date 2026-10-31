@@ -117,6 +117,15 @@ add_custom_target(
 
 add_dependencies(dynamical shaders)
 
+### IMAGE COMPARISON (visual tests)
+add_library(imgdiff_core STATIC tools/imgdiff/imgdiff.cpp tools/imgdiff/stb_impl.cpp)
+target_include_directories(imgdiff_core PUBLIC tools ${STB_INCLUDE_DIRS})
+add_executable(imgdiff tools/imgdiff/main.cpp)
+target_link_libraries(imgdiff PRIVATE imgdiff_core)
+if (MSVC)
+    target_compile_definitions(imgdiff_core PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+
 ### TESTS
 option(DYNAMICAL_TESTS "Build the tests" ON)
 if (DYNAMICAL_TESTS)
@@ -128,7 +137,7 @@ if (DYNAMICAL_TESTS)
     file(GLOB_RECURSE test_sources ./tests/*.cpp)
     add_executable(dynamical_tests ${test_sources} src/scene/run_args.cpp src/util/log.cpp)
     target_include_directories(dynamical_tests PRIVATE src)
-    target_link_libraries(dynamical_tests PRIVATE doctest::doctest)
+    target_link_libraries(dynamical_tests PRIVATE doctest::doctest imgdiff_core)
     if (MSVC)
         target_compile_options(dynamical_tests PRIVATE /bigobj /utf-8)
         target_compile_definitions(dynamical_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
