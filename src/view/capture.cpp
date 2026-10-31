@@ -9,6 +9,9 @@
 #include <filesystem>
 #include <fstream>
 
+#include <SDL.h>
+#include <imgui/imgui.h>
+
 #include "logic/components/camera.h"
 #include "logic/terrain/chunk.h"
 #include "scene/run_args.h"
@@ -59,6 +62,25 @@ Capture::Capture(entt::registry& reg, const RunArgs& args) : reg(reg), directory
             }
             shots.push_back(shot);
         }
+        if(script.contains("input")) {
+            for(auto& j : script["input"]) {
+                InputEvent event;
+                event.frame = j.at("frame").get<uint64_t>();
+                event.key = j.value("key", "");
+                event.button = j.value("button", "");
+                event.down = j.value("down", true);
+                if(j.contains("mouse")) event.mouse = glm::vec2(j["mouse"].at(0).get<float>(), j["mouse"].at(1).get<float>());
+                if(!event.key.empty() && SDL_GetScancodeFromName(event.key.c_str()) == SDL_SCANCODE_UNKNOWN) {
+                    error = "capture script " + args.capture + ": unknown key " + event.key;
+                    return;
+                }
+                if(!event.button.empty() && event.button != "left" && event.button != "right" && event.button != "middle") {
+                    error = "capture script " + args.capture + ": unknown mouse button " + event.button;
+                    return;
+                }
+                inputs.push_back(event);
+            }
+        }
     } catch(const std::exception& e) {
         error = "capture script " + args.capture + ": " + e.what();
         return;
@@ -69,7 +91,36 @@ Capture::Capture(entt::registry& reg, const RunArgs& args) : reg(reg), directory
 
 }
 
+void Capture::sendInput(uint64_t frame) {
+
+    for(auto& in : inputs) {
+        if(in.frame != frame) continue;
+        if(in.mouse) ImGui::GetIO().MousePos = ImVec2(in.mouse->x, in.mouse->y);
+        SDL_Event e {};
+        if(!in.key.empty()) {
+            e.type = in.down ? SDL_KEYDOWN : SDL_KEYUP;
+            e.key.state = in.down ? SDL_PRESSED : SDL_RELEASED;
+            e.key.keysym.scancode = SDL_GetScancodeFromName(in.key.c_str());
+            SDL_PushEvent(&e);
+        }
+        if(!in.button.empty()) {
+            e = {};
+            e.type = in.down ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+            e.button.state = in.down ? SDL_PRESSED : SDL_RELEASED;
+            e.button.button = in.button == "left" ? SDL_BUTTON_LEFT : in.button == "right" ? SDL_BUTTON_RIGHT : SDL_BUTTON_MIDDLE;
+            if(in.mouse) {
+                e.button.x = (int) in.mouse->x;
+                e.button.y = (int) in.mouse->y;
+            }
+            SDL_PushEvent(&e);
+        }
+    }
+
+}
+
 void Capture::beginFrame(uint64_t frame) {
+
+    sendInput(frame);
 
     auto& camera = reg.ctx().get<Camera>();
     if(!have_spawn) {
@@ -81,6 +132,9 @@ void Capture::beginFrame(uint64_t frame) {
 
     if(done()) return;
     const Shot& shot = shots[next];
+
+    // A shot without a camera leaves the camera where it is (scripted input may move it)
+    if(!shot.pos && !shot.offset && !shot.look_at && !shot.yaw && !shot.pitch) return;
 
     camera.position = shot.pos.value_or(spawn_position) + shot.offset.value_or(glm::vec3(0.f));
     camera.yaw = shot.yaw.value_or(spawn_yaw);

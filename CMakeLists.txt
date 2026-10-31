@@ -182,7 +182,10 @@ if (DYNAMICAL_TESTS)
         add_test(NAME "S1.1 base scene probe matches the P0 probe"
             COMMAND ${VISUAL_TEST} probe --exe $<TARGET_FILE:dynamical> --out ${ARTIFACTS}/P1/probe --runs 1 --tol 1e-5
                 --golden ${CMAKE_SOURCE_DIR}/tests/golden/base_probe.csv -- scene=base probe_entities=RigidBody probe_every=60 ticks=900)
+        add_test(NAME "P1 check: scripted input flies the camera, throws a box and toggles the grass"
+            COMMAND ${VISUAL_TEST} shots --exe $<TARGET_FILE:dynamical> --script ${CAPTURES}/base_interactive.capture.json --out ${ARTIFACTS}/P1/interactive)
         set_tests_properties(
+            "P1 check: scripted input flies the camera, throws a box and toggles the grass"
             "V1.1 base scene captures match the P0 goldens"
             "S1.1 base scene probe matches the P0 probe"
             "V0.1 base captures are deterministic"

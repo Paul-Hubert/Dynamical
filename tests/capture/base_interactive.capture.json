@@ -1,0 +1,18 @@
+{
+  "scene": "base",
+  "input": [
+    { "frame": 601, "key": "W", "down": true },
+    { "frame": 661, "key": "W", "down": false },
+    { "frame": 680, "button": "left", "down": true, "mouse": [800, 450] },
+    { "frame": 682, "button": "left", "down": false, "mouse": [800, 450] },
+    { "frame": 708, "mouse": [107, 160] },
+    { "frame": 710, "button": "left", "down": true, "mouse": [107, 160] },
+    { "frame": 712, "button": "left", "down": false, "mouse": [107, 160] }
+  ],
+  "shots": [
+    { "frame": 600, "name": "interactive_start" },
+    { "frame": 670, "name": "interactive_flown" },
+    { "frame": 700, "name": "interactive_thrown" },
+    { "frame": 730, "name": "interactive_grass_off" }
+  ]
+}

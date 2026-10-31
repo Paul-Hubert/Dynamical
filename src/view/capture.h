@@ -20,6 +20,10 @@ struct RunArgs;
 //                                 "camera": { "pos": [x, y, z], "look_at": [x, y, z] } } ] }
 // camera (optional, else the spawn camera): pos with look_at or yaw / pitch (radians), or offset from the spawn
 // camera position. The camera of a shot is held from the frame after the previous shot.
+//
+// "input": [ { "frame": 610, "key": "W", "down": true }, { "frame": 700, "button": "left", "down": true, "mouse": [x, y] } ]
+// Scripted input goes through SDL's event queue, so InputSys and the systems after it see it as real input.
+// "mouse" places ImGui's cursor (the hidden window never has the OS cursor); the OS cursor is not touched.
 class Capture {
 public:
     Capture(entt::registry& reg, const RunArgs& args);
@@ -39,6 +43,16 @@ public:
     static constexpr uint64_t max_wait = 1200;
 
 private:
+    struct InputEvent {
+        uint64_t frame = 0;
+        std::string key;            // SDL scancode name
+        std::string button;         // left, right, middle
+        bool down = true;
+        std::optional<glm::vec2> mouse;
+    };
+
+    void sendInput(uint64_t frame);
+
     struct Shot {
         uint64_t frame = 0;
         std::string name;
@@ -51,6 +65,7 @@ private:
     entt::registry& reg;
     std::string directory;
     std::vector<Shot> shots;
+    std::vector<InputEvent> inputs;
     size_t next = 0;
 
     bool have_spawn = false;

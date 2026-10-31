@@ -4,6 +4,8 @@
     visual_test.py golden  --exe E --imgdiff I --script S --out DIR [--golden-dir G] [--expect-fail]
         capture the script's shots, imgdiff each against its golden. --expect-fail inverts the verdict
         (the altered-capture check: imgdiff must see the change)
+    visual_test.py shots   --exe E --script S --out DIR
+        capture the script's shots (no golden: checked by eye in the phase report)
     visual_test.py repeat  --exe E --imgdiff I --script S --out DIR [--mae 0.1]
         capture twice, imgdiff the two runs with only a mean-error threshold (determinism)
     visual_test.py probe   --exe E --out DIR [--runs 2] [--golden CSV] [--tol 1e-6] -- <dynamical arguments>
@@ -54,6 +56,14 @@ def golden(args):
     if failed:
         verdict = "did not detect the change in" if args.expect_fail else "failed"
         sys.exit(f"imgdiff {verdict}: {', '.join(failed)}")
+
+
+def shots(args):
+    out = pathlib.Path(args.out)
+    capture(args, out)
+    missing = [name for name in shot_names(args.script) if not (out / f"{name}.png").exists()]
+    if missing:
+        sys.exit(f"missing captures: {', '.join(missing)}")
 
 
 def repeat(args):
@@ -122,6 +132,11 @@ def main():
     g.add_argument("--golden-dir", default=str(pathlib.Path(__file__).resolve().parent.parent / "tests" / "golden" / "images"))
     g.add_argument("--expect-fail", action="store_true")
 
+    s = sub.add_parser("shots")
+    s.add_argument("--exe", required=True)
+    s.add_argument("--script", required=True)
+    s.add_argument("--out", required=True)
+
     r = sub.add_parser("repeat")
     r.add_argument("--exe", required=True)
     r.add_argument("--imgdiff", required=True)
@@ -140,7 +155,7 @@ def main():
     args = parser.parse_args()
     if getattr(args, "rest", None) and args.rest[0] == "--":
         args.rest = args.rest[1:]
-    {"golden": golden, "repeat": repeat, "probe": probe}[args.command](args)
+    {"golden": golden, "shots": shots, "repeat": repeat, "probe": probe}[args.command](args)
 
 
 if __name__ == "__main__":
