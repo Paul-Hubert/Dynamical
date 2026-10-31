@@ -4,6 +4,9 @@ set(CMAKE_CXX_STANDARD 20)
 
 project(dynamical)
 
+# Test names with spaces and punctuation (the test IDs of phases.md)
+cmake_policy(SET CMP0110 NEW)
+
 option(DYNAMICAL_BUILD_VIEWER "Build dynamical (Vulkan, SDL, OpenXR, shaders)" ON)   # OFF in CI
 option(DYNAMICAL_BUILD_TOOLS "Build offline tools (grass raycast baker)" OFF)
 
@@ -151,6 +154,31 @@ if (DYNAMICAL_TESTS)
 
     # doctest test suites (unit, scenario, protocol) become CTest labels
     doctest_discover_tests(dynamical_tests ADD_LABELS 1 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+    # Visual and probe tests run dynamical: they need a GPU (label gpu, not run in CI)
+    if (DYNAMICAL_BUILD_VIEWER)
+        find_package(Python3 COMPONENTS Interpreter REQUIRED)
+        set(VISUAL_TEST ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/visual_test.py)
+        set(VISUAL_EXES --exe $<TARGET_FILE:dynamical> --imgdiff $<TARGET_FILE:imgdiff>)
+        set(ARTIFACTS ${CMAKE_BINARY_DIR}/artifacts)
+        set(CAPTURES ${CMAKE_SOURCE_DIR}/tests/capture)
+
+        add_test(NAME "V0.1 base captures are deterministic"
+            COMMAND ${VISUAL_TEST} repeat ${VISUAL_EXES} --script ${CAPTURES}/base.capture.json --out ${ARTIFACTS}/P0/repeat --mae 0.1)
+        add_test(NAME "V0.2 base captures match the goldens"
+            COMMAND ${VISUAL_TEST} golden ${VISUAL_EXES} --script ${CAPTURES}/base.capture.json --out ${ARTIFACTS}/P0/captures)
+        add_test(NAME "P0 check: imgdiff fails on a capture with the camera moved by 0.1 m"
+            COMMAND ${VISUAL_TEST} golden ${VISUAL_EXES} --script ${CAPTURES}/base_moved.capture.json --out ${ARTIFACTS}/P0/moved --expect-fail)
+        add_test(NAME "S0.1 base probe is deterministic"
+            COMMAND ${VISUAL_TEST} probe --exe $<TARGET_FILE:dynamical> --out ${ARTIFACTS}/P0/probe --runs 2 --tol 1e-6
+                -- probe_entities=RigidBody probe_every=60 ticks=900)
+        set_tests_properties(
+            "V0.1 base captures are deterministic"
+            "V0.2 base captures match the goldens"
+            "P0 check: imgdiff fails on a capture with the camera moved by 0.1 m"
+            "S0.1 base probe is deterministic"
+            PROPERTIES LABELS gpu RUN_SERIAL TRUE WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    endif()
 endif()
 
 ### TOOLS

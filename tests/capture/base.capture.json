@@ -2,6 +2,6 @@
   "scene": "base",
   "shots": [
     { "frame": 600, "name": "base_spawn" },
-    { "frame": 900, "name": "base_ring", "camera": { "pos": [10, 125, 55], "look_at": [-30, 80, 0] } }
+    { "frame": 900, "name": "base_ring", "camera": { "pos": [50, 90, 10], "look_at": [10, 40, 30] } }
   ]
 }

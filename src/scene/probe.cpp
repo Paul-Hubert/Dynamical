@@ -10,7 +10,7 @@
 
 using namespace dy;
 
-Probe::Probe(const RunArgs& args) : file(args.probe), component(args.probe_entities), every(args.probe_every) {
+Probe::Probe(const RunArgs& args) : file(args.probe, std::ios::binary), component(args.probe_entities), every(args.probe_every) {
 
     if(component != "RigidBody" && component != "Transform") {
         error = "probe_entities=" + component + ": only RigidBody and Transform can be probed";

@@ -1,0 +1,6 @@
+{
+  "scene": "base",
+  "shots": [
+    { "frame": 600, "name": "base_spawn", "camera": { "offset": [0.1, 0, 0] } }
+  ]
+}
