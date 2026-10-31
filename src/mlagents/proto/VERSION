@@ -1,0 +1,7 @@
+ML-Agents protos vendored unchanged from the fork used by the trainer.
+
+fork:   C:/Users/Paul/Desktop/Dynamical-noToes/ml-agents
+commit: cc376888a2a8bd504425e8a7217f52ad37224ba7
+path:   protobuf-definitions/proto/mlagents_envs/communicator_objects/*.proto
+parent: Dynamical-noToes 815fb4b41bcbbbb325507456d6ca0432f247edcd (git -C .../Dynamical-noToes rev-parse HEAD)
+protocol: communication version 1.5.0, package version 4.0.0 (com.unity.ml-agents/Runtime/Academy.cs:104,110)

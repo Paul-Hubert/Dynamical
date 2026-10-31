@@ -105,10 +105,34 @@ endif()
 
 ### HEADLESS TRAINING EXECUTABLE (TrainingEnv.exe: the trainer globs <path>.exe)
 if (DYNAMICAL_TRAIN)
+    # ML-Agents protocol: the fork's protos (src/mlagents/proto, VERSION), compiled with vcpkg's protoc and
+    # grpc_cpp_plugin into the build directory
+    find_package(Protobuf CONFIG REQUIRED)
+    find_package(gRPC CONFIG REQUIRED)
+    file(GLOB MLAGENTS_PROTOS ./src/mlagents/proto/mlagents_envs/communicator_objects/*.proto)
+    file(GLOB MLAGENTS_SOURCES CONFIGURE_DEPENDS ./src/mlagents/*.cpp)
+    add_library(dynamical_mlagents STATIC ${MLAGENTS_SOURCES} ${MLAGENTS_PROTOS})
+    set(PROTO_OUT ${CMAKE_CURRENT_BINARY_DIR}/proto)
+    file(MAKE_DIRECTORY ${PROTO_OUT})
+    protobuf_generate(TARGET dynamical_mlagents LANGUAGE cpp IMPORT_DIRS ${CMAKE_SOURCE_DIR}/src/mlagents/proto PROTOC_OUT_DIR ${PROTO_OUT})
+    protobuf_generate(TARGET dynamical_mlagents LANGUAGE grpc GENERATE_EXTENSIONS .grpc.pb.h .grpc.pb.cc
+        PLUGIN "protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>" IMPORT_DIRS ${CMAKE_SOURCE_DIR}/src/mlagents/proto PROTOC_OUT_DIR ${PROTO_OUT})
+    target_include_directories(dynamical_mlagents PUBLIC ${PROTO_OUT})
+    target_link_libraries(dynamical_mlagents PUBLIC dynamical_sim gRPC::grpc++ protobuf::libprotobuf)
+
+    # The engine's commit, stamped into envparams.txt
+    set(VERSION_HEADER ${CMAKE_CURRENT_BINARY_DIR}/generated/dynamical_version.h)
+    execute_process(COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_SOURCE_DIR} -DOUT=${VERSION_HEADER} -P ${CMAKE_SOURCE_DIR}/cmake/git_version.cmake)
+    add_custom_target(dynamical_version
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_SOURCE_DIR} -DOUT=${VERSION_HEADER} -P ${CMAKE_SOURCE_DIR}/cmake/git_version.cmake
+        BYPRODUCTS ${VERSION_HEADER})
+
     # Train-side code in a library so the tests link it too
     file(GLOB_RECURSE TRAIN_SOURCES CONFIGURE_DEPENDS ./src/train/*.cpp)
     add_library(dynamical_train_core STATIC ${TRAIN_SOURCES})
-    target_link_libraries(dynamical_train_core PUBLIC dynamical_sim)
+    target_include_directories(dynamical_train_core PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/generated)
+    target_link_libraries(dynamical_train_core PUBLIC dynamical_sim dynamical_mlagents)
+    add_dependencies(dynamical_train_core dynamical_version)
 
     add_executable(dynamical_train src/train_main.cpp)
     target_link_libraries(dynamical_train PRIVATE dynamical_train_core)
@@ -136,11 +160,17 @@ if (DYNAMICAL_TESTS)
     include(${doctest_DIR}/doctest.cmake)
 
     file(GLOB_RECURSE test_sources CONFIGURE_DEPENDS ./tests/*.cpp)
+    if (NOT DYNAMICAL_TRAIN)
+        # The protocol tests and the MockTrainer need gRPC and the train code
+        list(FILTER test_sources EXCLUDE REGEX "/tests/(protocol|support/mock_trainer)")
+    endif()
     add_executable(dynamical_tests ${test_sources})
     target_include_directories(dynamical_tests PRIVATE tests)
     target_link_libraries(dynamical_tests PRIVATE dynamical_sim doctest::doctest imgdiff_core)
     if (DYNAMICAL_TRAIN)
         target_link_libraries(dynamical_tests PRIVATE dynamical_train_core)
+        target_compile_definitions(dynamical_tests PRIVATE DYNAMICAL_TRAIN_EXE="$<TARGET_FILE:dynamical_train>")
+        add_dependencies(dynamical_tests dynamical_train)
     endif()
 
     # doctest test suites (unit, scenario, protocol) become CTest labels

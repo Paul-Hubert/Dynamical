@@ -4,8 +4,10 @@
     "doctest",
     "entt",
     "glm",
+    "grpc",
     "joltphysics",
     "nlohmann-json",
+    "protobuf",
     "stb",
     "taskflow"
   ],
