@@ -5,8 +5,8 @@
 #include "scene/scenario_runner.h"
 #include "scene/system_registry.h"
 #include "physics/jolt_runtime.h"
-#include "train/env_params_file.h"
 #include "train/train_args.h"
+#include "train/process_control.h"
 #include "train/train_host.h"
 #include "util/log.h"
 #include "util/paths.h"
@@ -17,7 +17,13 @@ using namespace dy;
 // (the trainer passes relative output paths) and never touches config.6.json
 int main(int argc, char** argv) {
 
+    // stop-run's CTRL_C, and the log file the trainer greps, before any other output
+    installStopHandler();
     TrainArgs train = parseTrainArgs(argc, argv);
+    if(!train.log_file.empty() && !setLogFile(train.log_file)) {
+        dy::log(dy::error) << "Cannot open the log file " << train.log_file << "\n";
+        return 1;
+    }
     RunArgsResult run = parseRunArgs(train.rest);
     bool ok = true;
     for(auto& error : train.errors) { dy::log(dy::error) << error << "\n"; ok = false; }
@@ -34,7 +40,8 @@ int main(int argc, char** argv) {
     options.resources = executableDirectory() / "resources";
     options.allow_renderer = false;
 
-    std::string scene = args.scene.empty() ? "walker_train" : args.scene;
+    // An unmodified trainer config passes no scene: walker_train. mode=null runs the null scene
+    std::string scene = !args.scene.empty() ? args.scene : args.mode == "null" ? "null" : "walker_train";
 
     std::unique_ptr<ScenarioRunner> runner;
     try {
@@ -46,12 +53,6 @@ int main(int argc, char** argv) {
 
     if(!train.log_file.empty()) {
         writeResolved(runner->scene(), std::filesystem::path(train.log_file).parent_path() / "scene.resolved.json");
-    }
-
-    if(!train.env_params_out.empty()) {
-        EnvParamsFile file;
-        file.behavior = "HeidelBotBehavior";
-        if(!writeEnvParamsFile(train.env_params_out, file)) dy::log(dy::warning) << "Could not write " << train.env_params_out << "\n";
     }
 
     TrainHost host(args, train, *runner);
