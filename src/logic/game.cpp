@@ -50,6 +50,15 @@ Game::Game(int argc, char** argv) {
         dy::log(dy::warning) << "Argument ignored, " << error << "\n";
     }
     reg.ctx().emplace<RunArgs>(parsed.args);
+
+    // Captures and probes: a 960 x 540 window, no headset. Not saved to the config file
+    if(parsed.args.deterministic()) {
+        auto& settings = reg.ctx().get<Settings>();
+        settings.window_width = 960;
+        settings.window_height = 540;
+        settings.fullscreen = false;
+        settings.vr_mode = 0;
+    }
     reg.ctx().emplace<FrameClock>();
 }
 

@@ -9,6 +9,7 @@
 #include "renderer/util/vk.h"
 #include "context.h"
 #include "logic/settings/settings.h"
+#include "scene/run_args.h"
 
 using namespace dy;
 
@@ -23,10 +24,14 @@ Windu::Windu(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     int w = settings.window_width > 0 ? settings.window_width : 1280;
     int h = settings.window_height > 0 ? settings.window_height : 720;
 
+    // A hidden window still has a surface and a swapchain (captures, probes)
+    auto* args = reg.ctx().find<RunArgs>();
+    Uint32 visibility = args && args->window_hidden ? SDL_WINDOW_HIDDEN : SDL_WINDOW_SHOWN;
+
     window = SDL_CreateWindow("Dynamical",
                               SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                               w, h,
-                              SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | (settings.fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0)
+                              SDL_WINDOW_VULKAN | visibility | (settings.fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0)
              );
     
     if (window == nullptr) {
