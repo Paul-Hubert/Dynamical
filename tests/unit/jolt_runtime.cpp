@@ -64,3 +64,26 @@ TEST_CASE("T2.2 a world with threads=1 uses JobSystemSingleThreaded and base kee
 }
 
 }
+
+TEST_SUITE("unit") {
+
+TEST_CASE("Layers: agents collide with static and moving bodies and sensors but not with each other") {
+    using namespace PhysicsLayers;
+    ObjectPairFilter pairs;
+    CHECK(!pairs.ShouldCollide(static_layer, static_layer));
+    CHECK(pairs.ShouldCollide(static_layer, moving_layer));
+    CHECK(pairs.ShouldCollide(moving_layer, moving_layer));
+    CHECK(pairs.ShouldCollide(static_layer, agent_layer));
+    CHECK(pairs.ShouldCollide(agent_layer, moving_layer));
+    CHECK(!pairs.ShouldCollide(agent_layer, agent_layer));
+    CHECK(pairs.ShouldCollide(sensor_layer, agent_layer));
+    CHECK(pairs.ShouldCollide(moving_layer, sensor_layer));
+    CHECK(!pairs.ShouldCollide(sensor_layer, static_layer));
+    CHECK(!pairs.ShouldCollide(sensor_layer, sensor_layer));
+
+    BroadPhaseLayers bp;
+    CHECK(bp.GetBroadPhaseLayer(static_layer).GetValue() == non_moving_bp);
+    for(auto layer : { moving_layer, agent_layer, sensor_layer }) CHECK(bp.GetBroadPhaseLayer(layer).GetValue() == moving_bp);
+}
+
+}

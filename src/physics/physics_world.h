@@ -18,32 +18,54 @@
 
 namespace dy {
 
+// Object layers (physics.md): agents collide with arena geometry and moving props, never with each other
+// (self-collision inside a ragdoll is a group filter); sensors only see what moves
 namespace PhysicsLayers {
-    constexpr JPH::ObjectLayer static_layer = 0;   // terrain colliders, static bodies
-    constexpr JPH::ObjectLayer moving_layer = 1;   // dynamic and kinematic bodies
-    constexpr JPH::ObjectLayer count = 2;
+    constexpr JPH::ObjectLayer static_layer = 0;   // STATIC: terrain colliders, ground, static bodies
+    constexpr JPH::ObjectLayer moving_layer = 1;   // MOVING: dynamic and kinematic props
+    constexpr JPH::ObjectLayer agent_layer = 2;    // AGENT: ragdoll segments
+    constexpr JPH::ObjectLayer sensor_layer = 3;   // SENSOR: triggers
+    constexpr JPH::ObjectLayer count = 4;
+
+    // Broad phase: NON_MOVING (static) and MOVING (everything else)
+    constexpr JPH::uint8 non_moving_bp = 0;
+    constexpr JPH::uint8 moving_bp = 1;
+
+    constexpr bool collide(JPH::ObjectLayer a, JPH::ObjectLayer b) {
+        if(a > b) return collide(b, a);
+        switch(a) {
+        case static_layer: return b == moving_layer || b == agent_layer;
+        case moving_layer: return true;
+        case agent_layer: return b == sensor_layer;
+        default: return false;
+        }
+    }
 }
 
 class BroadPhaseLayers final : public JPH::BroadPhaseLayerInterface {
 public:
     JPH::uint GetNumBroadPhaseLayers() const override { return 2; }
-    JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer layer) const override { return JPH::BroadPhaseLayer((JPH::uint8) layer); }
+    JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer layer) const override {
+        return JPH::BroadPhaseLayer(layer == PhysicsLayers::static_layer ? PhysicsLayers::non_moving_bp : PhysicsLayers::moving_bp);
+    }
 #if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
-    const char* GetBroadPhaseLayerName(JPH::BroadPhaseLayer layer) const override { return layer.GetValue() == 0 ? "static" : "moving"; }
+    const char* GetBroadPhaseLayerName(JPH::BroadPhaseLayer layer) const override { return layer.GetValue() == 0 ? "non_moving" : "moving"; }
 #endif
 };
 
 class ObjectVsBroadPhaseFilter final : public JPH::ObjectVsBroadPhaseLayerFilter {
 public:
     bool ShouldCollide(JPH::ObjectLayer layer, JPH::BroadPhaseLayer bp) const override {
-        return layer == PhysicsLayers::moving_layer || bp.GetValue() == PhysicsLayers::moving_layer;
+        // Static and sensor layers only query moving things; moving props and agents query both
+        if(layer == PhysicsLayers::static_layer || layer == PhysicsLayers::sensor_layer) return bp.GetValue() == PhysicsLayers::moving_bp;
+        return true;
     }
 };
 
 class ObjectPairFilter final : public JPH::ObjectLayerPairFilter {
 public:
     bool ShouldCollide(JPH::ObjectLayer a, JPH::ObjectLayer b) const override {
-        return a == PhysicsLayers::moving_layer || b == PhysicsLayers::moving_layer;
+        return PhysicsLayers::collide(a, b);
     }
 };
 
