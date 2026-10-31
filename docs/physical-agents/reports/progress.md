@@ -50,8 +50,8 @@ Tests: T2.1, T2.2, T2.4, T2.5 (unit), S2.1–S2.4 (scenario), B2.1 (bench), V2.1
 | P2.3 | done | f432505 | `PhysicsConfig`, `PhysicsWorld` in the ctx |
 | P2.4 | done | 8f29930 | `PhysicsSys` split |
 | P2.5 | done | 70a43b2 | layers |
-| P2.6 | done | (this commit) | worlds, `TrainHost` bench, `WorldStepper` |
-| P2.7 | | | `Ground`, combine callbacks, capsules |
+| P2.6 | done | 3aa28db | worlds, `TrainHost` bench, `WorldStepper` |
+| P2.7 | done | (this commit) | `Ground`, combine callbacks, capsules |
 | P2.8 | | | `WorldView` |
 | P2.9 | | | test scenes |
 | P2.10 | | | `benchmarks.md` |

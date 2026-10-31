@@ -6,6 +6,7 @@
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Body/BodyLock.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 
@@ -70,12 +71,47 @@ void RigidBodySys::preinit() {
     world = &physicsWorld(reg);
     physicsStats(reg);
     reg.on_destroy<RigidBody>().connect<&RigidBodySys::destroyBody>(this);
+    reg.on_destroy<Ground>().connect<&RigidBodySys::destroyGround>(this);
 
+}
+
+void RigidBodySys::createGrounds() {
+
+    bool added = false;
+    for(auto [entity, ground] : reg.view<Ground>().each()) {
+        if(ground.created()) continue;
+        glm::vec3 half = glm::max(ground.size * 0.5f, glm::vec3(0.001f));
+        JPH::BodyCreationSettings settings(new JPH::BoxShape(toJolt(half)), JPH::RVec3(0.f, ground.top_y - half.y, 0.f),
+            JPH::Quat::sIdentity(), JPH::EMotionType::Static, PhysicsLayers::static_layer);
+        settings.mFriction = ground.friction;
+        settings.mRestitution = ground.restitution;
+        JPH::BodyID id = world->bodies().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
+        if(id.IsInvalid()) {
+            dy::log(dy::warning) << "Physics : out of bodies for the ground\n";
+            continue;
+        }
+        ground.body = id.GetIndexAndSequenceNumber();
+        added = true;
+    }
+
+    // Static geometry is in place: rebuild the broad phase once
+    if(added) world->system().OptimizeBroadPhase();
+
+}
+
+void RigidBodySys::destroyGround(entt::registry& reg, entt::entity entity) {
+    auto& ground = reg.get<Ground>(entity);
+    if(!ground.created() || !world) return;
+    world->bodies().RemoveBody(JPH::BodyID(ground.body));
+    world->bodies().DestroyBody(JPH::BodyID(ground.body));
+    ground.body = JPH::BodyID().GetIndexAndSequenceNumber();
 }
 
 void RigidBodySys::tick(double dt) {
 
     OPTICK_EVENT();
+
+    createGrounds();
 
     auto& bodies = world->bodies();
     std::vector<entt::entity> failed;
@@ -87,6 +123,8 @@ void RigidBodySys::tick(double dt) {
         JPH::ShapeSettings::ShapeResult result;
         if(body.shape == RigidBody::Shape::Sphere) {
             result = JPH::SphereShapeSettings(std::max(body.half_extent.x, 0.001f)).Create();
+        } else if(body.shape == RigidBody::Shape::Capsule) {
+            result = JPH::CapsuleShapeSettings(std::max(body.half_extent.y, 0.001f), std::max(body.half_extent.x, 0.001f)).Create();
         } else {
             glm::vec3 half = glm::max(body.half_extent, glm::vec3(0.001f));
             float convex_radius = std::min(JPH::cDefaultConvexRadius, 0.5f * std::min(half.x, std::min(half.y, half.z)));
@@ -158,6 +196,15 @@ void RigidBodySys::destroyBody(entt::registry& reg, entt::entity entity) {
 void RigidBodySys::finish() {
 
     reg.on_destroy<RigidBody>().disconnect(this);
+    reg.on_destroy<Ground>().disconnect(this);
+
+    for(auto [entity, ground] : reg.view<Ground>().each()) {
+        if(ground.created()) {
+            world->bodies().RemoveBody(JPH::BodyID(ground.body));
+            world->bodies().DestroyBody(JPH::BodyID(ground.body));
+        }
+        ground.body = JPH::BodyID().GetIndexAndSequenceNumber();
+    }
 
     for(auto [entity, body] : reg.view<RigidBody>().each()) {
         if(body.created() && !bodyId(body).IsInvalid()) {
@@ -171,6 +218,7 @@ void RigidBodySys::finish() {
 
 RigidBodySys::~RigidBodySys() {
     reg.on_destroy<RigidBody>().disconnect(this);
+    reg.on_destroy<Ground>().disconnect(this);
     world = nullptr;
 }
 

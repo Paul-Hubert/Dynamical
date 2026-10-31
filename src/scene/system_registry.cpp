@@ -20,7 +20,7 @@ std::map<std::string, SystemInfo>& systems() {
 }
 
 const char* const motion_names[] = { "static", "dynamic", "kinematic" };
-const char* const shape_names[] = { "box", "sphere" };
+const char* const shape_names[] = { "box", "sphere", "capsule" };
 
 void registerSimComponents() {
 
@@ -61,6 +61,24 @@ void registerSimComponents() {
                 { "half_extent", toJson(b.half_extent) }, { "offset", toJson(b.offset) }, { "friction", b.friction },
                 { "restitution", b.restitution }, { "initial_velocity", toJson(b.initial_velocity) },
                 { "initial_angular_velocity", toJson(b.initial_angular_velocity) } };
+        }
+    });
+
+    registerComponent("Ground", {
+        [](entt::registry& reg, entt::entity e, const nlohmann::json& j) {
+            Ground g;
+            JsonFields f(j);
+            f.read("size", g.size);
+            f.read("top_y", g.top_y);
+            f.read("friction", g.friction);
+            f.read("restitution", g.restitution);
+            f.finish();
+            if(g.size.x <= 0.f || g.size.y <= 0.f || g.size.z <= 0.f) throw ComponentError("/size", "sizes must be positive");
+            reg.emplace_or_replace<Ground>(e, g);
+        },
+        [](const entt::registry& reg, entt::entity e) {
+            auto& g = reg.get<Ground>(e);
+            return nlohmann::json { { "size", toJson(g.size) }, { "top_y", g.top_y }, { "friction", g.friction }, { "restitution", g.restitution } };
         }
     });
 

@@ -14,12 +14,13 @@ namespace dy {
 class RigidBody {
 public:
     enum class Motion : uint8_t { Static, Dynamic, Kinematic };
-    enum class Shape : uint8_t { Box, Sphere };
+    enum class Shape : uint8_t { Box, Sphere, Capsule };
 
     Motion motion = Motion::Dynamic;
     Shape shape = Shape::Box;
 
-    glm::vec3 half_extent = glm::vec3(0.5f);   // world units, scale included. Sphere radius is half_extent.x
+    glm::vec3 half_extent = glm::vec3(0.5f);   // world units, scale included. Sphere radius is half_extent.x;
+                                               // capsule radius half_extent.x, cylinder half-height half_extent.y (local Y)
     glm::vec3 offset = glm::vec3(0.f);         // shape center relative to the Transform position, in local space
 
     float friction = 0.6f;
@@ -29,6 +30,18 @@ public:
     glm::vec3 initial_angular_velocity = glm::vec3(0.f);
 
     uint32_t body = 0xffffffffu; // JPH::BodyID, assigned by PhysicsSys
+
+    bool created() const { return body != 0xffffffffu; }
+};
+
+// Flat ground (physics.md): a static box whose top face is at top_y, on the STATIC layer. Created by RigidBodySys
+struct Ground {
+    glm::vec3 size = glm::vec3(150.f, 10.f, 150.f);     // full extents
+    float top_y = 0.f;
+    float friction = 1.f;
+    float restitution = 0.f;
+
+    uint32_t body = 0xffffffffu;
 
     bool created() const { return body != 0xffffffffu; }
 };

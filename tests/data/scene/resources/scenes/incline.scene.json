@@ -1,0 +1,18 @@
+{
+  "format_version": 1,
+  "name": "incline",
+  "variables": { "combine": { "type": "string", "default": "max" } },
+  "templates": {
+    "incline": {
+      "physics": { "threads": 1, "max_bodies": 16, "friction_combine": "${combine}", "restitution_combine": "min" },
+      "fixed": ["RigidBody", "PhysicsStep"],
+      "entities": [
+        { "Transform": { "rotation": [0, 0, 0.258819045, 0.965925826] },
+          "RigidBody": { "motion": "static", "half_extent": [5, 0.5, 2], "friction": 0.2, "restitution": 0 } },
+        { "Transform": { "position": [-0.375, 0.649519053, 0], "rotation": [0, 0, 0.258819045, 0.965925826] },
+          "RigidBody": { "half_extent": [0.25, 0.25, 0.25], "friction": 1, "restitution": 0 } }
+      ]
+    }
+  },
+  "worlds": [ { "template": "incline" } ]
+}

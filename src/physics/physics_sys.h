@@ -48,6 +48,8 @@ public:
 
 private:
     void destroyBody(entt::registry& reg, entt::entity entity);
+    void destroyGround(entt::registry& reg, entt::entity entity);
+    void createGrounds();
 
     PhysicsWorld* world = nullptr;
 };
