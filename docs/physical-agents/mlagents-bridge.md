@@ -39,9 +39,17 @@ TrainingEnv.exe -nographics -batchmode --mlagents-port <base+i> -logFile <run>/P
 - Python is the gRPC **server** on `localhost:<port>`.
 - The engine is the **client**. It must connect within 60 s and repeatedly calls
   `UnityToExternalProto.Exchange(UnityMessageProto) → UnityMessageProto`.
-- Communicator version `1.5.0`, package version `4.0.0` and the RL capability flags.
+- Communicator version `1.5.0`, package version `4.0.0` (verified: `com.unity.ml-agents/Runtime/Academy.cs:104`,
+  `:110`; `package.json:4`) and the RL capability flags, all true as the C# defaults
+  (`Communicator/UnityRLCapabilities.cs:56-63`).
 
-### Sequence (*verify* the initial double exchange against the C# communicator)
+### Sequence (verified)
+
+Verified against the fork (`ml-agents` @ `cc376888`): the C# communicator sends the initialisation output, then an
+empty message (`Communicator/RpcCommunicator.cs:235-236`); Python's `initialize()` receives the first, answers it
+with the initialisation input, then receives the second without answering (`rpc_communicator.py`, `initialize`), so
+the second call returns the first command when the trainer resets. `close()` answers the pending call with header
+400.
 
 ```
 engine                                                          python
@@ -83,8 +91,10 @@ Per agent, per window:
 ### Action routing
 
 - Python sends actions only for agents that requested a decision and are not done.
-- Actions arrive in the order of the previous `AgentInfo` list for each behaviour (*verify*). The
-  bridge keeps that order per behaviour and maps actions back to `AgentId`s.
+- Actions arrive in the order of the previous `AgentInfo` list for each behaviour, **skipping the done agents**
+  (verified: `RpcCommunicator.cs:361-368` records only non-done agents, in `PutObservations` order;
+  `:419-428` maps action `i` to the `i`-th of them). The bridge keeps that order per behaviour and maps actions
+  back to `AgentId`s.
 - Agents that were done get no action. Their terminal step is in this output, and the first observation
   of their new episode is in the **next** output, under the same `AgentId`. This matches Unity, where the
   fork assigns `episodeId` once per agent (`Agent.cs:489`).
@@ -93,8 +103,13 @@ Per agent, per window:
 
 ## Side channels
 
-The payload is a sequence of `[16-byte UUID][int32 length][bytes]` messages (*verify* UUID byte
-order: Python `uuid.bytes_le`).
+The payload is a sequence of `[16-byte UUID][int32 length][bytes]` messages, little endian. The UUID is in
+.NET `Guid.ToByteArray` order, which is Python's `uuid.bytes_le` (verified: `SideChannels/SideChannelManager.cs:139-141`,
+`side_channel_manager.py:22-24`, `:58-59`). Channel ids: environment parameters `534c891e-810f-11ea-a9d0-822485860400`,
+engine configuration `e951342c-4f7e-11ea-b238-784f4387d1f7`, stats `a1d8f7b7-cec8-50f9-b78b-d3e165a78520`.
+Strings are an int32 length plus ASCII bytes; a stat is key, float value, int32 aggregation
+(`StatsSideChannel.cs:30-32`). P3.2 checks the engine's codec byte for byte against blobs written by the fork's
+Python classes (`tools/capture_sidechannels.py`).
 
 | Channel | Direction | Handling |
 |---|---|---|
@@ -147,7 +162,9 @@ Precedence, highest first (UA §9.3):
 - **CTRL_C.** `stop-run` sends CTRL_C to the console group.
   - `SetConsoleCtrlHandler` returns `TRUE` for `CTRL_C_EVENT`, `CTRL_BREAK_EVENT` and
     `CTRL_CLOSE_EVENT`, and sets a flag.
-  - gRPC calls use a 1 s deadline and are retried, so the loop sees the flag.
+  - Each gRPC call is issued once and awaited in 1 s slices (async API), so the loop sees the flag within a
+    second. A call is never re-sent after a timeout: the trainer may already hold the message, and a duplicate
+    would break the lockstep.
   - **Once the flag is set, the process exits 0 regardless of the connection state.** The trainer dies
     at the same time.
 - **A lost connection without the flag:** exit 0 after QUIT or header 400; otherwise exit 2 with the
@@ -159,7 +176,10 @@ Precedence, highest first (UA §9.3):
 
 `mode=null`:
 - the real handshake and step loop;
-- 25 agents with a fixed observation (138 × 2 zeros for the noToes layout, with Unity's sensor name) and zero rewards;
+- 25 agents with a fixed observation (138 × 2 zeros for the noToes layout) and zero rewards. The sensor is
+  Unity's `StackingSensor` around the agent's `VectorSensor` (`Agent.cs:1022-1025`), so its name is
+  `StackingSensor_size2_VectorSensor_size138` (`StackingSensor.cs:62`, `VectorSensor.cs:28`), its shape `[276]`,
+  dimension properties `[0]` and observation type `DEFAULT` (`ObservationSpec.cs:62-69`, `GrpcExtensions.cs:430-457`);
 - episodes of 1000 decisions (2000 ticks / decision period 2);
 - no worlds, no physics.
 
