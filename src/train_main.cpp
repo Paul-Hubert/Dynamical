@@ -5,6 +5,7 @@
 #include "scene/run_args.h"
 #include "scene/scenario_runner.h"
 #include "scene/system_registry.h"
+#include "physics/jolt_runtime.h"
 #include "train/env_params_file.h"
 #include "train/train_args.h"
 #include "util/log.h"
@@ -25,6 +26,7 @@ int main(int argc, char** argv) {
     if(!ok) return 1;
     const RunArgs& args = run.args;
 
+    JoltRuntime jolt;
     registerSimSystems();
 
     // Resources next to the executable: TrainingEnv.exe, resources/{scenes,prefabs,agents}

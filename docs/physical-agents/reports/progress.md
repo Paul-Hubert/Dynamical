@@ -45,8 +45,8 @@ Tests: T2.1, T2.2, T2.4, T2.5 (unit), S2.1–S2.4 (scenario), B2.1 (bench), V2.1
 
 | Step | Status | Commit | Note |
 |---|---|---|---|
-| P2.1 | done | (this commit) | Jolt 5.6.0 overlay; drift explained, goldens re-recorded |
-| P2.2 | | | `JoltRuntime` |
+| P2.1 | done | 9094118 | Jolt 5.6.0 overlay; drift explained, goldens re-recorded |
+| P2.2 | done | (this commit) | `JoltRuntime` |
 | P2.3 | | | `PhysicsConfig`, `PhysicsWorld` in the ctx |
 | P2.4 | | | `PhysicsSys` split |
 | P2.5 | | | layers |

@@ -45,7 +45,7 @@ public:
     }
 };
 
-// Jolt setup : global registration, allocators, job threads and the physics system
+// A Jolt physics system with its job system and temporary allocator. Needs a JoltRuntime
 class PhysicsWorld {
 public:
     PhysicsWorld();

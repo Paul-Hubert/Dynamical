@@ -1,6 +1,7 @@
 #include "view/game.h"
 #include "view/register_view.h"
 #include "scene/system_registry.h"
+#include "physics/jolt_runtime.h"
 
 #include <filesystem>
 #include <memory>
@@ -38,11 +39,15 @@ int main(int argc, char **argv) {
 
     find_resources();
 
+    dy::JoltRuntime jolt;
     dy::registerSimSystems();
     dy::registerViewSystems();
 
-    auto game = std::make_unique<dy::Game>(argc, argv);
-
-    return game->start();
+    int code;
+    {
+        auto game = std::make_unique<dy::Game>(argc, argv);
+        code = game->start();
+    }
+    return code;
 
 }
