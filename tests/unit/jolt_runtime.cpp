@@ -46,3 +46,21 @@ TEST_CASE("T2.1 JoltRuntime: 100 worlds sequentially and 8 concurrently leave no
 }
 
 }
+
+TEST_SUITE("unit") {
+
+TEST_CASE("T2.2 a world with threads=1 uses JobSystemSingleThreaded and base keeps the thread pool") {
+
+    PhysicsConfig single;
+    single.threads = 1;
+    PhysicsWorld training(single);
+    CHECK(training.singleThreaded());
+
+    // base: the default config, master's thread pool
+    entt::registry reg;
+    CHECK(!physicsWorld(reg).singleThreaded());
+    CHECK(&physicsWorld(reg) == reg.ctx().find<PhysicsWorld>());
+
+}
+
+}

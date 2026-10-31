@@ -55,7 +55,7 @@ PhysicsSys::PhysicsSys(entt::registry& reg) : System(reg) {
 
 void PhysicsSys::preinit() {
 
-    world = std::make_unique<PhysicsWorld>();
+    world = &physicsWorld(reg);
     terrain = std::make_unique<TerrainColliders>(reg, *world);
 
     reg.ctx().emplace<PhysicsStats>();
@@ -275,6 +275,6 @@ PhysicsSys::~PhysicsSys() {
     reg.on_destroy<RigidBody>().disconnect(this);
 
     terrain.reset();
-    world.reset();
+    world = nullptr;
 
 }

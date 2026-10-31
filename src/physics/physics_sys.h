@@ -31,7 +31,7 @@ private:
     void destroyBody(entt::registry& reg, entt::entity entity);
     void updateTerrain(int steps);
 
-    std::unique_ptr<PhysicsWorld> world;
+    PhysicsWorld* world = nullptr;      // registry context variable
     std::unique_ptr<TerrainColliders> terrain;
 
     double accumulator = 0.;
