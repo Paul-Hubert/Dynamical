@@ -57,6 +57,26 @@ Tests: T2.1, T2.2, T2.4, T2.5 (unit), S2.1–S2.4 (scenario), B2.1 (bench), V2.1
 | P2.10 | done | 0eaba61 | `benchmarks.md` |
 | P2 gate | done | (exit gate commit) | unit 28, scenario 5, gpu 10; report `reports/P2.md` |
 
+## P3 — Bridge skeleton and null environment
+
+Tests: P3.1–P3.5 (protocol), L3.1 (slow, `tools/train_smoke.py`), B3.1 (`tools/bench_null.py`).
+
+| Step | Status | Commit | Note |
+|---|---|---|---|
+| P3.1 | done | ee7d0d9 | gRPC, protobuf, vendored protos |
+| P3.2 | done | e3c9cd1 | `MlAgentsClient` |
+| P3.3 | done | b318d47 | side channels |
+| P3.4 | done | cf60c24 | `train_args` |
+| P3.5 | done | efcd032 | log file sink, CTRL_C |
+| P3.6 | done | 1d901b9 | `mode=null` |
+| P3.7 | done | e063bd0 | `MockTrainer` |
+| P3.8 | done | (this commit) | `train_smoke.py` |
+
+P3.1–P3.7 were written together while gRPC built; each commit holds its step's files, and only the P3.7 commit
+builds on its own (the CMake of P3.1 already names the later sources).
+
 ## Last failure
 
-(none)
+- L3.1 first runs: `WANDB_MODE=disabled` made the fork's `wandb.init` raise, dropping the TensorBoard writer (no
+  events); then `WANDB_MODE=offline` was overridden by the fork and one run (`null_smoke`) reached wandb.ai.
+  Fixed by `tools/wandb_offline/sitecustomize.py` (decisions.md, incident).
