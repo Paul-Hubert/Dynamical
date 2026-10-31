@@ -8,67 +8,53 @@ project(dynamical)
 cmake_policy(SET CMP0110 NEW)
 
 option(DYNAMICAL_BUILD_VIEWER "Build dynamical (Vulkan, SDL, OpenXR, shaders)" ON)   # OFF in CI
+option(DYNAMICAL_TRAIN "Build the headless training executable" ON)
+option(DYNAMICAL_TESTS "Build the tests" ON)
 option(DYNAMICAL_BUILD_TOOLS "Build offline tools (grass raycast baker)" OFF)
+set(DYNAMICAL_TRAIN_NAME "TrainingEnv" CACHE STRING "Output name of dynamical_train")
 
 set(FASTNOISE2_NOISETOOL OFF CACHE BOOL "Build Noise Tool" FORCE)
 add_subdirectory(lib/FastNoise2)
 
-include_directories("./src")
-include_directories("./lib")
+# Common flags for every target below (master set them on dynamical only)
+add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
+if (MSVC)
+    add_compile_options(/bigobj /utf-8)
+endif()
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options(-Wall -Wextra -Wno-sign-compare -Wno-unused-variable -Wno-unused-parameter -Wno-class-memaccess -Wno-unused-but-set-variable -Wno-reorder -Wno-missing-field-initializers -Wno-unused-function -Wno-type-limits)
+endif()
 
+find_package(EnTT CONFIG REQUIRED)
+find_package(Jolt CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
+find_package(Taskflow CONFIG REQUIRED)
+find_path(CEREAL_INCLUDE_DIRS "cereal")
 find_path(STB_INCLUDE_DIRS "stb_image.h")
 
+### SIMULATION LIBRARY: no Vulkan, SDL, OpenXR or ImGui (checked by the T1.1 header-boundary test)
+file(GLOB_RECURSE SIM_SOURCES CONFIGURE_DEPENDS ./src/logic/*.cpp ./src/physics/*.cpp ./src/scene/*.cpp ./src/util/*.cpp)
+add_library(dynamical_sim STATIC ${SIM_SOURCES})
+target_include_directories(dynamical_sim PUBLIC src lib/FastNoise2/include ${CEREAL_INCLUDE_DIRS})
+target_link_libraries(dynamical_sim PUBLIC EnTT::EnTT Jolt::Jolt glm::glm nlohmann_json::nlohmann_json Taskflow::Taskflow FastNoise)
+
+### VIEWER
 if (DYNAMICAL_BUILD_VIEWER)
 
 add_subdirectory(lib/VulkanMemoryAllocator)
 
-file(GLOB_RECURSE sources ./src/main.cpp ./src/*.cpp ./src/*.h)
+file(GLOB_RECURSE VIEW_SOURCES CONFIGURE_DEPENDS ./src/main.cpp ./src/view/*.cpp ./src/view/*.h ./src/renderer/*.cpp ./src/renderer/*.h ./src/extra/*.cpp ./src/extra/*.h)
 
-add_executable(dynamical ${sources})
-
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ./)
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined -g")
-
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(dynamical PRIVATE -Wall -Wextra -Wno-sign-compare -Wno-unused-variable -Wno-unused-parameter -Wno-class-memaccess -Wno-unused-but-set-variable -Wno-reorder -Wno-missing-field-initializers -Wno-unused-function -Wno-type-limits)
-endif()
-
-if (MSVC)
-    target_compile_options(dynamical PRIVATE /bigobj /utf-8)
-    target_compile_definitions(dynamical PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
-endif()
+add_executable(dynamical ${VIEW_SOURCES})
 
 find_package(Vulkan REQUIRED)
-target_link_libraries(dynamical PRIVATE Vulkan::Vulkan)
-
 find_package(SDL2 REQUIRED)
-include_directories(${SDL2_INCLUDE_DIR})
-target_link_libraries(dynamical PRIVATE ${SDL2_LIBRARIES})
-
-find_package(EnTT CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE EnTT::EnTT)
-
-find_package(Jolt CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE Jolt::Jolt)
-
 find_package(OpenXR CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE OpenXR::headers OpenXR::openxr_loader)
 
-find_package(nlohmann_json CONFIG REQUIRED)
-target_link_libraries(dynamical PRIVATE nlohmann_json::nlohmann_json)
+target_include_directories(dynamical PRIVATE lib lib/imgui lib/implot lib/VulkanMemoryAllocator/include ${SDL2_INCLUDE_DIR} ${STB_INCLUDE_DIRS})
+target_link_libraries(dynamical PRIVATE dynamical_sim Vulkan::Vulkan ${SDL2_LIBRARIES} OpenXR::headers OpenXR::openxr_loader VulkanMemoryAllocator)
 
-target_include_directories(dynamical PRIVATE ${STB_INCLUDE_DIRS})
-
-find_path(CEREAL_INCLUDE_DIRS "cereal")
-target_include_directories(dynamical PRIVATE ${CEREAL_INCLUDE_DIRS})
-
-find_path(GLM_INCLUDE_DIRS "glm")
-target_include_directories(dynamical PRIVATE ${GLM_INCLUDE_DIRS})
-
-find_path(TASKFLOW_INCLUDE_DIRS "taskflow")
-target_include_directories(dynamical PRIVATE ${TASKFLOW_INCLUDE_DIRS})
-
-target_include_directories(dynamical PRIVATE "lib/imgui")
 target_sources(
   dynamical PRIVATE
   "lib/imgui/imgui.cpp"
@@ -80,15 +66,6 @@ target_sources(
   "lib/implot/implot_demo.cpp"
   "lib/implot/implot_items.cpp"
 )
-
-target_include_directories(dynamical PRIVATE "lib/implot")
-
-
-target_link_libraries(dynamical PRIVATE FastNoise)
-target_include_directories(dynamical PRIVATE "lib/FastNoise2/include/")
-
-target_link_libraries(dynamical PRIVATE VulkanMemoryAllocator)
-target_include_directories(dynamical PRIVATE "lib/VulkanMemoryAllocator/include/")
 
 # Copy resources to build
 file(
@@ -126,31 +103,37 @@ add_dependencies(dynamical shaders)
 
 endif()
 
+### HEADLESS TRAINING EXECUTABLE (TrainingEnv.exe: the trainer globs <path>.exe)
+if (DYNAMICAL_TRAIN)
+    file(GLOB_RECURSE TRAIN_SOURCES CONFIGURE_DEPENDS ./src/train/*.cpp)
+    add_executable(dynamical_train src/train_main.cpp ${TRAIN_SOURCES})
+    target_link_libraries(dynamical_train PRIVATE dynamical_sim)
+    set_target_properties(dynamical_train PROPERTIES OUTPUT_NAME ${DYNAMICAL_TRAIN_NAME})
+
+    # Deployed layout: the executable with resources/{scenes,prefabs,agents} next to it
+    foreach(dir scenes prefabs agents)
+        if (EXISTS ${CMAKE_SOURCE_DIR}/resources/${dir})
+            add_custom_command(TARGET dynamical_train POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/resources/${dir}" "$<TARGET_FILE_DIR:dynamical_train>/resources/${dir}")
+        endif()
+    endforeach()
+endif()
+
 ### IMAGE COMPARISON (visual tests)
 add_library(imgdiff_core STATIC tools/imgdiff/imgdiff.cpp tools/imgdiff/stb_impl.cpp)
 target_include_directories(imgdiff_core PUBLIC tools ${STB_INCLUDE_DIRS})
 add_executable(imgdiff tools/imgdiff/main.cpp)
 target_link_libraries(imgdiff PRIVATE imgdiff_core)
-if (MSVC)
-    target_compile_definitions(imgdiff_core PRIVATE _CRT_SECURE_NO_WARNINGS)
-endif()
 
 ### TESTS
-option(DYNAMICAL_TESTS "Build the tests" ON)
 if (DYNAMICAL_TESTS)
     enable_testing()
     find_package(doctest CONFIG REQUIRED)
     include(${doctest_DIR}/doctest.cmake)
 
-    # Until the library split, only sources that build without Vulkan, SDL or OpenXR
-    file(GLOB_RECURSE test_sources ./tests/*.cpp)
-    add_executable(dynamical_tests ${test_sources} src/scene/run_args.cpp src/util/log.cpp)
-    target_include_directories(dynamical_tests PRIVATE src)
-    target_link_libraries(dynamical_tests PRIVATE doctest::doctest imgdiff_core)
-    if (MSVC)
-        target_compile_options(dynamical_tests PRIVATE /bigobj /utf-8)
-        target_compile_definitions(dynamical_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
-    endif()
+    file(GLOB_RECURSE test_sources CONFIGURE_DEPENDS ./tests/*.cpp)
+    add_executable(dynamical_tests ${test_sources})
+    target_link_libraries(dynamical_tests PRIVATE dynamical_sim doctest::doctest imgdiff_core)
 
     # doctest test suites (unit, scenario, protocol) become CTest labels
     doctest_discover_tests(dynamical_tests ADD_LABELS 1 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -185,5 +168,6 @@ endif()
 if (DYNAMICAL_BUILD_TOOLS)
     # Bakes resources/raycast_data.bin, the lookup texture used by the grass shader
     add_executable(raycast tools/raycast/main.cpp)
-    target_include_directories(raycast PRIVATE "./src" ${CEREAL_INCLUDE_DIRS} ${GLM_INCLUDE_DIRS})
+    target_include_directories(raycast PRIVATE "./src" ${CEREAL_INCLUDE_DIRS})
+    target_link_libraries(raycast PRIVATE glm::glm)
 endif()

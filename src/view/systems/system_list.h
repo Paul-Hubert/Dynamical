@@ -3,7 +3,7 @@
 
 #include "entt/entt.hpp"
 
-#include "system.h"
+#include "logic/systems/system.h"
 
 #define DEFINE_SYSTEM(NAME) \
 class NAME : public System { \

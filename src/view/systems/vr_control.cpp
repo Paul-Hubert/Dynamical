@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "logic/scene_spawn.h"
-#include "logic/components/model_renderable.h"
+#include "view/spawn.h"
+#include "view/components/model_renderable.h"
 #include "logic/components/rigid_body.h"
 #include "logic/components/transform.h"
 #include "logic/components/vr.h"

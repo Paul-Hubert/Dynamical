@@ -1,5 +1,5 @@
-#ifndef DY_SCENE_SPAWN_H
-#define DY_SCENE_SPAWN_H
+#ifndef DY_SPAWN_H
+#define DY_SPAWN_H
 
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>

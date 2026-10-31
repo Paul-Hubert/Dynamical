@@ -6,7 +6,7 @@
 #include <memory>
 
 #include "logic/components/camera.h"
-#include "logic/components/input.h"
+#include "view/components/input.h"
 #include "logic/components/vr.h"
 #include "logic/terrain/terrain_generator.h"
 

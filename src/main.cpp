@@ -1,4 +1,4 @@
-#include "logic/game.h"
+#include "view/game.h"
 
 #include <filesystem>
 #include <memory>

@@ -3,10 +3,10 @@
 #include <imgui/imgui.h>
 
 #include "logic/components/camera.h"
-#include "logic/components/input.h"
+#include "view/components/input.h"
 #include "logic/components/render_settings.h"
 #include "logic/components/rigid_body.h"
-#include "logic/scene_spawn.h"
+#include "view/spawn.h"
 #include "logic/components/vr.h"
 #include "logic/settings/settings.h"
 #include "logic/terrain/chunk.h"

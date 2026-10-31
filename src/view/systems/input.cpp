@@ -1,6 +1,6 @@
 #include "input.h"
 
-#include "logic/components/input.h"
+#include "view/components/input.h"
 
 #include "renderer/context/context.h"
 #include "util/log.h"

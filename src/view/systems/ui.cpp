@@ -6,7 +6,7 @@
 
 #include "renderer/context/context.h"
 
-#include "logic/components/input.h"
+#include "view/components/input.h"
 #include "scene/run_args.h"
 
 using namespace dy;

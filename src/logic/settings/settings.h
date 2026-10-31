@@ -32,7 +32,8 @@ public:
     int spectator_mode = 2;
 
     // Marching cubes chunks are loaded within this distance of the cameras, in world units
-    int view_distance = 768;
+    static constexpr int default_view_distance = 768;
+    int view_distance = default_view_distance;
 
     template <class Archive>
     void serialize(Archive& ar) {

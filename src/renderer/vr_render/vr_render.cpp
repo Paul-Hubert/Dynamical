@@ -8,7 +8,7 @@
 #include "renderer/context/context.h"
 #include "renderer/context/num_frames.h"
 
-#include "logic/components/input.h"
+#include "view/components/input.h"
 #include "logic/components/vr.h"
 
 using namespace dy;

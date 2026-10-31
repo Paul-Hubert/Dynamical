@@ -41,7 +41,9 @@ void ChunkManagerSys::tick(double dt) {
     OPTICK_EVENT();
 
     auto& map = reg.ctx().get<ChunkMap>();
-    float view_distance = (float) reg.ctx().get<Settings>().view_distance;
+    // Settings only exist in dynamical; headless runs stream chunks with the default distance
+    auto* settings = reg.ctx().find<Settings>();
+    float view_distance = (float) (settings ? settings->view_distance : Settings::default_view_distance);
 
     auto centers = loadCenters(reg);
     if(centers.empty()) return;

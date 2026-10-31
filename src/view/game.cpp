@@ -7,12 +7,12 @@
 #include "renderer/renderer.h"
 #include "renderer/terrain/terrain_sys.h"
 #include "physics/physics_sys.h"
-#include "systems/system_set.h"
+#include "logic/systems/system_set.h"
 
-#include "systems/system_list.h"
-#include "systems/chunk_systems.h"
-#include "systems/input.h"
-#include "systems/ui.h"
+#include "view/systems/system_list.h"
+#include "logic/systems/chunk_systems.h"
+#include "view/systems/input.h"
+#include "view/systems/ui.h"
 
 #include "util/entt_util.h"
 
@@ -20,7 +20,7 @@
 #include "scene/run_args.h"
 
 #include "logic/components/frame_clock.h"
-#include "logic/components/input.h"
+#include "view/components/input.h"
 
 #include "util/log.h"
 #include "scene/probe.h"

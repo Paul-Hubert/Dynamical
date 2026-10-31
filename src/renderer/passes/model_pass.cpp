@@ -5,7 +5,7 @@
 #include "renderer/util/pipeline.h"
 #include "renderer/util/texture.h"
 
-#include "logic/components/model_renderable.h"
+#include "view/components/model_renderable.h"
 #include "logic/components/render_settings.h"
 #include "logic/components/transform.h"
 
