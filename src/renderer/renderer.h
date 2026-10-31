@@ -31,6 +31,10 @@ public:
 
     Context& getContext() { return ctx; }
 
+    // Capture: request before render(), then take after it (waits for this frame's fence). RGB, 8 bits
+    bool requestCapture();
+    bool takeCapture(std::vector<uint8_t>& rgb, uint32_t& width, uint32_t& height);
+
 private:
     entt::registry& reg;
     Context ctx;

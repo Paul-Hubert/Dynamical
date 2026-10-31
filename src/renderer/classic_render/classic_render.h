@@ -39,7 +39,13 @@ public:
 
     void present();
 
+    // Copies this frame's image to host memory at the end of record(). Read it once the frame fence is signaled
+    bool requestCapture();
+    void readCapture(std::vector<uint8_t>& rgb, uint32_t& width, uint32_t& height);
+
 private:
+    void recordCapture(vk::CommandBuffer command);
+
     entt::registry& reg;
     Context& ctx;
 
@@ -61,6 +67,9 @@ private:
     std::vector<vk::Semaphore> presentSemaphores;
 
     bool acquired = false;
+
+    VmaBuffer capture_buffer;
+    bool capture_requested = false;
 
 };
 

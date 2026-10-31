@@ -112,7 +112,69 @@ void ClassicRender::record(uint32_t frame_index, const std::vector<ScenePass*>& 
 
     command.endRenderPass();
 
+    if(capture_requested) recordCapture(command);
+
     command.end();
+
+}
+
+bool ClassicRender::requestCapture() {
+
+    if(!ctx.swap.readable || !acquired) return false;
+
+    vk::DeviceSize size = (vk::DeviceSize) ctx.swap.extent.width * ctx.swap.extent.height * 4;
+    if(!capture_buffer || capture_buffer.size < size) {
+        VmaAllocationCreateInfo allocInfo = {};
+        allocInfo.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
+        allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        capture_buffer = VmaBuffer(ctx.device, &allocInfo, vk::BufferCreateInfo({}, size, vk::BufferUsageFlagBits::eTransferDst, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+        capture_buffer.size = size;
+    }
+
+    capture_requested = true;
+    return true;
+
+}
+
+void ClassicRender::recordCapture(vk::CommandBuffer command) {
+
+    vk::Image image = ctx.swap.images[ctx.swap.current];
+    vk::ImageSubresourceRange range(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1);
+    vk::Extent2D extent = ctx.swap.extent;
+
+    command.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput, vk::PipelineStageFlagBits::eTransfer, {}, {}, {},
+        vk::ImageMemoryBarrier(vk::AccessFlagBits::eColorAttachmentWrite, vk::AccessFlagBits::eTransferRead,
+            vk::ImageLayout::ePresentSrcKHR, vk::ImageLayout::eTransferSrcOptimal, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image, range));
+
+    command.copyImageToBuffer(image, vk::ImageLayout::eTransferSrcOptimal, capture_buffer,
+        vk::BufferImageCopy(0, 0, 0, vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1), vk::Offset3D(), vk::Extent3D(extent.width, extent.height, 1)));
+
+    command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost | vk::PipelineStageFlagBits::eBottomOfPipe, {}, {},
+        vk::BufferMemoryBarrier(vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eHostRead, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, capture_buffer, 0, VK_WHOLE_SIZE),
+        vk::ImageMemoryBarrier(vk::AccessFlagBits::eTransferRead, {}, vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::ePresentSrcKHR,
+            VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image, range));
+
+}
+
+void ClassicRender::readCapture(std::vector<uint8_t>& rgb, uint32_t& width, uint32_t& height) {
+
+    capture_requested = false;
+
+    width = ctx.swap.extent.width;
+    height = ctx.swap.extent.height;
+
+    vmaInvalidateAllocation(ctx.device, capture_buffer.allocation, 0, VK_WHOLE_SIZE);
+    VmaAllocationInfo info;
+    vmaGetAllocationInfo(ctx.device, capture_buffer.allocation, &info);
+    const uint8_t* pixels = static_cast<const uint8_t*>(info.pMappedData);
+
+    bool bgra = ctx.swap.format == vk::Format::eB8G8R8A8Srgb || ctx.swap.format == vk::Format::eB8G8R8A8Unorm;
+    rgb.resize((size_t) width * height * 3);
+    for(size_t i = 0; i < (size_t) width * height; i++) {
+        rgb[i * 3 + 0] = pixels[i * 4 + (bgra ? 2 : 0)];
+        rgb[i * 3 + 1] = pixels[i * 4 + 1];
+        rgb[i * 3 + 2] = pixels[i * 4 + (bgra ? 0 : 2)];
+    }
 
 }
 

@@ -46,8 +46,15 @@ Swapchain::Swapchain(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
 }
 
 void Swapchain::setup() {
+
+    // Transfer source so a frame can be read back (captures)
+    vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eColorAttachment;
+    if(capabilities.supportedUsageFlags & vk::ImageUsageFlagBits::eTransferSrc) {
+        usage |= vk::ImageUsageFlagBits::eTransferSrc;
+    }
+    readable = (bool) (usage & vk::ImageUsageFlagBits::eTransferSrc);
     
-    vk::SwapchainCreateInfoKHR createInfo({}, ctx.win.surface, num_frames, format, colorSpace, extent, 1, vk::ImageUsageFlagBits::eColorAttachment, vk::SharingMode::eExclusive,
+    vk::SwapchainCreateInfoKHR createInfo({}, ctx.win.surface, num_frames, format, colorSpace, extent, 1, usage, vk::SharingMode::eExclusive,
         1, &ctx.device.g_i, capabilities.currentTransform, vk::CompositeAlphaFlagBitsKHR::eOpaque, presentMode, VK_TRUE, swapchain
     );
     

@@ -23,6 +23,7 @@
 #include "logic/components/input.h"
 
 #include "util/log.h"
+#include "view/capture.h"
 
 #include <algorithm>
 #include <chrono>
@@ -62,7 +63,7 @@ Game::Game(int argc, char** argv) {
     reg.ctx().emplace<FrameClock>();
 }
 
-void Game::start() {
+int Game::start() {
 
     entt::registry& reg = *registry;
 
@@ -107,6 +108,16 @@ void Game::start() {
     const RunArgs& args = reg.ctx().get<RunArgs>();
     FrameClock& frame_clock = reg.ctx().get<FrameClock>();
 
+    std::unique_ptr<Capture> capture;
+    if(!args.capture.empty()) {
+        capture = std::make_unique<Capture>(reg, args);
+        if(capture->failed()) {
+            dy::log(dy::error) << capture->error << "\n";
+            return 1;
+        }
+    }
+    std::vector<uint8_t> pixels;
+
     // start loop
 
     using clock = std::chrono::high_resolution_clock;
@@ -133,13 +144,34 @@ void Game::start() {
         frame_clock.time += dt;
         frame_clock.frame++;
 
+        if(capture) capture->beginFrame(frame_clock.frame);
+
         set->pre_tick(dt);
 
         set->post_tick(dt);
 
+        bool shoot = capture && capture->due(frame_clock.frame) && renderer->requestCapture();
+
         renderer->render();
 
+        if(shoot) {
+            uint32_t width, height;
+            if(renderer->takeCapture(pixels, width, height)) capture->save(pixels, width, height);
+            else capture->error = "frame readback failed";
+        }
+
+        if(capture) {
+            if(capture->failed()) {
+                dy::log(dy::error) << capture->error << "\n";
+                return 1;
+            }
+            if(capture->done() && args.exit_after_capture) running = false;
+        }
+        if(args.ticks > 0 && frame_clock.frame >= (uint64_t) args.ticks) running = false;
+
     }
+
+    return 0;
 
 }
 

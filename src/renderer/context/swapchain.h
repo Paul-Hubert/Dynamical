@@ -39,6 +39,8 @@ public :
     vk::Format findSupportedFormat(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features);
 
     uint32_t current = 1000;
+
+    bool readable = false; // images have eTransferSrc
     
     
 private :

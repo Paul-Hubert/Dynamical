@@ -13,7 +13,8 @@ class Renderer;
 class Game {
 public:
     Game(int argc, char** argv);
-    void start();
+    // Returns the process exit code
+    int start();
     ~Game();
 
     std::unique_ptr<entt::registry> registry;

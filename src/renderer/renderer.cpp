@@ -181,6 +181,19 @@ void Renderer::render() {
 
 }
 
+bool Renderer::requestCapture() {
+    return classic->requestCapture();
+}
+
+bool Renderer::takeCapture(std::vector<uint8_t>& rgb, uint32_t& width, uint32_t& height) {
+
+    auto& f = per_frame[ctx.frame_index];
+    ctx.device->waitForFences({ f.fence }, VK_TRUE, std::numeric_limits<uint64_t>::max());
+    classic->readCapture(rgb, width, height);
+    return !rgb.empty();
+
+}
+
 void Renderer::finish() {
 
     ctx.device->waitIdle();
