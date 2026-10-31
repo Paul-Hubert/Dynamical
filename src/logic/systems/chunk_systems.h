@@ -32,6 +32,8 @@ public:
     void finish() override;
 
 private:
+    void collect();
+
     struct Job {
         entt::entity entity;
         glm::ivec3 pos;

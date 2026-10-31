@@ -12,6 +12,7 @@
 #include "logic/components/camera.h"
 #include "logic/components/vr.h"
 #include "logic/settings/settings.h"
+#include "scene/run_args.h"
 
 using namespace dy;
 
@@ -90,11 +91,7 @@ void ChunkGeneratorSys::preinit() {
     reg.ctx().emplace<std::shared_ptr<TerrainGenerator>>(generator);
 }
 
-void ChunkGeneratorSys::tick(double dt) {
-
-    OPTICK_EVENT();
-
-    // Collect finished jobs
+void ChunkGeneratorSys::collect() {
 
     for(auto it = jobs.begin(); it != jobs.end();) {
         auto& job = *it;
@@ -115,6 +112,19 @@ void ChunkGeneratorSys::tick(double dt) {
         it = jobs.erase(it);
     }
 
+}
+
+void ChunkGeneratorSys::tick(double dt) {
+
+    OPTICK_EVENT();
+
+    // Fixed-clock runs generate every pending chunk this frame, so what is loaded at frame N never depends on
+    // worker timing
+    auto* args = reg.ctx().find<RunArgs>();
+    const bool sync = args && args->deterministic();
+
+    collect();
+
     if(jobs.size() >= max_jobs) return;
 
 
@@ -129,7 +139,7 @@ void ChunkGeneratorSys::tick(double dt) {
         candidates.emplace_back(glm::distance2(view.get<ChunkC>(entity).center(), center), entity);
     }
 
-    size_t count = std::min(candidates.size(), max_jobs - jobs.size());
+    size_t count = sync ? candidates.size() : std::min(candidates.size(), max_jobs - jobs.size());
     std::partial_sort(candidates.begin(), candidates.begin() + count, candidates.end());
 
     tf::Executor& executor = reg.ctx().get<tf::Executor>();
@@ -147,6 +157,15 @@ void ChunkGeneratorSys::tick(double dt) {
             job->surface = generator->generate(job->pos, job->values, job->mean);
             job->done.store(true);
         });
+    }
+
+    if(sync) {
+        for(auto& job : jobs) {
+            while(!job->done.load()) {
+                std::this_thread::yield();
+            }
+        }
+        collect();
     }
 
 }

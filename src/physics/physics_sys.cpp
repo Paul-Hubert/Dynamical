@@ -151,6 +151,10 @@ void PhysicsSys::updateTerrain(int steps) {
     const auto& lock_interface = world->system().GetBodyLockInterfaceNoLock();
     const float frame_time = steps * fixed_dt;
 
+    // No background prefetch in fixed-clock runs: colliders are only built synchronously, when required
+    auto* args = reg.ctx().find<RunArgs>();
+    const bool deterministic = args && args->deterministic();
+
     for(auto [entity, body] : reg.view<RigidBody>().each()) {
         if(body.motion != RigidBody::Motion::Dynamic || !body.created()) continue;
 
@@ -163,7 +167,7 @@ void PhysicsSys::updateTerrain(int steps) {
         glm::vec3 velocity = toGlm(b.GetLinearVelocity());
 
         required.push_back(grow(bounds, velocity * frame_time, 1.f));
-        prefetch.push_back(grow(bounds, velocity * lookahead, 4.f));
+        if(!deterministic) prefetch.push_back(grow(bounds, velocity * lookahead, 4.f));
     }
 
     terrain->update(required, prefetch, sim_time);
