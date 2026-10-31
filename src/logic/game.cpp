@@ -19,6 +19,7 @@
 #include "logic/settings/settings.h"
 #include "scene/run_args.h"
 
+#include "logic/components/frame_clock.h"
 #include "logic/components/input.h"
 
 #include "util/log.h"
@@ -49,6 +50,7 @@ Game::Game(int argc, char** argv) {
         dy::log(dy::warning) << "Argument ignored, " << error << "\n";
     }
     reg.ctx().emplace<RunArgs>(parsed.args);
+    reg.ctx().emplace<FrameClock>();
 }
 
 void Game::start() {
@@ -93,6 +95,8 @@ void Game::start() {
     renderer->init();
 
     Input& input = reg.ctx().get<Input>();
+    const RunArgs& args = reg.ctx().get<RunArgs>();
+    FrameClock& frame_clock = reg.ctx().get<FrameClock>();
 
     // start loop
 
@@ -114,6 +118,11 @@ void Game::start() {
 
         double dt = std::chrono::duration_cast<std::chrono::nanoseconds>(clock::now() - start).count() / 1000000000.0;
         start = clock::now();
+        if(args.deterministic()) dt = args.fixed_frame_dt;
+
+        frame_clock.dt = dt;
+        frame_clock.time += dt;
+        frame_clock.frame++;
 
         set->pre_tick(dt);
 

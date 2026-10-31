@@ -19,7 +19,9 @@
 #include "renderer/passes/model_pass.h"
 #include "renderer/passes/ui_pass.h"
 
+#include "logic/components/frame_clock.h"
 #include "logic/components/render_settings.h"
+#include "scene/run_args.h"
 
 using namespace dy;
 
@@ -98,6 +100,9 @@ void Renderer::render() {
     auto& f = per_frame[ctx.frame_index];
     uint32_t frame_index = ctx.frame_index;
     float time = std::chrono::duration<float>(std::chrono::steady_clock::now() - start_time).count();
+    if(auto* args = reg.ctx().find<RunArgs>(); args && args->deterministic()) {
+        time = (float) reg.ctx().get<FrameClock>().time;
+    }
 
     ctx.transfer.check();
 

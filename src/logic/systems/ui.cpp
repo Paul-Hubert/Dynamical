@@ -7,6 +7,7 @@
 #include "renderer/context/context.h"
 
 #include "logic/components/input.h"
+#include "scene/run_args.h"
 
 using namespace dy;
 
@@ -59,6 +60,9 @@ void UISys::tick(double dt) {
     Uint64 current_time = SDL_GetPerformanceCounter();
     io.DeltaTime = g_Time > 0 ? (float)((double)(current_time - g_Time) / frequency) : (float)(1.0f / 60.0f);
     g_Time = current_time;
+    if(auto* args = reg.ctx().find<RunArgs>(); args && args->deterministic()) {
+        io.DeltaTime = (float) dt;
+    }
 
     ImGui::NewFrame();
     

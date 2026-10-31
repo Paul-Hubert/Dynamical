@@ -12,6 +12,7 @@
 #include "logic/components/rigid_body.h"
 #include "logic/components/transform.h"
 
+#include "scene/run_args.h"
 #include "util/log.h"
 
 #include <algorithm>
@@ -216,6 +217,11 @@ void PhysicsSys::tick(double dt) {
         }
 
         stats.step_ms = millis(start);
+
+        // Wall-clock timings are shown in the debug menu, keep fixed-clock captures reproducible
+        if(auto* args = reg.ctx().find<RunArgs>(); args && args->deterministic()) {
+            stats.step_ms = stats.colliders_ms = 0.f;
+        }
 
         accumulator -= steps * fixed_dt;
         if(accumulator > fixed_dt) {
