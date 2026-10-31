@@ -23,7 +23,7 @@ folder. When they change, update this spec, then regenerate the diagram.
 | Lane | Contents |
 |---|---|
 | **1. Unity (authoring only)** | `Dynamical-noToes` project: HeidelBot noToes prefab (16 bodies, 15 joints, Plagenhoef masses); Mecanim walk clip(s); Editor exporter (batch). Outputs, as file icons: `body.json`, `params.json`, `track.json/.bin`, `golden/*.json` |
-| **2. Shared library `dynamical_sim`** | Scene loader (JSON: variables, systems, worlds, prefabs), system and component registries; World = `entt::registry` + `SystemSet` + Jolt `PhysicsSystem`; `RagdollBuilder`; agent runtime (layouts 138×2 / 120, rewards, termination, episodes, energy recorder); `JoltRuntime` |
+| **2. Shared library `dynamical_sim`** | Scene loader (JSON: variables, systems, worlds, prefabs), system and component registries; World = `entt::registry` + `SystemSet` + Jolt `PhysicsSystem`; `RagdollBuilder`; agent runtime (Jolt-native layout heidelbot_notoes_2, 138×2 / 120, rewards, termination, episodes, energy recorder); `JoltRuntime` |
 | **3. Executables** | `dynamical_train` = **TrainingEnv.exe** (headless; `TrainHost`; modes train / null / bench / eval / record-demo; links `dynamical_mlagents` gRPC and `dynamical_onnx`). `dynamical` (Vulkan, SDL, OpenXR; `WorldView`, panels; links `dynamical_onnx`) |
 | **4. Scenes** | `walker_train` (in TrainingEnv.exe: 25 flat-ground worlds); `rig_anim` (in dynamical: kinematic pose-track playback plus live checks); `walker_view` (in dynamical: latest ONNX policy); `base` (in dynamical: marching-cubes world, unchanged) |
 | **5. Python trainer (unchanged)** | `mlagents-learn` fork, configs, GAIL, W&B, `start-run` / `stop-run`. Outputs: `results/<run>/*.onnx`, TensorBoard / W&B stats |
@@ -37,7 +37,7 @@ folder. When they change, update this spec, then regenerate the diagram.
 4. Trainer ⇄ TrainingEnv.exe: a bidirectional thick edge, "gRPC, ML-Agents protocol 1.5.0: obs,
    rewards and stats out; actions, env params and RESET in".
 5. Trainer → `results/*.onnx` → `walker_view` ("hot-reload of the newest checkpoint; separate process").
-6. `golden/*.json` → `dynamical_tests` ("parity and regression").
+6. `golden/*.json` → `dynamical_tests` ("Unity oracle and regression").
 7. TrainingEnv.exe `eval` → CSV and `EVT|` lines → existing analysis scripts.
 8. Replays → `walker_view` and the Unity `ReplayPlayer` ("videos").
 
@@ -80,7 +80,7 @@ Show each gate as a diamond with a two-to-four-word gate label:
 | M0 | "trainer ceiling measured" |
 | M1 | "rest pose 1e-5 m" |
 | M2 | "limits ±1°, energy checks" |
-| M3 | "rewards/obs reproduce" |
+| M3 | "oracle features match" |
 | M4 | "unmodified config trains" |
 | M5 | "GAIL loads demos" |
 | M6 | "matches Unity reference" |
@@ -121,10 +121,10 @@ stays unchanged.
 Layout: five vertical lanes, left to right, following the data flow:
 1. "Unity — authoring only" (muted): HeidelBot noToes prefab (16 bodies, 15 joints, Plagenhoef
    masses), Mecanim walk clip, Editor exporter. Output file glyphs: body.json, params.json,
-   track.bin, golden/*.json.
+   track.bin, golden/*.json; a small 'Unity importer' box on the engine side converts them.
 2. "dynamical_sim (shared C++ library)": Scene loader (JSON: variables, systems, worlds, prefabs);
    System & component registries; World = EnTT registry + SystemSet + Jolt PhysicsSystem;
-   RagdollBuilder; Agent runtime (obs 138×2, actions 120, rewards, termination, episodes, exact
+   RagdollBuilder; Agent runtime (Jolt-native layout, obs 138×2, actions 120, rewards, termination, episodes, exact
    energy recorder); JoltRuntime.
 3. "Executables": chip "TrainingEnv.exe (dynamical_train, headless)" containing TrainHost with
    modes train / null / bench / eval / record-demo, linking gRPC bridge and ONNX Runtime; chip
@@ -143,7 +143,7 @@ Labelled edges:
 - TrainingEnv.exe ⇄ mlagents-learn, the thickest line on the canvas: "gRPC · ML-Agents 1.5.0 —
   obs/rewards/stats out, actions/env params/RESET in"
 - results/*.onnx → walker_view: "hot-reload newest checkpoint · separate process"
-- golden/*.json → "dynamical_tests": "parity & regression"
+- golden/*.json → "dynamical_tests": "Unity oracle & regression"
 - TrainingEnv.exe eval → "CSV + EVT lines" → "existing analysis scripts"
 
 Inset (bottom-right), titled "One decision window in TrainingEnv.exe": exchange → scatter actions →
@@ -166,7 +166,7 @@ Milestones: put a small text pill on each box with the milestone that delivers i
 Along the bottom, a timeline strip S1 → S2 → M0 → M1 → M2 → M3 → M4 → M5/M5b → M6 → M7 → M8 → M9.
 Each gate is a diamond with a short label:
 S1 "base unchanged", S2 "25 worlds deterministic", M0 "trainer ceiling measured",
-M1 "rest pose 1e-5 m", M2 "limits ±1°, energy checks", M3 "rewards/obs reproduce",
+M1 "rest pose 1e-5 m", M2 "limits ±1°, energy checks", M3 "oracle features match",
 M4 "unmodified config trains", M5 "GAIL loads demos", M6 "matches Unity reference".
 
 A small greyed "later" note: heightfield terrain, marching-cubes terrain for agents, VR,

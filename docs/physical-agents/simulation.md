@@ -23,7 +23,7 @@ struct WorldRng  { std::mt19937_64 engine; };   // seeded hash(base_seed, index)
   their own.
 
 This replaces Unity's single PhysX scene holding 25 arenas 350 m apart under collision filtering
-(UP §2).
+(UA §9.1).
 
 ## Fixed lane
 
@@ -40,35 +40,35 @@ master's systems. The scene loader uses an untyped `add(list, unique_ptr<System>
 
 ## Per-tick schedule
 
-UP §3.6 makes Unity's implicit order explicit. The world template lists these systems in this order:
+Unity runs Academy and agent updates in an undefined order (UA §3.1). Here the order is explicit, and the world template lists these systems in this order:
 
-| # | System | Phase | Does (UP ref) |
+| # | System | Phase | Does |
 |---|---|---|---|
-| 1 | `TrainerActions` / `Policy` / `TrackActions` | Act | Applies the action received for this window: targets and gains (UP §3.5). `Policy` runs ONNX first. `TrackActions` is the kinematic player |
+| 1 | `TrainerActions` / `Policy` / `TrackActions` | Act | Applies the action received for this window: targets and gains ([agent-runtime.md](agent-runtime.md#actions-8--15)). `Policy` runs ONNX first. `TrackActions` is the kinematic player |
 | 2 | `DriveTargets` | Every | Writes the held drive targets into the Jolt motors; the target is rewritten every tick |
-| 3 | `Disturbances` | Every | Push impulses and pull constraints, randomisation events (UP §3.7) |
-| 4 | `PhysicsStep` | Every | `PhysicsWorld::step(h)`. Collision sub-steps; constraint impulses are read per sub-step by the energy recorder (UP §3.8) |
-| 5 | `BodySync` | Every | Segment poses and velocities, **finite-difference bone-origin velocities** (UP §3.4), joint angles |
+| 3 | `Disturbances` | Every | Push impulses and pull constraints, randomisation events |
+| 4 | `PhysicsStep` | Every | `PhysicsWorld::step(h)`. Collision sub-steps; constraint impulses are read per sub-step by the energy recorder |
+| 5 | `BodySync` | Every | Segment poses and velocities, **finite-difference anchor velocities**, joint angles |
 | 6 | `Energy` | Every | Exact motor work from lambdas, plus whole-body d(KE + PE) as a cross-check |
 | 7 | `Contacts` | Every | Drains the contact recorder into per-segment contacts |
 | 8 | `Stats` | Every | Accumulates per-episode stats |
-| 9 | `Termination` | Every | Kill and truncation (UP §3.7). A terminal agent **snapshots its terminal observation and reward now** and parks (below) |
+| 9 | `Termination` | Every | Kill and truncation. A terminal agent **snapshots its terminal observation and reward now** and parks (below) |
 | 10 | `Observation` | Observe | Builds the stacked observation for the window that just ended |
-| 11 | `Episode` | Observe | Final rewards for the window; writes `AgentStep`s to the `Outbox`; resets done agents (UP §3.7 reset order) |
+| 11 | `Episode` | Observe | Final rewards for the window; writes `AgentStep`s to the `Outbox`; resets done agents |
 
-**Decided differences from Unity, all from UP §3.6:**
+**Decided differences from Unity:**
 - the decision phase is per episode;
 - terminal-window rewards are counted;
 - the order is fixed.
 
-Parity mode does not reproduce Unity's undefined same-order `FixedUpdate`s.
+The undefined same-order `FixedUpdate`s of Unity are not reproduced.
 
 ### Windows, lockstep and early termination
 
 - **Lockstep.** The trainer exchange is lockstep: every agent in a process decides on the same exchange.
   Windows are therefore global, `decision_period` ticks long, and every episode starts on a window
-  boundary. That gives each episode its own decision phase, which is the UP decision.
-- **A kill mid-window** (UP: kill on the first dying tick):
+  boundary. Unity also uses one global decision phase (UA §3.1); here every episode additionally starts on a boundary.
+- **A kill mid-window** (Unity kills on the first dying tick):
   1. `Termination` snapshots the terminal observation and reward at that tick.
   2. The agent's world **stops stepping** for the rest of the window. Training has one agent per
      world, so nothing else in that world needs to advance.
@@ -77,9 +77,9 @@ Parity mode does not reproduce Unity's undefined same-order `FixedUpdate`s.
   The episode thus ends exactly at the kill tick, as in Unity, without breaking lockstep.
 - **Several agents per world** (later lines, duels): park the dead agent's bodies kinematic, or end
   the group episode. This is decided per line in M9.
-- **Truncation** (`maxFrames`, UP §3.7) is checked on window boundaries. The agent-parameter loader
-  rejects a `max_frames` that is not a multiple of `decision_period`, unless the scene sets
-  `allow_unaligned_truncation`.
+- **Truncation** (`episode_s`, 33.3 s = 2000 ticks at 60 Hz, a multiple of the decision period 2) is
+  checked on window boundaries. The params loader rejects an episode length that is not a whole number
+  of windows.
 
 ## Training host
 
@@ -97,7 +97,7 @@ loop:
 ```
 
 - Runs as fast as the CPU allows. The engine-configuration `time_scale` and frame rate are accepted
-  and ignored (UP §3.9).
+  and ignored.
 - `mode=bench`: random actions, no bridge, prints ticks/s per world and in total.
 - `mode=null`: no worlds; fixed observations for 25 agents (M0).
 - `mode=eval` and `mode=record-demo`: [inference-and-replay.md](inference-and-replay.md).

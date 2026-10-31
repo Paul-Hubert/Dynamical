@@ -4,7 +4,7 @@
 **kinematic** bodies, plays Unity pose tracks onto them, and checks live everything later milestones
 depend on. No drives, policy or trainer are involved.
 
-It is the visual front end of the M1 gate and the debugging tool for M3 parity and M5 demos. The
+It is the visual front end of the M1 gate and the debugging tool for M3 (features against the Unity oracle) and M5 demos. The
 demo recorder runs the same playback path headless.
 
 ## Scene
@@ -47,7 +47,7 @@ demo recorder runs the same playback path headless.
 | `TrackPlayer` | world, every tick | Reads frame `f` of the `PoseTrack` and calls `MoveKinematic` on each segment body (so Jolt computes the implied velocities and contacts). Supports play, pause, step ±1 frame, scrub, loop, and an alternative "teleport" mode (`SetPositionAndRotation`) |
 | `BodySync` | world | The same system as in training: finite-difference velocities and joint angles. **No separate code path for validation** |
 | `RigChecks` | world | Per tick: the checks below; violations go to a ring buffer with tick and frame |
-| `Observation` | world, on observe ticks | The **real** observation layout on the kinematic pose, as the demo recorder does (UP §3.10) |
+| `Observation` | world, on observe ticks | The **real** observation layout on the kinematic pose, as the demo recorder does |
 | `RigPanel` | host (ImGui/ImPlot) | Transport controls, track and body pickers, check results, plots |
 | `WorldView` | host | Draws segment shapes (capsule/box glTF), optional bone axes, joint twist and swing arcs with limit wedges, foot contact markers |
 
@@ -74,5 +74,5 @@ as well as a viewer.
   Jolt limit wedge.
 - **Bake regressions.** Diff two tracks of the same clip, from different exporter versions, in one
   scene with two worlds side by side.
-- **Mirroring check.** Visual confirmation that `simToEngine` produces a correct, non-mirrored-looking
-  walker: the left leg is on the left.
+- **Import check.** Visual confirmation that the Unity importer's frame conversion produces a correct
+  walker: the left leg is on the left, and it walks toward −z.

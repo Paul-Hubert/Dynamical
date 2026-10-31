@@ -1,101 +1,182 @@
 # Agent runtime
 
-The C++ replacement for the ~5.7k lines of active-path MonoBehaviours (UP §3.3). The **content** is
-UP's: layouts in §3.4–3.5, reset, randomisation, rewards and termination in §3.7, energy in §3.8. This
-doc defines where each piece lives and the interfaces it implements.
+The task is defined natively in C++ on Jolt state. It reproduces the experiments' **intent and
+behaviour**, not Unity's arithmetic. The Unity reference, with file:line sources, is
+[unity-analysis.md](unity-analysis.md) ("UA §x"). The trainer contract stays exact:
+- behaviour names, observation and action sizes, the sensor name;
+- reward and done semantics;
+- stat names and env param names.
 
 ## Components (agent root entity, next to `ArticulatedBody`)
 
 ```cpp
 struct Agent        { uint16_t behavior; int32_t group_id = 0; };
-struct AgentId      { int32_t value; };                 // stable across episodes
-struct ActionBuffer { std::vector<float> continuous; bool fresh = false; };
-struct HeldDrive    { /* per joint: spring, damper, target local rotation, target angular velocity */ };
-struct ObsStack     { std::vector<float> frames; uint32_t size, depth; };   // oldest first, zeroed at reset
+struct AgentId      { int32_t value; };                       // stable across episodes
+struct ActionBuffer { std::array<float, 120> a{}; bool fresh = false; };
+struct HeldDrive    { std::array<JointDrive, 15> joints; };    // stiffness, damping, target rotation, target ω (constraint space)
+struct ObsStack     { std::array<float, 138 * 2> v{}; };       // oldest first, zeroed at reset
+struct AnchorHistory{ std::array<glm::vec3, 15> prev; bool valid = false; };   // finite-difference velocities
 struct RewardWindow { float reward = 0; std::array<float, 16> terms{}; };
-struct Episode {
-    uint64_t tick = 0;                                  // ticks since episode start
-    uint32_t decisions = 0;
-    bool killed = false, truncated = false;
-    bool parked = false;                                // terminal snapshot taken, waiting for window end
-    std::vector<float> terminal_obs; float terminal_reward = 0;
-};
-struct TaskState    { glm::vec3 target; float target_speed; uint32_t arc_ticks; /* push/pull state */ };
-struct AgentConfig  { std::shared_ptr<const AgentParams> params; EpisodeOverrides overrides; };
+struct Episode      { uint64_t tick = 0; uint32_t decisions = 0; bool killed = false, truncated = false, parked = false;
+                      std::array<float, 138 * 2> terminal_obs; float terminal_reward = 0; };
+struct Task         { glm::vec3 target; float target_speed; float arc_timer_s; float est0; /* push/pull state */ };
+struct EnergyState  { /* per joint per window: pos/neg/abs motor work, limit work, vectors τ, ω_rel; whole-body E */ };
+struct Recording {};                                           // tag: demo recorder / rig_anim
 ```
-
-An **agent slot** is built once by `AgentFactory` (world init, from `AgentSpawn`). Episodes reset it
-in place.
 
 ## Layouts
 
-```cpp
-class ObservationLayout {           // one per (body, version), registered by name
-public:
-    virtual std::vector<ObservationSpec> specs() const = 0;     // names exactly as Unity (UP §3.4)
-    virtual std::span<const char* const> element_names() const = 0;
-    virtual void write(const entt::registry&, entt::entity agent, std::span<float> out) const = 0;   // pure
-};
-class ActionLayout {
-public:
-    virtual int size() const = 0;
-    virtual void apply(entt::registry&, entt::entity agent, std::span<const float> a) const = 0; // gains + targets
-    virtual void zero(std::span<float> a) const;                 // demo actions are zeros (UP §3.10)
-};
+Layouts are versioned and registered by name; the params file selects one.
+
+| Layout | Use |
+|---|---|
+| **`heidelbot_notoes_2`** | **Trained.** The Jolt-native definition below |
+| `heidelbot_notoes_1` | **Test oracle only.** Unity's exact math (non-orthogonal referential, right-side negation, ZXY targets), used to check the rig, frames and features against Unity logs. Never trained |
+
+Both have 138 floats, a stack of 2 and 120 actions. The sensor name the trainer sees stays
+`StackingSensor_size2_VectorSensor_size138` (*verify* the exact string with the fork). The layout
+version goes into the run metadata and the demo cache key, so `_2` demos and checkpoints never mix
+with Unity's.
+
+### Frames
+
+- **Segment forward** `f(s)` = the segment's rest forward axis in world space (Unity's +z, i.e. −z in
+  the engine after import).
+- **Heading frame** `H(s)`, yaw-only:
+  - `x = normalize(horizontal(f(s)))`;
+  - `y = world up`;
+  - `z = x × y` (right-handed).
+- **Intent.** This replaces Unity's non-orthogonal referential (UA §2.2). The command and the
+  velocities stay expressed relative to where the body faces. The vertical component is always true
+  world vertical, which carries gravity and inclination, as in Unity. Pitch no longer leaks into x.
+- **Parent frame per joint** (UA §2.3):
+  - Spine: its own frame;
+  - UpLegs, Spine2: Spine;
+  - Head, Arms: Spine2;
+  - Leg: UpLeg; Foot: Leg; ForeArm: Arm; Hand: ForeArm.
+
+### Header (3)
+
+```
+tsv  = horizontal(target − Spine.anchor).normalized · target_speed      (0 while dying, 0 when Recording)
+v    = horizontal(Spine COM linear velocity)                             (Jolt body velocity: true COM velocity)
+d    = tsv − v                                                           (0 when Recording: see GAIL coupling)
+est  = max over feet of (Head.anchor.y − Foot.anchor.y)
+obs  = [ H(Spine).x · d,  clamp01(1 − est / est0),  H(Spine).z · d ]
 ```
 
-- **The parity layout** (`heidelbot_notoes_1`, D4) follows UP §3.4 with the noToes joint list (15 joints: UP's 17 without `RToeBase` and `LToeBase`)
-  bit for bit:
-  - the 3-float header through the **non-orthogonal** spine frame;
-  - per joint, the normal and tangent negated on right-side joints, and the bone finite-difference
-    velocity, all in the parent joint's frame;
-  - the UP joint order;
-  - a stack of 2, with the sensor name `StackingSensor_size2_VectorSensor_size138` (3 + 15 × 9).
-- Optional blocks (`targetSpeedObs`, `dyingObs`, per-joint channels, the `nogail` goal sensor) are
-  flags of the layout, set from the params file only.
-- **The action layout** follows UP §3.5 (per joint: spring, damper, rx, ry, rz, ωx, ωy, ωz):
-  - gains `(a + 1)/2` times the factors, held until the next decision, initialised to (0.5, 0.5);
-  - `rx` mapped onto the twist range, centred;
-  - `ry` and `rz` as fractions of the swing limits;
-  - ω times `maxTargetAngularVelocity`.
+`est0` comes from the **body file's rest pose**, not the spawn pose. That removes Unity's dependency on
+scene placement (UA §3.3).
 
-  There is no clipping in C++; the trainer clips.
-- Shared math lives in `src/agent/features.h` (`UnorthogonalReferential`, horizontal projection,
-  bone finite differences) and is written against `SegmentState` / `JointState` only.
-- **Fixes are versions.** Fixing the header leak or the right-side negation creates a new layout
-  version. A new version needs new demos and a new baseline (UP D3).
+### Per joint (9 × 15, joint order of the body file)
 
-## Systems (world fixed lane, order in [simulation.md](simulation.md#per-tick-schedule))
+```
+n = R_child · twist_axis        (world)      → H(parent) components
+t = R_child · plane_axis        (world)      → H(parent) components
+u = (anchor_t − anchor_{t−1}) / h            → H(parent) components    (finite difference, world)
+```
 
-| System | Ports (UP §3.3) | Notes |
+- **No right-side negation.** It only flipped signs (UA §2.3).
+- **Finite-difference anchor velocity is kept.** It is robust, and identical between kinematic demos
+  and dynamic training. `AnchorHistory` is **reset after every pose write** of a reset, which removes
+  Unity's 60–120 m/s spike after a random yaw or random init.
+- The anchor is the joint pivot, i.e. the child bone origin.
+
+### Actions (8 × 15)
+
+`[s, d, ax, ay, az, ex, ey, ez]` per joint. Gains and targets are held for the whole window.
+
+| Slot | Mapping | Jolt |
 |---|---|---|
-| `AgentFactory` (init) | `JointAgent` setup, `RigidbodyCopy` | Builds ragdoll, joint order, collision group |
-| `TrainerActions` / `Policy` / `TrackActions` | `BotJoint` action mapping | Writes `HeldDrive` via `ActionLayout::apply` |
-| `DriveTargets` | `BotJoint` drive configuration | Jolt motors from `HeldDrive`, every tick |
-| `Disturbances` | `HumanBotAgent` push/pull | Push impulse on a random segment, scaled by total mass; pull = temporary motorised constraint to a static anchor ≤ 2 s |
-| `Task` | `SetTarget`, `ArcUpdate`, `TargetMover`, `RandomSpeed` | Target re-placed every `arcFrames` ticks (not physics-rate scaled) |
-| `Rewards` | `HumanBotAgent.CalculateRewards`, `EnergyRewardProvider` | Terms as classes with names = stat names; legacy rewards only if a config needs them |
-| `Termination` | dying/kill, `maxFrames` | Kill pays `deathPenalty`, terminal done; truncation is `max_step_reached`, win reward if alive |
-| `Observation` | `CollectObservations` | Pushes into `ObsStack` |
-| `Episode` | `BotAgent` lifecycle | Outbox, then reset in UP §3.7 order |
-| `Stats` | stat recording, `DeVitaStepStat` (M7) | Same stat names (UP §3.9) |
+| s, d | `(a + 1)/2` | `stiffness = rotationSpring · s · factors`, `damping = rotationDamper · d · factors` (Head `springFactor` 0.5); scale re-derived in M2 |
+| ax | `twist = lo + (ax + 1)/2 · (hi − lo)`; a = 0 is mid-range | twist part of the target |
+| ay, az | `swing_y = ay · Y`, `swing_z = az · Z` | swing part (cone) |
+| target | `q = swing(swing_y, swing_z) · twist(twist)`, relative to rest | `SetTargetOrientationCS(q)` |
+| ex, ey, ez | `ω = e · maxTargetAngularVelocity` (rad/s, constraint axes) | motor target angular velocity; the sign is defined physically (positive ω turns the child positively about the axis) |
 
-**Reward gating.** `AddReward × rewardFactor` applies only while training (UP §3.3). The `training`
-flag comes from the brain parameters `is_training` and from the mode.
+- Initial gains (0.5, 0.5) at reset; targets at rest.
+- No clipping in C++; the trainer clips with `clamp(−3, 3)/3`.
+- `maxTargetAngularVelocity` is an experiment variable: it flips the sign of net joint work (UA §2.4).
+- **Knee rest policy.** The knee's low twist stop is 2° while the rest pose is straight (UA §1.2). The
+  body importer bends the rest knee to the stop plus 0.1°, so reset poses are inside the limits. The
+  rest pose stays the drive's zero reference.
 
-## Reset order (UP §3.7)
+## Task systems
 
-1. `RandomSpeed`.
-2. Re-read env params; a config `targetSpeed` overwrites the draw.
-3. Rest pose, zero velocities, `ResetWarmStart`.
-4. `SetTarget`.
-5. Optional random yaw. Then, with probability `randomInitChance`, the random-init drop.
-6. Reset the reward providers.
-7. `BodySync` once, then clear the finite-difference history, `ObsStack`, energy and contacts.
+### Rewards (per decision; UA §3.2, §4.1)
 
-Randomisation is gated by `randomize && training && !recording`. Use the per-world RNG
-(`WorldRng`), seeded from `seed + worker_id` and the world index. Reproducing Unity's exact sequence
-is neither possible nor needed.
+| Term | Definition | Default (flat walker / DeVita) |
+|---|---|---|
+| first decision | no reward on the first decision of an episode | |
+| `root` | `rootSpeed = ((Spine.anchor − at last decision)/T) · normalize(tsv)`; `r = min(rootSpeed, targetSpeed) · w / targetSpeed` (undivided when targetSpeed = 0); not while dying | 0.34 / 0 |
+| `energy` | UA §4.1 steps 1–7, fed by the **exact Jolt channel** (motor work per joint per sub-step); `v` from the pelvis | weight 0 / 1; `energyScale` re-derived |
+| `life`, `dying`, `head*`, `win` | as UA §3.2 | 0 |
+| `collision` | off (weight 0) but `Collision/*` stats kept | |
+| `death` | `deathPenalty` on kill | −10 |
+
+- **Scaling.** Rewards are scaled by `rewardFactor` and added only while training.
+- **Terminal window.** The terminal window's rewards **are counted**; Unity discards them (UA §3.2).
+  This is a declared difference.
+
+### Termination (UA §3.3)
+
+- **Kill:** `est < dyingHeightFactor · est0` (0.7), with `dieOnFall`. `maxDyingFrames` 0 kills on the
+  first dying tick. It is a terminal done with the death penalty.
+- **Truncation:** `episode_s` (33.3 s) gives an interrupted done (`max_step_reached`), plus the win
+  reward if alive.
+
+### Reset (explicit order; UA §3.4)
+
+1. **Target speed**, by an explicit rule:
+   - with `continuousSpeed`, uniform in [`targetSpeedMin`, `targetSpeedMax`];
+   - else, if randomizing and `randomSpeed`, a pick from `speeds` ({0, 1.36});
+   - else `targetSpeed`.
+
+   Unity silently lets a config `targetSpeed` overwrite the draw. Here that is the named rule
+   `env_target_speed_overrides_draw` (default **true**, to reproduce existing configs).
+2. Episode env params applied (UA §9.3 precedence).
+3. Ground: slope rotation and speed compensation (M7).
+4. Rest pose, zero velocities, `ResetWarmStart`.
+5. Target: if randomizing and `randomTarget`, a random radius of 20–30 m around the head; otherwise
+   1000 m straight ahead.
+6. If randomizing: random yaw; then random init with probability `randomInitChance` (+2 m, −4 m/s,
+   random rotation).
+7. **Reset `AnchorHistory`, `ObsStack`, energy, contacts and reward windows**, then run `BodySync` once.
+
+- **Randomizing** = `randomize && training && !Recording`.
+- **Arc update:** every `arc_s` (6.67 s; defined in seconds, see [conventions.md](conventions.md#time)),
+  the target is re-placed and, unless continuous, the speed is redrawn.
+
+### Disturbances (UA §3.5)
+
+- **Push:** per tick with probability `pushChance`, on a random segment: `AddImpulse` and
+  `AddAngularImpulse` of `pushForce · totalMass` with an upward-biased direction. `pushForce` default 5.
+- **Pull:** a temporary `SixDOFConstraint` to `Body::sFixedToWorld` with position and orientation
+  motors (spring `100·m·f`, damper `10·m·f`, max `1e4·m·f`), lasting up to 2 s.
+- Both use the world RNG.
+
+### GAIL coupling (UA §6)
+
+- Demos record header x,z = 0, while the policy sees `d`. Since GAIL sees the whole vector, the
+  discriminator **implicitly rewards tracking the velocity command**. This is part of the task, so
+  `_2` keeps it.
+- Moving the header into a `nogail` sensor would be a new layout version, with new demos and a new
+  baseline.
+
+### Stats
+
+Stats keep their names: `Root/*`, `Head/*`, `Death/*`, `Win/*`, `Bot Joint/*` (UA §2.4),
+`EnergyProvider/*`, `DeVita/*`, `Slope/*`, `Collision/*`.
+
+- `DeVita/*` follows UA §4.2 on the exact channel. `DeVita/Full GRF/*` is emitted with the same values,
+  because on Jolt the exact channel already includes friction.
+- Use the ratio of sums.
+- **New stats:**
+  - `Body/Torso Pitch`, since lean is otherwise unmeasured;
+  - `Physics/Foot Penetration`;
+  - `Energy/Closure Residual`.
+
+Stats are emitted only while training.
 
 ## Outbox
 
@@ -105,5 +186,4 @@ struct StatEntry { std::string key; float value; uint8_t aggregation; };   // 0.
 struct Outbox    { std::vector<AgentStep> steps; std::vector<StatEntry> stats; };
 ```
 
-- One per world. `TrainHost` gathers outboxes in world index order.
-- Stats are emitted only while training (UP §3.9).
+There is one outbox per world. `TrainHost` gathers them in world index order.

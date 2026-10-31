@@ -8,8 +8,8 @@
 | `dynamical_mlagents` | static lib | `dynamical_sim`, gRPC, protobuf | Generated protos, gRPC client, side channels, `.demo` writer |
 | `dynamical_onnx` | static lib | `dynamical_sim`, ONNX Runtime | `PolicyRunner`, `PolicySys` |
 | `dynamical` | exe (window) | `dynamical_sim`, `dynamical_onnx`, Vulkan, SDL2, OpenXR, VMA, ImGui, ImPlot | Renderer, input, UI, panels, `WorldView`, game-only systems. Scenes `base`, `rig_anim`, `walker_view` |
-| `dynamical_train` | exe (console) | `dynamical_sim`, `dynamical_mlagents`, `dynamical_onnx` | `TrainHost` and its modes. Scene `walker_train`. Output name configurable (`DYNAMICAL_TRAIN_NAME`, default `TrainingEnv`) because the trainer globs `<path>.exe` (UP §3.9) |
-| `dynamical_tests` | exe (console) | `dynamical_sim`, `dynamical_mlagents`, `dynamical_onnx`, doctest | Unit, physics, parity and protocol tests |
+| `dynamical_train` | exe (console) | `dynamical_sim`, `dynamical_mlagents`, `dynamical_onnx` | `TrainHost` and its modes. Scene `walker_train`. Output name configurable (`DYNAMICAL_TRAIN_NAME`, default `TrainingEnv`) because the trainer globs `<path>.exe` (UA §9.4) |
+| `dynamical_tests` | exe (console) | `dynamical_sim`, `dynamical_mlagents`, `dynamical_onnx`, doctest | Unit, physics, oracle and protocol tests |
 
 Systems register by name in the target that compiles them (see [scenes.md](scenes.md#registries)).
 A scene that names a system its executable does not link fails to load with a clear error. For

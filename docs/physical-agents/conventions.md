@@ -1,67 +1,56 @@
 # Conventions
 
-## Frames
+## One frame: the engine's
 
-| Frame | Handedness | Up | Forward | Used by |
-|---|---|---|---|---|
-| **Sim** | left-handed (Unity's numbers) | +y | +z | Jolt worlds of agents, body file, pose tracks, observations, rewards, replays |
-| **Engine** | right-handed | +y | −z | Renderer, `Transform`, marching-cubes terrain, `base` scene bodies |
+**The simulation is native to the engine**: right-handed, +y up, −z forward, metres. Jolt worlds of
+agents, the body file in memory, observations, rewards, replays and the renderer all share it.
 
-**Why the sim keeps Unity's numbers (UP §3.1).**
-- Unity hands left-handed coordinates to PhysX unchanged, and rigid-body physics is mirror-symmetric.
-- So Jolt can take Unity's positions, Hamilton quaternions (x, y, z, w), velocities, torques, joint
-  axes and limits verbatim.
-- That keeps every observation bit-comparable for the M3 golden tests.
-- No code in `src/physics` or `src/agent` converts frames.
+Unity's left-handed coordinates exist in exactly one place: the **Unity importer**
+(`src/agent/unity_import.*`). It reads the files the Unity exporter writes verbatim and converts them
+once at load.
 
-**Sim → engine (drawing only).** Mirror z:
+| Quantity (Unity, left-handed) | Engine (right-handed) |
+|---|---|
+| point / vector `(x, y, z)` | `(x, y, −z)` |
+| quaternion `(x, y, z, w)` | `(−x, −y, z, w)` |
+| angular velocity, torque (axial vectors) | `(−x, −y, z)` |
+| joint `axis`, `secondaryAxis` | as vectors; the importer then derives the constraint frame in the engine's handedness |
+| twist and swing limits | kept. Each twist limit is checked against the probes, because reflection can swap low and high |
+| Unity forward (+z) | engine forward (−z) |
 
-```cpp
-// src/agent/frames.h
-inline glm::vec3 simToEngine(glm::vec3 p) { return { p.x, p.y, -p.z }; }
-// R' = M R M with M = diag(1, 1, -1): the rotation axis maps to -M·axis, the angle is kept.
-inline glm::quat simToEngine(glm::quat q) { return glm::quat(q.w, -q.x, -q.y, q.z); }   // glm: (w, x, y, z)
-```
-
-- The sim's forward (+z) then draws as the engine's forward (−z), so a walker heading "forward" in Unity
-  walks into the screen.
-- `WorldView` applies this, plus a per-world offset. A unit test converts a segment's local axes and
-  checks that `cross(x', y') == z'` holds in the engine frame.
-- Agents placed in `base` (M9) use the inverse conversion when they read engine terrain.
-
-## Unity conventions to reproduce exactly
-
-These matter wherever ported code builds or decomposes rotations (UP §3.1):
-
-| Unity | Meaning | C++ |
-|---|---|---|
-| `Quaternion.Euler(x, y, z)` | applies Z, then X, then Y (degrees) | `unityEuler(glm::vec3 deg)` in `src/agent/unity_math.h` |
-| `q.eulerAngles` | decomposes in the same order into [0, 360) | `unityEulerAngles(q)` |
-| `Transform.forward / up / right` | +z / +y / +x rotated by the rotation | `unityForward(q)` … |
-| `Vector3.Angle`, `Quaternion.Angle`, `SignedAngle` | degrees, clamped dot | same names, unit-tested against values logged in Unity |
-
-Every helper in `unity_math.h` has a test against numbers logged from Unity.
+- **Why mirroring z is safe.** Rigid-body physics is mirror-symmetric, and mirroring z maps Unity's
+  forward onto the engine's forward. The walker therefore looks and moves the same, with the left leg
+  still on the left.
+- **What it buys.** There is no conversion when drawing, policy walkers can be placed in `base`, and
+  all C++ is written in one handedness.
+- **No Unity math in the runtime.** `Quaternion.Euler` ZXY, `eulerAngles` and Unity's
+  `Referential` classes are not reproduced in `src/agent`. The task is defined in its own terms
+  ([agent-runtime.md](agent-runtime.md)).
+- **Unity math stays in two places.** `src/agent/unity_math.h` (ZXY Euler and friends) serves only
+  the importer and the oracle tests that compare against Unity logs. The oracle tests convert Unity
+  golden data with the same importer.
+- **Importer test.** It converts a segment's local axes and checks `cross(x', y') == z'`. It also
+  imports the rest pose and checks that every joint anchor coincides with its parent's.
 
 ## Units
 
-- SI throughout the sim: metres, kilograms, seconds, radians internally.
-- Files may store degrees as Unity does; the field name says so (`*_deg`), and loaders convert.
-- The engine's marching-cubes world is 4 units per cube. One engine unit = 1 m. The walker drawn in
-  `walker_view` uses 1 sim m = 1 engine unit.
+- SI throughout: metres, kilograms, seconds, radians.
+- Files from Unity store degrees, and their field names say so (`*_deg`). The importer converts them.
+- One engine unit is 1 m, both in the marching-cubes world and in agent worlds.
 
 ## Time
 
 | Name | Meaning | Source |
 |---|---|---|
-| `h` | Physics tick in seconds. UP §3.1 gives Unity's exact value (a rational close to 1/60) and the `physicsRate` override | world `clock.hz` or `clock.dt` |
-| `decision_period` | Ticks per decision | agent parameters |
-| `tick` | Ticks since world creation (`uint64_t`) | `WorldClock` |
-| `episode_tick` | Ticks since episode start; decision phase counts from here (UP §3.6) | `Episode` |
-| `max_frames` | Truncation limit in **ticks**, scaled by physics rate (UP §3.7) | agent parameters |
-| frame `dt` | Wall-clock frame time in `dynamical` | `Game` loop; never fed to agent physics |
+| `h` | Physics tick. Default 1/60 s, as Unity; 120, 240 and 480 Hz are allowed | params `physics_hz` |
+| `decision_period` | Ticks per decision. **30 Hz control** is the invariant: 2 at 60 Hz, 4 at 120 Hz | derived: `physics_hz / control_hz` |
+| `episode_ticks` | Truncation length; **33.3 s** is the invariant (2000 ticks at 60 Hz) | derived from `episode_s` |
+| `arc_ticks` | Target re-placement period. Unity does not scale `arcFrames` with the physics rate; here it is defined in seconds (`arc_s` = 6.67 s) | params |
+| frame `dt` | Wall-clock frame time in `dynamical`; never fed to agent physics | `Game` |
 
-Name every field after its unit (`*_ticks`, `*_decisions`, `*_s`); never convert silently.
-`arcFrames` is **not** scaled by the physics rate (UP §3.7); keep that quirk named and tested.
+Rates and durations are stored in seconds and Hz, and tick counts are derived from them. Unity's
+quirk of scaling some counts and not others is not reproduced; this is recorded in
+[unity-analysis.md](unity-analysis.md) §8.
 
 ## Identifiers
 
@@ -69,14 +58,15 @@ Name every field after its unit (`*_ticks`, `*_decisions`, `*_s`); never convert
 |---|---|
 | `entt::entity` | Internal only; recycled. Never on the wire or in files |
 | `AgentId` (`int32_t`) | Process-unique, assigned once per agent slot from an atomic counter, kept across episodes. Sent as `AgentInfoProto.id` |
-| Behaviour name | Exact Unity names (`HeidelBotBehavior`, `AnySpeedBotBehavior`, UP §3.1), plus `?team=N` |
-| Segment index / joint index | Order of the body file = Unity's joint order (UP §3.4). Never re-sorted |
-| Layout version | `"<body>_<n>"`, e.g. `heidelbot_notoes_1`. Bumped on any change to observation or action content |
+| Behaviour name | Trainer contract: `HeidelBotBehavior` (DeVita: `AnySpeedBotBehavior`), plus `?team=N` |
+| Segment / joint index | Order of the body file. Joint order is the trainer-facing order: Spine, Spine2, Head, RUpLeg, RLeg, RFoot, RArm, RForeArm, RHand, LUpLeg, LLeg, LFoot, LArm, LForeArm, LHand |
+| Body version | `heidelbot_notoes`, `heidelbot_notoes_h173`, … Each scaled or edited rig is its own body file |
+| Layout version | `heidelbot_notoes_2` (Jolt-native, trained). `heidelbot_notoes_1` (Unity oracle, tests only). Any change to observation or action content bumps it |
 
 ## Code style
 
-- Match master: `PascalCase` types, `snake_case` members, systems end in `Sys`, plain-struct components,
-  EnTT 3.16 ctx API (`reg.ctx().emplace/get/find`).
+- Match master: `PascalCase` types, `snake_case` members, systems end in `Sys`, plain-struct
+  components, EnTT 3.16 ctx API (`reg.ctx().emplace/get/find`).
 - `OPTICK_EVENT()` at the top of every `tick`.
 - Definitions loaded from disk (`BodyDef`, `PoseTrack`, `AgentParams`) are immutable after load and
   shared by `std::shared_ptr<const T>`. Mutable per-world state lives in that world's registry.

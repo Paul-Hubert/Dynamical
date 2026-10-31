@@ -69,7 +69,7 @@ executables load scenes with the same loader: `dynamical scene=<name>` and
   3. nothing else.
 
   ML-Agents environment parameters are **not** scene variables: they belong to the agent parameters
-  and follow UP §3.9's precedence ([mlagents-bridge.md](mlagents-bridge.md#environment-parameters)).
+  and follow Unity's precedence (UA §9.3) ([mlagents-bridge.md](mlagents-bridge.md#environment-parameters)).
 - **Substitution:**
   - `${name}` inside a string substitutes a variable; a string that is only `${name}` keeps the
     variable's type.
@@ -135,7 +135,7 @@ Game::start
 - `base` has no worlds. Its systems run on the host registry exactly as `Game::start` does today.
 - In `dynamical_train`, the `TrainHost` loop replaces the frame loop ([simulation.md](simulation.md#training-host)).
 - The renderer only reads the host registry. `WorldView` mirrors segment poses from worlds into host
-  entities (`Transform` + `ModelRenderable`), applying `simToEngine` and a grid offset per world. So
+  entities (`Transform` + `ModelRenderable`), applying a grid offset per world (sim and engine share one frame). So
   `ScenePass::record` keeps its single-registry, read-only rule.
 
 ## The four scenes

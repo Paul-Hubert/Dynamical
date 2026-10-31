@@ -1,7 +1,7 @@
 # ML-Agents bridge
 
 **`dynamical_train` must be indistinguishable from the Unity `TrainingEnv.exe`** to the fork's
-`mlagents-learn`, `start-run` and `stop-run`. UP §3.9 is the requirement list; this doc is the design.
+`mlagents-learn`, `start-run` and `stop-run`. The Unity-side contract is in [unity-analysis.md](unity-analysis.md) §9; this doc is the design.
 Wire details marked *verify* must be checked against the fork's
 `ml-agents-envs/mlagents_envs/communicator_objects/*.proto`, `rpc_communicator.py`, the side-channel
 classes and the C# `RpcCommunicator` before coding.
@@ -30,7 +30,7 @@ TrainingEnv.exe -nographics -batchmode --mlagents-port <base+i> -logFile <run>/P
 - Python is the gRPC **server** on `localhost:<port>`.
 - The engine is the **client**. It must connect within 60 s and repeatedly calls
   `UnityToExternalProto.Exchange(UnityMessageProto) → UnityMessageProto`.
-- Communicator version `1.5.0`, package version `4.0.0` (UP §3.9), and the RL capability flags.
+- Communicator version `1.5.0`, package version `4.0.0` and the RL capability flags.
 
 ### Sequence (*verify* the initial double exchange against the C# communicator)
 
@@ -94,18 +94,39 @@ order: Python `uuid.bytes_le`).
 
 ## Environment parameters
 
-Precedence, highest first (UP §3.9):
+Precedence, highest first (UA §9.3):
 1. `-set:<name>=<value>`;
 2. the live value from the trainer;
 3. the `-envParams=<file>` replay;
 4. the params-file default.
 
-- Values apply at initialisation and at **every episode start**, never mid-episode.
-- Sampler parameters are sampled with the world RNG per episode.
-- **An unknown name logs a warning once.** Today Unity ignores it silently.
-- Layout-changing parameters are rejected with an error ([assets.md](assets.md#agent-parameters)).
-- **`envparams.txt`** is written to `-envParamsOut=` in Unity's format, **including `sha=`**: the git
-  sha of the engine build, plus the body file and params file hashes.
+- Values apply at initialisation and at **every episode start**, never mid-episode. The exception is
+  `physicsRate`, which applies once at start (UA §9.3).
+- Sampler parameters are sampled with the world RNG per episode. Bools are `value > 0`.
+- A missing or malformed `-envParams` file is fatal (exit 1), as in Unity.
+- **An unknown name logs a warning once.** Unity ignores it silently.
+- Layout-defining parameters (`relativeVelocity` and the `*Obs` flags) are rejected with an error
+  ([assets.md](assets.md#agent-parameters)).
+
+**Accepted names** (union from UA §7, §4.1, §3.6, §9.3):
+
+| Group | Names |
+|---|---|
+| Body and drive | `rotationSpring`, `rotationDamper`, `maxTorque`, `torqueFactor`, `maxAngularVelocity`, `angularVelocityFactor`, `maxTargetAngularVelocity`, `totalMass`, `physicsRate` |
+| Task | `targetSpeed`, `continuousSpeed`, `targetSpeedMin`, `targetSpeedMax`, `randomize`, `randomTarget`, `randomSpeed`, `randomInit`, `randomInitChance`, `arcFrames`, `winDistance` |
+| Disturbances | `pushing`, `pushChance`, `pushForce`, `pulling`, `pullChance`, `pullForce` |
+| Rewards and termination | `rootReward`, `headSpringReward`, `headDamperReward`, `winReward`, `deathPenalty`, `dyingHeightFactor`, `maxDyingFrames`, `lifeReward`, `dyingReward`, `dieOnFall`, `resetOnAlive`, `collisionPenalty`, `rewardFactor`, `normalizeSpeedDiff` |
+| Energy | `energyBonusWeight`, `energyScale`, `energySpeedEdge`, `energyMinSpeedFloor`, `energyVelocitySmoothingTau`, `positiveEnergyMultiplier`, `negativeEnergyMultiplier`, `energySource` (0–2 mapped to 3 with a warning), `energyClosure`, `energyChargeResidual` and `energyFullGrf` (accepted, no-ops on Jolt, warned once), `statsSettleSeconds`, `useTorqueNotEnergy`, `energyLimitEpsDeg`, `energyRewardStyle`, `energyNormDivisor`, `energyNormOffset`, `energyMinSpeed`, `energyMaxSpeed`, `etaPositiveWork`, `etaNegativeWork` |
+| Slope (M7) | `slopeAngle`, `slopeRandom`, `slopeIncludeLevel`, `slopeSign`, `slopeCompensateSpeed`, `slopeFootReach`, `slopeLiftMargin` |
+| Misc | `selfColliding` (must be 0), `freezeJointActions`, `pinFrozenJointDrive` |
+| Inert, accepted silently | `depth`, `energyPenalty`, `legacy*` |
+
+**`envparams.txt`** is written to `-envParamsOut=` in Unity's format (UA §9.3):
+- rewritten atomically on every change;
+- header `# run=<dir> behavior=<name> written=<steps>`, then `name value` lines sorted ordinally, with
+  round-trippable floats;
+- **plus** `sha=<engine git sha>`, `body=<sha256>`, `params=<sha256>` and `layout=<version>`. Unity
+  parses `-gitSha` but never writes it.
 
 ## Process behaviour
 

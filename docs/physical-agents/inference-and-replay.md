@@ -18,7 +18,7 @@ public:
   `version_number`, `memory_size`) are *verify*. Recurrent policies (`memory_size > 0`) are refused in
   v1.
 - Apply the trainer's `clamp(−3, 3)/3` to the actions if the exported graph does not already include
-  it (*verify*: UP §3.5 says it is the only clipping).
+  it (*verify*; Unity applies no clipping of its own, UA §2.4).
 - `PolicySys` (world, Act phase) batches every agent of the world into one `run`.
 
 ## `walker_view`
@@ -52,24 +52,31 @@ public:
 deterministic actions.
 
 - It emits **the same CSV columns and `EVT|{json}` stdout lines** as Unity's `energy-eval` and
-  `gait-cycle` builds (UP §3.11), so `energy_eval_run.py` and `gait_run.py` run unchanged.
-- It applies env params from `-envParams=`. Unity's `record-run.ps1` forgets this today (UP §7).
+  `gait-cycle` builds, so `energy_eval_run.py` and `gait_run.py` run unchanged.
+- It applies env params from `-envParams=`. Unity's `record-run.ps1` forgets this today.
 
 ## Demo recorder
 
-`dynamical_train mode=record-demo var.track=<track> decisions=<n>` (UP §3.10):
+`dynamical_train mode=record-demo var.track=<track> decisions=<n>` (UA §6, §9.2). Defaults per line: flat walker 3000 decisions, DeVita 10000.
 
-1. Builds the world with a **kinematic** body and `TrackActions` playing the pose track. This is the
-   same playback as [`rig_anim`](rig-animation.md).
-2. Runs the same `Observation` system as training, with the recording flags on (`speedDiffZeroRecording`
-   and the others).
-3. Writes a stock `.demo` (*verify* against the fork's `demo_loader.py`):
+1. Builds the world with a **kinematic**, non-colliding body. `TrackActions` plays the pose track
+   with `MoveKinematic`, the same playback as [`rig_anim`](rig-animation.md). Unity's pose lands one
+   tick late; `MoveKinematic` targets the frame at the end of the step, a documented 1-tick difference.
+2. **Limits are not enforced**: kinematic bodies follow the clip even past the stops, as in Unity.
+   `rig_anim` reports by how much.
+3. Runs the same `Observation` system as training with `Recording` set:
+   - header x,z = 0 (`speedDiffZeroRecording`);
+   - header y = head error;
+   - joint velocities from the anchor finite differences.
+
+   Episodes are 1000 ticks; randomisation is off; there is no death.
+4. Writes a stock `.demo` (*verify* against the fork's `demo_loader.py`):
    - `DemonstrationMetaProto` in the first 32 bytes;
    - `BrainParametersProto` at offset 33;
    - then length-delimited `AgentInfoActionPairProto` records.
 
    The actions are zeros of the layout size.
-4. **Cache.** The file is keyed on (track hash, body hash, layout version, params hash) under
+5. **Cache.** The file is keyed on (track hash, body hash, layout version, params hash) under
    `Demonstrations/`. `start-run` reuses a cached demo instead of re-recording, which makes demo bytes
    a controlled variable.
 
@@ -82,7 +89,7 @@ deterministic actions.
 - **Players.**
   - `walker_view var.replay=<file>`: in-engine, with a scrubber and synced plots.
   - Unity's `ReplayPlayer` scene: the skinned HeidelBot, recorded with the existing FFmpeg recorder,
-    for publication videos (UP §3.11).
+    for publication videos.
 
   The format is documented in `docs/physical-agents/replay-format.md`, written at M8, so both
   readers stay in sync.

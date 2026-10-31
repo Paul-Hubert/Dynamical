@@ -1,110 +1,149 @@
 # Assets
 
-**Unity stays the authoring tool** (UP §3.1, §3.10).
-- One Editor script, callable in batch mode, writes versioned files into `resources/agents/`.
-- Each file is stamped with the source prefab or scene GUID, the git sha and the exporter version.
-- All numbers are in the sim frame, i.e. Unity's own ([conventions.md](conventions.md)).
+**Unity authors, the engine imports.**
+- A Unity Editor exporter, callable in batch mode, writes **Unity's own values verbatim** into
+  `resources/agents/`. Each file is stamped with the source prefab or scene GUID, the git sha and the
+  exporter version.
+- The C++ **Unity importer** (`src/agent/unity_import.*`) converts everything to the engine frame and
+  SI units at load ([conventions.md](conventions.md)). All Unity-specific logic lives on the C++ side,
+  in one place, so the exporter stays dumb.
 
 | File | Format | Loaded into | Written by |
 |---|---|---|---|
-| `bodies/<body>.body.json` | JSON | `BodyDef` | Exporter (UP §3.1) |
-| `tracks/<clip>.track.json` + `.track.bin` | JSON header + float32 | `PoseTrack` | Pose-track bake (UP §3.10) |
-| `params/<scenario>.params.json` | JSON | `AgentParams` | Exporter: the **resolved** scene values of `HumanBotParameters`, the energy provider and scene overrides (UP §3.1) |
-| `golden/<body>/<case>.json` | JSON | tests | Unity rollout logger (UP §4 M3) |
+| `bodies/<body>.body.json` | JSON | `BodyDef` | Exporter |
+| `tracks/<clip>.track.json` + `.track.bin` | JSON header + float32 | `PoseTrack` | Pose-track bake |
+| `params/<scenario>.params.json` | JSON | `AgentParams` | Exporter, from a scene plus a config |
+| `golden/<body>/<case>.json` | JSON | oracle tests | Unity rollout logger |
 
-Every file carries `format_version`; loaders refuse unknown versions.
+Every file carries `format_version`; loaders refuse unknown versions. The Unity reference for every
+value is [unity-analysis.md](unity-analysis.md) ("UA").
 
 ## Body file
 
-**The body file is part of the policy contract** (UP §3.1). Its SHA-256 goes into the run metadata
-(`envparams.txt`, `scene.resolved.json`) and into the demo cache key.
+**The body file is part of the policy contract.** Its SHA-256 goes into the run metadata
+(`envparams.txt`, `scene.resolved.json`), the demo cache key and the replay header.
+
+**Body versions:**
+
+| Version | Source | Notes |
+|---|---|---|
+| `heidelbot_notoes` | `HeidelBot.prefab`, scale 1 (1.89 m) | Flat walker, `DeVitaArena` |
+| `heidelbot_notoes_h173` | Same prefab under the H173 root scale 0.9153439 (1.73 m) | DeVita H173 line. Shapes and anchors are scaled; masses come from `totalMass` |
 
 ```jsonc
 {
   "format_version": 1,
   "name": "heidelbot_notoes",
-  "source": { "prefab_guid": "…", "git_sha": "<noToes sha>", "exporter": "1.0.0" },
+  "source": { "prefab_guid": "b5543a35…", "git_sha": "815fb4b41", "exporter": "1.0.0", "root_scale": 1.0 },
+  "frame": "unity_left_handed",                       // the importer converts
+  "inertia_source": "physx_readback",                 // or "anthropometric"
+  "angular_damping": 0.0, "linear_damping": 0.0,      // body-version choices (Unity: 0.05 / 0)
   "segments": [
     {
-      "name": "Spine", "parent": -1,
-      "rest_world_pos": [0, 0, 0], "rest_world_rot": [0, 0, 0, 1],     // bone origin (root origin is at the feet)
-      "rest_local_pos": [0, 0, 0], "rest_local_rot": [0, 0, 0, 1],
-      "scale": [1, 1, 1],                                               // export the real scale (gladiator feet are 1.0517, UP §3.1)
-      "mass": 9.94, "center_of_mass": [0, 0, 0],
-      "inertia_tensor": [0, 0, 0], "inertia_tensor_rotation": [0, 0, 0, 1],   // play-mode readback after Configure
-      "linear_damping": 0, "angular_damping": 0.05, "max_angular_velocity": 20,
-      "shapes": [
-        { "type": "capsule", "center": [0, 0, 0], "rotation": [0, 0, 0, 1], "radius": 0.1, "height": 0.3, "direction": 1, "material": "heidelbot" },
-        { "type": "box", "center": [0, 0, 0], "rotation": [0, 0, 0, 1], "half_extents": [0.1, 0.05, 0.12], "material": "heidelbot" }
-      ]
+      "name": "HeidelBot", "parent": -1, "role": "pelvis",
+      "rest_world_pos": [0, 0, 0], "rest_world_rot": [0, 0, 0, 1],      // bone origin; pelvis origin at floor level
+      "body_percentage": 13.66,
+      "center_of_mass": [0, 1.03, -0.03], "inertia_tensor": [0, 0, 0], "inertia_tensor_rotation": [0, 0, 0, 1],
+      "shapes": [ { "type": "capsule", "source": "mixamorig:Hips", "center": [0, 1.0315, -0.031], "rotation": [0, 0, 0, 1],
+                    "radius": 0.11363, "height": 0.35495, "direction": 0, "material": "heidelbot" } ]
     }
   ],
   "joints": [
     {
-      "name": "RUpLeg", "parent": 0, "child": 3, "side": "R",                 // C / R / L
-      "anchor": [0, 0, 0], "connected_anchor": [0, 0, 0],                       // runtime values
+      "name": "RightLeg", "parent": "RightUpLeg", "child": "RightLeg", "side": "R",
       "axis": [1, 0, 0], "secondary_axis": [0, 1, 0],
-      "twist_low_deg": -20, "twist_high_deg": 70, "swing_y_deg": 30, "swing_z_deg": 30,
-      "spring_factor": 1, "damper_factor": 1, "max_force": 200000,
+      "low_x_deg": 2, "high_x_deg": 132.62, "y_deg": 15, "z_deg": 13,
+      "spring_factor": 1, "damper_factor": 1, "torque_factor": 1,
       "limit_probes": [ { "dof": "twist", "at": "low", "child_local_rot": [0, 0, 0, 1] } ]
     }
   ],
+  "joint_order": ["Spine", "Spine2", "Head", "RightUpLeg", "RightLeg", "RightFoot", "RightArm", "RightForeArm", "RightHand",
+                  "LeftUpLeg", "LeftLeg", "LeftFoot", "LeftArm", "LeftForeArm", "LeftHand"],
   "materials": { "heidelbot": { "friction": 1, "friction_combine": "max", "bounciness": 0, "bounce_combine": "min" } }
 }
 ```
 
-The example values are placeholders; UP §3.1 and the exporter supply the real ones.
+The values come from UA §1. The exporter reads the real ones; this doc never becomes their source.
 
 **Exporter requirements:**
-- Read values back **in play mode, after `Configure`**: mass properties, connected anchors.
-- Exclude eye triggers.
-- Merge compound children (Spine1, Neck, Shoulders) into their parent segments, as Unity's
-  compound colliders do.
-- Joint order = UP §3.4's order; segment order = hierarchy order. Never re-sorted.
-- `limit_probes`: the limit-sweep rig (UP §4 M2) records the child's local rotation at each limit.
+- Read back **in play mode after `Configure`**:
+  - centre of mass and inertia (`physx_readback`; nothing in code sets them, so PhysX derives them from
+    the colliders);
+  - the auto-configured connected anchors.
+- Export per-shape transforms, including the foot child objects and their 1.0517 scale. Drop triggers.
+- Export compound children with their source names. The pelvis capsule sits on the unbodied Hips.
+- Export the **joint order explicitly** (UA §1.4). Never derive it from hierarchy and side.
+- `limit_probes` come from the limit-sweep rig. They are the authority for twist sign and cone shape
+  after import.
 
-**`loadBody` validates:**
-- parents come before children, and every index is valid;
-- masses are > 0;
-- quaternions are unit to 1e-4;
-- joint anchors coincide in world space at rest to 1e-5 m.
-
-It converts degrees to radians.
+**`loadBody` + importer validate and convert:**
+- parents come before children, the indices resolve, `body_percentage` sums to 99.98 ± 0.05;
+- quaternions are unit to 1e-4; anchors coincide in world space at rest to 1e-5 m;
+- frame conversion and degrees → radians;
+- the knee rest pose is moved onto its stop ([agent-runtime.md](agent-runtime.md#actions-8--15));
+- swing half-angles are clamped below 180° (with a log line).
 
 ## Pose tracks
 
-Baked once per clip by playing the Mecanim controller on the animated clone at the physics rate
-(UP §3.10).
+Baked once per clip and body version by playing the Mecanim controller with root motion at the
+controller's state speed, at the physics rate (UA §6, §9.2).
 
 ```jsonc
-// tracks/walk.track.json
-{ "format_version": 1, "body": "heidelbot_notoes", "body_sha256": "…", "clip": "BasicMotions@Walk",
-  "clip_guid": "…", "dt": 0.0166666, "frames": 3000, "segments": 16, "loop": true, "has_velocities": false }
+// tracks/walk_h173.track.json
+{ "format_version": 1, "body": "heidelbot_notoes_h173", "body_sha256": "…",
+  "controller": "Walk1p500mps-h173", "clip": "BasicMotions@Walk01 - Forwards", "state_speed": 0.807316,
+  "clip_guid": "…", "dt": 0.0166666, "frames": 20000, "segments": 16, "loop": false, "has_velocities": false,
+  "frame": "unity_left_handed" }
 ```
 
 - `.track.bin`: little-endian float32, frame-major. Per frame and per segment, in body order:
-  `pos.xyz, rot.xyzw` (7 floats), plus `lin_vel.xyz, ang_vel.xyz` when `has_velocities`.
-- The poses are **world poses of the body bones**, the ones Unity copies by name onto the kinematic
-  bodies. No retargeting happens in C++.
-- When needed, velocities are derived in C++: linear velocity by finite difference of the bone origin,
-  angular velocity by quaternion finite difference (UP §3.10 open question; compare with a Unity demo
-  in M5).
-- `dt` must equal the world's physics dt (UP §3.1 gives the exact value). The loader refuses a mismatch instead of interpolating, so
-  demos stay exact.
-- The rest pose is not a track: it comes from the body file.
+  `pos.xyz, rot.xyzw` (7 floats).
+- **World poses of the 16 bodies**, matched by name, as Unity's recorder copies them. No retargeting
+  happens in C++.
+- `dt` must equal the world's physics dt. The loader refuses a mismatch instead of interpolating.
+- **Velocities are not stored.** C++ derives them: finite differences of the anchors for observations,
+  and `MoveKinematic` for the bodies.
+- **One track per controller.** Controllers that chain states (Ladder, Leans) are baked as one long
+  track per episode sequence.
 
 ## Agent parameters
 
-`AgentParams` is one struct (UP §3.3: `BotParameters` + `HumanBotParameters` + `EnergyRewardProvider`),
-loaded from `params/*.params.json` and then overridden by environment parameters at initialisation and
-at every episode start ([mlagents-bridge.md](mlagents-bridge.md#environment-parameters)).
+`AgentParams` is one struct. It is loaded from `params/*.params.json`, then overridden by env params at
+initialisation and every episode start ([mlagents-bridge.md](mlagents-bridge.md#environment-parameters)).
 
-- **Layout-changing flags are file-only**, never env-param overridable (UP §3.1): `springControl`,
-  `angularVelocityControl`, `jointSpace`, `*Obs`, `freezeObs`, `normalizedVelocity`.
-- They select the layout version; the loader rejects combinations the C++ layout does not implement.
-- Physics settings (dt, physics rate, solver, gravity) and the arena description live in the same
-  file, so one exported file pins a scenario.
-- Unknown keys are an error in the file, and a **warning** when they arrive as env params (UP §3.9).
+- **Resolved values only.** The exporter writes the prefab plus scene-override values, never C# field
+  defaults. They differ (UA §8):
+
+  | Field | Resolved (prefab) | C# default |
+  |---|---|---|
+  | `pushForce` | 5 | 1 |
+  | `decisionPeriod` | 2 | 5 |
+  | `maxAngularVelocity` | 20 | 10 |
+  | `totalMass` | 70 | 80 |
+  | `normalizeSpeedDiff`, `relativeVelocity`, `normalizedVelocity`, `targetSpeedObs`, `dyingObs` | off | on |
+- **One file per line:**
+
+  | File | Content |
+  |---|---|
+  | `walker.params.json` | `Training.unity`: behaviour `HeidelBotBehavior`, body `heidelbot_notoes`, 70 kg, `energyBonusWeight 0`, `rootReward 0.34`, randomised target and speed |
+  | `devita_h173.params.json` | `DeVitaArenaH173.unity`: behaviour `AnySpeedBotBehavior`, body `heidelbot_notoes_h173`, 69 kg, `rootReward 0` |
+
+  Config env params (gains, energy, slope) arrive at runtime as env params, as in Unity.
+- **Layout-defining flags are file-only.** `springControl`, `angularVelocityControl`, `jointSpace`,
+  `*Obs`, `freezeObs`, `normalizedVelocity` and `relativeVelocity` select the layout. An env param
+  that tries to change them is rejected.
+- **Physics** (rate, solver, gravity, `drive_gain_scale`) and the arena (ground box, world count) live
+  in the same file, so one file pins a scenario.
+- **Unknown keys** are an error in the file and a warning when they arrive as env params.
+
+## Demo cache key
+
+`.demo` files are cached under `Demonstrations/` by the hash of:
+- the track;
+- the body;
+- the layout version;
+- the params that change demo observations (`relativeVelocity`, `normalizeSpeedDiff`,
+  `speedDiffZeroRecording`, recording episode length).
 
 ## glTF
 
