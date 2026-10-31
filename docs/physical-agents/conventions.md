@@ -1,92 +1,83 @@
 # Conventions
 
-## Coordinate frames
+## Frames
 
-There are three frames. The simulation uses only the first one.
-
-| Frame | Handedness | Up | Units | Used by |
+| Frame | Handedness | Up | Forward | Used by |
 |---|---|---|---|---|
-| **Sim frame** | numerically Unity's (left-handed) | +y | metres, kg, seconds, radians | Jolt, body file, pose tracks, observations, rewards |
-| Map frame | right-handed | +z (`Position::getVec3()` = x, y, height) | 1 tile = 1 m | `MapManager`, `Position`, renderer |
-| Jolt's nominal frame | right-handed | any (gravity vector decides) | SI | — |
+| **Sim** | left-handed (Unity's numbers) | +y | +z | Jolt worlds of agents, body file, pose tracks, observations, rewards, replays |
+| **Engine** | right-handed | +y | −z | Renderer, `Transform`, marching-cubes terrain, `base` scene bodies |
 
-### Why the sim keeps Unity's numbers unchanged
+**Why the sim keeps Unity's numbers (UP §3.1).**
+- Unity hands left-handed coordinates to PhysX unchanged, and rigid-body physics is mirror-symmetric.
+- So Jolt can take Unity's positions, Hamilton quaternions (x, y, z, w), velocities, torques, joint
+  axes and limits verbatim.
+- That keeps every observation bit-comparable for the M3 golden tests.
+- No code in `src/physics` or `src/agent` converts frames.
 
-Unity hands its left-handed coordinates straight to PhysX, which is a right-handed engine, and it
-works: rigid-body equations written in components (cross products, quaternion products, inertia
-tensors) are the same formulas in either handedness. A left-handed scene fed into a right-handed solver
-simulates the mirror image of the scene, read back in the same mirrored coordinates. So:
-
-- Positions, linear velocities, quaternions (x, y, z, w), angular velocities and torques from Unity go
-  into Jolt **as is**. No sign flips, no axis swaps.
-- Observations computed from Jolt state are then numerically comparable with Unity's on the same pose.
-  This is what makes the M3 golden parity tests possible.
-- Gravity is `(0, -9.81, 0)` (Unity plan D6).
-- Joint frames and limits from Unity's `ConfigurableJoint` (or whatever the Unity body uses) are taken
-  numerically too. The only thing to watch is code that *interprets* a rotation direction (e.g.
-  "positive twist bends the knee forward"): that interpretation must come from the Unity numbers, never
-  from intuition about a right-handed frame.
-
-### Sim → map conversion (rendering and game integration only)
+**Sim → engine (drawing only).** Mirror z:
 
 ```cpp
 // src/agent/frames.h
-inline glm::vec3 simToMap(glm::vec3 p, glm::vec2 origin_xy, float origin_z) {
-    return { origin_xy.x + p.x, origin_xy.y + p.z, origin_z + p.y };   // swap y and z
-}
-inline glm::quat simToMap(glm::quat q) {
-    // R' = M R M with M = swap(y,z), det(M) = -1: the axis maps to -M*axis, the angle is kept.
-    // (w, x, y, z) -> (w, -x, -z, -y); glm::quat takes (w, x, y, z).
-    return glm::quat(q.w, -q.x, -q.z, -q.y);
-}
+inline glm::vec3 simToEngine(glm::vec3 p) { return { p.x, p.y, -p.z }; }
+// R' = M R M with M = diag(1, 1, -1): the rotation axis maps to -M·axis, the angle is kept.
+inline glm::quat simToEngine(glm::quat q) { return glm::quat(q.w, -q.x, -q.y, q.z); }   // glm: (w, x, y, z)
 ```
 
-Swapping y and z is a reflection (determinant −1), which is exactly the left→right handedness change,
-so a sim pose drawn through `simToMap` looks correct in the right-handed z-up map. Write a unit test
-that converts a segment's local axes and checks `cross(x', y') == z'` in the map frame.
+- The sim's forward (+z) then draws as the engine's forward (−z), so a walker heading "forward" in Unity
+  walks into the screen.
+- `WorldView` applies this, plus a per-world offset. A unit test converts a segment's local axes and
+  checks that `cross(x', y') == z'` holds in the engine frame.
+- Agents placed in `base` (M9) use the inverse conversion when they read engine terrain.
+
+## Unity conventions to reproduce exactly
+
+These matter wherever ported code builds or decomposes rotations (UP §3.1):
+
+| Unity | Meaning | C++ |
+|---|---|---|
+| `Quaternion.Euler(x, y, z)` | applies Z, then X, then Y (degrees) | `unityEuler(glm::vec3 deg)` in `src/agent/unity_math.h` |
+| `q.eulerAngles` | decomposes in the same order into [0, 360) | `unityEulerAngles(q)` |
+| `Transform.forward / up / right` | +z / +y / +x rotated by the rotation | `unityForward(q)` … |
+| `Vector3.Angle`, `Quaternion.Angle`, `SignedAngle` | degrees, clamped dot | same names, unit-tested against values logged in Unity |
+
+Every helper in `unity_math.h` has a test against numbers logged from Unity.
 
 ## Units
 
-- SI everywhere in `src/physics` and `src/agent`. Angles in radians internally; the body file may store
-  degrees (as Unity does) and converts on load — the field name says which (`*_deg`).
-- **1 map tile = 1 m.** Today a human is drawn as a sphere 1 tile wide, so this is consistent.
-  Tile `level` (height) units must be confirmed in `MapGenerator` before terrain heightfields are used
-  (see [physics.md](physics.md#ground)).
+- SI throughout the sim: metres, kilograms, seconds, radians internally.
+- Files may store degrees as Unity does; the field name says so (`*_deg`), and loaders convert.
+- The engine's marching-cubes world is 4 units per cube. One engine unit = 1 m. The walker drawn in
+  `walker_view` uses 1 sim m = 1 engine unit.
 
 ## Time
 
-| Name | Meaning | Where it lives |
+| Name | Meaning | Source |
 |---|---|---|
-| `h` | Physics tick, seconds (e.g. 1/120) | `ScenarioDef::physics_hz` → `ArenaClock::h` |
-| `decision_period` | Physics ticks per agent decision | `ScenarioDef::decision_period` |
-| `tick` | Physics ticks since arena creation (`uint64_t`) | `ArenaClock::tick` |
-| `episode_step` | Decisions since episode start | `Episode::step` |
-| `max_episode_steps` | Decisions before `max_step_reached` | `ScenarioDef` |
-| Game `Time::dt` | Game seconds per frame — **compressed ~600×**, unrelated to physics time | existing `Time` ctx |
+| `h` | Physics tick in seconds. UP §3.1 gives Unity's exact value (a rational close to 1/60) and the `physicsRate` override | world `clock.hz` or `clock.dt` |
+| `decision_period` | Ticks per decision | agent parameters |
+| `tick` | Ticks since world creation (`uint64_t`) | `WorldClock` |
+| `episode_tick` | Ticks since episode start; decision phase counts from here (UP §3.6) | `Episode` |
+| `max_frames` | Truncation limit in **ticks**, scaled by physics rate (UP §3.7) | agent parameters |
+| frame `dt` | Wall-clock frame time in `dynamical` | `Game` loop; never fed to agent physics |
 
-Never feed the game's `Time::dt` into physics. See [game-integration.md](game-integration.md#the-time-scale-problem).
-
-Unity counts `MaxStep` in academy steps (physics ticks) for agents, not decisions. Whichever the
-Unity plan uses, store it under that meaning and name the field accordingly
-(`max_steps_physics` or `max_steps_decisions`); never convert silently.
+Name every field after its unit (`*_ticks`, `*_decisions`, `*_s`); never convert silently.
+`arcFrames` is **not** scaled by the physics rate (UP §3.7); keep that quirk named and tested.
 
 ## Identifiers
 
-| Id | Type | Rule |
-|---|---|---|
-| `entt::entity` | EnTT | Internal only. Recycled (version bits change). Never sent over the wire |
-| `AgentId::value` | `int32_t` | Process-unique, assigned once when an agent slot is created, kept across episodes. Sent as `AgentInfoProto.id`. Allocated from a process-wide atomic counter starting at 0 |
-| Behaviour name | `std::string` | `"<Name>?team=<n>"`, e.g. `Walker?team=0`. Fixed per agent slot |
-| `group_id` | `int32_t` | 0 unless the scenario uses multi-agent groups (duel line) |
-| Segment index | `uint16_t` | Index into `BodyDef::segments`; stable, used in observations and logs |
+| Id | Rule |
+|---|---|
+| `entt::entity` | Internal only; recycled. Never on the wire or in files |
+| `AgentId` (`int32_t`) | Process-unique, assigned once per agent slot from an atomic counter, kept across episodes. Sent as `AgentInfoProto.id` |
+| Behaviour name | Exact Unity names (`HeidelBotBehavior`, `AnySpeedBotBehavior`, UP §3.1), plus `?team=N` |
+| Segment index / joint index | Order of the body file = Unity's joint order (UP §3.4). Never re-sorted |
+| Layout version | `"<body>_<n>"`, e.g. `heidelbot_notoes_1`. Bumped on any change to observation or action content |
 
-## Naming and code style
+## Code style
 
-- Follow the existing style: `PascalCase` types, `snake_case` members, systems end in `Sys`, components
-  are plain structs/classes in `components/`, `reg.ctx<T>()` / `reg.set<T>()` (EnTT 3.8 API — it is the
-  vendored version in `lib/entt`, not a submodule).
-- New systems use the existing `System` base and `DEFINE_SYSTEM`-style declarations, collected in
-  `src/physics/systems/physics_system_list.h` and `src/agent/systems/agent_system_list.h`.
+- Match master: `PascalCase` types, `snake_case` members, systems end in `Sys`, plain-struct components,
+  EnTT 3.16 ctx API (`reg.ctx().emplace/get/find`).
 - `OPTICK_EVENT()` at the top of every `tick`.
-- Definitions loaded from disk (`BodyDef`, `ScenarioDef`) are immutable after load and shared by
-  pointer; per-arena mutable state goes in that arena's registry.
+- Definitions loaded from disk (`BodyDef`, `PoseTrack`, `AgentParams`) are immutable after load and
+  shared by `std::shared_ptr<const T>`. Mutable per-world state lives in that world's registry.
+- No `rand()` in sim code; use the world RNG.

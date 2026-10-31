@@ -1,109 +1,94 @@
-# Physical HumanBot agents in the Dynamical engine — plan
+# HumanBot physical agents in Dynamical — plan
 
-**The HumanBot training simulation is built inside this engine rather than as a standalone program.**
-The Python trainer stays unchanged: the ML-Agents fork, its configs and GAIL. This engine replaces the
-Unity player, and Unity is kept only as the source of the body and motion data.
+*2026-10-30 · Plan only; nothing is built.*
 
-- **Full inventory:** the Unity-side inventory of what has to be rebuilt is in the Unity repo at
-  `Dynamical/Docs/JoltSim/PLAN.md`. It covers the body, joint drives, observations, actions, rewards,
-  the tick order, the ML-Agents protocol, demos and tooling, and it still applies.
-- **This document** only maps that plan onto this engine.
-- **Detailed engine docs:** [`physical-agents/`](physical-agents/README.md) — architecture, conventions,
-  simulation loop, Jolt physics, assets, agent runtime, ML-Agents bridge, demos, inference, rendering,
-  game integration, testing and per-milestone task lists.
+**This engine becomes the new `TrainingEnv.exe`.**
+- It simulates HumanBot ragdolls on Jolt and speaks the stock ML-Agents protocol to the unchanged
+  Python trainer: the fork, the configs, GAIL, W&B and `start-run`.
+- Unity keeps authoring: the prefab and the Mecanim retargeting, exported to data files.
+- Everything Unity does at runtime for training is rebuilt here, as **scenes** of this engine.
 
-*2026-10-30 · Plan only; nothing built.*
+## Sources
 
----
+| Source | Authority on |
+|---|---|
+| **Unity plan**: `Dynamical/Docs/JoltSim/PLAN.md` in the Unity repo (`C:\Users\Paul\Desktop\Dynamical`, branch `gladiator` @ `d762114ec`) | What has to be rebuilt: body, physics behaviour, observation and action contracts, tick order, episodes, rewards, energy, bridge behaviour, demos, tooling, decisions D1–D6, Unity-side milestone work. Cited below as "UP §x" |
+| **The Jolt doc**: "Joint Kinetics & Actuator Energy in Jolt Physics" (Paul, 2026-10-29, claude.ai artifact) | Solver settings, the exact energy recorder, the validation identities |
+| **The ML-Agents fork** (release 23, protocol 1.5.0) | Wire format, `.demo` format, ONNX I/O |
+| **This repo** | How the engine does it: [`physical-agents/`](physical-agents/README.md) |
 
-## What the engine already provides
+The engine docs never restate a Unity number that UP owns. They say where it plugs in and which test
+checks it.
 
-| The Unity plan needs | This engine has | Used for |
+## Fixed decisions
+
+| # | Decision | Notes |
 |---|---|---|
-| An ECS | `entt::registry` and `System`/`SystemSet` | Arena, agent, body-segment and joint entities. Physics and agent systems in `pre_tick` |
-| Parallel arenas | Taskflow executor | Stepping the arenas and agents in parallel, alongside Jolt's job system |
-| Body, scenario and parameter files | `Settings` with cereal JSON | Body file, scenario file, env-param defaults |
-| Terrain | Chunked tile map with heights, FastNoise2 | Heightfield ground for slope and terrain experiments, replacing Unity's `TerrainData` and `Mathf.PerlinNoise` |
-| Rendering for videos | Vulkan renderer with compute | Agent viewer, replay playback and video capture, replacing the Unity video builds |
-| Inspection | ImGui, ImPlot, `DevMenuSys` | Live panels for joint angles, torques, energy channels and rewards |
-| Profiling | Optick | The step-loop cost per system |
-| Build | CMake + vcpkg, Visual Studio 2022 and NixOS | Add Jolt, gRPC/protobuf and ONNX Runtime |
-| A high-level decision layer | Score-based behaviours and action chains, plus the LLM planner design (`llm-ai-system.md`) | Commanding the physical walker (see "Game integration") |
+| D1 | Unity is the training simulator's data source only; the Unity games keep PhysX | UP §5 |
+| D2 | gRPC, protocol 1.5.0, trainer unchanged | Revisit only if the null environment shows a trainer ceiling *and* speed is the goal |
+| D3 | Keep the observation layout and parity-test it; fix the scheduling quirks by design | UP §3.6 |
+| D4 | **noToes / Plagenhoef body**: 16 bodies, 15 joints (no toe joints), Plagenhoef anthropometric masses, obs 138 × 2, 120 actions. Source: the `Dynamical-noToes` worktree (`C:\Users\Paul\Desktop\Dynamical-noToes`, branch `slope-lean-devita-on-master` @ `815fb4b41`, based on Unity `master`) | Absolute J/(kg·m) for energetics needs anthropometric masses (UP D4). The engine stays body-agnostic: the body file and a versioned layout decide, so the gladiator body remains exportable later |
+| D6 | Gravity −9.81 | |
+| E1 | **Two executables.** `dynamical` (Vulkan, SDL, OpenXR) and a **headless `dynamical_train`**, shipped as `TrainingEnv.exe`. It links no graphics, and both link one `dynamical_sim` library | [architecture.md](physical-agents/architecture.md) |
+| E2 | **Scenes.** Every way of running the engine is a JSON scene that declares its variables, systems, worlds and content | [scenes.md](physical-agents/scenes.md) |
+| E3 | **Worlds.** A training process holds N independent worlds, each with its own `entt::registry`, `SystemSet` and Jolt `PhysicsSystem`. Taskflow steps them in parallel, each single-threaded inside | Replaces Unity's 5×5 `PrefabGrid` with collision filtering. [simulation.md](physical-agents/simulation.md) |
+| E4 | **Flat ground only** for training until the walker trains (M6): a static box with its top at y = 0. Slope (`SlopeGround`) arrives in M7, heightfields after | [physics.md](physical-agents/physics.md#ground) |
+| E5 | **Sim frame = Unity's numbers** (left-handed, y-up, +Z forward). The engine is right-handed, y-up, −Z forward. Drawing mirrors z; nothing else converts | [conventions.md](physical-agents/conventions.md) |
+| E6 | **The viewer is a separate process.** `dynamical scene=walker_view` watches the results folder and hot-loads the newest ONNX. A renderer crash cannot stop a run | [inference-and-replay.md](physical-agents/inference-and-replay.md) |
 
-## What the engine is missing
+## The scenes
 
-1. **A fixed-step simulation loop.**
-   - `Game::start` advances every system by the wall-clock `dt`.
-   - Training needs fixed physics ticks (60–480 Hz), a decision period, and running as fast as
-     possible, decoupled from frames.
-2. **A headless training mode.**
-   - `Renderer` (SDL window + Vulkan) is always constructed.
-   - Training processes need no window, no renderer and no input/UI systems, and they run N arenas
-     each.
-3. **3D articulated bodies.**
-   - `Position` is a 2D tile position plus height, and `MapManager` owns it.
-   - Ragdoll segments need full 3D poses, velocities and joints. They get their own components; at most
-     the map places the agent.
-4. **Physics.** A `PhysicsSys` that owns the Jolt world and maps bodies to entities.
-5. **The agent runtime.** The observation, action, reward, episode, randomisation, stats and exact
-   energy systems (the Unity plan, §3.3–3.8).
-6. **The ML-Agents bridge** (protocol 1.5.0).
-   - The training executable stands in for `TrainingEnv.exe`.
-   - **Agent ids must stay stable.** EnTT recycles entity ids, so keep a separate id.
-7. **Asset input.** The engine has no skeletal, mesh or animation pipeline. v1 imports the body file
-   and the pose tracks exported by Unity. glTF import of meshes and animations can replace the Unity
-   bake later.
-8. **A 3D body render path.** Debug capsules and boxes first, then a skinned mesh. Plus replay and
-   offscreen video capture.
-9. **ONNX Runtime inference** for the eval mode and for agents in the game world.
-10. **A demo-recorder mode** that writes `.demo` files from pose tracks.
-
-## Engine-specific decisions
-
-| # | Question | Recommendation |
+| Scene | Executable | Purpose |
 |---|---|---|
-| E1 | Training mode of the game executable, or a separate target | **Separate targets on a shared simulation library.** One target is `dynamical` (game); the other is a headless train target that links no Vulkan or SDL. CMake currently globs everything into one executable |
-| E2 | Frame convention: Unity is y-up; this map is z-up (`Position::getVec3` = x, y, height) | **Train in Unity's numbers**, which keeps the observation golden tests possible, and convert at the boundary to the map. Swapping y and z is a reflection, which rigid-body physics does not care about |
-| E3 | Training arena ground: Jolt boxes or the engine's terrain | **Boxes for v1** (flat and tilted, as in Unity). Use the FastNoise2 terrain as a heightfield once the walker exists |
-| E4 | Game time runs ~600× real time (`TimeSys`), physics must run at 1× | **Real-time focus mode**: physical walkers only at a new real-time game speed and near the camera; kinematic `PatherSys` otherwise. See `physical-agents/game-integration.md` |
-| E5 | How arenas share the registry and threads | **One `entt::registry` + `SystemSet` + Jolt `PhysicsSystem` per arena**, each stepped single-threaded; Taskflow runs arenas in parallel. EnTT 3.8 registries are not thread-safe for the creates/destroys that resets do |
+| `base` | `dynamical` | Today's master: marching cubes world, grass, glTF, Jolt boxes, VR. Must be unchanged by the scene port |
+| `rig_anim` | `dynamical` | **Kinematic rig validation.** Plays Unity pose tracks onto the ragdoll's kinematic bodies and draws them. Live checks: rest pose, joint angles against limits, finite-difference velocities, observation vector. [rig-animation.md](physical-agents/rig-animation.md) |
+| `walker_train` | `dynamical_train` | N flat-ground worlds, one agent each. The training system list only: no terrain, no chunks, no input, no UI |
+| `walker_view` | `dynamical` | One or more flat-ground worlds driven by the latest exported ONNX, drawn with panels |
 
-The Unity plan's decisions still stand:
-- **D1:** Unity becomes a data source only; the VR games stay on PhysX.
-- **D2:** gRPC.
-- **D3:** keep the observation layout.
-- **D4:** body choice.
-- **D6:** gravity −9.81.
+`dynamical_train` also has the modes `null` (M0), `bench`, `eval` and `record-demo`, on the same
+scene files.
 
-D5 is settled by this engine: EnTT, Taskflow, Windows and NixOS.
+## What master already has
 
-## Milestones, adapted
-
-| # | Work in this engine | Gate |
+| Need | Master | Change |
 |---|---|---|
-| M0 | Bridge skeleton plus a null environment in the headless target | Trainer steps/s at 6 and 20 envs. If it stays near ~424, the trainer is the bottleneck |
-| M1 | Fixed-step loop, headless target, `PhysicsSys`, body and joint components, capsule debug draw | A ragdoll loaded from the Unity body file stands in its rest pose and is drawn |
-| M2 | Joint limits, motors, contacts, floor | Limit envelopes and drive responses match Unity's contract. The Jolt energy checks pass |
-| M3 | Agent runtime in parity mode | Observations, rewards and terminations match Unity on identical poses |
-| M4 | Full bridge; `start-run` launches the train target | An unmodified config trains, stats reach W&B, and `stop-run` exports the ONNX |
-| M5 | Demo-recorder mode | `.demo` files from Unity pose tracks load in GAIL |
-| M6 | First GAIL walker from scratch | It matches the frozen Unity reference on behavioural stats at matched updates |
-| M7 | Exact energy channel, DeVita stats, slope | The energetics line reruns on the new simulation |
-| M8 | In-engine replay viewer, video capture, ONNX eval mode | Videos and evals with no Unity build |
-| M9 | Game integration (below), terrain, then the strike and duel lines | Each gated like M3 + M6 |
+| Jolt | `PhysicsWorld`, `PhysicsSys` (60 Hz accumulator, box and sphere bodies, interpolation), `TerrainColliders`. Jolt 5.5 via vcpkg | Jolt registration moves out of `PhysicsWorld` into a process guard, because a second world would unregister the types. The world gets a config (single-threaded job system for training) and moves into the registry ctx. `PhysicsSys` splits into reusable systems |
+| ECS | EnTT 3.16, `System` / `SystemSet` with pre and post lists | Add a fixed lane and decision-tick systems. Add name-based system and component registries for scenes |
+| Rendering | `ModelPass` draws `Transform` + `ModelRenderable` glTF instances | Body segments are drawn as glTF box and capsule instances in the host registry. No new pipeline for v1 |
+| Settings | cereal JSON + `key=value` arguments | Unchanged. Scenes use nlohmann-json, and `dynamical_train` also parses the Unity-style flags the trainer passes |
+| Build | One globbed executable | Split into `dynamical_sim`, `dynamical`, `dynamical_train`, `dynamical_mlagents`, `dynamical_onnx` and `dynamical_tests` |
 
-## Game integration (M9)
+## Milestones
 
-The engine's `human` entities can become physical walkers.
+The gates in the last column are measured: behavioural stats at matched gradient updates, never mean
+reward (UP §4). Steps S1–S3 are engine work; M0–M9 follow UP §4, with the engine tasks listed per row.
 
-**Layering.**
-- The behaviour and LLM layer stays the **planner** (`llm-ai-system.md`: "planner, not controller").
-- A commanded walker policy, taking direction, speed and facing as in the Unity `CommandedLowerAgent`
-  line, is the **controller**. Jolt does the rest.
-- `PatherSys` paths become a stream of walker commands, not tile moves.
+| # | Engine work | Unity-side work (UP §4) | Gate |
+|---|---|---|---|
+| **S1** Scenes | Scene loader, variables, system and component registries, prefabs, fixed lane, optional renderer with a pass list. CMake split into a library and two executables; `dynamical_tests` | — | `base` runs identically to master. Malformed scenes fail with the file and JSON path. `dynamical_train` builds and links no Vulkan, SDL or OpenXR |
+| **S2** Worlds | `JoltRuntime`, `PhysicsConfig`, `PhysicsSys` split, `World`, `WorldClock`, `WorldRng`, `WorldStepper`, `WorldView`, flat `Ground` | — | 25 worlds × 50 falling boxes step in parallel in `dynamical_train mode=bench`; a determinism hash is equal across two runs; `dynamical` draws one world |
+| **M0** Null env | `dynamical_mlagents`: handshake, step loop, side channels; `mode=null` with fixed observations for 25 agents | Freeze the reference runs (one GAIL walker, one DeVita) | Trainer steps/s at 6 and 20 envs. **About 424 means the trainer is the ceiling** |
+| **M1** Body + rig | Body file and pose-track loaders, `RagdollBuilder`, `BodySync`; **`rig_anim` scene** | Exporter and pose-track bake | Rest pose equals Unity's bone world poses to 1e-5 m, joint angles read 0 at rest, and the mass properties equal the play-mode readback. `rig_anim` plays the walk track with no joint outside its limits |
+| **M2** Joints | Limits, motors, contacts, friction combine, energy recorder, Joints and Energy panels | Limit-sweep rig, drive step responses | Envelopes within 1° (twist sign, elliptical cone). Documented step-response match after gain re-derivation. Passive drop without explosion. Jolt doc checks 1–3 |
+| **M3** Agent runtime | Observations, actions, rewards, termination, episodes and stats in parity mode; golden tests. `rig_anim` shows the live observation diff | Per-tick logs from Unity rollouts | Observations equal Unity's to 1e-4 on identical poses. Reward and termination tests reproduce the logs. The action mapping round-trips |
+| **M4** Bridge | Full bridge over N worlds, env params, `envparams.txt`, stats names, CTRL_C, `TrainingEnv.exe` launch contract | — | An unmodified config trains 1M steps. `start-run` prints `STARTED`. The W&B key set equals a Unity run's. A lesson change resets cleanly. `stop-run` exports the ONNX |
+| **M5** Demos | `mode=record-demo` from pose tracks, `.demo` writer, cache | Bake the walk clip(s) | `demo_loader` accepts the file; the observation spec matches; the differences from a Unity demo are explained |
+| **M5b** Viewer | `dynamical_onnx`, `PolicySys`, `latest:` model source, **`walker_view` scene** | — | During a run, the viewer shows the newest checkpoint and swaps models without restarting |
+| **M6** First walker | Train the GAIL flat walker from scratch | — | Dead rate, episode length, root speed vs target and head height reach the M0 reference at matched updates. Paul judges the video |
+| **M7** Energy, slope | Exact energy channel (new `energySource` value), `DeVitaStepStat`, `SlopeGround` (tilted box), physics rate | — | Jolt doc validation on eval episodes; DeVita stats produced; `energyScale` re-derived |
+| **M8** Eval, replay | `mode=eval` with the same CSV and `EVT|` lines, replay writer, replay playback in `walker_view` | `ReplayPlayer` scene for videos | `energy_eval_run.py` and `gait_run.py` run unchanged; post-training video from a replay |
+| **M9** Extended | UP §4 M9 order (body variants, strike, duel, heightfield terrain, soil…); then policy walkers in `base` on marching-cubes colliders | Variant exports | Each gated like M3 + M6 |
 
-**Constraints.**
-- **Cost:** a ragdoll per human costs physics and ONNX inference at 30 Hz. Cap the number of physical
-  agents, or fall back to kinematic movement beyond the camera.
-- **Bodies:** a policy is bound to the body and simulation it trained on. Game humans must use the
-  trained body and the same physics settings.
+M5b depends only on M4, because an exported ONNX is all it needs. It can move ahead of M5.
+
+## Risks
+
+UP §6 applies unchanged: throughput, drive semantics, feet, unknown PhysX behaviour, two lines in
+flight, and unverified Jolt API claims. Engine-specific risks:
+
+- **The scene port regresses `base`.** S1 gates on identical behaviour. Port `Game::start` mechanically
+  before adding features.
+- **Jolt's global state.** Registration, the factory and the default allocator are process-wide. Every
+  test and both executables must go through `JoltRuntime`.
+- **vcpkg Jolt flags.** Cross-platform determinism and assert settings must match between the port and
+  the consumer. Windows-only training first (UP D5) lowers the stakes.
