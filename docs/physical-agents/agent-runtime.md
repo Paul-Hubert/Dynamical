@@ -11,12 +11,13 @@ behaviour**, not Unity's arithmetic. The Unity reference, with file:line sources
 
 ```cpp
 struct Agent        { uint16_t behavior; int32_t group_id = 0; };
-struct AgentId      { int32_t value; };                       // stable across episodes
+struct AgentId      { int32_t value; };                       // stable across episodes (as the fork: episodeId set once, Agent.cs:489)
 struct ActionBuffer { std::array<float, 120> a{}; bool fresh = false; };
 struct HeldDrive    { std::array<JointDrive, 15> joints; };    // stiffness, damping, target rotation, target ω (constraint space)
 struct ObsStack     { std::array<float, 138 * 2> v{}; };       // oldest first, zeroed at reset
 struct AnchorHistory{ std::array<glm::vec3, 15> prev; bool valid = false; };   // finite-difference velocities
 struct RewardWindow { float reward = 0; std::array<float, 16> terms{}; };
+struct Parked {};                                              // world ctx tag, see simulation.md
 struct Episode      { uint64_t tick = 0; uint32_t decisions = 0; bool killed = false, truncated = false, parked = false;
                       std::array<float, 138 * 2> terminal_obs; float terminal_reward = 0; };
 struct Task         { glm::vec3 target; float target_speed; float arc_timer_s; float est0; /* push/pull state */ };
@@ -65,8 +66,14 @@ est  = max over feet of (Head.anchor.y − Foot.anchor.y)
 obs  = [ H(Spine).x · d,  clamp01(1 − est / est0),  H(Spine).z · d ]
 ```
 
-`est0` comes from the **body file's rest pose**, not the spawn pose. That removes Unity's dependency on
-scene placement (UA §3.3).
+- **`est0`** comes from the **imported rest pose** (after the knee move), not from the spawn pose.
+  That removes Unity's dependency on scene placement (UA §3.3). The `_1` oracle instead takes Unity's
+  `est0` from the golden log header.
+- **Header z sign.** `H.z = x × y` points to the agent's **right**. Unity's third axis points left
+  (UA §2.2), so `_2` header z = −(`_1` header z) for the same motion. The `[oracle]` comparisons account
+  for this.
+- **Heading singularity.** When `|horizontal(f(s))| < 0.1` (a segment pointing nearly vertical), `H(s)`
+  falls back to the segment's horizontal right axis rotated by +90° about up. `T8.1` covers it.
 
 ### Per joint (9 × 15, joint order of the body file)
 
@@ -98,8 +105,9 @@ u = (anchor_t − anchor_{t−1}) / h            → H(parent) components    (fi
 - No clipping in C++; the trainer clips with `clamp(−3, 3)/3`.
 - `maxTargetAngularVelocity` is an experiment variable: it flips the sign of net joint work (UA §2.4).
 - **Knee rest policy.** The knee's low twist stop is 2° while the rest pose is straight (UA §1.2). The
-  body importer bends the rest knee to the stop plus 0.1°, so reset poses are inside the limits. The
-  rest pose stays the drive's zero reference.
+  body importer bends the rest knee to **2.1°** (the stop plus 0.1°), so reset poses are inside the
+  limits. This bent rest pose is the drive's zero reference. Pose comparisons against Unity are made
+  **before** the knee move, or exclude the knee-descendant chain.
 
 ## Task systems
 
@@ -109,7 +117,7 @@ u = (anchor_t − anchor_{t−1}) / h            → H(parent) components    (fi
 |---|---|---|
 | first decision | no reward on the first decision of an episode | |
 | `root` | `rootSpeed = ((Spine.anchor − at last decision)/T) · normalize(tsv)`; `r = min(rootSpeed, targetSpeed) · w / targetSpeed` (undivided when targetSpeed = 0); not while dying | 0.34 / 0 |
-| `energy` | UA §4.1 steps 1–7, fed by the **exact Jolt channel** (motor work per joint per sub-step); `v` from the pelvis | weight 0 / 1; `energyScale` re-derived |
+| `energy` | UA §4.1 steps 1–7, fed by the **exact Jolt channel** (motor work per joint per sub-step); `v` from the **hips point** = pelvis body transform × the Hips rest local position (Unity measures the unbodied Hips transform) | weight 0 / 1; `energyScale` re-derived |
 | `life`, `dying`, `head*`, `win` | as UA §3.2 | 0 |
 | `collision` | off (weight 0) but `Collision/*` stats kept | |
 | `death` | `deathPenalty` on kill | −10 |
@@ -138,7 +146,7 @@ u = (anchor_t − anchor_{t−1}) / h            → H(parent) components    (fi
 3. Ground: slope rotation and speed compensation (M7).
 4. Rest pose, zero velocities, `ResetWarmStart`.
 5. Target: if randomizing and `randomTarget`, a random radius of 20–30 m around the head; otherwise
-   1000 m straight ahead.
+   `head + 1000 · (0, 0, −1)` (engine frame), set before the random yaw.
 6. If randomizing: random yaw; then random init with probability `randomInitChance` (+2 m, −4 m/s,
    random rotation).
 7. **Reset `AnchorHistory`, `ObsStack`, energy, contacts and reward windows**, then run `BodySync` once.
@@ -171,12 +179,15 @@ Stats keep their names: `Root/*`, `Head/*`, `Death/*`, `Win/*`, `Bot Joint/*` (U
 - `DeVita/*` follows UA §4.2 on the exact channel. `DeVita/Full GRF/*` is emitted with the same values,
   because on Jolt the exact channel already includes friction.
 - Use the ratio of sums.
-- **New stats:**
+- **New stats (extras):**
   - `Body/Torso Pitch`, since lean is otherwise unmeasured;
-  - `Physics/Foot Penetration`;
-  - `Energy/Closure Residual`.
-
-Stats are emitted only while training.
+  - `Physics/Foot Penetration`, `Physics/Clamp Events`;
+  - `Energy/Closure Residual`;
+  - `Bridge/NaN`.
+- **Gate rule:** Unity's key set ⊆ the engine's key set, with the extras listed here.
+- **When stats and rewards run.** Stats go to the side channel only while training. `training` is
+  the trainer's `is_training` in `mode=train`, and false in eval and view modes. Reward terms are always
+  computed (panels and eval show them) and only gated when added.
 
 ## Outbox
 

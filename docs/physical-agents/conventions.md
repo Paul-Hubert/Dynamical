@@ -42,22 +42,22 @@ once at load.
 
 | Name | Meaning | Source |
 |---|---|---|
-| `h` | Physics tick. Default 1/60 s, as Unity; 120, 240 and 480 Hz are allowed | params `physics_hz` |
-| `decision_period` | Ticks per decision. **30 Hz control** is the invariant: 2 at 60 Hz, 4 at 120 Hz | derived: `physics_hz / control_hz` |
-| `episode_ticks` | Truncation length; **33.3 s** is the invariant (2000 ticks at 60 Hz) | derived from `episode_s` |
-| `arc_ticks` | Target re-placement period. Unity does not scale `arcFrames` with the physics rate; here it is defined in seconds (`arc_s` = 6.67 s) | params |
+| `h` | Physics tick, `1 / physics_hz`. Default 60 Hz, as Unity; 120, 240 and 480 Hz are allowed | params `physics_hz` (env `physicsRate`, fixed before the worlds exist) |
+| `decision_period` | Ticks per decision = `physics_hz / control_hz`. **30 Hz control** is the invariant (2 at 60 Hz) | params `control_hz` = 30 |
+| `episode_ticks` | Truncation = `max_frames_60hz · physics_hz / 60` (2000 at 60 Hz = 33.33 s); must be a whole number of windows | params `max_frames_60hz` (env `maxFrames`) |
+| `arc_ticks` | Target re-placement = `arc_frames_60hz · physics_hz / 60` (400 at 60 Hz). This deliberately scales with the rate; Unity does not | params `arc_frames_60hz` (env `arcFrames`) |
 | frame `dt` | Wall-clock frame time in `dynamical`; never fed to agent physics | `Game` |
 
-Rates and durations are stored in seconds and Hz, and tick counts are derived from them. Unity's
-quirk of scaling some counts and not others is not reproduced; this is recorded in
-[unity-analysis.md](unity-analysis.md) §8.
+Durations are stored as Unity's integer counts at the 60 Hz reference, so they are exact. Tick counts
+at other rates are derived from them and must come out integral. Unity's quirk of scaling some counts
+and not others is not reproduced (recorded in [unity-analysis.md](unity-analysis.md) §8).
 
 ## Identifiers
 
 | Id | Rule |
 |---|---|
 | `entt::entity` | Internal only; recycled. Never on the wire or in files |
-| `AgentId` (`int32_t`) | Process-unique, assigned once per agent slot from an atomic counter, kept across episodes. Sent as `AgentInfoProto.id` |
+| `AgentId` (`int32_t`) | Process-unique, assigned once per agent slot from an atomic counter, kept across episodes, as the fork does (`episodeId` assigned once, `Agent.cs:489`). Sent as `AgentInfoProto.id` |
 | Behaviour name | Trainer contract: `HeidelBotBehavior` (DeVita: `AnySpeedBotBehavior`), plus `?team=N` |
 | Segment / joint index | Order of the body file. Joint order is the trainer-facing order: Spine, Spine2, Head, RUpLeg, RLeg, RFoot, RArm, RForeArm, RHand, LUpLeg, LLeg, LFoot, LArm, LForeArm, LHand |
 | Body version | `heidelbot_notoes`, `heidelbot_notoes_h173`, … Each scaled or edited rig is its own body file |

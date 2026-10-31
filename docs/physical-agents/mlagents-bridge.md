@@ -16,12 +16,21 @@ TrainingEnv.exe -nographics -batchmode --mlagents-port <base+i> -logFile <run>/P
                 [env_args from the config]
 ```
 
+- **Verified against the fork** (`ml-agents-envs/mlagents_envs/environment.py:269-284`): the worker
+  arguments are `-nographics -batchmode`, then `--mlagents-port <port>`, `-logFile <path>`, then the
+  config's `env_args`. `start-run` appends `-envParamsOut=… -gitSha=…` through `env_args` (UA §9.4).
 - `train_args.cpp` parses these Unity-style flags. `-nographics` and `-batchmode` are accepted and
   ignored, since the process is always headless.
+- **Working directory.** `dynamical_train` never changes the working directory, because the trainer
+  passes relative paths (`-envParamsOut=results/<run>/…`). Resources are resolved from the executable's
+  directory (`GetModuleFileNameW`). The deployed layout is `TrainingEnv.exe` plus `resources/scenes`,
+  `resources/prefabs` and `resources/agents` next to it.
+- **No config file.** It never constructs `Settings` with load or save, so N processes do not race on
+  `config.6.json` ([architecture.md](architecture.md#run-arguments)).
 - Everything else uses the engine's own `key=value` (`scene=walker_train var.num_worlds=25
   threads=4`). Configs pass those through `env_args`.
 - The default scene is `walker_train`, so an unmodified config needs no extra arguments.
-- **Logging.** All logging goes to `-logFile` (the health check greps it) and to stdout.
+- **Logging.** All logging goes to `-logFile` (the health check greps it) and to stdout; see "Process behaviour".
 - **Executable name.** The trainer globs `<path>.exe`, so the build names the target `TrainingEnv`
   ([architecture.md](architecture.md#targets)) and `start-run` points `--env` at it.
 
@@ -48,8 +57,8 @@ Exchange(output{ rl_output }) -> ...
                                            <- QUIT, or header 400        exit 0
 ```
 
-- **Seed.** `base_seed = seed + worker_id`. Worker id = port − base port. World `w` seeds with
-  `hash(base_seed, w)`.
+- **Seed.** The trainer already sends `seed + worker_id` (`learn.py:190`, `env_seed = seed + worker_id`),
+  so `base_seed = rl_initialization_input.seed`. World `w` seeds with `hash(base_seed, w)`.
 - **`num_areas` is ignored.** The scene's `num_worlds` decides the agent count, as Unity's PrefabGrid
   did. Log both.
 - **Brain parameters** are sent once per behaviour **together with** its first `AgentInfo`s, because
@@ -76,10 +85,11 @@ Per agent, per window:
 - Python sends actions only for agents that requested a decision and are not done.
 - Actions arrive in the order of the previous `AgentInfo` list for each behaviour (*verify*). The
   bridge keeps that order per behaviour and maps actions back to `AgentId`s.
-- Agents that were done get no action; they are already reset and their first observation was in
-  this output.
+- Agents that were done get no action. Their terminal step is in this output, and the first observation
+  of their new episode is in the **next** output, under the same `AgentId`. This matches Unity, where the
+  fork assigns `episodeId` once per agent (`Agent.cs:489`).
 - **NaN or Inf** in an observation: log it, zero the observation, end the episode as interrupted, and
-  count it in the `Bridge/NaN` stat.
+  count it in the `Bridge/NaN` stat (an extra; see agent-runtime.md "Stats").
 
 ## Side channels
 
@@ -105,8 +115,12 @@ Precedence, highest first (UA §9.3):
 - Sampler parameters are sampled with the world RNG per episode. Bools are `value > 0`.
 - A missing or malformed `-envParams` file is fatal (exit 1), as in Unity.
 - **An unknown name logs a warning once.** Unity ignores it silently.
-- Layout-defining parameters (`relativeVelocity` and the `*Obs` flags) are rejected with an error
-  ([assets.md](assets.md#agent-parameters)).
+- **Layout-defining parameters** (`springControl`, `angularVelocityControl`, `jointSpace`, `relativeVelocity`,
+  `normalizedVelocity`, `freezeObs` and the `*Obs` flags; one list in [assets.md](assets.md#agent-parameters)):
+  - accepted silently when equal to the params file;
+  - **fatal (exit 1, logged) when different**, because the layout cannot change at runtime.
+
+  Unity configs that resend the scene value still load.
 
 **Accepted names** (union from UA §7, §4.1, §3.6, §9.3):
 
@@ -118,7 +132,7 @@ Precedence, highest first (UA §9.3):
 | Rewards and termination | `rootReward`, `headSpringReward`, `headDamperReward`, `winReward`, `deathPenalty`, `dyingHeightFactor`, `maxDyingFrames`, `lifeReward`, `dyingReward`, `dieOnFall`, `resetOnAlive`, `collisionPenalty`, `rewardFactor`, `normalizeSpeedDiff` |
 | Energy | `energyBonusWeight`, `energyScale`, `energySpeedEdge`, `energyMinSpeedFloor`, `energyVelocitySmoothingTau`, `positiveEnergyMultiplier`, `negativeEnergyMultiplier`, `energySource` (0–2 mapped to 3 with a warning), `energyClosure`, `energyChargeResidual` and `energyFullGrf` (accepted, no-ops on Jolt, warned once), `statsSettleSeconds`, `useTorqueNotEnergy`, `energyLimitEpsDeg`, `energyRewardStyle`, `energyNormDivisor`, `energyNormOffset`, `energyMinSpeed`, `energyMaxSpeed`, `etaPositiveWork`, `etaNegativeWork` |
 | Slope (M7) | `slopeAngle`, `slopeRandom`, `slopeIncludeLevel`, `slopeSign`, `slopeCompensateSpeed`, `slopeFootReach`, `slopeLiftMargin` |
-| Misc | `selfColliding` (must be 0), `freezeJointActions`, `pinFrozenJointDrive` |
+| Misc | `selfColliding` (0 accepted; 1 is fatal: self-collision is not implemented), `freezeJointActions`, `pinFrozenJointDrive` |
 | Inert, accepted silently | `depth`, `energyPenalty`, `legacy*` |
 
 **`envparams.txt`** is written to `-envParamsOut=` in Unity's format (UA §9.3):
@@ -130,18 +144,23 @@ Precedence, highest first (UA §9.3):
 
 ## Process behaviour
 
-- `stop-run` sends CTRL_C to the console group. Install a console control handler that sets a flag.
-  The main loop then finishes the current exchange, returns, and exits 0 quietly, so the trainer can
-  export the final ONNX.
-- A lost connection (gRPC error, or header 400): exit 0 if after QUIT, non-zero otherwise, logging
-  the reason.
+- **CTRL_C.** `stop-run` sends CTRL_C to the console group.
+  - `SetConsoleCtrlHandler` returns `TRUE` for `CTRL_C_EVENT`, `CTRL_BREAK_EVENT` and
+    `CTRL_CLOSE_EVENT`, and sets a flag.
+  - gRPC calls use a 1 s deadline and are retried, so the loop sees the flag.
+  - **Once the flag is set, the process exits 0 regardless of the connection state.** The trainer dies
+    at the same time.
+- **A lost connection without the flag:** exit 0 after QUIT or header 400; otherwise exit 2 with the
+  reason logged.
+- **Logging.** `dy::log` gains a file sink, opened from `-logFile` before any other output and flushed
+  per line, because the health check greps it live. stdout remains.
 
 ## Null environment (M0)
 
 `mode=null`:
 - the real handshake and step loop;
 - 25 agents with a fixed observation (138 × 2 zeros for the noToes layout, with Unity's sensor name) and zero rewards;
-- episodes of `maxFrames / decision_period` decisions;
+- episodes of 1000 decisions (2000 ticks / decision period 2);
 - no worlds, no physics.
 
 It measures trainer steps/s at 6 and 20 envs. The result goes in `benchmarks.md`.

@@ -4,7 +4,7 @@
 
 **This engine becomes the new `TrainingEnv.exe`.** It simulates the HumanBot noToes walker as a
 **first-class C++ / Jolt implementation** and speaks the stock ML-Agents protocol to the unchanged
-Python trainer: the fork, the configs, GAIL, W&B and `start-run`.
+Python trainer: the fork, the configs, GAIL and W&B. `start-run` gains an `-Engine dynamical` path.
 
 - **The goal is reproducibility of the experiments, not Unity compatibility.** The gait quality, the
   energetics and the DeVita statistics must be reproduced at matched updates. Unity's arithmetic,
@@ -22,9 +22,11 @@ Python trainer: the fork, the configs, GAIL, W&B and `start-run`.
 | Unity plan `Dynamical/Docs/JoltSim/PLAN.md` (Unity repo, `gladiator`) | Background inventory and decisions D1–D6. Written for the gladiator body and for parity; superseded by UA where they differ |
 | The Jolt doc, "Joint Kinetics & Actuator Energy in Jolt Physics" (Paul, 2026-10-29) | Solver settings, the exact energy recorder, the validation identities |
 | The ML-Agents fork (release 23, protocol 1.5.0) | Wire format, `.demo` format, ONNX I/O |
-| [`physical-agents/`](physical-agents/README.md) | How the engine does it |
+| [`physical-agents/`](physical-agents/README.md) | How the engine does it; [`phases.md`](physical-agents/phases.md) is the executable plan |
 
 ## Decisions
+
+Numbering follows the Unity plan; D5 (platform: Windows first) is settled by this engine.
 
 | # | Decision | Notes |
 |---|---|---|
@@ -67,50 +69,58 @@ scene files.
 
 | Need | Master | Change |
 |---|---|---|
-| Jolt | `PhysicsWorld`, `PhysicsSys` (60 Hz accumulator, box and sphere bodies, interpolation), `TerrainColliders`. Jolt 5.5 via vcpkg | Registration moves out of `PhysicsWorld` into a process guard. The world gets a config and lives in the registry ctx. `PhysicsSys` splits into reusable systems |
-| ECS | EnTT 3.16, `System` / `SystemSet` with pre and post lists | Add a fixed lane with act and observe phases, plus name-based system and component registries |
-| Rendering | `ModelPass` draws `Transform` + `ModelRenderable` glTF instances | Body segments are drawn as glTF box and capsule instances. No new pipeline for v1 |
-| Settings | cereal JSON + `key=value` arguments | Unchanged. Scenes use nlohmann-json; `dynamical_train` also parses the trainer's Unity-style flags |
-| Build | One globbed executable | Split into `dynamical_sim`, `dynamical`, `dynamical_train`, `dynamical_mlagents`, `dynamical_onnx` and `dynamical_tests` |
+| Jolt | `PhysicsWorld`, `PhysicsSys` (60 Hz accumulator, box and sphere bodies, interpolation), `TerrainColliders`. Jolt 5.5 via vcpkg | **Jolt 5.6.0 through an overlay port** (S2), with patches P-A and P-C (M2); no vcpkg baseline bump. Registration moves into `JoltRuntime`. The world gets a config and lives in the registry ctx. `PhysicsSys` splits into reusable systems |
+| ECS | EnTT 3.16, `System` / `SystemSet` with pre and post lists | Add a fixed lane with act and observe phases, parking, and name-based system and component registries |
+| Rendering | `ModelPass` draws `Transform` + `ModelRenderable` glTF instances; four passes hard-coded; no capture | Pass list from the scene; capture readback (P0); `WorldView` with primitives and generated capsules. No new pipeline for v1 |
+| Settings | cereal JSON with 9 known `key=value` keys; writes `config.6.json` at every start | `Settings` stays for `dynamical`. A new `RunArgs` parses scene, process, capture and trainer arguments; `dynamical_train` never touches `config.6.json` |
+| Build | One globbed executable, no tests | Split into `dynamical_sim`, `dynamical`, `dynamical_train`, `dynamical_mlagents`, `dynamical_onnx`, `dynamical_tests`, `imgdiff`; CI on Windows without a GPU |
 
 ## Milestones
 
-Gates are measured with behavioural stats at matched gradient updates, never mean reward.
+The executable plan is [`physical-agents/phases.md`](physical-agents/phases.md) (P0–P15), with ordered
+steps, automated tests with thresholds, and the visual sign-off per phase. The table below is the
+summary, in execution order.
 
-| # | Engine work | Unity-side work | Gate |
-|---|---|---|---|
-| **S1** Scenes | Scene loader, variables, registries, prefabs, fixed lane, optional renderer with a pass list. CMake split; `dynamical_tests` | — | `base` runs identically to master. Malformed scenes fail with the file and JSON path. `dynamical_train` links no Vulkan, SDL or OpenXR |
-| **S2** Worlds | `JoltRuntime`, `PhysicsConfig`, `PhysicsSys` split, `World`, `WorldClock`, `WorldRng`, `WorldStepper`, `WorldView`, flat `Ground` | — | 25 worlds × 50 falling boxes in `dynamical_train mode=bench`; determinism hash equal across runs; `dynamical` draws one world |
-| **M0** Null env | `dynamical_mlagents`: handshake, step loop, side channels; `mode=null` with 25 agents | Freeze the reference runs (flat walker, DeVita H173) | Trainer steps/s at 6 and 20 envs. **About 424 means the trainer is the ceiling** |
-| **M1** Body + rig | Exporter-format loaders, **Unity importer**, `RagdollBuilder`, `BodySync`; **`rig_anim`** | Exporter (body with PhysX readback, params), pose-track bake | The imported rest pose equals Unity's to 1e-5 m; masses and inertia equal the readback; `rig_anim` plays the walk tracks with limit excursions reported |
-| **M2** Joints + energy | Limits, motors, gain-scale derivation, contacts, friction combine, exact energy recorder, panels | Limit-sweep rig, drive step responses | Envelopes within 1°; step responses matched after the scale is derived; passive drop without explosion; energy closure < 1–2 % |
-| **M3** Agent runtime | `heidelbot_notoes_2` and the `_1` oracle; rewards, termination, reset, disturbances, stats | Per-tick logs from Unity rollouts (golden files) | The `_1` oracle reproduces Unity's observations to 1e-4, and the rewards and kills match the logs. This validates the rig and features. `_2` passes its `[task]` tests |
-| **M4** Bridge | Full bridge over N worlds, env params (UA §7 union), `envparams.txt` with sha, stats names, CTRL_C, launch contract | — | An unmodified config trains 1M steps; `start-run` reaches its ready marker; the W&B key set equals a Unity run's; a lesson change resets cleanly; `stop-run` exports the ONNX |
-| **M5** Demos | `mode=record-demo`, `.demo` writer, cache | Bake the walk tracks | `demo_loader` accepts the files; the spec matches; header x,z zero |
-| **M5b** Viewer | `dynamical_onnx`, `PolicySys`, `latest:` source, **`walker_view`** | — | During a run, the viewer shows the newest checkpoint and swaps models without restarting |
-| **M6** First walker | Train the flat GAIL walker from scratch on `_2` | — | Dead rate, episode length, root speed vs target and head height reach the frozen Unity reference at matched updates. Paul judges the video |
-| **M7** Energetics, slope | DeVita H173 line: energy reward on the exact channel, `DeVitaStepStat`, `SlopeGround`, `energyScale` re-derived for g = 9.81 | — | Jolt doc validation on eval episodes; DeVita stats produced; neg/pos ratio reported (a finding, not a gate) |
-| **M8** Eval, replay | `mode=eval` with the same CSV and `EVT|` lines, replay writer, replay playback in `walker_view` | `ReplayPlayer` scene for videos | `energy_eval_run.py` and `gait_run.py` run unchanged; post-training video from a replay |
-| **M9** Extended | Lean line, body variants, strike, duel, heightfield terrain, soil; then policy walkers in `base` | Variant exports | Each gated like M3 + M6 |
+- P0 (the test and capture harness) comes before S1.
+- **M5 (demos) comes before M4 (bridge)**, so M4 can gate on an unmodified GAIL config.
+- Gates are measured with behavioural stats at matched gradient updates, never mean reward.
 
-M5b depends only on M4, because an exported ONNX is all it needs. It can move ahead of M5.
+| Phase | # | Engine work | Unity-side work | Gate |
+|---|---|---|---|---|
+| P0 | **Harness** | Tests target, capture, `imgdiff`, phase report, probes, CI; master baseline recorded | — | Captures deterministic; master goldens and probe committed |
+| P1 | **S1** Scenes | Scene loader, variables, registries, prefabs, fixed lane, renderer pass list, `RunArgs`. CMake split | — | `base` matches master (probe ≤ 1e-5 m, captures within `imgdiff`). Malformed scenes fail with file and JSON path. `dynamical_train` links no Vulkan, SDL or OpenXR |
+| P2 | **S2** Worlds | **Jolt 5.6.0 overlay**, `JoltRuntime`, `PhysicsConfig`, `PhysicsSys` split, `World`, `WorldStepper`, `WorldView`, flat `Ground` | — | 25 worlds × 50 boxes at rest; determinism hash equal for 1 and 8 threads; drawn worlds match their golden |
+| P3 | **M0** Null env | `dynamical_mlagents`, `null` scene, CTRL_C, log file sink | Freeze the reference runs (flat walker, DeVita H173) | Trainer steps/s at 6 and 20 envs. **About 424 means the trainer is the ceiling** |
+| P4–P5 | **M1** Body + rig | Unity importer, `RagdollBuilder`, `BodySync`, `TrackActions`, `RigChecks`; **`rig_anim`** | Exporter (PhysX readback, params), pose-track bake, Unity reference screenshots | Pre-knee-move rest pose equals Unity's to 1e-5 m; mass properties equal the readback; walk tracks play with the reviewed limit excursions; side-by-side signed off |
+| P6–P7 | **M2** Joints + energy | Limits, `PositionAndVelocity` motors, gain-scale fit, **patches P-A and P-C**, contacts, friction combine, exact energy recorder | Limit-sweep rig, drive step responses | Envelopes within 1°; step responses within 15 %; stands for 10 s; energy closure ≤ 2 % |
+| P8 | **M3** Agent runtime | `heidelbot_notoes_2`, the `_1` oracle, task systems, `walker_heuristic` | Golden rollouts | `_1` reproduces Unity's observations to 1e-4, and rewards and kills match the logs; `_2` passes its `[task]` tests |
+| P9 | **M5** Demos | `mode=record-demo` (`walker_demo`), `.demo` writer, cache | Bake the walk tracks | `demo_loader` accepts the files; spec matches; header x,z zero |
+| P10 | **M4** Bridge | Full bridge over N worlds, env params, `envparams.txt` with hashes, stats, `start-run -Engine dynamical` | `start-run` engine path | **Unmodified** `default-training.yaml` (GAIL on) trains 1M steps through `start-run`; Unity's stat keys ⊆ the engine's; a lesson change resets cleanly; `stop-run` exports the ONNX |
+| P11 | **M5b** Viewer | `dynamical_onnx`, `Policy`, `ModelWatcher`, **`walker_view`**, minimal `mode=eval` | — | `PolicyRunner` equals Python onnxruntime to 1e-5; the viewer swaps checkpoints during a run |
+| P12 | **M6** First walker | Train the flat GAIL walker from scratch on `_2`, 3 seeds | — | Dead rate, episode length, root speed vs target and head height reach the frozen Unity reference at matched updates. Paul judges the video |
+| P13 | **M7** Energetics, slope | DeVita H173 line on the exact channel, `DeVitaStepStat`, `SlopeGround`, `energyScale` re-derived | — | Synthetic DeVita tests exact; reward equals the Python reference; DeVita keys produced; neg/pos ratio reported (a finding, not a gate) |
+| P14 | **M8** Eval, replay | Full eval (Unity CSV and `EVT|`), replays | `ReplayPlayer` scene | `energy_eval_run.py` and `gait_run.py` run unchanged; replay equals live bit-exactly |
+| P15 | **M9** Extended | Lean line, body variants, strike, duel, heightfield terrain; policy walkers in `base` | Variant exports | Each gated like M3 + M6 |
+
+M5b needs the M3 layout and an exported ONNX (M4). It can run alongside M6.
 
 ## Risks
 
-- **Throughput.** Unity measured about 424 steps/s at 20 envs at low CPU and GPU, so the limit may be the
-  trainer. M0 settles it.
-- **Drive semantics.** Swing-twist motors are not a SLERP drive. Budget for gain-scale derivation (M2)
-  and a tuning iteration in M6.
-- **Feet.** The friction combine, speculative contacts and the foot boxes decide stance. Compare drop,
-  slide and stance-duration stats early.
+- **Throughput.** Unity measured about 424 steps/s at 20 envs at low CPU and GPU, so the limit may be
+  the trainer. M0 settles it.
+- **Drive semantics.** Swing-twist motors are not a SLERP drive. Budget for the gain-scale fit (M2) and
+  a tuning iteration in M6.
+- **Feet.** The friction model (5.6: per-manifold with torsion), speculative contacts and the foot boxes
+  decide stance. Compare drop, slide and stance-duration stats early.
 - **A new layout means a new baseline.** `_2` checkpoints never compare to Unity ones except
   behaviourally at matched updates.
 - **The GAIL header coupling** (UA §6): demos zero the velocity header, so GAIL rewards command
   tracking. `_2` keeps the coupling on purpose.
-- **Unverified Jolt API.** Per-sub-step lambda access and post-solve contact impulses. Fallbacks:
-  stepping ourselves, and the momentum balance.
-- **The scene port could regress `base`.** S1 gates on identical behaviour; port `Game::start`
-  mechanically first.
+- **Jolt patch maintenance.** P-A and P-C live in an overlay port on 5.6.0. Upstream them; re-verify on
+  every Jolt bump.
+- **The scene port could regress `base`.** P0 pins master's behaviour; P1 gates on it.
 - **Jolt global state.** Every test and both executables go through `JoltRuntime`.
 - **The Unity working tree is dirty**: uncommitted energy changes (UA, status). The contract is what is
   committed.
+- **Unity-side tooling** (exporter, bake, limit sweep, step responses, golden logger, `start-run` engine
+  path) is real work in the Unity repo, on the critical path of P4–P10.

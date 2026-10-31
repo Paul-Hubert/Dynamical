@@ -13,9 +13,9 @@ Master has `PhysicsWorld` (`src/physics/physics_world.*`), `PhysicsSys` (`physic
 | # | Change | Why |
 |---|---|---|
 | P1 | **`JoltRuntime`** RAII guard in `main`, `train_main` and the test runner. It owns `RegisterDefaultAllocator`, `Trace`, `AssertFailed`, `Factory::sInstance` and `RegisterTypes`/`UnregisterTypes`, which today run in `PhysicsWorld`'s constructor and destructor | With two worlds, the first destructor unregisters types the second still uses |
-| P2 | **`PhysicsConfig`**: `threads` (1 → `JobSystemSingleThreaded`, else `JobSystemThreadPool`), `max_bodies`, `max_body_pairs`, `max_contacts`, `temp_bytes`, `gravity`, `PhysicsSettings` overrides (velocity and position steps, speculative distance, penetration slop, restitution threshold), `collision_steps` | Training worlds are small (≈ 20 bodies) and single-threaded. `base` keeps 65536 bodies, the thread pool and a 16 MB temp allocator |
-| P3 | `PhysicsWorld` lives in the **registry ctx** | Builder, drive, contact and energy systems need it; `PhysicsSys` stops owning it |
-| P4 | **Layers** become `STATIC`, `MOVING`, `AGENT`, `SENSOR` (broad-phase `NON_MOVING`, `MOVING`) | Agents collide with arena geometry only (UA §5: no self-collision, no agent–agent). Self-collision is handled per ragdoll by a group filter |
+| P2 | **`PhysicsConfig`**: `threads` (1 → `JobSystemSingleThreaded`, else `JobSystemThreadPool`), `max_bodies`, `max_body_pairs`, `max_contacts`, `temp_bytes`, `gravity`, `PhysicsSettings` overrides (velocity and position steps, speculative distance, penetration slop, restitution threshold), `substeps` (our own sub-stepping; Jolt's `inCollisionSteps` is always 1) | Training worlds are small (≈ 20 bodies) and single-threaded. `base` keeps 65536 bodies, the thread pool and a 16 MB temp allocator |
+| P3 | `PhysicsWorld` lives in the **registry ctx**; its job system member becomes `std::unique_ptr<JPH::JobSystem>` (master: `JobSystemThreadPool`, `physics_world.h:68`) | Builder, drive, contact and energy systems need it; `PhysicsSys` stops owning it |
+| P4 | **Layers** become `STATIC`, `MOVING`, `AGENT`, `SENSOR` (broad-phase `NON_MOVING`, `MOVING`) | Agents collide with arena geometry only (UA §5: no self-collision, no agent–agent). Self-collision is handled per ragdoll by a group filter. With one agent per world, `AGENT`-vs-`AGENT` filtering only matters for M9 multi-agent worlds |
 | P5 | **Split `PhysicsSys`** into `RigidBodySys` (create and destroy `RigidBody` bodies), `TerrainCollidersSys`, and `PhysicsSys` itself (accumulator, interpolation; used by `base`). Agent worlds use `PhysicsStep` (one step per fixed tick) | `base` keeps its behaviour; worlds get the fixed lane |
 | P6 | `RigidBody::Shape::Capsule`; `Ground` component | Flat ground and debug content in worlds |
 | P7 | A contact listener that records into a per-world queue | `Contacts` system; the base scene does not install it |
@@ -61,8 +61,8 @@ The `BodyDef` is already in the engine frame: the Unity importer converted it
    - linear damping 0;
    - angular damping from the body version: **0 by default**, for clean energy books (Unity used 0.05;
      UA §5);
-   - `mMaxAngularVelocity` 20 rad/s, explicit (Jolt's default is ~47). Scaled bodies take theirs from
-     the params file (H173: 20.9044);
+   - `maxAngularVelocity` from the **params file** (20, or 20.9044 for H173), env-overridable per episode,
+     applied with `MotionProperties::SetMaxAngularVelocity` at reset (Jolt's default is ~47);
    - sleeping off; `Discrete` motion quality (CCD changes velocities outside constraint impulses and
      would break the energy and contact books; walking speeds on a thick floor box do not need it;
      [jolt-readouts.md](jolt-readouts.md#4-friction-without-patching-momentum-balance));
@@ -80,7 +80,8 @@ The `BodyDef` is already in the engine frame: the Unity importer converted it
 - `ResetWarmStart()`;
 - clear contacts, energy and finite-difference history.
 
-Rebuild only when the body version changes.
+Rebuild only when the body version changes. A per-episode `totalMass` env param re-applies mass
+properties with `MotionProperties::SetMassProperties`, scaling inertia by the mass ratio.
 
 ## Joints
 
@@ -88,7 +89,7 @@ One `SwingTwistConstraint` per joint, in `LocalToBodyCOM` space, pivot at the ch
 
 | Unity (UA §1.2) | Jolt |
 |---|---|
-| `axis` | twist axis (forearms: L (0, 0, 1), R (0, 0, −1)) |
+| `axis` | twist axis. Forearms in Unity: L (0, 0, 1), R (0, 0, −1); after import (z mirrored): L (0, 0, −1), R (0, 0, 1) |
 | `secondaryAxis` | plane axis; normal = twist × plane |
 | low/high X limit | twist min/max. Reflection at import can swap the sign; the `[limits]` tests decide |
 | Y limit (about the secondary axis) | plane half-cone |
@@ -99,7 +100,7 @@ One `SwingTwistConstraint` per joint, in `LocalToBodyCOM` space, pivot at the ch
 - **Wide swing limits.** The arm swing limits (174.8° / 112.7°) and the head Y limit (90°) are wide.
   Jolt's cone half-angles must stay below π. The importer clamps at 179° and logs it; `rig_anim`
   checks whether any pose reaches that.
-- **The knee rest pose** is moved onto its 2° stop at import
+- **The knee rest pose** is moved to 2.1° (the 2° stop plus 0.1°) at import
   ([agent-runtime.md](agent-runtime.md#actions-8--15)).
 
 ### Drives
@@ -176,7 +177,7 @@ M2 checks (Jolt doc §8):
 | Physics rate | 60 Hz; 120, 240 or 480 allowed | Intent: 30 Hz control, 33.3 s episodes |
 | Solver steps, speculative distance, penetration slop, restitution threshold | Jolt doc settings table | Tuned fresh (Unity: TGS 20/20, adaptive force, offset 0.04) |
 | Friction | μ 1, max combine | Reproduced |
-| Max angular velocity | 20 rad/s (per body version) | Reproduced explicitly |
+| Max angular velocity | 20 rad/s (params file; H173 20.9044), env-overridable | Reproduced explicitly |
 | Angular damping | 0 (body-version field) | Intent; 0 for energy closure |
 | CCD | `Discrete` for agents | Changed on purpose (exact books); revisit if feet tunnel |
 | Sleeping | off | Irrelevant |
@@ -186,7 +187,7 @@ M2 checks (Jolt doc §8):
 
 - vcpkg `joltphysics` 5.5 is in use today. The consumer's compile definitions must match the port
   (`JPH_*` flags propagated by `Jolt::Jolt`).
-- **Jolt 5.6.0** (vcpkg baseline bump) with a vcpkg overlay port (`ports/joltphysics`) carrying patches
+- **Jolt 5.6.0** through a vcpkg overlay port (no baseline bump), (`ports/joltphysics`) carrying patches
   P-A (limit axes) and P-C (post-solve contact impulse listener, written for 5.6's per-manifold friction).
   GPU compute options off
   ([jolt-readouts.md](jolt-readouts.md#5-recommended-setup)). The same overlay can set

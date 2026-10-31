@@ -1,4 +1,8 @@
-# Jolt readouts: constraint forces, contact impulses, friction (5.5 verified, 5.6 upstream checked)
+# Jolt readouts: constraint forces, contact impulses, friction
+
+> **Plan of record: Jolt 5.6.0** (overlay port, no vcpkg baseline bump), `EMotorState::PositionAndVelocity`,
+> patches **P-A** (limit axes) and **P-C** (post-solve contact impulses). §1–§4 document the 5.5 source as
+> verified; §0 lists what 5.6 changes.
 
 *Verified 2026-10-31 against the Jolt source vcpkg builds:
 `$VCPKG_ROOT/buildtrees/joltphysics/src/v5.5.0-ca68e48c31.clean/Jolt/`. Paths below are relative to
@@ -6,7 +10,7 @@
 
 ## Summary
 
-| Question | Stock Jolt 5.5 | With a small patch |
+| Question | Stock Jolt 5.5 (verified) | With a small patch |
 |---|---|---|
 | Joint constraint impulses (point, limits, motors) per collision sub-step | **Yes.** Public `GetTotalLambda*()`, read from a `PhysicsStepListener` or after each `Update` | — |
 | World axes of the limit impulses | No, the axes are private | Accessors (3 lines) |
@@ -36,8 +40,8 @@ unreleased) and the release notes for **v5.6.0** (tag `e77f175`). vcpkg master s
   is always deterministic), and the warm-start impulse ratio is clamped for uneven time steps.
 
 **Recommendation.**
-- **Move to 5.6.0 before M2.** This is a vcpkg baseline bump, plus an overlay only for the remaining
-  patches.
+- **Move to 5.6.0 in S2 (phases P2)** through an overlay port, with **no vcpkg baseline bump**. The
+  remaining patches are added to that overlay in M2.
 - Use `PositionAndVelocity` and drop P-B.
 - Write P-A and P-C against 5.6.0's per-manifold friction layout.
 - Propose P-C upstream as a post-solve contact callback. The same request covers P-A.
@@ -98,6 +102,8 @@ equal steps (`PhysicsSystem.cpp:213`). Two ways to read each one:
 
 ## 2. Drive semantics: position motors ignore the target angular velocity
 
+> 5.5 history. On 5.6.0 use `EMotorState::PositionAndVelocity` (§0); patch P-B is not needed.
+
 `SwingTwistConstraint::SetupVelocityConstraint` (`Constraints/SwingTwistConstraint.cpp:205-320`)
 handles the motor states as follows:
 
@@ -150,14 +156,20 @@ the implicit `(c + h·k)` damping. It also has to be booked separately in the en
 serialises the cached manifolds, lambdas included. It is public but uses an internal binary layout,
 holds only the last step, and is brittle. It is fine for a one-off check, not for the recorder.
 
-**Patch P-C, the recommended route** (~30 lines):
-- an optional `ContactImpulseListener` on `PhysicsSystem`, called from `StoreAppliedImpulses`;
-- per manifold, it passes the two `BodyID`s, the sub-shape IDs, the world normal, `t1` and `t2`, and per
-  point the world position plus `(λ_n, λ_t1, λ_t2)`;
-- it fires per collision step, from parallel solver jobs, so the listener must be thread-safe. Training
-  worlds use `JobSystemSingleThreaded`, so it is trivially safe there.
-- The contact impulse vector at a point is `λ_n·n + λ_t1·t1 + λ_t2·t2`; it acts + on body 2 and − on
-  body 1 (*verify* the sign in `sWarmStartConstraint`).
+**Patch P-C, the recommended route** (~30 lines on 5.6.0):
+- an optional `ContactImpulseListener` on `PhysicsSystem`, called from `sStoreAppliedImpulses` after
+  every collision step's velocity solve;
+- **payload per manifold (5.6 friction model):**
+  - the two `BodyID`s and sub-shape IDs;
+  - the world normal;
+  - per point, the world position and `λ_n`;
+  - per manifold, the average friction point, tangents `t1`, `t2`, `mFrictionLambda[2]` and
+    `mAngularFrictionLambda` (torsional, about the normal).
+- **The contact wrench on body 2** = `Σ λ_n,i·n` applied at the points, plus `λ_t1·t1 + λ_t2·t2` at the
+  average point, plus a torsional impulse `λ_ang·n`. The opposite acts on body 1 (*verify* the sign in
+  `sWarmStartConstraint`).
+- It fires from parallel solver jobs, so the listener must be thread-safe. Training worlds use
+  `JobSystemSingleThreaded`.
 
 ## 4. Friction without patching: momentum balance
 
@@ -191,25 +203,25 @@ P-C, the momentum balance books those as "contact" too.
 
 ## 5. Recommended setup
 
-1. **vcpkg overlay port** `ports/joltphysics/` (5.5.0), with three patch files:
-   - P-A: limit-axis accessors;
-   - P-B: target velocity in position motors;
-   - P-C: contact impulse listener.
-
-   Each patch is a few dozen lines, applied with `vcpkg_from_github(... PATCHES ...)`. The same overlay
-   can set `CROSS_PLATFORM_DETERMINISTIC`. Keep each patch upstreamable; the P-B and P-C behaviours
-   would be reasonable feature requests for Jolt.
-2. **Recorder:**
+1. **Jolt 5.6.0 through a vcpkg overlay port** (`ports/joltphysics`). There is **no baseline bump**:
+   that would also move EnTT, SDL2, OpenXR and others and put the `base` gate at risk. The overlay:
+   - builds with the GPU compute options off, and optionally cross-platform determinism;
+   - carries P-A (limit-axis accessors) and P-C (contact impulse listener) as patch files, each
+     upstreamable.
+2. **Motors:** `EMotorState::PositionAndVelocity` with stiffness and damping per joint
+   (physics.md "Drives").
+3. **Recorder:**
    - our own sub-stepping (`Update(h_sub, 1)`);
-   - joint lambdas after each sub-step;
-   - contact impulses from P-C, cross-checked against the momentum balance;
-   - the whole-body closure residual per tick.
-3. **Agent bodies:** `Discrete` motion quality, damping 0, `maxAngularVelocity` with headroom, and a
+   - joint lambdas and P-C impulses read inside `PhysicsStep` after each sub-step;
+   - the momentum balance as a cross-check;
+   - the closure residual per tick.
+4. **Agent bodies:** `Discrete` motion quality, damping 0, `maxAngularVelocity` with headroom, and a
    clamp-event counter as a stat.
-4. **Tests** (`[energy]`):
-   - the P-C impulses equal the momentum balance on single-foot stance (flat ground) to 1e-4;
-   - the P-B motor tracks a ramp target at constant `ω_target` with zero steady-state velocity error;
-   - the closure residual stays under 1–2 % with P-A limit work included.
+5. **Tests** (`[energy]`, phases P6–P7):
+   - the P-C impulses equal the momentum balance on a box and on single-foot stance (flat ground) to
+     1e-4;
+   - the `PositionAndVelocity` motor tracks a constant ω target with ≤ 2 % steady-state error;
+   - the closure residual stays under 2 % with P-A limit work included.
 
-**Not checked:** whether a Jolt release newer than 5.5 already exposes any of this. Check upstream
-before writing the patches, and prefer an upstream API if one exists.
+**Upstreaming.** Propose P-C as a post-solve contact callback and P-A as accessors. Drop either patch if
+upstream adds an equivalent.

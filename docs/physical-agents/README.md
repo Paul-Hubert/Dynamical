@@ -22,9 +22,10 @@ worlds, a JSON scene system, a headless training executable that the unchanged t
 | 9 | [mlagents-bridge.md](mlagents-bridge.md) | Launch contract, handshake, step loop, side channels, env params, process behaviour |
 | 10 | [inference-and-replay.md](inference-and-replay.md) | ONNX Runtime, `walker_view`, eval mode, demo recorder, replays |
 | 11 | [testing.md](testing.md) | Test target, oracle tests, gates, benchmarks |
-| — | [jolt-readouts.md](jolt-readouts.md) | **Reference**: Jolt 5.5 constraint and contact impulse access, drive semantics, the three patches |
+| — | [jolt-readouts.md](jolt-readouts.md) | **Reference**: Jolt impulse access (5.5 verified, 5.6 plan of record), `PositionAndVelocity` motors, patches P-A and P-C |
 | — | [unity-analysis.md](unity-analysis.md) | **Reference**: what the noToes Unity code computes, with file:line sources |
-| 12 | [diagram.md](diagram.md) | Spec and Claude Design prompt for the implementation-plan diagram |
+| 12 | [phases.md](phases.md) | **The executable plan**: P0–P15 with steps, tests, visual sign-off and gates |
+| 13 | [diagram.md](diagram.md) | Spec and Claude Design prompt for the implementation-plan diagram |
 
 ## Rules for these docs
 
@@ -44,7 +45,7 @@ worlds, a JSON scene system, a headless training executable that the unchanged t
 |---|---|
 | World | One independent simulation: an `entt::registry`, its `SystemSet` and its Jolt `PhysicsSystem`. A training *area* in ML-Agents terms |
 | Host registry | The process-wide registry (`Game::registry`, or `TrainHost`'s): settings, executor, scene variables, bridge, renderer state |
-| Sim frame | Unity's coordinates, used unchanged in physics, observations and assets |
+| Unity frame | Unity's left-handed coordinates. They exist only in exported files and `unity_import`; everything else uses the engine frame |
 | Body file | Exported prefab physics: segments, shapes, mass properties, joints, rest pose |
 | Pose track | Exported per-tick world poses of every segment, baked from a retargeted Unity clip |
 | Decision tick | The physics tick on which observations go out and actions come in |

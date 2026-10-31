@@ -11,7 +11,7 @@
 | File | Format | Loaded into | Written by |
 |---|---|---|---|
 | `bodies/<body>.body.json` | JSON | `BodyDef` | Exporter |
-| `tracks/<clip>.track.json` + `.track.bin` | JSON header + float32 | `PoseTrack` | Pose-track bake |
+| `tracks/<body>__<controller>.track.json` + `.track.bin` | JSON header + float32 | `PoseTrack` | Pose-track bake |
 | `params/<scenario>.params.json` | JSON | `AgentParams` | Exporter, from a scene plus a config |
 | `golden/<body>/<case>.json` | JSON | oracle tests | Unity rollout logger |
 
@@ -80,7 +80,8 @@ The values come from UA §1. The exporter reads the real ones; this doc never be
 - parents come before children, the indices resolve, `body_percentage` sums to 99.98 ± 0.05;
 - quaternions are unit to 1e-4; anchors coincide in world space at rest to 1e-5 m;
 - frame conversion and degrees → radians;
-- the knee rest pose is moved onto its stop ([agent-runtime.md](agent-runtime.md#actions-8--15));
+- the knee rest pose is moved to 2.1° ([agent-runtime.md](agent-runtime.md#actions-8--15)); the
+  pre-move pose is kept for the Unity comparison tests;
 - swing half-angles are clamped below 180° (with a log line).
 
 ## Pose tracks
@@ -89,7 +90,7 @@ Baked once per clip and body version by playing the Mecanim controller with root
 controller's state speed, at the physics rate (UA §6, §9.2).
 
 ```jsonc
-// tracks/walk_h173.track.json
+// tracks/heidelbot_notoes_h173__Walk1p500mps-h173.track.json
 { "format_version": 1, "body": "heidelbot_notoes_h173", "body_sha256": "…",
   "controller": "Walk1p500mps-h173", "clip": "BasicMotions@Walk01 - Forwards", "state_speed": 0.807316,
   "clip_guid": "…", "dt": 0.0166666, "frames": 20000, "segments": 16, "loop": false, "has_velocities": false,
@@ -100,7 +101,8 @@ controller's state speed, at the physics rate (UA §6, §9.2).
   `pos.xyz, rot.xyzw` (7 floats).
 - **World poses of the 16 bodies**, matched by name, as Unity's recorder copies them. No retargeting
   happens in C++.
-- `dt` must equal the world's physics dt. The loader refuses a mismatch instead of interpolating.
+- `dt` must equal the world's physics dt to a relative 1e-5 (Unity's dt is 2351990/141120000 s,
+  4e-6 off 1/60). The loader refuses a larger mismatch instead of interpolating.
 - **Velocities are not stored.** C++ derives them: finite differences of the anchors for observations,
   and `MoveKinematic` for the bodies.
 - **One track per controller.** Controllers that chain states (Ladder, Leans) are baked as one long
@@ -130,11 +132,33 @@ initialisation and every episode start ([mlagents-bridge.md](mlagents-bridge.md#
 
   Config env params (gains, energy, slope) arrive at runtime as env params, as in Unity.
 - **Layout-defining flags are file-only.** `springControl`, `angularVelocityControl`, `jointSpace`,
-  `*Obs`, `freezeObs`, `normalizedVelocity` and `relativeVelocity` select the layout. An env param
-  that tries to change them is rejected.
+  `*Obs`, `freezeObs`, `normalizedVelocity` and `relativeVelocity` select the layout. **This is the one
+  list.** An env param equal to the file value is accepted. A different value is fatal (exit 1).
+- **Durations** are Unity's 60 Hz counts: `physics_hz` (60), `control_hz` (30), `max_frames_60hz`
+  (2000), `arc_frames_60hz` (400), `substeps` (default 1).
 - **Physics** (rate, solver, gravity, `drive_gain_scale`) and the arena (ground box, world count) live
   in the same file, so one file pins a scenario.
 - **Unknown keys** are an error in the file and a warning when they arrive as env params.
+
+## Golden rollout files
+
+`golden/<body>/rollout_<n>.json` comes from the Unity rollout logger (phases P8). It feeds the `[oracle]`
+tests.
+
+```jsonc
+{ "format_version": 1, "body": "heidelbot_notoes", "body_sha256": "…", "params": { /* resolved values */ },
+  "scene": "Training.unity", "git_sha": "…", "dt": 0.016666596, "decision_period": 2,
+  "est0": 1.534,                                  // Unity's spawn-pose head–foot height (UA §3.3)
+  "tick_phase": "post_fixedupdate",               // poses are logged after physics, before the next FixedUpdate
+  "ticks": [ { "t": 0, "poses": [[px,py,pz,qx,qy,qz,qw], …16],
+               "spine_rb_velocity": [vx,vy,vz],    // PhysX Rigidbody.linearVelocity (header input, UA §2.2)
+               "last_position": [[x,y,z], …15],    // BotJoint.lastPosition per joint (finite-difference state)
+               "target": [x,y,z], "target_speed": 1.36 } ],
+  "decisions": [ { "t": 1, "obs": [ …276 ], "actions": [ …120 ], "reward_terms": { "root": 0.0, "death": 0.0 },
+                   "done": false, "max_step_reached": false } ] }
+```
+
+All values are in Unity's frame. The tests convert them with the same importer as the body.
 
 ## Demo cache key
 

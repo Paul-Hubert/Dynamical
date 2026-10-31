@@ -59,22 +59,25 @@ Colour or badge each box with the milestone that delivers it:
 
 | Badge | Boxes |
 |---|---|
+| P0 | Test and capture harness (tests target, capture, `imgdiff`, CI) |
 | S1 | Scene loader, registries, CMake split, `base` scene |
-| S2 | Worlds, `JoltRuntime`, flat ground, `WorldView`, `bench` |
+| S2 | Worlds, `JoltRuntime`, Jolt 5.6.0 overlay, flat ground, `WorldView`, `bench` |
 | M0 | gRPC bridge, `null` mode |
 | M1 | Exporter, body loader, `RagdollBuilder`, **`rig_anim`** |
-| M2 | Joints, motors, contacts, energy recorder |
+| M2 | Joints, `PositionAndVelocity` motors, patches P-A/P-C, contacts, energy recorder |
 | M3 | Layouts, rewards, termination, episodes |
-| M4 | Full training through TrainingEnv.exe |
-| M5 / M5b | Demo recorder / **`walker_view`** with ONNX |
+| M5 | Demo recorder (before M4) |
+| M4 | Full training through TrainingEnv.exe, `start-run -Engine dynamical` |
+| M5b | **`walker_view`** with ONNX, minimal eval |
 | M6 | First GAIL walker (gate) |
 | M7–M9 | Slope, DeVita stats, eval, replays, extended lines (greyed, "later") |
 
-Add a thin timeline strip along the bottom: S1 → S2 → M0 → M1 → M2 → M3 → M4 → M5/M5b → M6 → M7 → M8 → M9.
+Add a thin timeline strip along the bottom: P0 → S1 → S2 → M0 → M1 → M2 → M3 → M5 → M4 → M5b → M6 → M7 → M8 → M9.
 Show each gate as a diamond with a two-to-four-word gate label:
 
 | Milestone | Gate label |
 |---|---|
+| P0 | "captures deterministic" |
 | S1 | "base unchanged" |
 | S2 | "25 worlds deterministic" |
 | M0 | "trainer ceiling measured" |
@@ -152,20 +155,21 @@ Jolt step → BodySync → Energy → Contacts → Stats → Termination → Obs
 exchange. Small callout: "kill mid-window → terminal snapshot, world parks until window end".
 
 Milestones: put a small text pill on each box with the milestone that delivers it:
+- P0: test and capture harness
 - S1: scene loader, registries, build split, base scene
-- S2: worlds, JoltRuntime, flat ground, WorldView
+- S2: worlds, JoltRuntime, Jolt 5.6 overlay, flat ground, WorldView
 - M0: gRPC bridge, null mode
 - M1: exporter, body loader, RagdollBuilder, rig_anim
 - M2: joints, motors, contacts, energy recorder
 - M3: layouts, rewards, termination, episodes
-- M4: full training
-- M5: demo recorder
+- M5: demo recorder (before M4)
+- M4: full training via start-run -Engine dynamical
 - M5b: walker_view with ONNX
 - M7–M9: greyed
 
-Along the bottom, a timeline strip S1 → S2 → M0 → M1 → M2 → M3 → M4 → M5/M5b → M6 → M7 → M8 → M9.
+Along the bottom, a timeline strip P0 → S1 → S2 → M0 → M1 → M2 → M3 → M5 → M4 → M5b → M6 → M7 → M8 → M9.
 Each gate is a diamond with a short label:
-S1 "base unchanged", S2 "25 worlds deterministic", M0 "trainer ceiling measured",
+P0 "captures deterministic", S1 "base unchanged", S2 "25 worlds deterministic", M0 "trainer ceiling measured",
 M1 "rest pose 1e-5 m", M2 "limits ±1°, energy checks", M3 "oracle features match",
 M4 "unmodified config trains", M5 "GAIL loads demos", M6 "matches Unity reference".
 

@@ -437,7 +437,7 @@ multipliers 4.0 / 0.8333 and the gate widths.
 | Contact offset 0.04, bounce threshold 1, depenetration 20 | | Tune fresh |
 | Max angular velocity | 20 rad/s | Reproduce explicitly, or remove and log |
 | Angular damping | 0.05 | Intent only. 0 if energy closure needs it (part of the body version) |
-| CCD | ContinuousDynamic | `LinearCast` |
+| CCD | ContinuousDynamic | `Discrete` for agents (exact energy and contact books); `LinearCast` stays for `base` rigid bodies |
 | Sleep | 0.005 | Irrelevant: sleeping off |
 | Self-collision | off (`JointAgent.cs:421-424`) | Reproduce: all pairs filtered |
 
@@ -606,4 +606,4 @@ scene. A missing or malformed `-envParams` file is fatal.
   - whether trigger Eye capsules count toward the Head mass;
   - Unity drive spring units;
   - the exact D6 swing-cone mapping.
-- Jolt 5.5: lambda accessors per sub-step, and public post-solve contact impulses.
+- (Resolved: Jolt lambdas are public; contact impulses need patch P-C; see [jolt-readouts.md](jolt-readouts.md).)

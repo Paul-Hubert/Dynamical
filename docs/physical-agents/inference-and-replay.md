@@ -19,7 +19,11 @@ public:
   v1.
 - Apply the trainer's `clamp(−3, 3)/3` to the actions if the exported graph does not already include
   it (*verify*; Unity applies no clipping of its own, UA §2.4).
-- `PolicySys` (world, Act phase) batches every agent of the world into one `run`.
+- **Ownership.** Worlds cannot see the host registry, so the host system `ModelWatcher` (view) or
+  `TrainHost` (eval) loads the session and injects a `PolicyHandle` (`std::shared_ptr<PolicyRunner>`)
+  into each world's ctx. A swap replaces the handle; the world adopts it at its next episode start.
+- `Policy` (world, Act phase) batches every agent of the world into one `run`, through the handle.
+  Registry name `Policy`; the class is `PolicySys`.
 
 ## `walker_view`
 
@@ -34,7 +38,8 @@ public:
 
   The swap avoids loading half-written files by waiting for two equal size and mtime reads.
 - **Worlds.** Default 1, or `num_worlds` side by side. Same `humanbot_world` template as training, with
-  `Policy` replacing `TrainerActions`. Randomisation is off by default (`var.randomize=false`).
+  `Policy` replacing `TrainerActions`. Randomisation is off by default: the scene variable `randomize` (bool, default false) feeds the params
+  override `randomize`.
   The target is controllable from the panel (click to place, speed slider).
 - **Panels** (`AgentPanel`, ImGui/ImPlot):
   - joints: angle against limits, target against actual, motor torque, saturation;
@@ -48,16 +53,18 @@ public:
 
 ## Eval mode
 
-`dynamical_train mode=eval var.policy=<onnx> episodes=<n>` replaces the bridge with `PolicySys` and
+**Minimal eval (P11):** `dynamical_train scene=walker_eval mode=eval var.policy=<onnx> episodes=<n>`
+replaces the bridge with `Policy` and
 deterministic actions.
 
 - It emits **the same CSV columns and `EVT|{json}` stdout lines** as Unity's `energy-eval` and
   `gait-cycle` builds, so `energy_eval_run.py` and `gait_run.py` run unchanged.
 - It applies env params from `-envParams=`. Unity's `record-run.ps1` forgets this today.
+- **Full eval (P14):** the same CSV columns and `EVT|` lines as Unity's builds, plus replays.
 
 ## Demo recorder
 
-`dynamical_train mode=record-demo var.track=<track> decisions=<n>` (UA §6, §9.2). Defaults per line: flat walker 3000 decisions, DeVita 10000.
+`dynamical_train scene=walker_demo mode=record-demo var.track=<track> var.decisions=<n>` (UA §6, §9.2). Defaults per line: flat walker 3000 decisions, DeVita 10000.
 
 1. Builds the world with a **kinematic**, non-colliding body. `TrackActions` plays the pose track
    with `MoveKinematic`, the same playback as [`rig_anim`](rig-animation.md). Unity's pose lands one
@@ -76,13 +83,14 @@ deterministic actions.
    - then length-delimited `AgentInfoActionPairProto` records.
 
    The actions are zeros of the layout size.
-5. **Cache.** The file is keyed on (track hash, body hash, layout version, params hash) under
+5. **Cache.** The file is keyed on (track hash, body hash, layout version, and the demo-relevant params
+   subset from [assets.md](assets.md#demo-cache-key)) under
    `Demonstrations/`. `start-run` reuses a cached demo instead of re-recording, which makes demo bytes
    a controlled variable.
 
 ## Replays
 
-- **Writer.** `dynamical_train replay=<dir>` (eval and training) writes per episode:
+- **Writer.** The run argument `replay=<dir>` (eval and training) writes per episode:
   - a JSON header (body hash, layout, params, policy, seed);
   - per tick, float32 segment poses;
   - per decision, actions, reward terms, contacts and energy channels.
