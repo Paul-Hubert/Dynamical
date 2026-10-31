@@ -124,8 +124,10 @@ if (DYNAMICAL_TESTS)
     find_package(doctest CONFIG REQUIRED)
     include(${doctest_DIR}/doctest.cmake)
 
+    # Until the library split, only sources that build without Vulkan, SDL or OpenXR
     file(GLOB_RECURSE test_sources ./tests/*.cpp)
-    add_executable(dynamical_tests ${test_sources})
+    add_executable(dynamical_tests ${test_sources} src/scene/run_args.cpp src/util/log.cpp)
+    target_include_directories(dynamical_tests PRIVATE src)
     target_link_libraries(dynamical_tests PRIVATE doctest::doctest)
     if (MSVC)
         target_compile_options(dynamical_tests PRIVATE /bigobj /utf-8)

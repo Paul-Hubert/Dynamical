@@ -17,11 +17,13 @@
 #include "util/entt_util.h"
 
 #include "logic/settings/settings.h"
+#include "scene/run_args.h"
 
 #include "logic/components/input.h"
 
 #include "util/log.h"
 
+#include <algorithm>
 #include <chrono>
 
 using namespace std::chrono_literals;
@@ -33,6 +35,20 @@ Game::Game(int argc, char** argv) {
     entt::registry& reg = *registry;
     reg.ctx().emplace<Settings>(argc, argv);
     reg.ctx().emplace<tf::Executor>();
+
+    // Settings parses its own keys from the same arguments, anything else unknown is only a warning here
+    static const char* settings_keys[] = { "window_width", "window_height", "fullscreen", "fps_max", "username",
+        "server_side", "client_side", "vr_mode", "view_distance" };
+    auto parsed = parseRunArgs(argc, argv);
+    for(auto& key : parsed.unknown) {
+        if(std::find(std::begin(settings_keys), std::end(settings_keys), key) == std::end(settings_keys)) {
+            dy::log(dy::warning) << "Unknown argument " << key << "\n";
+        }
+    }
+    for(auto& error : parsed.errors) {
+        dy::log(dy::warning) << "Argument ignored, " << error << "\n";
+    }
+    reg.ctx().emplace<RunArgs>(parsed.args);
 }
 
 void Game::start() {
