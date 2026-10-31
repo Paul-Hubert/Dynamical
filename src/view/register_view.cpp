@@ -9,6 +9,7 @@
 #include "view/systems/input.h"
 #include "view/systems/system_list.h"
 #include "view/systems/ui.h"
+#include "view/world_stepper.h"
 
 using namespace dy;
 
@@ -24,6 +25,7 @@ void dy::registerViewSystems() {
     registerSystem("ModelLineup", systemInfo<ModelLineupSys>(SystemScope::Host, true));
     registerSystem("BoxThrower", systemInfo<BoxThrowerSys>(SystemScope::Host, true));
     registerSystem("Terrain", systemInfo<TerrainSys>(SystemScope::Host, true));
+    registerSystem("WorldStepper", systemInfo<WorldStepperSys>(SystemScope::Host, true));
 
     // Needs the renderer's ModelManager: only valid once the renderer exists
     registerComponent("ModelRenderable", {

@@ -41,6 +41,7 @@ struct WorldDef {
     nlohmann::json clock = nlohmann::json::object();
     std::vector<SystemEntry> fixed;         // template list after the world's replace / remove
     std::vector<EntityDef> entities;
+    std::string file, path;                 // the template, for errors
 };
 
 struct RendererDef {

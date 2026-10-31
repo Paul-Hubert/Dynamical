@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "name": "worlds",
+  "templates": {
+    "drop": {
+      "physics": { "threads": 1, "max_bodies": 64 },
+      "clock": { "physics_hz": 60, "control_hz": 30 },
+      "fixed": ["TestWorld@act", "RigidBody", "PhysicsStep", "TestBoth@observe"],
+      "entities": [
+        { "Transform": { "position": [0, -0.5, 0] }, "RigidBody": { "motion": "static", "half_extent": [5, 0.5, 5] } },
+        { "prefab": "crate", "Transform": { "position": [0, 3, 0] } }
+      ]
+    }
+  },
+  "worlds": [ { "template": "drop", "count": 3 } ]
+}

@@ -8,6 +8,7 @@
 #include "logic/systems/system_set.h"
 #include "scene/scene_def.h"
 #include "scene/system_registry.h"
+#include "scene/world.h"
 
 #include "util/entt_util.h"
 
@@ -86,6 +87,18 @@ int Game::start() {
     for(auto& e : scene.host_pre) set->add(SystemSet::List::Pre, findSystem(e.name)->make(reg, e.params), e.phase, e.name);
     for(auto& e : scene.host_post) set->add(SystemSet::List::Post, findSystem(e.name)->make(reg, e.params), e.phase, e.name);
 
+    // The scene's worlds, stepped by WorldStepper and drawn by WorldView
+    Worlds* worlds = nullptr;
+    if(!scene.worlds.empty()) {
+        worlds = &reg.ctx().emplace<Worlds>();
+        try {
+            worlds->create(scene, 0);
+        } catch(const SceneError& e) {
+            dy::log(dy::error) << "Scene: " << e.what() << "\n";
+            return 1;
+        }
+    }
+
 
     // preinit
 
@@ -93,10 +106,14 @@ int Game::start() {
 
     set->preinit();
 
+    if(worlds) worlds->preinit();
+
 
     // init
 
     set->init();
+
+    if(worlds) worlds->init();
 
     renderer->init();
 
@@ -184,6 +201,7 @@ int Game::start() {
 
 Game::~Game() {
 
+    if(auto* worlds = registry->ctx().find<Worlds>()) worlds->finish();
     if(set) set->finish();
     if(renderer) renderer->finish();
 

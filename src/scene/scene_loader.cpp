@@ -543,6 +543,8 @@ private:
 
             WorldDef world;
             world.template_name = name;
+            world.file = t->second.file;
+            world.path = t->second.path;
             world.count = w.value.value("count", 1);
             world.physics = tv.value("physics", json::object());
             world.clock = tv.value("clock", json::object());
