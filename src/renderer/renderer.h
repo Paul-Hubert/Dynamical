@@ -7,6 +7,7 @@
 #include "classic_render/classic_render.h"
 #include "vr_render/vr_render.h"
 #include "scene_pass.h"
+#include "scene/scene_def.h"
 
 #include <chrono>
 #include <memory>
@@ -21,7 +22,8 @@ namespace dy {
 // transfer -> compute -> graphics, the desktop and VR command buffers being recorded in parallel.
 class Renderer {
 public:
-    Renderer(entt::registry& reg);
+    // Builds the passes the scene lists, in draw order
+    Renderer(entt::registry& reg, const RendererDef& desc);
     void preinit();
     void init();
     void prepare();

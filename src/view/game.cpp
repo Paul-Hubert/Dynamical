@@ -69,7 +69,7 @@ int Game::start() {
     entt::registry& reg = *registry;
 
     // Creates the Vulkan context, OpenXR session, both render targets and the scene passes
-    renderer = std::make_unique<Renderer>(reg);
+    renderer = std::make_unique<Renderer>(reg, RendererDef { { "terrain", "grass", "model", "ui" }, true });
 
     set = std::make_unique<SystemSet>(reg);
 

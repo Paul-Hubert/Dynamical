@@ -25,7 +25,7 @@
 
 using namespace dy;
 
-Renderer::Renderer(entt::registry& reg) : reg(reg),
+Renderer::Renderer(entt::registry& reg, const RendererDef& desc) : reg(reg),
 ctx(reg),
 per_frame(NUM_FRAMES) {
 
@@ -41,11 +41,14 @@ per_frame(NUM_FRAMES) {
     reg.ctx().emplace<ModelManager>(reg);
     reg.ctx().emplace<RenderSettings>();
 
-    // Draw order : opaque terrain, grass shells on top of it, models, then the desktop UI
-    passes.push_back(std::make_unique<TerrainPass>(ctx, reg));
-    passes.push_back(std::make_unique<GrassPass>(ctx, reg));
-    passes.push_back(std::make_unique<ModelPass>(ctx, reg));
-    passes.push_back(std::make_unique<UIPass>(ctx, reg));
+    // Draw order as listed (base: opaque terrain, grass shells on top of it, models, then the desktop UI)
+    for(const std::string& name : desc.passes) {
+        if(name == "terrain") passes.push_back(std::make_unique<TerrainPass>(ctx, reg));
+        else if(name == "grass") passes.push_back(std::make_unique<GrassPass>(ctx, reg));
+        else if(name == "model") passes.push_back(std::make_unique<ModelPass>(ctx, reg));
+        else if(name == "ui") passes.push_back(std::make_unique<UIPass>(ctx, reg));
+        else dy::log(dy::error) << "Renderer : unknown pass " << name << "\n";
+    }
 
     for(auto& pass : passes) {
         pass_list.push_back(pass.get());
