@@ -22,6 +22,7 @@ worlds, a JSON scene system, a headless training executable that the unchanged t
 | 9 | [mlagents-bridge.md](mlagents-bridge.md) | Launch contract, handshake, step loop, side channels, env params, process behaviour |
 | 10 | [inference-and-replay.md](inference-and-replay.md) | ONNX Runtime, `walker_view`, eval mode, demo recorder, replays |
 | 11 | [testing.md](testing.md) | Test target, parity tests, gates, benchmarks |
+| 12 | [diagram.md](diagram.md) | Spec and Claude Design prompt for the implementation-plan diagram |
 
 ## Rules for these docs
 
