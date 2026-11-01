@@ -91,6 +91,11 @@ every scene with a renderer must include `common/desktop.json`. The loader check
   - `@observe` runs it on the last tick (right before observations leave).
   - See [simulation.md](simulation.md#per-tick-schedule).
   - A world entry may `replace` or `remove` systems of its template.
+- **Variables of a world entry** (T1.5). `"variable_files": ["common/wheel_body.json"]` applies those files'
+  variable defaults, then `"variables": { "radius": 0.94 }` sets values over them. Both apply to that entry's worlds
+  only, and win over the scene's values and the command line. The entry's template is resolved again from its text
+  as written. The resolved scene holds it as a template of its own, `<template>@<entry>`, so the dump reloads as
+  is; `WorldDef::template_name` stays `<template>`. `vr_roller` uses it for the desktop player's wheel.
 - **Entities** are a prefab plus component overrides. Components are keyed by registered name.
 - **Validation.** The loader fails, naming the file and JSON path, on:
   - an unknown key, system, component, prefab or variable;

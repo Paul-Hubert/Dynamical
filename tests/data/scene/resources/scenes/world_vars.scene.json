@@ -1,0 +1,24 @@
+{
+  "format_version": 1,
+  "name": "world_vars",
+  "variables": {
+    "size":    { "type": "float",  "default": 0.5 },
+    "combine": { "type": "string", "default": "geometric" },
+    "count":   { "type": "int",    "default": 2 }
+  },
+  "templates": {
+    "drop": {
+      "physics": { "threads": 1, "max_bodies": 64, "friction_combine": "${combine}" },
+      "clock": { "physics_hz": 60, "control_hz": 30 },
+      "fixed": ["TestWorld@act", "RigidBody", "PhysicsStep"],
+      "entities": [
+        { "Transform": { "position": [0, 3, 0] }, "RigidBody": { "half_extent": ["${size}", "${size}", "${size}"] } }
+      ]
+    }
+  },
+  "worlds": [
+    { "template": "drop", "count": "${count}" },
+    { "template": "drop", "variables": { "size": 2 } },
+    { "template": "drop", "variable_files": ["common/world_vars_big.json"], "variables": { "combine": "min" } }
+  ]
+}

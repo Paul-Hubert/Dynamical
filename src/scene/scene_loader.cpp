@@ -155,6 +155,12 @@ public:
         for(auto& f : files) checkTopLevel(f);
         for(auto& f : files) readVariables(f);
         applyCommandLine(vars);
+        // Templates before substitution: worlds with variables of their own resolve them again
+        for(auto& f : files) {
+            auto it = f.content.find("templates");
+            if(it == f.content.end() || !it->is_object()) continue;
+            for(auto& [name, t] : it->items()) raw_templates[name] = { t, f.display, pointer("/templates", name) };
+        }
         for(auto& f : files) {
             substitute(f.content, f.display, "");
             validate(f);
@@ -463,7 +469,17 @@ private:
             for(size_t i = 0; i < it->size(); i++) {
                 const json& w = (*it)[i];
                 std::string path = pointer("/worlds", i);
-                checkKeys(w, { "template", "count", "systems" }, d, path);
+                checkKeys(w, { "template", "count", "systems", "variables", "variable_files" }, d, path);
+                if(w.contains("variables") && !w["variables"].is_object()) throw SceneError(d, path + "/variables", "expected an object of variable values");
+                if(w.contains("variable_files")) {
+                    if(!w["variable_files"].is_array()) throw SceneError(d, path + "/variable_files", "expected an array of file names");
+                    for(size_t k = 0; k < w["variable_files"].size(); k++) {
+                        const json& name = w["variable_files"][k];
+                        std::string file_path = pointer(path + "/variable_files", k);
+                        if(!name.is_string()) throw SceneError(d, file_path, "expected a file name");
+                        if(!fs::exists(scenes / name.get<std::string>())) throw SceneError(d, file_path, "variable file not found: " + name.get<std::string>());
+                    }
+                }
                 if(!w.contains("template") || !w["template"].is_string()) throw SceneError(d, path + "/template", "expected a template name");
                 if(w.contains("count") && !(w["count"].is_number_integer() && w["count"].get<int64_t>() >= 0)) {
                     throw SceneError(d, path + "/count", "expected a non-negative integer, got " + w["count"].dump());
@@ -535,14 +551,43 @@ private:
         for(auto& e : pre) def.host_pre.push_back(system(e.value, e.file, e.path, SystemScope::Host));
         for(auto& e : post) def.host_post.push_back(system(e.value, e.file, e.path, SystemScope::Host));
 
-        for(auto& w : worlds) {
+        for(size_t wi = 0; wi < worlds.size(); wi++) {
+            auto& w = worlds[wi];
             std::string name = w.value["template"].get<std::string>();
-            auto t = templates.find(name);
+            if(w.value.contains("variables") || w.value.contains("variable_files")) {
+                // The template resolved again with this entry's variables (the files' defaults, then its own values):
+                // a template of its own, <template>@<entry>, in the resolved scene
+                auto raw = raw_templates.find(name);
+                if(raw == raw_templates.end()) throw SceneError(w.file, w.path + "/template", "unknown world template " + name);
+                auto saved = variables;
+                const json files_of_world = w.value.value("variable_files", json::array());
+                const json values_of_world = w.value.value("variables", json::object());
+                for(auto& file : files_of_world) {
+                    std::string display = file.get<std::string>();
+                    readVariables(SourceFile { display, readJson(scenes / display, display) });
+                }
+                for(auto& [var, value] : values_of_world.items()) {
+                    std::string path = pointer(w.path + "/variables", var);
+                    auto it = variables.find(var);
+                    if(it == variables.end()) throw SceneError(w.file, path, "unknown variable " + var);
+                    if(!hasType(value, it->second.type)) throw SceneError(w.file, path, value.dump() + " is not a " + it->second.type);
+                    it->second.value = it->second.type == "float" ? json(value.get<double>()) : value;
+                }
+                json resolved = raw->second.value;
+                substitute(resolved, raw->second.file, raw->second.path);
+                variables = saved;
+                std::string own = name + "@" + std::to_string(wi);
+                templates[own] = { resolved, raw->second.file, raw->second.path };
+                w.value["template"] = own;
+                w.value.erase("variables");
+                w.value.erase("variable_files");
+            }
+            auto t = templates.find(w.value["template"].get<std::string>());
             if(t == templates.end()) throw SceneError(w.file, w.path + "/template", "unknown world template " + name);
             const json& tv = t->second.value;
 
             WorldDef world;
-            world.template_name = name;
+            world.template_name = name.substr(0, name.find('@'));   // drop@1 (a world with variables of its own, resolved) is drop
             world.file = t->second.file;
             world.path = t->second.path;
             world.count = w.value.value("count", 1);
@@ -613,6 +658,7 @@ private:
     std::optional<json> resolved_from;
     std::map<std::string, Variable> variables;
     std::map<std::string, json> referenced;
+    std::map<std::string, Located> raw_templates;   // as written, before substitution
 };
 
 }

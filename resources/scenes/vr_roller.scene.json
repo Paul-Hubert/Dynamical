@@ -3,34 +3,42 @@
   "name": "vr_roller",
   "include": ["common/desktop.json", "common/sphere_world.json"],
   "variables": {
-    "model":        { "type": "string", "default": "resources/policies/sphere_roller.onnx" },
-    "spawn_radius": { "type": "float",  "default": 0.0 },
-    "stagger":      { "type": "bool",   "default": false },
-    "steered":      { "type": "bool",   "default": true },
-    "turn_rate":    { "type": "float",  "default": 1.5 },
-    "acceleration": { "type": "float",  "default": 1.5 },
-    "fall_depth":   { "type": "float",  "default": 1000.0 },
-    "lean_speed":   { "type": "float",  "default": 3.0, "description": "m/s asked by a lean of lean_range or more" },
-    "lean_range":   { "type": "float",  "default": 0.08, "description": "m of lean (top of the head) where the speed reaches lean_speed" }
+    "model":         { "type": "string", "default": "resources/policies/sphere_roller.onnx", "description": "the VR player's policy (world 0, the small sphere)" },
+    "desktop_model": { "type": "string", "default": "latest:runs/*/WheelRoller|resources/policies/wheel_roller.onnx", "description": "the desktop player's policy (world 1, the wheel): the newest WheelRoller checkpoint of build/runs, else the shipped one" },
+    "spawn_radius":  { "type": "float",  "default": 0.0 },
+    "spawn_spacing": { "type": "float",  "default": 3.0, "description": "m between the VR player's sphere (world 0) and the desktop player's (world 1)" },
+    "stagger":       { "type": "bool",   "default": false },
+    "steered":       { "type": "bool",   "default": true },
+    "turn_rate":     { "type": "float",  "default": 1.5 },
+    "acceleration":  { "type": "float",  "default": 1.5 },
+    "fall_depth":    { "type": "float",  "default": 1000.0 },
+    "lean_speed":    { "type": "float",  "default": 3.0, "description": "m/s asked by a lean of lean_range or more" },
+    "lean_range":    { "type": "float",  "default": 0.08, "description": "m of lean (top of the head) where the speed reaches lean_speed" }
   },
   "renderer": { "passes": ["terrain", "grass", "model", "ui"], "vr": true },
   "host": {
     "pre": [
       "Input", "UI", "Time", "PlayerControl", "DebugMenu", "ChunkManager", "ChunkGenerator",
-      { "name": "ModelWatcher", "params": { "model": "${model}" } },
+      { "name": "ModelWatcher", "params": { "model": "${model}", "models": { "1": "${desktop_model}" } } },
       "WorldStepper",
       { "name": "VRRoller", "params": { "world": 0, "lean_speed": "${lean_speed}", "lean_range": "${lean_range}" } },
+      { "name": "DesktopRoller", "params": { "world": 1 } },
       "VRControl",
-      { "name": "SphereView", "params": { "world": 0, "camera": false, "bars": false } },
+      { "name": "SphereView", "params": { "world": 1, "camera": false, "bars": false } },
       "BoxThrower", "RigidBody", "TerrainColliders", "Physics"
     ],
-    "post": [ { "name": "WorldView", "params": { "worlds": "all", "spacing": 0.0 } }, "Terrain" ]
+    "post": [ { "name": "WorldView", "params": { "worlds": "all", "spacing": 0.0, "colors": [[0.95, 0.45, 0.15], [0.2, 0.5, 0.95]] } }, "Terrain" ]
   },
-  "worlds": [ {
-    "template": "sphere_world", "count": 1,
-    "systems": { "replace": {
-      "TrainerActions@act": "Policy@act",
-      "WorldTerrain": { "name": "WorldTerrain", "params": { "seed": "${terrain_seed}", "margin": 8.0, "below": 6.0 } }
-    } }
-  } ]
+  "worlds": [
+    { "template": "sphere_world", "count": 1,
+      "systems": { "replace": {
+        "TrainerActions@act": "Policy@act",
+        "WorldTerrain": { "name": "WorldTerrain", "params": { "seed": "${terrain_seed}", "margin": 8.0, "below": 6.0 } }
+      } } },
+    { "template": "sphere_world", "count": 1, "variable_files": ["common/wheel_body.json"],
+      "systems": { "replace": {
+        "TrainerActions@act": "Policy@act",
+        "WorldTerrain": { "name": "WorldTerrain", "params": { "seed": "${terrain_seed}", "margin": 8.0, "below": 6.0 } }
+      } } }
+  ]
 }

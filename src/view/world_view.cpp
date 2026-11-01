@@ -34,6 +34,9 @@ WorldViewSys::WorldViewSys(entt::registry& reg, const nlohmann::json& params) : 
     if(auto it = params.find("worlds"); it != params.end() && it->is_array()) {
         for(auto& i : *it) only.push_back(i.get<uint32_t>());
     }
+    if(auto it = params.find("colors"); it != params.end() && it->is_array()) {
+        for(auto& c : *it) colors.push_back(glm::vec4(c.at(0).get<float>(), c.at(1).get<float>(), c.at(2).get<float>(), c.size() > 3 ? c.at(3).get<float>() : 1.f));
+    }
 }
 
 glm::vec3 WorldViewSys::gridOffset(uint32_t index, size_t count, float spacing) {
@@ -101,6 +104,7 @@ void WorldViewSys::tick(double dt) {
 
             glm::vec4 color = bodyColor(e);
             if(auto* ref = world.reg.try_get<ModelRef>(e)) color = ref->color;
+            if(!colors.empty()) color = colors[index % colors.size()];
 
             entt::entity model = entt::null;
             glm::vec3 scale(1.f);

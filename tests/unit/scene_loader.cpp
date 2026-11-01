@@ -48,6 +48,8 @@ TEST_CASE("T1.3 malformed scenes fail with the file and JSON path") {
         { "bad/bad_default", "bad/bad_default.scene.json", "/variables/n/default", "is not a int" },
         { "bad/missing_include", "bad/missing_include.scene.json", "/include/0", "include not found" },
         { "bad/bad_component_field", "bad/bad_component_field.scene.json", "/templates/t/entities/0/RigidBody/half_extent", "array of 3 numbers" },
+        { "bad/world_unknown_variable", "bad/world_unknown_variable.scene.json", "/worlds/0/variables/sise", "unknown variable sise" },
+        { "bad/world_variable_type", "bad/world_variable_type.scene.json", "/worlds/0/variables/size", "\"big\" is not a float" },
     };
 
     int failed_as_expected = 0;
@@ -64,7 +66,7 @@ TEST_CASE("T1.3 malformed scenes fail with the file and JSON path") {
             if(e.file == f.file && e.path == f.path) failed_as_expected++;
         }
     }
-    CHECK(failed_as_expected == 15);
+    CHECK(failed_as_expected == 17);
 
 }
 
@@ -105,6 +107,44 @@ TEST_CASE("T1.4 variables: defaults and command line overrides (last wins) with 
         CHECK(e.file == "<command line>");
         CHECK(e.path == "var.zzz");
     }
+
+}
+
+TEST_CASE("T1.5 world entries with variables of their own resolve their template again and survive the resolved dump") {
+
+    test::registerTestSystems();
+
+    auto check = [](const SceneDef& def, double size0, double size1, double size2) {
+        REQUIRE(def.worlds.size() == 3);
+        const double sizes[3] = { size0, size1, size2 };
+        const char* combines[3] = { "geometric", "geometric", "min" };
+        for(int i = 0; i < 3; i++) {
+            CAPTURE(i);
+            CHECK(def.worlds[i].template_name == "drop");
+            CHECK(def.worlds[i].entities[0].components["RigidBody"]["half_extent"] == nlohmann::json { sizes[i], sizes[i], sizes[i] });
+            CHECK(def.worlds[i].physics["friction_combine"] == combines[i]);
+        }
+    };
+
+    // Entry 1: its own value; entry 2: the file's defaults, then its own value over them
+    SceneDef def = loadScene("world_vars", {}, testResources());
+    check(def, 0.5, 2.0, 4.0);
+    CHECK(def.worlds[0].count == 2);
+    CHECK(def.worlds[1].count == 1);
+    CHECK(def.resolved["variables"]["size"]["default"] == 0.5);
+    CHECK(def.resolved["templates"].contains("drop@1"));
+    CHECK(def.resolved["templates"].contains("drop@2"));
+    CHECK(!def.resolved["worlds"][1].contains("variables"));
+
+    // The command line sets the scene's variables; a world's own win over it
+    check(loadScene("world_vars", { { "size", "1" } }, testResources()), 1.0, 2.0, 4.0);
+
+    auto file = std::filesystem::temp_directory_path() / "dynamical_tests_world_vars.resolved.json";
+    writeResolved(def, file);
+    SceneDef again = loadScene(file.string(), {}, testResources());
+    check(again, 0.5, 2.0, 4.0);
+    CHECK(again.resolved == def.resolved);
+    std::filesystem::remove(file);
 
 }
 

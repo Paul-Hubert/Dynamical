@@ -90,7 +90,7 @@ Tracking play(std::shared_ptr<PolicyRunner> policy, double seconds, uint32_t see
 
 TEST_SUITE("unit") {
 
-TEST_CASE("SR.18 vr_roller: VRRoller between WorldStepper and VRControl owns the desktop camera and one steered sphere is driven by the shipped policy") {
+TEST_CASE("SR.18 vr_roller: the VR player on the small sphere and the desktop player on the wheel with VRRoller and DesktopRoller in order") {
 
     test::registerViewSystemStubs();
     SceneDef def = loadScene("vr_roller", {}, SceneLoadOptions {});
@@ -103,29 +103,59 @@ TEST_CASE("SR.18 vr_roller: VRRoller between WorldStepper and VRControl owns the
     CHECK(at("WorldStepper") < at("VRRoller"));
     CHECK(at("VRRoller") < at("VRControl"));
     CHECK(at("ModelWatcher") < at("WorldStepper"));
-    // The desktop player: VRRoller places the camera PlayerControl turned, SphereView leaves it alone
-    CHECK(at("PlayerControl") < at("VRRoller"));
-    auto view = std::find_if(def.host_pre.begin(), def.host_pre.end(), [](const SystemEntry& e) { return e.name == "SphereView"; });
-    REQUIRE(view != def.host_pre.end());
-    CHECK(view->params.value("camera", true) == false);
+    // The desktop player: DesktopRoller places the camera PlayerControl turned, on world 1; SphereView leaves it alone
+    CHECK(at("DesktopRoller") < (long long) pre.size());
+    CHECK(at("PlayerControl") < at("DesktopRoller"));
+    CHECK(at("WorldStepper") < at("DesktopRoller"));
+    auto entry = [&](const char* name) { return *std::find_if(def.host_pre.begin(), def.host_pre.end(), [&](const SystemEntry& e) { return e.name == name; }); };
+    CHECK(entry("VRRoller").params.value("world", -1) == 0);
+    CHECK(entry("DesktopRoller").params.value("world", -1) == 1);
+    CHECK(entry("SphereView").params.value("world", -1) == 1);
+    CHECK(entry("SphereView").params.value("camera", true) == false);
 
-    REQUIRE(def.worlds.size() == 1);
-    CHECK(def.worlds[0].count == 1);
-    bool policy = false, trainer = false;
-    for(auto& s : def.worlds[0].fixed) {
-        policy |= s.name == "Policy" && s.phase == Phase::Act;
-        trainer |= s.name == "TrainerActions";
+    // World 0 the small sphere, world 1 the wheel (common/wheel_body.json), both driven by Policy
+    REQUIRE(def.worlds.size() == 2);
+    for(auto& world : def.worlds) {
+        CHECK(world.count == 1);
+        CHECK(world.template_name == "sphere_world");
+        bool policy = false, trainer = false;
+        for(auto& s : world.fixed) {
+            policy |= s.name == "Policy" && s.phase == Phase::Act;
+            trainer |= s.name == "TrainerActions";
+        }
+        CHECK(policy);
+        CHECK(!trainer);
     }
-    CHECK(policy);
-    CHECK(!trainer);
+    CHECK(def.worlds[0].entities[0].components["RigidBody"]["half_extent"][0] == 0.25);
+    CHECK(def.worlds[1].entities[0].components["RigidBody"]["half_extent"][0] == 0.94);
+    CHECK(def.worlds[1].entities[0].components["RigidBody"]["mass"] == 69.0);
+    CHECK(def.worlds[1].entities[0].components["SphereAgent"]["behavior"] == "WheelRoller");
+    CHECK(physicsConfig(def.worlds[0]).friction == Combine::Geometric);
+    CHECK(physicsConfig(def.worlds[1]).friction == Combine::Max);
+    // The desktop player's policy: the newest WheelRoller checkpoint of build/runs, else the shipped wheel
+    auto watcher = entry("ModelWatcher").params;
+    CHECK(watcher["model"] == shipped);
+    CHECK(watcher["models"]["1"] == "latest:runs/*/WheelRoller|resources/policies/wheel_roller.onnx");
+    PolicyRunner wheel("resources/policies/wheel_roller.onnx", SphereObs::size, sphere_actions);
+    CHECK(wheel.info().memory_size == 0);
 
+    // Two steered spheres, spawned 3 m apart along x
     ScenarioRunner runner("vr_roller", {}, SceneLoadOptions {});
-    auto& reg = runner.world(0).reg;
-    const auto& agent = reg.get<SphereAgent>(*reg.view<SphereAgent>().begin());
-    CHECK(agent.steered);
-    CHECK(agent.spawn_radius == 0.f);
-    CHECK(agent.turn_rate == 1.5f);
-    CHECK(agent.acceleration == 1.5f);
+    REQUIRE(runner.worldCount() == 2);
+    for(size_t i = 0; i < 2; i++) {
+        auto& reg = runner.world(i).reg;
+        entt::entity e = *reg.view<SphereAgent>().begin();
+        const auto& agent = reg.get<SphereAgent>(e);
+        CHECK(agent.steered);
+        CHECK(agent.spawn_radius == 0.f);
+        CHECK(agent.turn_rate == 1.5f);
+        CHECK(agent.acceleration == 1.5f);
+        glm::vec3 p = reg.get<Transform>(e).position;
+        CHECK(p.x == doctest::Approx(3.f * i));
+        CHECK(p.z == doctest::Approx(0.f));
+        CHECK(reg.get<RigidBody>(e).half_extent.x == (i == 0 ? 0.25f : 0.94f));
+        CHECK(agent.behavior == (i == 0 ? "SphereRoller" : "WheelRoller"));
+    }
     PolicyRunner model(shipped, SphereObs::size, sphere_actions);
     CHECK(model.info().memory_size == 0);
 

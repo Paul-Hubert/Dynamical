@@ -11,7 +11,7 @@
 #include "view/systems/ui.h"
 #include "view/world_stepper.h"
 #include "view/sphere_view.h"
-#include "view/vr_roller.h"
+#include "view/roller_player.h"
 #include "view/world_view.h"
 #include "view/fixed_camera.h"
 
@@ -34,8 +34,10 @@ void dy::registerViewSystems() {
         SystemScope::Host, true });
     registerSystem("SphereView", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<SphereViewSys>(reg, params); },
         SystemScope::Host, true });
-    registerSystem("VRRoller", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<VRRollerSys>(reg, params); },
-        SystemScope::Host, true });
+    registerSystem("VRRoller", { [](entt::registry& reg, const nlohmann::json& params) {
+        return std::make_unique<RollerPlayerSys>(reg, params, RollerPlayerSys::Player::VR); }, SystemScope::Host, true });
+    registerSystem("DesktopRoller", { [](entt::registry& reg, const nlohmann::json& params) {
+        return std::make_unique<RollerPlayerSys>(reg, params, RollerPlayerSys::Player::Desktop); }, SystemScope::Host, true });
     registerSystem("WorldView", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<WorldViewSys>(reg, params); },
         SystemScope::Host, true });
 

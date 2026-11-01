@@ -22,7 +22,8 @@ struct WorldViewLink {
 // shape, so the renderer keeps reading the host registry only. World i sits at grid(i) * spacing on the XZ plane.
 // Boxes and spheres scale the unit primitives of resources/models/primitives; capsules are generated per
 // (radius, half-height). Dynamic bodies are drawn between their last two ticks with the WorldStepper alpha.
-// params: { "worlds": "all" or [indices], "spacing": 6.0 }
+// params: { "worlds": "all" or [indices], "spacing": 6.0, "colors": [[r, g, b(, a)], ...] (optional: world i's bodies take
+//           colors[i % n] instead of their ModelRef color) }
 class WorldViewSys : public System {
 public:
     WorldViewSys(entt::registry& reg, const nlohmann::json& params);
@@ -36,6 +37,7 @@ public:
 private:
     float spacing = 6.f;
     std::vector<uint32_t> only;     // empty: every world
+    std::vector<glm::vec4> colors;  // per world index, cyclic; empty: the bodies' own
     std::map<std::pair<uint32_t, entt::entity>, entt::entity> links;
 };
 

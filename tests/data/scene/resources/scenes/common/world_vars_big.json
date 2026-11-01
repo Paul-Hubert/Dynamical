@@ -1,0 +1,6 @@
+{
+  "variables": {
+    "size":    { "type": "float",  "default": 4.0 },
+    "combine": { "type": "string", "default": "max" }
+  }
+}

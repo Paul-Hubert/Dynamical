@@ -27,7 +27,7 @@ void dy::test::registerTestSystems() {
 
 void dy::test::registerViewSystemStubs() {
     for(const char* name : { "Input", "UI", "Time", "PlayerControl", "VRControl", "DebugMenu", "BoxRing", "ModelLineup", "BoxThrower", "Terrain",
-                             "WorldStepper", "WorldView", "SphereView", "FixedCamera", "VRRoller" }) {
+                             "WorldStepper", "WorldView", "SphereView", "FixedCamera", "VRRoller", "DesktopRoller" }) {
         registerSystem(name, stub(name, SystemScope::Host, true));
     }
 }

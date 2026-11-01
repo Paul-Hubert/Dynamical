@@ -137,10 +137,12 @@ void SphereViewSys::tick(double dt) {
     bar(TargetBar, target, glm::vec4(0.2f, 0.9f, 0.3f, 1.f), 0.f);
     bar(VelocityBar, horizontal, glm::vec4(1.f, 0.55f, 0.1f, 1.f), 0.08f);
 
-    // Three dots on the surface turn with the sphere
+    // Three dots on the surface turn with the sphere; hidden from a camera inside it (a player on a large sphere)
     const glm::vec3 axes[3] = { glm::vec3(r, 0.f, 0.f), glm::vec3(0.f, r, 0.f), glm::vec3(0.f, 0.f, r) };
+    const auto* eye = reg.ctx().find<Camera>();
+    const bool inside = eye && glm::length(eye->position - position) < r + 0.1f;
     for(int i = 0; i < 3; i++) {
-        place(Dot0 + i, position + rotation * axes[i], rotation, glm::vec3(0.1f), glm::vec4(0.95f, 0.95f, 0.95f, 1.f));
+        place(Dot0 + i, position + rotation * axes[i], rotation, glm::vec3(inside ? 0.f : 0.1f), glm::vec4(0.95f, 0.95f, 0.95f, 1.f));
     }
 
     // Panel; the engine's own panels start collapsed so the sphere stays in view
@@ -152,7 +154,8 @@ void SphereViewSys::tick(double dt) {
     ImGui::SetNextWindowBgAlpha(0.55f);
     if(ImGui::Begin("Sphere roller", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
 #ifdef DYNAMICAL_ONNX
-        if(const auto* source = reg.ctx().find<PolicySource>()) {
+        const auto* sources = reg.ctx().find<PolicySources>();
+        if(const auto* source = sources ? sources->find((size_t) world) : nullptr) {
             if(!source->error.empty()) ImGui::TextColored(ImVec4(1.f, 0.4f, 0.4f, 1.f), "%s", source->error.c_str());
             else if(!source->file.empty()) ImGui::Text("policy %s (step %lld)", source->file.filename().string().c_str(), (long long) source->step);
         }

@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <chrono>
 #include <fstream>
 #include <memory>
 
@@ -93,7 +94,7 @@ TEST_CASE("SR.14 PolicyRunner refuses a model of another layout or a missing fil
     }
 }
 
-TEST_CASE("SR.15 ModelWatcher latest picks the largest step") {
+TEST_CASE("SR.15 ModelWatcher latest picks the largest step and across runs the most recent run") {
     auto dir = std::filesystem::temp_directory_path() / "dynamical_latest";
     std::filesystem::remove_all(dir);
     std::filesystem::create_directories(dir);
@@ -105,6 +106,24 @@ TEST_CASE("SR.15 ModelWatcher latest picks the largest step") {
     CHECK(step == 10000);
     std::filesystem::remove_all(dir);
     CHECK(ModelWatcherSys::latest(dir, &step).empty());
+
+    // A '*' component: the run whose newest checkpoint is the most recent, not the largest step
+    auto runs = std::filesystem::temp_directory_path() / "dynamical_latest_runs";
+    std::filesystem::remove_all(runs);
+    for(const char* run : { "wheel_a", "wheel_b", "sphere_c" }) std::filesystem::create_directories(runs / run / "WheelRoller");
+    std::ofstream(runs / "wheel_a" / "WheelRoller" / "WheelRoller-90000.onnx") << "x";
+    std::ofstream(runs / "wheel_b" / "WheelRoller" / "WheelRoller-500.onnx") << "x";
+    std::ofstream(runs / "sphere_c" / "WheelRoller" / "WheelRoller-700.onnx") << "x";
+    auto now = std::filesystem::file_time_type::clock::now();
+    std::filesystem::last_write_time(runs / "wheel_a" / "WheelRoller" / "WheelRoller-90000.onnx", now - std::chrono::hours(2));
+    std::filesystem::last_write_time(runs / "wheel_b" / "WheelRoller" / "WheelRoller-500.onnx", now - std::chrono::hours(1));
+    std::filesystem::last_write_time(runs / "sphere_c" / "WheelRoller" / "WheelRoller-700.onnx", now);
+    auto found = ModelWatcherSys::latest(runs / "wheel_*" / "WheelRoller", &step);
+    CHECK(found.parent_path().parent_path().filename() == "wheel_b");
+    CHECK(step == 500);
+    CHECK(ModelWatcherSys::latest(runs / "*" / "WheelRoller", &step).parent_path().parent_path().filename() == "sphere_c");
+    CHECK(ModelWatcherSys::latest(runs / "none_*" / "WheelRoller", &step).empty());
+    std::filesystem::remove_all(runs);
 }
 
 }

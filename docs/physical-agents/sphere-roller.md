@@ -163,11 +163,25 @@ against the controller's 0.61 on the same 8 marching cubes worlds.
 
 ## Player (`vr_roller`)
 
-The trained sphere is the player's locomotion, in VR and on the desktop: `dynamical.exe scene=vr_roller` (base's
-renderer with VR and grass, `var.model=<file.onnx>` to try another checkpoint). `base` is unchanged.
+The trained spheres are the players' locomotion: `dynamical.exe scene=vr_roller` (base's renderer with VR and grass).
+Two players at once, each on their own sphere in their own world: the VR player on the small sphere, world 0 (orange),
+and the desktop player on the wheel, world 1 (blue). `base` is unchanged.
 
-- **Policy.** `resources/policies/sphere_roller.onnx`, the final checkpoint of `sphere_mc_night_20261031` (200M
-  steps), loaded by `ModelWatcher` into one `sphere_world` with `Policy@act`.
+- **Policies** (`ModelWatcher`, `sphere_world` with `Policy@act` in both worlds):
+  - world 0: `var.model`, by default `resources/policies/sphere_roller.onnx`, the final checkpoint of
+    `sphere_mc_night_20261031` (200M steps);
+  - world 1: `var.desktop_model`, by default `latest:runs/*/WheelRoller|resources/policies/wheel_roller.onnx`.
+    That is the newest `WheelRoller` checkpoint of `build/runs`, reloaded as training writes new ones, else the
+    shipped wheel, the final checkpoint of `wheel_50m_20261101` (50M steps, mean episode reward 544).
+  - `ModelWatcher` takes `models: { "<world>": <spec> }` over `model`. `latest:` accepts one `*` path component,
+    which picks the run whose newest checkpoint is the most recent. `|<file>` is loaded while no checkpoint
+    exists. `PolicySources` holds what each world runs, and `SphereView` shows its own world's.
+- **Two worlds.** Two world entries of `sphere_world`. The second takes `variable_files: ["common/wheel_body.json"]`
+  (a world entry's own variables, [scenes.md](scenes.md)), so world 1 is the wheel: 0.94 m, 69 kg, μ 4
+  max-combined, 520 N m, `WheelRoller`. `SphereAgent::spawn_spacing` (template variable, 3 m here, 0 elsewhere)
+  spawns world i around (3 i, 0), so the spheres start 3 m apart. `WorldView`'s new `colors` param gives world i's
+  bodies the colour `colors[i % n]`. The worlds share nothing but the terrain generator: the spheres pass through
+  each other.
 - **Steered agent.** `SphereAgent::steered` (template variable `steered`): the goal comes from `steerSphere`
   (a horizontal velocity: its heading and speed, not capped, the command source picks; a null command keeps the
   heading). No goal
@@ -184,9 +198,10 @@ renderer with VR and grass, `var.model=<file.onnx>` to try another checkpoint). 
 
   At the training rates the target lags the stick (a 180° turn takes 4.5 s); instant targets (rates of 100) gave
   0.32 / 0.40 on 3 players.
-- **`VRRoller`** (host, after `PlayerControl` and `WorldStepper`, before `VRControl`) commands the sphere. In VR the
-  left stick, relative to where the head looks, is the command (dead zone 0.15, full deflection `stick_speed` =
-  3 m/s, training's top target speed).
+- **`RollerPlayerSys`** (`src/view/roller_player.cpp`, host, after `WorldStepper`) commands one world's sphere.
+  It is registered twice: `VRRoller` (world 0, before `VRControl`) and `DesktopRoller` (world 1, after
+  `PlayerControl`). For the VR player, the left stick, relative to where the head looks, is the command (dead zone
+  0.15, full deflection `stick_speed` = 3 m/s, training's top target speed).
 - **Lean.** With the stick at rest, once A (right controller) has been pressed: each press of A (its rising edge)
   stores the top of the head in stage space, and the horizontal offset of the top of the head from it is the
   command's direction (turned to the world with the play area's yaw). Its speed is
@@ -201,24 +216,27 @@ renderer with VR and grass, `var.model=<file.onnx>` to try another checkpoint). 
 - **Above 3 m/s** (`var.lean_speed=4`). Training's targets stop at 3 m/s. The policy still gets to 4 m/s (always
   4 m/s: mean speed 3.94 m/s over held commands, SR.20), but holds commands up to 4 m/s to 0.41 m/s (0.19 up to 3,
   SR.19; the controller manages 0.64). Fine-tuning with `speed_range` up to 4.5 would close the gap.
-- **Desktop player.** Without a VR session the desktop camera is the player's eyes on the sphere, `eye_height` =
-  1.6 m above its lowest point. Hold the right mouse button to look (`PlayerControl`'s mouse look; its free flight is
-  overwritten). WASD rolls the sphere relative to where the camera looks: 2 m/s, 3 with shift. While a VR session
-  runs, the desktop window shows the headset's view instead and WASD does nothing.
-- **Standing on the sphere.** The play area and the desktop player follow the sphere between the last two ticks,
+- **Desktop player** (`DesktopRoller`). The desktop camera is the player's eyes on the wheel, `eye_height` = 1.6 m
+  above its lowest point, with or without a VR session. That is inside the wheel (its top is at 1.88 m), whose
+  surface is back-face culled from there; `SphereView` hides the rotation dots from a camera inside the sphere. Hold the right mouse button to look
+  (`PlayerControl`'s mouse look; its free flight is overwritten). WASD rolls the sphere relative to where the camera
+  looks: 2 m/s, 3 with shift. Without a headset the VR player's sphere waits at its spawn point.
+- **Standing on the sphere.** The play area and the desktop player follow their sphere between the last two ticks,
   their floor at the sphere's lowest point, smoothed in height at 10/s (it snaps after a jump of more than 2 m).
   `VRRoller` sets `VRRig::stick_locomotion` off, so `VRControl` keeps the right stick turn, the hands and the box
   throw but no longer moves the rig. If the headset is off or in a system menu, the command is zero and the sphere
   stops.
-- `SphereView` keeps its panel and the sphere's rotation dots, with `camera: false` (it leaves the desktop camera
-  to `VRRoller`) and `bars: false`: from the player's eyes the bars are a stripe across the view. The panel's
-  Bars checkbox brings them back.
-- The sphere lives in its own world, so it does not collide with base's boxes (thrown with the right trigger or a
-  left click; they are in the host's PhysicsWorld) or with the hands.
+- `SphereView` shows the desktop player's sphere (world 1): its panel and rotation dots, with `camera: false` (it
+  leaves the desktop camera to `DesktopRoller`) and `bars: false`, since from the player's eyes the bars are a stripe
+  across the view. The panel's Bars checkbox brings them back, and its World slider switches to the VR player's
+  sphere.
+- The spheres live in their own worlds, so they do not collide with base's boxes (thrown with the right trigger or
+  a left click; they are in the host's PhysicsWorld), with the hands or with each other.
 
 Verified headless (SR.17 to SR.21) and on the desktop through captures with scripted WASD, shift and mouse look
 (the capture harness's new `"motion": [dx, dy]` input sends relative mouse motion):
-`build/artifacts/vr_roller/vr_roller_desktop_first_person.mp4`. The stick, the lean and the A button have not yet
+`build/artifacts/vr_roller/vr_roller_desktop_first_person.mp4` (one player), `build/artifacts/vr_roller/two/` (the
+desktop player looking at the VR player's sphere, then rolling). The stick, the lean and the A button have not yet
 been tried in a headset.
 
 ## Wheel (`wheel_roll`, the next training)
@@ -276,9 +294,10 @@ The same task on a human-scale body: a sphere whose radius is the walker's hip h
   Smoke run `wheel_smoke_20261101` (16 envs, 1.5M steps, from scratch): mean episode reward 73, 132 and 174 at
   0.5M, 1M and 1.5M, against 75, 122 and 171 for the small sphere's `smoke_mc`. That is 4.8k steps/s (5.4k for the
   small sphere), so 200M steps take about 11.5 h.
-- **`vr_roller`** keeps the small sphere and its policy until a `WheelRoller` policy exists. With the wheel, the
-  player's eyes (1.6 m) would be inside the sphere (its top at 1.88 m), so the player's view needs the sphere
-  hidden.
+- **Run `wheel_50m_20261101`** (50M steps from scratch, 16 envs, 2.2 h at 6.3k steps/s): mean episode reward 533
+  at 34M, 547 at 45M, 544 at 50M, above the small sphere's 200M plateau (about 480). The final checkpoint ships as
+  `resources/policies/wheel_roller.onnx`. `vr_roller`'s desktop player rolls it, and at a held 3 m/s command it is
+  within 0.01 m/s.
 
 ## Tests
 
@@ -299,7 +318,7 @@ The same task on a human-scale body: a sphere whose radius is the walker's hip h
 | SR.15 | unit | `latest:` picks the largest step |
 | SR.16 | scenario | `Policy` writes the policy's action; the trained policy beats the controller by 0.05 |
 | SR.17 | scenario | a steered agent: `steerSphere` goals only, no time limit, restart at rest at the spawn point facing the player's heading |
-| SR.18 | unit | `vr_roller`: `VRRoller` after `WorldStepper` and before `VRControl`, `Policy@act`, a steered agent, the shipped policy loads, the lean variables reach `VRRoller`, `VRRoller` owns the desktop camera |
+| SR.18 | unit | `vr_roller`: `VRRoller` (world 0) after `WorldStepper` and before `VRControl`, `DesktopRoller` (world 1) after `PlayerControl`, `Policy@act`, two steered agents spawned 3 m apart, the shipped policy loads, the lean variables reach `VRRoller` |
 | SR.19 | scenario | 6 scripted players up to 3 m/s: the shipped policy's errors are below the controller's, and within 0.25 m/s of a held command |
 | SR.20 | scenario | up to 4 m/s (`var.lean_speed=4`): the policy's held error below the controller's; always 4 m/s: mean held speed within 10% of 4 |
 | SR.21 | unit | `leanSpeed`: 0 in the dead zone, equal steps per doubling, the top speed at the range and beyond, rising |

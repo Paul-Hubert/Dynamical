@@ -39,7 +39,8 @@ struct SphereAgent {
     float home_radius = 30.f;                   // beyond it from the spawn point, new goal headings point back (+- 45 deg); 0: off
     float bounds = 55.f;                        // |x| or |z| beyond it truncates the episode; 0: off
     float fall_depth = 100.f;                   // this far below the spawn point truncates the episode
-    float spawn_radius = 10.f;                  // spawn points within it of the origin, on the ground
+    float spawn_radius = 10.f;                  // spawn points within it of the spawn centre, on the ground
+    float spawn_spacing = 0.f;                  // m: world i spawns around (i * spawn_spacing, 0) (vr_roller: two players apart)
     bool stagger = true;                        // the trainer's RESET starts each agent at a random point of its episode
     float reward_scale = 1.f;                   // r = exp(-|v_xz - v*| / reward_scale) per tick, m/s
     float probe_distance = 1.f;                 // horizontal distance of the look-ahead normals, m

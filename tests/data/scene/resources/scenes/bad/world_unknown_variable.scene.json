@@ -1,0 +1,7 @@
+{
+  "format_version": 1,
+  "name": "world_unknown_variable",
+  "variables": { "size": { "type": "float", "default": 0.5 } },
+  "templates": { "drop": { "entities": [ { "Transform": { "position": [0, "${size}", 0] } } ] } },
+  "worlds": [ { "template": "drop", "variables": { "sise": 2 } } ]
+}

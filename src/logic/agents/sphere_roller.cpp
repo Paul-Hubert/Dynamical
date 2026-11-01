@@ -117,11 +117,14 @@ void dy::resetSphereEpisode(entt::registry& reg) {
     auto& rng = reg.ctx().get<WorldRng>();
     auto& world = physicsWorld(reg);
 
-    // Spawn at rest on the ground, within spawn_radius of the origin. Marching cubes ground is built on demand:
-    // the column around the spawn point first, from the generator's height range there
+    // Spawn at rest on the ground, within spawn_radius of the world's spawn centre (x = index * spawn_spacing).
+    // Marching cubes ground is built on demand: the column around the spawn point first, from the generator's
+    // height range there
     double r = a.spawn_radius * std::sqrt(rng.uniform());
     double angle = rng.uniform(0., two_pi);
-    glm::vec3 p((float) (r * std::cos(angle)), 0.f, (float) (r * std::sin(angle)));
+    float centre = 0.f;
+    if(auto* info = reg.ctx().find<WorldInfo>()) centre = (float) info->index * a.spawn_spacing;
+    glm::vec3 p(centre + (float) (r * std::cos(angle)), 0.f, (float) (r * std::sin(angle)));
     float top = 1000.f, depth = 2000.f;
     if(auto* terrain = reg.ctx().find<std::shared_ptr<TerrainColliders>>()) {
         const auto& clock = reg.ctx().get<WorldClock>();
@@ -353,6 +356,7 @@ void dy::registerSphereRoller() {
             f.read("bounds", a.bounds);
             f.read("fall_depth", a.fall_depth);
             f.read("spawn_radius", a.spawn_radius);
+            f.read("spawn_spacing", a.spawn_spacing);
             f.read("stagger", a.stagger);
             f.read("reward_scale", a.reward_scale);
             f.read("probe_distance", a.probe_distance);
@@ -371,7 +375,7 @@ void dy::registerSphereRoller() {
             return nlohmann::json { { "behavior", a.behavior }, { "max_torque", a.max_torque }, { "speed_range", { a.speed_range.x, a.speed_range.y } },
                 { "stop_chance", a.stop_chance }, { "turn_rate", a.turn_rate }, { "acceleration", a.acceleration },
                 { "goal_interval", { a.goal_interval.x, a.goal_interval.y } }, { "max_goal_turn", a.max_goal_turn }, { "home_radius", a.home_radius },
-                { "bounds", a.bounds }, { "fall_depth", a.fall_depth }, { "spawn_radius", a.spawn_radius }, { "stagger", a.stagger }, { "reward_scale", a.reward_scale }, { "probe_distance", a.probe_distance },
+                { "bounds", a.bounds }, { "fall_depth", a.fall_depth }, { "spawn_radius", a.spawn_radius }, { "spawn_spacing", a.spawn_spacing }, { "stagger", a.stagger }, { "reward_scale", a.reward_scale }, { "probe_distance", a.probe_distance },
                 { "max_decisions", a.max_decisions }, { "steered", a.steered } };
         }
     });
