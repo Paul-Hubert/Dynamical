@@ -21,9 +21,13 @@ struct RunArgs;
 // camera (optional, else the spawn camera): pos with look_at or yaw / pitch (radians), or offset from the spawn
 // camera position. The camera of a shot is held from the frame after the previous shot.
 //
+// "sequence": { "start": 120, "count": 600, "every": 2, "name": "frame" }: frames for a video, after the shots,
+// written as <name>_00000.png ... without moving the camera (a scene system may drive it).
+//
 // "input": [ { "frame": 610, "key": "W", "down": true }, { "frame": 700, "button": "left", "down": true, "mouse": [x, y] } ]
 // Scripted input goes through SDL's event queue, so InputSys and the systems after it see it as real input.
 // "mouse" places ImGui's cursor (the hidden window never has the OS cursor); the OS cursor is not touched.
+// "motion": [dx, dy] sends a relative mouse motion (PlayerControl's mouse look while the right button is down).
 class Capture {
 public:
     Capture(entt::registry& reg, const RunArgs& args);
@@ -52,6 +56,7 @@ private:
         std::string button;         // left, right, middle
         bool down = true;
         std::optional<glm::vec2> mouse;
+        std::optional<glm::ivec2> motion;
     };
 
     void sendInput(uint64_t frame);

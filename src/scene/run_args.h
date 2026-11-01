@@ -20,6 +20,7 @@ struct RunArgs {
     int threads = 0;
     int64_t ticks = 0;          // dynamical: exit after this many frames when > 0
     int episodes = 0;
+    int64_t seed = 0;           // dynamical: the worlds' base seed (dynamical_train takes the trainer's)
 
     // Capture
     std::string capture;                    // capture script (json)

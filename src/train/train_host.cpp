@@ -10,6 +10,7 @@
 #include "mlagents/client.h"
 #include "mlagents/side_channels.h"
 #include "null_env.h"
+#include "worlds_env.h"
 #include "process_control.h"
 #include "util/log.h"
 
@@ -30,11 +31,14 @@ int sceneInt(const SceneDef& scene, const char* name, int fallback) {
 
 int TrainHost::run() {
 
+    std::string mode = args.mode.empty() ? "train" : args.mode;
+    if(mode == "train" && WorldsEnvironment::check(runner).empty()) behavior = runner.world(0).reg.ctx().get<AgentIO>().behavior;
+
     if(!loadEnvParams()) return 1;
 
-    std::string mode = args.mode.empty() ? "train" : args.mode;
     if(mode == "bench") return bench();
     if(mode == "null") return null();
+    if(mode == "train") return agents();
 
     dy::log(dy::error) << "mode=" << mode << " is not available yet\n";
     return 1;
@@ -63,7 +67,7 @@ void TrainHost::writeEnvParams(int64_t steps) {
     auto values = env_params.resolved();
     if(envparams_written && values == written) return;
     EnvParamsFile file;
-    file.behavior = "HeidelBotBehavior";
+    file.behavior = behavior;
     file.written = steps;
     file.header["sha"] = DYNAMICAL_GIT_SHA;
     file.values = values;
@@ -104,7 +108,42 @@ int TrainHost::null() {
     NullEnvironment::Config config;
     config.agents = sceneInt(runner.scene(), "agents", config.agents);
     config.episode_decisions = sceneInt(runner.scene(), "episode_decisions", config.episode_decisions);
-    NullEnvironment env(config);
+
+    return serve([&](int64_t) {
+        dy::log(dy::info) << "Null environment: " << config.agents << " agents of " << config.behavior << ", "
+            << config.episode_decisions << " decisions per episode\n";
+        return std::make_unique<NullEnvironment>(config);
+    });
+
+}
+
+int TrainHost::agents() {
+
+    if(train.port <= 0) {
+        dy::log(dy::error) << "mode=train needs --mlagents-port <port>\n";
+        return 1;
+    }
+    if(auto error = WorldsEnvironment::check(runner); !error.empty()) {
+        dy::log(dy::error) << "Scene " << runner.scene().name << " cannot train: " << error << "\n";
+        return 1;
+    }
+    behavior = runner.world(0).reg.ctx().get<AgentIO>().behavior;
+    const size_t worlds = runner.worldCount();
+    const unsigned threads = args.threads > 0 ? (unsigned) args.threads : 1u;
+
+    return serve([&, worlds, threads](int64_t seed) {
+        // The worlds again, seeded from the trainer's seed (it includes the worker id)
+        runner.restart((uint64_t) seed);
+        auto env = std::make_unique<WorldsEnvironment>(runner, threads);
+        dy::log(dy::info) << "Scene " << runner.scene().name << ": " << worlds << " worlds of " << env->behavior() << " ("
+            << env->agent(0).observation_size << " observations, " << env->agent(0).action_size << " actions, decision every "
+            << env->decisionPeriod() << " ticks), " << threads << " threads\n";
+        return env;
+    });
+
+}
+
+int TrainHost::serve(const std::function<std::unique_ptr<TrainerEnvironment>(int64_t seed)>& connected) {
 
     mlagents::MlAgentsClient client(train.port, stopRequested);
 
@@ -142,8 +181,8 @@ int TrainHost::null() {
 
     base_seed = init_in.seed();
     dy::log(dy::info) << "Trainer connected: communication " << init_in.communication_version() << ", package " << init_in.package_version()
-        << ", seed " << init_in.seed() << ", num_areas " << init_in.num_areas() << " (ignored: " << config.agents << " agents of "
-        << config.behavior << ", " << config.episode_decisions << " decisions per episode)\n";
+        << ", seed " << init_in.seed() << ", num_areas " << init_in.num_areas() << " (ignored)\n";
+    std::unique_ptr<TrainerEnvironment> env = connected(init_in.seed());
 
     bool engine_logged = false;
     int64_t steps = 0;
@@ -178,10 +217,10 @@ int TrainHost::null() {
             return 0;
         }
         if(rl.command() == co::RESET) {
-            env.reset();
+            env->reset();
         } else {
             std::string error;
-            if(!env.step(rl, error)) {
+            if(!env->step(rl, error)) {
                 dy::log(dy::error) << "STEP: " << error << "\n";
                 return 2;
             }
@@ -189,7 +228,7 @@ int TrainHost::null() {
         }
 
         co::UnityOutputProto output;
-        env.write(output);
+        env->write(output);
         status = client.exchange(output, input);
         if(status == mlagents::MlAgentsClient::Status::Stopped) return stopped();
         if(status == mlagents::MlAgentsClient::Status::Closed) {

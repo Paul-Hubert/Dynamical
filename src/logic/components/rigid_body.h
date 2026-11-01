@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <vector>
 
 namespace dy {
 
@@ -26,6 +27,7 @@ public:
     float friction = 0.6f;
     float restitution = 0.1f;
     float angular_damping = 0.05f;             // Jolt's default
+    float mass = 0.f;                          // kg, inertia scaled to it; 0: Jolt's density of 1000 kg/m³
 
     glm::vec3 initial_velocity = glm::vec3(0.f);
     glm::vec3 initial_angular_velocity = glm::vec3(0.f);
@@ -45,6 +47,32 @@ struct Ground {
     uint32_t body = 0xffffffffu;
 
     bool created() const { return body != 0xffffffffu; }
+};
+
+// Rolling hills (sphere_roll): a static Jolt height field centered on the origin, on the STATIC layer. Its heights
+// sample a sum of plane waves drawn from `seed` (0: one draw of the world RNG). Created by RigidBodySys with the grounds
+struct HeightField {
+    int samples = 256;                          // per side, a power of 2 >= 8
+    float spacing = 0.5f;                       // metres between samples
+    int waves = 6;
+    glm::vec2 wavelength = glm::vec2(6.f, 40.f);    // log-uniform range of the wavelengths, metres
+    float wave_slope = 0.07f;                   // steepest slope of each wave (amplitude x wavenumber)
+    float friction = 1.f;
+    float restitution = 0.f;
+    uint32_t seed = 0;
+
+    struct Wave {
+        glm::vec2 k;                            // wave vector on XZ, rad/m
+        float amplitude;
+        float phase;
+    };
+    std::vector<Wave> wave_list;                // drawn at creation
+    uint32_t body = 0xffffffffu;
+
+    bool created() const { return body != 0xffffffffu; }
+    float size() const { return (samples - 1) * spacing; }
+    // The smooth surface the samples are taken from (the collider is their triangulation)
+    float height(float x, float z) const;
 };
 
 // Context variable, written by PhysicsSys

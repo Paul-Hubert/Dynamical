@@ -24,6 +24,10 @@ public:
     size_t worldCount() const { return worlds.size(); }
     World& world(size_t i) { return worlds[i]; }
 
+    // The worlds again from scratch with another base seed (dynamical_train: the trainer's seed arrives after the
+    // scene was loaded and checked)
+    void restart(uint64_t base_seed);
+
     // Every world advances `ticks` fixed ticks, in parallel on the executor when given
     void step(int64_t ticks, tf::Executor* executor = nullptr);
     int64_t ticks() const { return ticks_done; }

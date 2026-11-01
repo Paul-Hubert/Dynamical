@@ -1,0 +1,26 @@
+{
+  "format_version": 1,
+  "name": "sphere_view_heuristic",
+  "include": ["common/desktop.json", "common/sphere_world.json"],
+  "variables": {
+    "num_worlds": { "type": "int",    "default": 1 },
+    "model":      { "type": "string", "default": "" }
+  },
+  "renderer": { "passes": ["terrain", "model", "ui"], "vr": false },
+  "host": {
+    "pre": [
+      "Input", "UI", "PlayerControl", "DebugMenu", "ChunkManager", "ChunkGenerator",
+      { "name": "ModelWatcher", "params": { "model": "${model}" } },
+      "WorldStepper",
+      { "name": "SphereView", "params": { "world": 0 } }
+    ],
+    "post": [ { "name": "WorldView", "params": { "worlds": "all", "spacing": 0.0 } }, "Terrain" ]
+  },
+  "worlds": [ {
+    "template": "sphere_world", "count": "${num_worlds}",
+    "systems": { "replace": {
+      "TrainerActions@act": "SphereHeuristic@act",
+      "WorldTerrain": { "name": "WorldTerrain", "params": { "seed": "${terrain_seed}", "margin": 8.0, "below": 6.0 } }
+    } }
+  } ]
+}

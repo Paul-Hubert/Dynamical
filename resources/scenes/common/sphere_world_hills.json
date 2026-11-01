@@ -1,0 +1,22 @@
+{
+  "variables": {
+    "wave_slope":    { "type": "float", "default": 0.07 },
+    "max_decisions": { "type": "int",   "default": 600 },
+    "stagger":       { "type": "bool",  "default": true }
+  },
+  "templates": {
+    "sphere_world_hills": {
+      "physics": { "threads": 1, "max_bodies": 16, "max_body_pairs": 64, "max_contacts": 256, "temp_bytes": 1048576,
+                   "allow_sleeping": false },
+      "clock": { "physics_hz": 60, "control_hz": 15 },
+      "fixed": [ "RigidBody", "TrainerActions@act", "SphereControl", "PhysicsStep", "SphereTask", "SphereObserve@observe" ],
+      "entities": [
+        { "HeightField": { "samples": 256, "spacing": 0.5, "waves": 6, "wavelength": [6, 40], "wave_slope": "${wave_slope}" } },
+        { "Transform": { "position": [0, 1, 0] },
+          "RigidBody": { "shape": "sphere", "half_extent": [0.25, 0.25, 0.25], "mass": 10, "friction": 1, "restitution": 0 },
+          "ModelRef": { "path": "models/primitives/sphere.gltf", "color": [0.95, 0.45, 0.15, 1] },
+          "SphereAgent": { "max_decisions": "${max_decisions}", "bounds": 55, "home_radius": 30, "spawn_radius": 10, "stagger": "${stagger}" } }
+      ]
+    }
+  }
+}

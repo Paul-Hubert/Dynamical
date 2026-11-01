@@ -1,0 +1,37 @@
+{
+  "variables": {
+    "max_decisions":    { "type": "int",    "default": 600 },
+    "spawn_radius":     { "type": "float",  "default": 2000.0 },
+    "terrain_seed":     { "type": "int",    "default": 1337 },
+    "stagger":          { "type": "bool",   "default": true },
+    "steered":          { "type": "bool",   "default": false },
+    "turn_rate":        { "type": "float",  "default": 0.7 },
+    "acceleration":     { "type": "float",  "default": 0.75 },
+    "fall_depth":       { "type": "float",  "default": 100.0 },
+    "behavior":         { "type": "string", "default": "SphereRoller", "description": "the trainer's behaviour name: checkpoints are <behavior>-<step>.onnx" },
+    "radius":           { "type": "float",  "default": 0.25, "description": "m; mass properties of a solid sphere of this radius, centre of mass at its centre" },
+    "mass":             { "type": "float",  "default": 10.0, "description": "kg" },
+    "friction":         { "type": "float",  "default": 1.0, "description": "the sphere's; combined with the terrain's 0.8 by friction_combine" },
+    "friction_combine": { "type": "string", "default": "geometric", "description": "geometric, max or min" },
+    "max_torque":       { "type": "float",  "default": 20.0, "description": "N m for an action component of 1" }
+  },
+  "templates": {
+    "sphere_world": {
+      "physics": { "threads": 1, "max_bodies": 256, "max_body_pairs": 256, "max_contacts": 256, "temp_bytes": 2097152,
+                   "allow_sleeping": false, "friction_combine": "${friction_combine}" },
+      "clock": { "physics_hz": 60, "control_hz": 15 },
+      "fixed": [ "RigidBody", { "name": "WorldTerrain", "params": { "seed": "${terrain_seed}", "margin": 2.0, "below": 6.0 } },
+                 "TrainerActions@act", "SphereControl", "PhysicsStep", "SphereTask", "SphereObserve@observe" ],
+      "entities": [
+        { "Transform": { "position": [0, 100, 0] },
+          "RigidBody": { "shape": "sphere", "half_extent": ["${radius}", "${radius}", "${radius}"], "mass": "${mass}",
+                         "friction": "${friction}", "restitution": 0 },
+          "ModelRef": { "path": "models/primitives/sphere.gltf", "color": [0.95, 0.45, 0.15, 1] },
+          "SphereAgent": { "behavior": "${behavior}", "max_torque": "${max_torque}",
+                           "max_decisions": "${max_decisions}", "spawn_radius": "${spawn_radius}", "home_radius": 0, "bounds": 0,
+                           "stagger": "${stagger}", "steered": "${steered}", "turn_rate": "${turn_rate}",
+                           "acceleration": "${acceleration}", "fall_depth": "${fall_depth}" } }
+      ]
+    }
+  }
+}

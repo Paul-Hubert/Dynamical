@@ -6,6 +6,7 @@
 #include <stb_image_write.h>
 
 #include <cmath>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 
@@ -38,7 +39,7 @@ Capture::Capture(entt::registry& reg, const RunArgs& args) : reg(reg), directory
     try {
         nlohmann::json script = nlohmann::json::parse(file);
 
-        for(auto& j : script.at("shots")) {
+        for(auto& j : script.value("shots", nlohmann::json::array())) {
             Shot shot;
             shot.frame = j.at("frame").get<uint64_t>();
             shot.name = j.at("name").get<std::string>();
@@ -56,6 +57,28 @@ Capture::Capture(entt::registry& reg, const RunArgs& args) : reg(reg), directory
             }
             shots.push_back(shot);
         }
+        // A frame sequence for videos: <name>_00000.png, ... every `every` frames from `start`, the camera untouched
+        if(script.contains("sequence")) {
+            auto& q = script["sequence"];
+            uint64_t start = q.at("start").get<uint64_t>(), count = q.at("count").get<uint64_t>(), every = q.value("every", (uint64_t) 1);
+            std::string name = q.value("name", std::string("frame"));
+            if(every == 0 || (!shots.empty() && start <= shots.back().frame)) {
+                error = "capture script " + args.capture + ": the sequence must start after the shots, every >= 1";
+                return;
+            }
+            for(uint64_t i = 0; i < count; i++) {
+                char index[16];
+                std::snprintf(index, sizeof(index), "_%05llu", (unsigned long long) i);
+                Shot shot;
+                shot.frame = start + i * every;
+                shot.name = name + index;
+                shots.push_back(shot);
+            }
+        }
+        if(shots.empty()) {
+            error = "capture script " + args.capture + ": no shots and no sequence";
+            return;
+        }
         if(script.contains("input")) {
             for(auto& j : script["input"]) {
                 InputEvent event;
@@ -64,6 +87,7 @@ Capture::Capture(entt::registry& reg, const RunArgs& args) : reg(reg), directory
                 event.button = j.value("button", "");
                 event.down = j.value("down", true);
                 if(j.contains("mouse")) event.mouse = glm::vec2(j["mouse"].at(0).get<float>(), j["mouse"].at(1).get<float>());
+                if(j.contains("motion")) event.motion = glm::ivec2(j["motion"].at(0).get<int>(), j["motion"].at(1).get<int>());
                 if(!event.key.empty() && SDL_GetScancodeFromName(event.key.c_str()) == SDL_SCANCODE_UNKNOWN) {
                     error = "capture script " + args.capture + ": unknown key " + event.key;
                     return;
@@ -121,6 +145,13 @@ void Capture::sendInput(uint64_t frame) {
                 e.button.x = (int) in.mouse->x;
                 e.button.y = (int) in.mouse->y;
             }
+            SDL_PushEvent(&e);
+        }
+        if(in.motion) {
+            e = {};
+            e.type = SDL_MOUSEMOTION;
+            e.motion.xrel = in.motion->x;
+            e.motion.yrel = in.motion->y;
             SDL_PushEvent(&e);
         }
     }

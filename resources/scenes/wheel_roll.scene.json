@@ -1,0 +1,7 @@
+{
+  "format_version": 1,
+  "name": "wheel_roll",
+  "include": ["common/sphere_world.json", "common/wheel_body.json"],
+  "variables": { "num_worlds": { "type": "int", "default": 25 } },
+  "worlds": [ { "template": "sphere_world", "count": "${num_worlds}" } ]
+}

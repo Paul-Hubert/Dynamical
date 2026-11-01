@@ -106,6 +106,19 @@ public:
     const PhysicsConfig& config() const { return settings; }
     bool singleThreaded() const;
 
+    // The first STATIC surface straight below `from` within `distance` (ground, height fields, terrain colliders).
+    // Outside the step only: no locking
+    struct GroundHit {
+        glm::vec3 point;
+        glm::vec3 normal;
+    };
+    std::optional<GroundHit> groundBelow(glm::vec3 from, float distance);
+    // The first STATIC surface on the segment from `from` to `to` (camera collision)
+    std::optional<GroundHit> castStatic(glm::vec3 from, glm::vec3 to);
+    // Where a sphere of `radius` at `centre` touches STATIC geometry, counting surfaces up to `margin` away: the
+    // deepest point (on a face, an edge or a vertex) and the normal from it to the centre. Outside the step only
+    std::optional<GroundHit> sphereContact(glm::vec3 centre, float radius, float margin = 0.f);
+
 private:
     BroadPhaseLayers broadphase_layers;
     ObjectVsBroadPhaseFilter object_vs_broadphase;

@@ -5,14 +5,14 @@
 #include <string>
 #include <vector>
 
-#include "mlagents/client.h"
+#include "environment.h"
 
 namespace dy {
 
 // mode=null (M0, mlagents-bridge.md): the trainer contract without worlds or physics. N agents of one behaviour,
 // a fixed zero observation (the noToes layout: 138 x 2 stacked, Unity's sensor name), zero rewards, episodes
 // ended by truncation after `episode_decisions` decisions. It measures the trainer's own ceiling.
-class NullEnvironment {
+class NullEnvironment : public TrainerEnvironment {
 public:
     struct Config {
         std::string behavior = "HeidelBotBehavior";
@@ -26,14 +26,14 @@ public:
     explicit NullEnvironment(const Config& config);
 
     // RESET: every agent starts a new episode and keeps its id
-    void reset();
+    void reset() override;
 
     // STEP: the actions of the agents that requested a decision in the last output, in that order
     // (RpcCommunicator.cs:361-368, :419-428). Done agents get none and start their next episode now
-    bool step(const mlagents::co::UnityRLInputProto& input, std::string& error);
+    bool step(const mlagents::co::UnityRLInputProto& input, std::string& error) override;
 
     // This window's AgentInfos (and the brain parameters with the first ones)
-    void write(mlagents::co::UnityOutputProto& output);
+    void write(mlagents::co::UnityOutputProto& output) override;
 
     // Agents asking for a decision in the last output, in output order
     std::vector<int32_t> requesting() const;

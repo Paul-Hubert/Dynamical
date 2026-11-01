@@ -9,7 +9,8 @@ namespace dy {
 
 class Context;
 
-// OpenXR actions : controller poses, trigger, grip and thumbstick. Results go in the VRInput context variable.
+// OpenXR actions : controller poses, trigger, grip, thumbstick and primary button. Results go in the VRInput context
+// variable.
 class VRActions {
 public:
     VRActions(Context& ctx, entt::registry& reg);
@@ -29,6 +30,7 @@ private:
     XrAction triggerAction = XR_NULL_HANDLE;
     XrAction gripAction = XR_NULL_HANDLE;
     XrAction thumbstickAction = XR_NULL_HANDLE;
+    XrAction primaryAction = XR_NULL_HANDLE;
     XrPath handPaths[2] = {};
     XrSpace handSpaces[2] = {};
     XrSpace viewSpace = XR_NULL_HANDLE;

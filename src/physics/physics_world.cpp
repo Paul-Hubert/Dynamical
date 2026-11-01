@@ -4,6 +4,13 @@
 
 #include <Jolt/Core/JobSystemSingleThreaded.h>
 #include <Jolt/Core/JobSystemThreadPool.h>
+#include <Jolt/Physics/Body/BodyLock.h>
+#include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/CollideShape.h>
+#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
+#include <Jolt/Physics/Collision/NarrowPhaseQuery.h>
+#include <Jolt/Physics/Collision/RayCast.h>
+#include <Jolt/Physics/Collision/Shape/SphereShape.h>
 
 #include "util/log.h"
 
@@ -63,6 +70,45 @@ PhysicsWorld::PhysicsWorld(const PhysicsConfig& config) : settings(config) {
 
 bool PhysicsWorld::singleThreaded() const {
     return single_threaded;
+}
+
+std::optional<PhysicsWorld::GroundHit> PhysicsWorld::groundBelow(glm::vec3 from, float distance) {
+    return castStatic(from, from - glm::vec3(0.f, distance, 0.f));
+}
+
+std::optional<PhysicsWorld::GroundHit> PhysicsWorld::castStatic(glm::vec3 from, glm::vec3 to) {
+
+    JPH::RRayCast ray(JPH::RVec3(toJolt(from)), toJolt(to - from));
+    JPH::RayCastResult hit;
+    JPH::SpecifiedBroadPhaseLayerFilter broadphase { JPH::BroadPhaseLayer(PhysicsLayers::non_moving_bp) };
+    JPH::SpecifiedObjectLayerFilter layer(PhysicsLayers::static_layer);
+    if(!physics->GetNarrowPhaseQueryNoLock().CastRay(ray, hit, broadphase, layer)) return std::nullopt;
+
+    JPH::RVec3 point = ray.GetPointOnRay(hit.mFraction);
+    JPH::BodyLockRead lock(physics->GetBodyLockInterfaceNoLock(), hit.mBodyID);
+    if(!lock.Succeeded()) return std::nullopt;
+    JPH::Vec3 normal = lock.GetBody().GetWorldSpaceSurfaceNormal(hit.mSubShapeID2, point);
+    return GroundHit { toGlm(JPH::Vec3(point)), toGlm(normal) };
+
+}
+
+std::optional<PhysicsWorld::GroundHit> PhysicsWorld::sphereContact(glm::vec3 centre, float radius, float margin) {
+
+    JPH::SphereShape sphere(radius + margin);
+    sphere.SetEmbedded();
+    JPH::CollideShapeSettings settings;
+    JPH::ClosestHitCollisionCollector<JPH::CollideShapeCollector> deepest;
+    JPH::SpecifiedBroadPhaseLayerFilter broadphase { JPH::BroadPhaseLayer(PhysicsLayers::non_moving_bp) };
+    JPH::SpecifiedObjectLayerFilter layer(PhysicsLayers::static_layer);
+    physics->GetNarrowPhaseQueryNoLock().CollideShape(&sphere, JPH::Vec3::sReplicate(1.f), JPH::RMat44::sTranslation(JPH::RVec3(toJolt(centre))),
+        settings, JPH::RVec3::sZero(), deepest, broadphase, layer);
+    if(!deepest.HadHit()) return std::nullopt;
+
+    glm::vec3 point = toGlm(JPH::Vec3(deepest.mHit.mContactPointOn2));
+    glm::vec3 out = centre - point;
+    float length = glm::length(out);
+    return GroundHit { point, length > 1e-6f ? out / length : glm::vec3(0.f, 1.f, 0.f) };
+
 }
 
 void PhysicsWorld::step(float dt) {

@@ -4,6 +4,7 @@
 
 #include "component_registry.h"
 
+#include "logic/agents/sphere_roller.h"
 #include "logic/components/model_ref.h"
 #include "logic/components/rigid_body.h"
 #include "logic/components/transform.h"
@@ -52,6 +53,7 @@ void registerSimComponents() {
             f.read("friction", b.friction);
             f.read("restitution", b.restitution);
             f.read("angular_damping", b.angular_damping);
+            f.read("mass", b.mass);
             f.read("initial_velocity", b.initial_velocity);
             f.read("initial_angular_velocity", b.initial_angular_velocity);
             f.finish();
@@ -61,7 +63,7 @@ void registerSimComponents() {
             auto& b = reg.get<RigidBody>(e);
             return nlohmann::json { { "motion", motion_names[(int) b.motion] }, { "shape", shape_names[(int) b.shape] },
                 { "half_extent", toJson(b.half_extent) }, { "offset", toJson(b.offset) }, { "friction", b.friction },
-                { "restitution", b.restitution }, { "angular_damping", b.angular_damping }, { "initial_velocity", toJson(b.initial_velocity) },
+                { "restitution", b.restitution }, { "angular_damping", b.angular_damping }, { "mass", b.mass }, { "initial_velocity", toJson(b.initial_velocity) },
                 { "initial_angular_velocity", toJson(b.initial_angular_velocity) } };
         }
     });
@@ -81,6 +83,36 @@ void registerSimComponents() {
         [](const entt::registry& reg, entt::entity e) {
             auto& g = reg.get<Ground>(e);
             return nlohmann::json { { "size", toJson(g.size) }, { "top_y", g.top_y }, { "friction", g.friction }, { "restitution", g.restitution } };
+        }
+    });
+
+    registerComponent("HeightField", {
+        [](entt::registry& reg, entt::entity e, const nlohmann::json& j) {
+            HeightField h;
+            JsonFields f(j);
+            int seed = 0;
+            f.read("samples", h.samples);
+            f.read("spacing", h.spacing);
+            f.read("waves", h.waves);
+            f.read("wavelength", h.wavelength);
+            f.read("wave_slope", h.wave_slope);
+            f.read("friction", h.friction);
+            f.read("restitution", h.restitution);
+            f.read("seed", seed);
+            f.finish();
+            if(h.samples < 8 || (h.samples & (h.samples - 1)) != 0) throw ComponentError("/samples", "a power of 2, at least 8");
+            if(h.spacing <= 0.f) throw ComponentError("/spacing", "must be positive");
+            if(h.waves < 0) throw ComponentError("/waves", "must not be negative");
+            if(h.wavelength.x <= 0.f || h.wavelength.y < h.wavelength.x) throw ComponentError("/wavelength", "expected 0 < min <= max");
+            if(seed < 0) throw ComponentError("/seed", "must not be negative");
+            h.seed = (uint32_t) seed;
+            reg.emplace_or_replace<HeightField>(e, h);
+        },
+        [](const entt::registry& reg, entt::entity e) {
+            auto& h = reg.get<HeightField>(e);
+            return nlohmann::json { { "samples", h.samples }, { "spacing", h.spacing }, { "waves", h.waves },
+                { "wavelength", { h.wavelength.x, h.wavelength.y } }, { "wave_slope", h.wave_slope }, { "friction", h.friction },
+                { "restitution", h.restitution }, { "seed", h.seed } };
         }
     });
 
@@ -121,9 +153,12 @@ void dy::registerSimSystems() {
     registerSystem("TerrainColliders", systemInfo<TerrainCollidersSys>(SystemScope::Host));
     registerSystem("Physics", systemInfo<PhysicsSys>(SystemScope::Host));
     registerSystem("PhysicsStep", systemInfo<PhysicsStepSys>(SystemScope::World));
+    registerSystem("WorldTerrain", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<WorldTerrainSys>(reg, params); },
+        SystemScope::World });
     registerSystem("BoxDrop", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<BoxDropSys>(reg, params); },
         SystemScope::World });
 
     registerSimComponents();
+    registerSphereRoller();
 
 }

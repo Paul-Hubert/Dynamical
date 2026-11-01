@@ -15,6 +15,15 @@ ScenarioRunner::~ScenarioRunner() {
     worlds.finish();
 }
 
+void ScenarioRunner::restart(uint64_t base_seed) {
+    worlds.finish();
+    worlds.list.clear();
+    worlds.create(def, base_seed);
+    worlds.preinit();
+    worlds.init();
+    ticks_done = 0;
+}
+
 void ScenarioRunner::step(int64_t ticks, tf::Executor* executor) {
     worlds.step(ticks, executor);
     ticks_done += ticks;

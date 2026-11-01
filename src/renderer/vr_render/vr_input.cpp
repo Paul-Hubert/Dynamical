@@ -50,7 +50,9 @@ VRActions::VRActions(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     makeAction(XR_ACTION_TYPE_FLOAT_INPUT, "trigger", "Trigger", triggerAction);
     makeAction(XR_ACTION_TYPE_FLOAT_INPUT, "grip", "Grip", gripAction);
     makeAction(XR_ACTION_TYPE_VECTOR2F_INPUT, "thumbstick", "Thumbstick", thumbstickAction);
+    makeAction(XR_ACTION_TYPE_BOOLEAN_INPUT, "primary", "Primary Button", primaryAction);
 
+    // Primary button: X (left) and A (right) on Touch, A on both Index controllers
     suggest("/interaction_profiles/oculus/touch_controller", {
         {poseAction, "/user/hand/left/input/grip/pose"},
         {poseAction, "/user/hand/right/input/grip/pose"},
@@ -60,6 +62,8 @@ VRActions::VRActions(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
         {gripAction, "/user/hand/right/input/squeeze/value"},
         {thumbstickAction, "/user/hand/left/input/thumbstick"},
         {thumbstickAction, "/user/hand/right/input/thumbstick"},
+        {primaryAction, "/user/hand/left/input/x/click"},
+        {primaryAction, "/user/hand/right/input/a/click"},
     });
 
     suggest("/interaction_profiles/valve/index_controller", {
@@ -71,6 +75,8 @@ VRActions::VRActions(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
         {gripAction, "/user/hand/right/input/squeeze/value"},
         {thumbstickAction, "/user/hand/left/input/thumbstick"},
         {thumbstickAction, "/user/hand/right/input/thumbstick"},
+        {primaryAction, "/user/hand/left/input/a/click"},
+        {primaryAction, "/user/hand/right/input/a/click"},
     });
 
     suggest("/interaction_profiles/khr/simple_controller", {
@@ -178,6 +184,13 @@ void VRActions::sync(XrTime time) {
         get_info.action = thumbstickAction;
         xrCheckResult(xrGetActionStateVector2f(ctx.vr.session, &get_info, &stick_state));
         hand.thumbstick = stick_state.isActive ? glm::vec2(stick_state.currentState.x, stick_state.currentState.y) : glm::vec2(0.f);
+
+        XrActionStateBoolean primary_state { XR_TYPE_ACTION_STATE_BOOLEAN };
+        get_info.action = primaryAction;
+        xrCheckResult(xrGetActionStateBoolean(ctx.vr.session, &get_info, &primary_state));
+        bool was_down = hand.primary;
+        hand.primary = primary_state.isActive && primary_state.currentState;
+        hand.primary_pressed = !was_down && hand.primary;
 
         XrSpaceVelocity velocity { XR_TYPE_SPACE_VELOCITY };
         XrSpaceLocation location { XR_TYPE_SPACE_LOCATION };

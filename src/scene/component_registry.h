@@ -37,6 +37,7 @@ public:
     void read(const char* key, int& out);
     void read(const char* key, float& out);
     void read(const char* key, std::string& out);
+    void read(const char* key, glm::vec2& out);
     void read(const char* key, glm::vec3& out);
     void read(const char* key, glm::vec4& out);
     void read(const char* key, glm::quat& out);    // [x, y, z, w]

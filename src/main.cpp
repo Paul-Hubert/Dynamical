@@ -2,6 +2,9 @@
 #include "view/register_view.h"
 #include "scene/system_registry.h"
 #include "physics/jolt_runtime.h"
+#ifdef DYNAMICAL_ONNX
+#include "onnx/policy_systems.h"
+#endif
 
 #include <filesystem>
 #include <memory>
@@ -42,6 +45,9 @@ int main(int argc, char **argv) {
     dy::JoltRuntime jolt;
     dy::registerSimSystems();
     dy::registerViewSystems();
+#ifdef DYNAMICAL_ONNX
+    dy::registerPolicySystems();
+#endif
 
     int code;
     {

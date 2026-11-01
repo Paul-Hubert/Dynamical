@@ -31,6 +31,8 @@ struct Bounds {
 // frame are built (in parallel, in a fixed order) before the physics step; cells on the predicted path are
 // prefetched on the taskflow executor. Densities come from the chunk volume when it is loaded, else straight
 // from the TerrainGenerator, so collision works without the renderer or chunk streaming (headless simulation).
+// Without a tf::Executor context variable (worlds, which already run in parallel) the required cells are built
+// inline, in the same order, and prefetching is skipped.
 class TerrainColliders {
 public:
     static constexpr int cell_cubes = 16;
@@ -42,6 +44,13 @@ public:
 
     // required : bodies will touch these this frame, built synchronously. prefetch : built in the background.
     void update(const std::vector<Bounds>& required, const std::vector<Bounds>& prefetch, double time);
+
+    // The cells overlapping bounds, built now (spawning on the ground)
+    void require(const Bounds& bounds, double time) { update({ bounds }, {}, time); }
+
+    // The generator's heightfield part of the surface (overhangs move the real surface by up to its overhang amplitude)
+    float surfaceHeight(float x, float z) const;
+    float overhangAmplitude() const;
 
     void clear();
 

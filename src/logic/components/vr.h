@@ -12,6 +12,7 @@ namespace dy {
 struct VRRig {
     glm::vec3 position = glm::vec3(0.f);
     float yaw = 0.f;
+    bool stick_locomotion = true;   // VRControl moves the rig with the left stick; off when a system drives it (VRRoller)
 
     glm::mat4 transform() const {
         return glm::rotate(glm::translate(glm::mat4(1.f), position), yaw, glm::vec3(0.f, 1.f, 0.f));
@@ -43,6 +44,8 @@ struct VRInput {
         float grip = 0.f;
         glm::vec2 thumbstick = glm::vec2(0.f);
         bool trigger_pressed = false; // rising edge this frame
+        bool primary = false;         // A (right) or X (left) on Touch, A on Index
+        bool primary_pressed = false; // rising edge this frame
     };
     Hand hands[2];
 

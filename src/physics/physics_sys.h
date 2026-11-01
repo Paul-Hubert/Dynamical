@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <nlohmann/json.hpp>
 
 #include <memory>
 
@@ -35,20 +36,22 @@ struct FixedStepClock {
     int stepsFor(double dt) const;
 };
 
-// Creates the Jolt bodies of new RigidBody components (every tick), removes them with the component.
-// Host (base) or world.
+// Creates the Jolt bodies of new RigidBody components (every tick), removes them with the component. Grounds and
+// height fields are created in init and on later ticks. Host (base) or world.
 class RigidBodySys : public System {
 public:
     RigidBodySys(entt::registry& reg) : System(reg) {}
     ~RigidBodySys() override;
     const char* name() override { return "RigidBody"; }
     void preinit() override;
+    void init() override;
     void tick(double dt) override;
     void finish() override;
 
 private:
     void destroyBody(entt::registry& reg, entt::entity entity);
     void destroyGround(entt::registry& reg, entt::entity entity);
+    void destroyHeightField(entt::registry& reg, entt::entity entity);
     void createGrounds();
 
     PhysicsWorld* world = nullptr;
@@ -69,6 +72,25 @@ public:
 
 private:
     std::unique_ptr<TerrainColliders> terrain;
+};
+
+// Marching cubes ground of a world (sphere_roll): TerrainColliders on the world's PhysicsWorld, built inline before
+// the step around every dynamic body (its bounds grown by `margin`, and by `below` downward so the ground under a
+// falling body is there). Shared as the world context variable std::shared_ptr<TerrainColliders>.
+// params: { "seed": 1337, "margin": 2.0, "below": 6.0 } (base's terrain is seed 1337)
+class WorldTerrainSys : public System {
+public:
+    WorldTerrainSys(entt::registry& reg, const nlohmann::json& params);
+    const char* name() override { return "WorldTerrain"; }
+    void preinit() override;
+    void tick(double h) override;
+    void finish() override;
+
+private:
+    int seed = 1337;
+    float margin = 2.f;
+    float below = 6.f;
+    std::shared_ptr<TerrainColliders> terrain;
 };
 
 // base's Jolt step (host): a fixed 60 Hz accumulator, Transforms interpolated between the last two steps,

@@ -1,0 +1,10 @@
+{
+  "variables": {
+    "behavior":         { "type": "string", "default": "WheelRoller" },
+    "radius":           { "type": "float",  "default": 0.94, "description": "m: the hip height of the H173 walker (Hips at 1.03 m x 0.9153)" },
+    "mass":             { "type": "float",  "default": 69.0, "description": "kg: the H173 walker's" },
+    "friction":         { "type": "float",  "default": 4.0, "description": "max-combined with the terrain's 0.8: mu = 4; under the proportional controller the loaded contact sticks on 98.8% of the ticks (SR.23)" },
+    "friction_combine": { "type": "string", "default": "max" },
+    "max_torque":       { "type": "float",  "default": 520.0, "description": "N m: the small sphere's max_torque / (m g r) = 0.816, kept" }
+  }
+}

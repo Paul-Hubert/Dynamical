@@ -1,0 +1,7 @@
+{
+  "format_version": 1,
+  "name": "sphere_roll_hills",
+  "include": ["common/sphere_world_hills.json"],
+  "variables": { "num_worlds": { "type": "int", "default": 25 } },
+  "worlds": [ { "template": "sphere_world_hills", "count": "${num_worlds}" } ]
+}

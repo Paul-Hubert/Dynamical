@@ -11,6 +11,7 @@ option(DYNAMICAL_BUILD_VIEWER "Build dynamical (Vulkan, SDL, OpenXR, shaders)" O
 option(DYNAMICAL_TRAIN "Build the headless training executable" ON)
 option(DYNAMICAL_TESTS "Build the tests" ON)
 option(DYNAMICAL_BUILD_TOOLS "Build offline tools (grass raycast baker)" OFF)
+option(DYNAMICAL_ONNX "Policy inference with the prebuilt ONNX Runtime (Windows x64)" ${WIN32})
 set(DYNAMICAL_TRAIN_NAME "TrainingEnv" CACHE STRING "Output name of dynamical_train")
 
 set(FASTNOISE2_NOISETOOL OFF CACHE BOOL "Build Noise Tool" FORCE)
@@ -39,6 +40,19 @@ add_library(dynamical_sim STATIC ${SIM_SOURCES})
 target_include_directories(dynamical_sim PUBLIC src lib/FastNoise2/include ${CEREAL_INCLUDE_DIRS})
 target_link_libraries(dynamical_sim PUBLIC EnTT::EnTT Jolt::Jolt glm::glm nlohmann_json::nlohmann_json Taskflow::Taskflow FastNoise)
 
+### POLICY INFERENCE (dynamical_onnx: PolicyRunner, the Policy and ModelWatcher systems)
+if (DYNAMICAL_ONNX)
+    include(cmake/onnxruntime.cmake)
+    file(GLOB ONNX_SOURCES CONFIGURE_DEPENDS ./src/onnx/*.cpp)
+    add_library(dynamical_onnx STATIC ${ONNX_SOURCES})
+    target_link_libraries(dynamical_onnx PUBLIC dynamical_sim onnxruntime::onnxruntime)
+    target_compile_definitions(dynamical_onnx PUBLIC DYNAMICAL_ONNX)
+    # onnxruntime.dll next to an executable (System32 has an older one of the same name)
+    function(copy_onnxruntime target)
+        add_custom_command(TARGET ${target} POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ONNXRUNTIME_DLLS} "$<TARGET_FILE_DIR:${target}>")
+    endfunction()
+endif()
+
 ### VIEWER
 if (DYNAMICAL_BUILD_VIEWER)
 
@@ -54,6 +68,10 @@ find_package(OpenXR CONFIG REQUIRED)
 
 target_include_directories(dynamical PRIVATE lib lib/imgui lib/implot lib/VulkanMemoryAllocator/include ${SDL2_INCLUDE_DIR} ${STB_INCLUDE_DIRS})
 target_link_libraries(dynamical PRIVATE dynamical_sim Vulkan::Vulkan ${SDL2_LIBRARIES} OpenXR::headers OpenXR::openxr_loader VulkanMemoryAllocator)
+if (DYNAMICAL_ONNX)
+    target_link_libraries(dynamical PRIVATE dynamical_onnx)
+    copy_onnxruntime(dynamical)
+endif()
 
 target_sources(
   dynamical PRIVATE
@@ -164,9 +182,16 @@ if (DYNAMICAL_TESTS)
         # The protocol tests and the MockTrainer need gRPC and the train code
         list(FILTER test_sources EXCLUDE REGEX "/tests/(protocol|support/mock_trainer)")
     endif()
+    if (NOT DYNAMICAL_ONNX)
+        list(FILTER test_sources EXCLUDE REGEX "/tests/onnx/")
+    endif()
     add_executable(dynamical_tests ${test_sources})
     target_include_directories(dynamical_tests PRIVATE tests)
     target_link_libraries(dynamical_tests PRIVATE dynamical_sim doctest::doctest imgdiff_core)
+    if (DYNAMICAL_ONNX)
+        target_link_libraries(dynamical_tests PRIVATE dynamical_onnx)
+        copy_onnxruntime(dynamical_tests)
+    endif()
     if (DYNAMICAL_TRAIN)
         target_link_libraries(dynamical_tests PRIVATE dynamical_train_core)
         target_compile_definitions(dynamical_tests PRIVATE DYNAMICAL_TRAIN_EXE="$<TARGET_FILE:dynamical_train>")

@@ -107,7 +107,7 @@ int Game::start() {
     if(!scene.worlds.empty()) {
         worlds = &reg.ctx().emplace<Worlds>();
         try {
-            worlds->create(scene, 0);
+            worlds->create(scene, (uint64_t) reg.ctx().get<RunArgs>().seed);
         } catch(const SceneError& e) {
             dy::log(dy::error) << "Scene: " << e.what() << "\n";
             return 1;

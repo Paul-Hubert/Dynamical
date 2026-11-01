@@ -72,7 +72,7 @@ void VRControlSys::tick(double dt) {
 
         // Left stick : move on the horizontal plane, relative to where the head looks
         glm::vec2 stick = input->hands[VRInput::left].thumbstick;
-        if(glm::length(stick) > 0.15f && input->head.valid) {
+        if(rig.stick_locomotion && glm::length(stick) > 0.15f && input->head.valid) {
             glm::mat3 world_from_stage = glm::mat3(rig.transform());
             glm::vec3 forward = world_from_stage * (input->head.rotation * glm::vec3(0.f, 0.f, -1.f));
             forward.y = 0.f;

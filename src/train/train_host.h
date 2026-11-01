@@ -3,8 +3,11 @@
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
+#include <memory>
 
 #include "env_params.h"
+#include "environment.h"
 #include "scene/run_args.h"
 #include "scene/scenario_runner.h"
 #include "train_args.h"
@@ -30,6 +33,12 @@ private:
     // mode=null: the trainer handshake and step loop with fixed observations (M0)
     int null();
 
+    // mode=train: the scene's agent worlds (WorldsEnvironment), recreated with the trainer's seed
+    int agents();
+
+    // The handshake, then RESET / STEP / QUIT against the environment `connected` makes from the trainer's seed
+    int serve(const std::function<std::unique_ptr<TrainerEnvironment>(int64_t seed)>& connected);
+
     // -envParams= and -set:, before anything else (a missing file is fatal, as in Unity)
     bool loadEnvParams();
     void writeEnvParams(int64_t steps);
@@ -39,6 +48,7 @@ private:
     ScenarioRunner& runner;
     EnvParamStore env_params;
     std::atomic<int64_t> base_seed { -1 };
+    std::string behavior = "HeidelBotBehavior";     // envparams.txt header
     std::map<std::string, float> written;
     bool envparams_written = false;
 };

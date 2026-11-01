@@ -69,6 +69,13 @@ void JsonFields::read(const char* key, std::string& out) {
     out = it->get<std::string>();
 }
 
+void JsonFields::read(const char* key, glm::vec2& out) {
+    auto it = object.find(key);
+    if(it == object.end()) return;
+    used.insert(key);
+    readFloats<2>(*it, key, &out.x);
+}
+
 void JsonFields::read(const char* key, glm::vec3& out) {
     auto it = object.find(key);
     if(it == object.end()) return;

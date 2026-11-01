@@ -1,5 +1,6 @@
 #include "physics_sys.h"
 
+#include "height_field.h"
 #include "physics_world.h"
 #include "terrain_colliders.h"
 
@@ -7,13 +8,16 @@
 #include <Jolt/Physics/Body/BodyLock.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
+#include <Jolt/Physics/Collision/Shape/HeightFieldShape.h>
 #include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 
 #include "logic/components/rigid_body.h"
 #include "logic/components/transform.h"
+#include "logic/terrain/terrain_generator.h"
 
 #include "scene/run_args.h"
+#include "scene/world.h"
 #include "util/log.h"
 
 #include <algorithm>
@@ -72,7 +76,13 @@ void RigidBodySys::preinit() {
     physicsStats(reg);
     reg.on_destroy<RigidBody>().connect<&RigidBodySys::destroyBody>(this);
     reg.on_destroy<Ground>().connect<&RigidBodySys::destroyGround>(this);
+    reg.on_destroy<HeightField>().connect<&RigidBodySys::destroyHeightField>(this);
 
+}
+
+void RigidBodySys::init() {
+    // Static geometry exists before the first tick: world systems place their bodies on it in init
+    createGrounds();
 }
 
 void RigidBodySys::createGrounds() {
@@ -94,6 +104,35 @@ void RigidBodySys::createGrounds() {
         added = true;
     }
 
+    for(auto [entity, field] : reg.view<HeightField>().each()) {
+        if(field.created()) continue;
+        if(field.wave_list.empty()) {
+            uint64_t seed = field.seed;
+            if(seed == 0) {
+                if(auto* rng = reg.ctx().find<WorldRng>()) seed = rng->engine();
+            }
+            drawWaves(field, seed);
+        }
+        std::vector<float> heights = sampleHeights(field);
+        const float half = field.size() * 0.5f;
+        JPH::HeightFieldShapeSettings shape(heights.data(), JPH::Vec3(-half, 0.f, -half), JPH::Vec3(field.spacing, 1.f, field.spacing), (JPH::uint32) field.samples);
+        auto result = shape.Create();
+        if(result.HasError()) {
+            dy::log(dy::warning) << "Physics : invalid height field, " << result.GetError().c_str() << "\n";
+            continue;
+        }
+        JPH::BodyCreationSettings settings(result.Get(), JPH::RVec3::sZero(), JPH::Quat::sIdentity(), JPH::EMotionType::Static, PhysicsLayers::static_layer);
+        settings.mFriction = field.friction;
+        settings.mRestitution = field.restitution;
+        JPH::BodyID id = world->bodies().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
+        if(id.IsInvalid()) {
+            dy::log(dy::warning) << "Physics : out of bodies for the height field\n";
+            continue;
+        }
+        field.body = id.GetIndexAndSequenceNumber();
+        added = true;
+    }
+
     // Static geometry is in place: rebuild the broad phase once
     if(added) world->system().OptimizeBroadPhase();
 
@@ -105,6 +144,14 @@ void RigidBodySys::destroyGround(entt::registry& reg, entt::entity entity) {
     world->bodies().RemoveBody(JPH::BodyID(ground.body));
     world->bodies().DestroyBody(JPH::BodyID(ground.body));
     ground.body = JPH::BodyID().GetIndexAndSequenceNumber();
+}
+
+void RigidBodySys::destroyHeightField(entt::registry& reg, entt::entity entity) {
+    auto& field = reg.get<HeightField>(entity);
+    if(!field.created() || !world) return;
+    world->bodies().RemoveBody(JPH::BodyID(field.body));
+    world->bodies().DestroyBody(JPH::BodyID(field.body));
+    field.body = JPH::BodyID().GetIndexAndSequenceNumber();
 }
 
 void RigidBodySys::tick(double dt) {
@@ -153,6 +200,10 @@ void RigidBodySys::tick(double dt) {
         settings.mRestitution = body.restitution;
         settings.mAngularDamping = body.angular_damping;
         settings.mAllowSleeping = world->config().allow_sleeping;
+        if(body.motion == RigidBody::Motion::Dynamic && body.mass > 0.f) {
+            settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
+            settings.mMassPropertiesOverride.mMass = body.mass;
+        }
         if(body.motion == RigidBody::Motion::Dynamic) {
             settings.mLinearVelocity = toJolt(body.initial_velocity);
             settings.mAngularVelocity = toJolt(body.initial_angular_velocity);
@@ -199,6 +250,15 @@ void RigidBodySys::finish() {
 
     reg.on_destroy<RigidBody>().disconnect(this);
     reg.on_destroy<Ground>().disconnect(this);
+    reg.on_destroy<HeightField>().disconnect(this);
+
+    for(auto [entity, field] : reg.view<HeightField>().each()) {
+        if(field.created()) {
+            world->bodies().RemoveBody(JPH::BodyID(field.body));
+            world->bodies().DestroyBody(JPH::BodyID(field.body));
+        }
+        field.body = JPH::BodyID().GetIndexAndSequenceNumber();
+    }
 
     for(auto [entity, ground] : reg.view<Ground>().each()) {
         if(ground.created()) {
@@ -221,6 +281,7 @@ void RigidBodySys::finish() {
 RigidBodySys::~RigidBodySys() {
     reg.on_destroy<RigidBody>().disconnect(this);
     reg.on_destroy<Ground>().disconnect(this);
+    reg.on_destroy<HeightField>().disconnect(this);
     world = nullptr;
 }
 
@@ -286,6 +347,48 @@ void TerrainCollidersSys::finish() {
 
 TerrainCollidersSys::~TerrainCollidersSys() {
     terrain.reset();
+}
+
+
+
+// WorldTerrain
+
+WorldTerrainSys::WorldTerrainSys(entt::registry& reg, const nlohmann::json& params) : System(reg) {
+    seed = params.value("seed", seed);
+    margin = params.value("margin", margin);
+    below = params.value("below", below);
+}
+
+void WorldTerrainSys::preinit() {
+    reg.ctx().emplace<std::shared_ptr<TerrainGenerator>>(std::make_shared<TerrainGenerator>(seed));
+    terrain = std::make_shared<TerrainColliders>(reg, physicsWorld(reg));
+    reg.ctx().emplace<std::shared_ptr<TerrainColliders>>(terrain);
+}
+
+void WorldTerrainSys::tick(double h) {
+
+    auto& world = physicsWorld(reg);
+    const auto& clock = reg.ctx().get<WorldClock>();
+    const auto& lock_interface = world.system().GetBodyLockInterfaceNoLock();
+
+    std::vector<Bounds> required;
+    for(auto [entity, body] : reg.view<RigidBody>().each()) {
+        if(body.motion != RigidBody::Motion::Dynamic || !body.created()) continue;
+        JPH::BodyLockRead lock(lock_interface, bodyId(body));
+        if(!lock.Succeeded()) continue;
+        const JPH::Body& b = lock.GetBody();
+        JPH::AABox box = b.GetWorldSpaceBounds();
+        Bounds bounds = grow(Bounds { toGlm(box.mMin), toGlm(box.mMax) }, toGlm(b.GetLinearVelocity()) * (float) h, margin);
+        bounds.min.y -= below;
+        required.push_back(bounds);
+    }
+
+    terrain->update(required, {}, clock.tick * clock.dt);
+
+}
+
+void WorldTerrainSys::finish() {
+    terrain->clear();
 }
 
 

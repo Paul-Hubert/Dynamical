@@ -153,7 +153,7 @@ void TerrainColliders::activate(glm::ivec3 position, Cell& cell) {
 
 void TerrainColliders::update(const std::vector<Bounds>& required, const std::vector<Bounds>& prefetch, double time) {
 
-    auto& executor = reg.ctx().get<tf::Executor>();
+    auto* executor = reg.ctx().find<tf::Executor>();
 
     // Required cells, sorted so bodies are always added in the same order (deterministic simulation)
 
@@ -172,14 +172,16 @@ void TerrainColliders::update(const std::vector<Bounds>& required, const std::ve
         it->second.last_used = time;
     }
 
-    if(!immediate.empty()) {
+    if(!immediate.empty() && !executor) {
+        for(auto& job : immediate) run(*job, *marching_cubes, *generator);
+    } else if(!immediate.empty()) {
         auto mc = marching_cubes;
         auto gen = generator;
         tf::Taskflow flow;
         flow.for_each(immediate.begin(), immediate.end(), [mc, gen](std::shared_ptr<Job>& job) {
             run(*job, *mc, *gen);
         });
-        executor.run(flow).wait();
+        executor->run(flow).wait();
     }
 
     for(auto& position : needed) {
@@ -190,13 +192,15 @@ void TerrainColliders::update(const std::vector<Bounds>& required, const std::ve
     // Prefetch along the predicted paths, bodies are only added once required
 
     std::vector<glm::ivec3> ahead;
-    for(auto& bounds : prefetch) cellsOverlapping(bounds, ahead);
+    if(executor) {
+        for(auto& bounds : prefetch) cellsOverlapping(bounds, ahead);
+    }
     for(auto& position : ahead) {
         auto [it, inserted] = cells.try_emplace(position);
         if(inserted) {
             auto job = makeJob(position);
             it->second.job = job;
-            executor.silent_async([job, mc = marching_cubes, gen = generator]() {
+            executor->silent_async([job, mc = marching_cubes, gen = generator]() {
                 run(*job, *mc, *gen);
             });
         }
@@ -250,6 +254,14 @@ void TerrainColliders::clear() {
     cells.clear();
     triangle_count = 0;
 
+}
+
+float TerrainColliders::surfaceHeight(float x, float z) const {
+    return generator->surfaceHeight(x, z);
+}
+
+float TerrainColliders::overhangAmplitude() const {
+    return generator->overhang_amplitude;
 }
 
 uint32_t TerrainColliders::activeCells() const {

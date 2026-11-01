@@ -14,11 +14,15 @@ public:
 - One `Ort::Env` per process; CPU provider; `ORT_ENABLE_ALL`.
 - **Validate at load** against the scene's layout: input sizes and continuous action count. Refuse on
   mismatch, because a policy is bound to its body and layout.
-- The fork's model I/O names (`obs_0`…, `continuous_actions`, `deterministic_continuous_actions`,
-  `version_number`, `memory_size`) are *verify*. Recurrent policies (`memory_size > 0`) are refused in
-  v1.
-- Apply the trainer's `clamp(−3, 3)/3` to the actions if the exported graph does not already include
-  it (*verify*; Unity applies no clipping of its own, UA §2.4).
+- The fork's model I/O names: `obs_0` (one input per sensor), `continuous_actions`,
+  `deterministic_continuous_actions`, `version_number` (3), `memory_size`, `continuous_action_output_shape`;
+  opset 9 (verified on the sphere roller's checkpoints, sphere-roller.md). Recurrent policies
+  (`memory_size > 0`) are refused in v1.
+- Built ahead of P11 for the sphere roller: `src/onnx` (`PolicyRunner`, `Policy`, `ModelWatcher`) on the prebuilt
+  ONNX Runtime 1.23.2 (`cmake/onnxruntime.cmake`). The walker reuses them.
+- The exported graph already holds the observation normaliser and the trainer's `clamp(−3, 3)/3` on both action
+  outputs (verified: `Clip` then `Div` by 3 after the mean and after the sampled action), so nothing is applied
+  on top (Unity applies no clipping of its own, UA §2.4).
 - **Ownership.** Worlds cannot see the host registry, so the host system `ModelWatcher` (view) or
   `TrainHost` (eval) loads the session and injects a `PolicyHandle` (`std::shared_ptr<PolicyRunner>`)
   into each world's ctx. A swap replaces the handle; the world adopts it at its next episode start.
