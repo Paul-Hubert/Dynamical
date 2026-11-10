@@ -1,0 +1,13 @@
+{
+  "format_version": 1,
+  "name": "walker_demo_terrain",
+  "include": ["common/ik_demo_world.json"],
+  "variables": {
+    "terrain_seed": { "type": "int", "default": 1337 },
+    "spawn_radius": { "type": "float", "default": 1000.0 },
+    "decisions": { "type": "int", "default": 30000 },
+    "out": { "type": "string", "default": "" }
+  },
+  "worlds": [ { "template": "ik_demo_world", "count": 1,
+                "systems": { "replace": { "GroundPlane": { "name": "GroundTerrain", "params": { "seed": "${terrain_seed}" } } } } } ]
+}

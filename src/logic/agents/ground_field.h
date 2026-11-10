@@ -36,6 +36,9 @@ public:
     // The first surface straight below `from`, no further than `distance`
     virtual std::optional<Hit> below(glm::vec3 from, float distance) const = 0;
 
+    // The highest surface at (x, z), when nothing is known of its height (spawn points)
+    virtual std::optional<Hit> top(float x, float z) const = 0;
+
     // Height of the surface under (x, z), looking down from `from_y`; `fallback` without one
     float height(float x, float z, float from_y, float fallback) const {
         auto hit = below(glm::vec3(x, from_y, z), 64.f);
@@ -58,6 +61,7 @@ public:
 
     float density(glm::vec3 p) const override { return glm::dot(n, origin - p); }
     std::optional<Hit> below(glm::vec3 from, float distance) const override;
+    std::optional<Hit> top(float x, float z) const override;
 
     glm::vec3 origin;
 
@@ -72,11 +76,13 @@ private:
 class TerrainField : public GroundField {
 public:
     static constexpr int block_cubes = 4;
+    static constexpr size_t max_blocks = 4096;      // the cache starts over beyond this (a walker that spawns far and wide)
 
     TerrainField(std::shared_ptr<TerrainGenerator> generator, std::shared_ptr<MarchingCubes> marching_cubes);
 
     float density(glm::vec3 p) const override;      // trilinear between the grid samples
     std::optional<Hit> below(glm::vec3 from, float distance) const override;
+    std::optional<Hit> top(float x, float z) const override;
 
     size_t blocks() const { return cache.size(); }
 

@@ -19,6 +19,7 @@ worlds, a JSON scene system, a headless training executable that the unchanged t
 | 6 | [assets.md](assets.md) | Body file, pose tracks, agent parameters, Unity exporter contract |
 | 7 | [rig-animation.md](rig-animation.md) | The `rig_anim` kinematic validation scene |
 | 7b | [ik-gait.md](ik-gait.md) | The kinematic walk on slopes and terrain: `Fabrik`, IK components, procedural gait, balance, the `ik_walk` scenes |
+| 7c | [reports/terrain-walker.md](reports/terrain-walker.md) | The physical walker trained on the marching cubes terrain from the kinematic walk's demonstrations: routes in a slope band, the 80M run, eval by slope |
 | 8 | [agent-runtime.md](agent-runtime.md) | Observations, actions, rewards, episodes, randomisation, termination, stats |
 | 9 | [mlagents-bridge.md](mlagents-bridge.md) | Launch contract, handshake, step loop, side channels, env params, process behaviour |
 | 10 | [inference-and-replay.md](inference-and-replay.md) | ONNX Runtime, `walker_view`, eval mode, demo recorder, replays |

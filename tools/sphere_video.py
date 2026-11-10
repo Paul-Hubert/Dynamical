@@ -8,7 +8,7 @@ camera) frame by frame through a capture script, then ffmpeg (imageio-ffmpeg in 
 
 --run takes the newest checkpoint of build/runs/<RUN_ID>/<behavior> (default: the newest run with checkpoints).
 --scene must match the body the policy was trained on: sphere_view (SphereRoller) or wheel_view (WheelRoller); by
-default it follows the behaviour's name.
+default it follows the behaviour's name. walker_terrain_view puts a walker policy on the marching cubes terrain.
 --heuristic films the proportional controller instead (scene sphere_view_heuristic). The simulation runs at 60 Hz
 with a fixed frame clock, so the video plays in real time whatever the render speed. Frames are 960 x 540.
 """
@@ -45,7 +45,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--model")
     parser.add_argument("--run")
-    parser.add_argument("--scene", choices=sorted(set(SCENES.values())))
+    parser.add_argument("--scene", choices=sorted(set(SCENES.values()) | {"walker_terrain_view", "walker_demo_terrain_view"}))
+    parser.add_argument("--var", action="append", default=[], metavar="NAME=VALUE", help="a scene variable, repeatable")
     parser.add_argument("--seconds", type=float, default=30.)
     parser.add_argument("--fps", type=int, default=30, choices=[15, 20, 30, 60])
     parser.add_argument("--seed", type=int, default=1, help="the worlds' seed: spawn point and targets")
@@ -54,7 +55,10 @@ def main():
     parser.add_argument("--keep-frames", action="store_true")
     args = parser.parse_args()
 
-    if args.heuristic:
+    if args.scene == "walker_demo_terrain_view":
+        # The kinematic walk recording its demonstrations: no policy
+        model, label, args.heuristic = "", "gait_demo", True
+    elif args.heuristic:
         model, label = "", "heuristic"
     elif args.model:
         model, label = str(pathlib.Path(args.model).resolve()), pathlib.Path(args.model).stem
@@ -78,12 +82,12 @@ def main():
 
     count = int(args.seconds * args.fps)
     script = {
-        "scene": "sphere_view_heuristic" if args.heuristic else scene,
-        "vars": {"num_worlds": "1"} | ({} if args.heuristic else {"model": model}),
+        "scene": scene if scene == "walker_demo_terrain_view" else "sphere_view_heuristic" if args.heuristic else scene,
+        "vars": {"num_worlds": "1"} | ({} if args.heuristic else {"model": model}) | dict(v.split("=", 1) for v in args.var),
         # Half a second first: the first decisions are taken and the terrain around the spawn point is meshed
         "sequence": {"start": 30, "count": count, "every": 60 // args.fps, "name": "frame"},
         # The walker views frame the body in the middle of the window, under the debug panels
-        "hide_ui": scene in ("walker_view", "devita_view"),
+        "hide_ui": scene in ("walker_view", "devita_view", "walker_terrain_view", "walker_demo_terrain_view"),
     }
     (frames / "capture.json").write_text(json.dumps(script, indent=2))
 

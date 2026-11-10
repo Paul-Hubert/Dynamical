@@ -9,6 +9,7 @@
 #include "logic/agents/humanbot.h"
 #include "logic/agents/ik.h"
 #include "logic/agents/sphere_roller.h"
+#include "logic/agents/walk_routes.h"
 #include "logic/components/model_ref.h"
 #include "logic/components/rigid_body.h"
 #include "logic/components/transform.h"
@@ -168,5 +169,6 @@ void dy::registerSimSystems() {
     registerIK();
     registerGroundField();
     registerGait();
+    registerWalkRoutes();
 
 }

@@ -67,7 +67,7 @@ struct GaitParams {
     float acceleration = 1.f, turn_rate = 0.7f, min_speed = 0.05f;
     float slope_slowdown = 1.5f;                // the speed walked is the command times exp(-slope_slowdown * |tan slope|),
     float slope_speed_floor = 0.25f;            // ... and no less than this share of it, however steep,
-    float step_rise = 0.35f;                    // ... but slow enough that a step climbs or drops no more than this, m
+    float step_rise = 0.35f;                    // ... but slow enough that a step climbs or drops no more than this, m (0: no such cap)
     float look_ahead = 0.8f;                    // m ahead of the walker where a steeper slope already slows it
     float braking = 2.5f;                       // m/s2, slowing down (acceleration is for speeding up)
     float max_print_rise = 0.5f;                // m between a foot's landing and the other foot's print: the step shortens to keep it

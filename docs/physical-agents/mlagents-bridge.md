@@ -115,7 +115,7 @@ Python classes (`tools/capture_sidechannels.py`).
 |---|---|---|
 | Environment parameters | in | Float and Sampler messages update `EnvParams` |
 | Engine configuration | in | Accepted, logged once, ignored (`time_scale` means nothing here) |
-| Stats | out | `{key, value, aggregation 0..3}`, with Unity's names (`Root/*`, `Head/*`, `Death/*`, `Win/*`, `Bot Joint/*`, `EnergyProvider/*`, `DeVita/*`, `Collision/*`), only while training |
+| Stats | out | `{key, value, aggregation 0..3}`, with Unity's names (`Root/*`, `Head/*`, `Death/*`, `Win/*`, `Bot Joint/*`, `EnergyProvider/*`, `DeVita/*`, `Collision/*`), only while training. On a terrain also `Terrain/Slope Along`, `Terrain/Slope Across` (degrees under the walker, along and across its commanded direction), `Terrain/Route Lost` (episodes truncated with no direction in the slope band) and `Terrain/Spawn Draws` |
 
 ## Environment parameters
 

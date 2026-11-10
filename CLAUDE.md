@@ -70,6 +70,7 @@ Entry point is `src/main.cpp` → `Game::start()`. The game loop runs: `renderer
 - `RigPose` (joint angles) is written by `GaitBase` (procedural gait), corrected by `Fabrik`, applied by `RigPoseApply` (`MoveKinematic`)
 - **IK is component driven**: any system posts `IKTarget` entities for an `IKChain`; `Fabrik` solves them all in one batch (FABRIK, pole, joint limits). `GaitFootIK` owns the leg targets, `GaitBalance` places the pelvis through `solveChain()`
 - `GroundField` (plane or marching cubes surface from the density samples) is what feet are planted on, no collider
+- **Terrain walker** (docs/physical-agents/reports/terrain-walker.md): `walker_terrain_train` trains the physical walker on the marching cubes terrain (`WorldTerrain` colliders, `GroundTerrain` field). `WalkRoutes` draws spawn points and target directions where the ground stays within 20° up, 7° down and 12° across; heights (fall test, head error, stats) are measured from the ground under the walker. `GaitRoutes` records the kinematic walk as GAIL demonstrations (`walker_demo_gait`, `walker_demo_terrain`; 1.36 m/s, limits hold). Tests `TW.*` in `tests/unit/terrain_walker.cpp`; `tools/terrain_eval.py` evaluates by slope band
 - A planted foot comes before a joint limit (`GaitParams::yield_limits`): the walk covers any slope, realistic up to about 20°. The body files' ankle swing limits are wider than Unity's export (`unity_y_deg`, `unity_z_deg` keep the originals)
 
 ### Models (`src/renderer/model/`)

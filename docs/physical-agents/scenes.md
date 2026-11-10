@@ -132,8 +132,9 @@ void registerComponent(std::string name, ComponentInfo);
 - **Registry names are independent of `System::name()`.** `DEFINE_SYSTEM` returns `"TimeSys"`, while the
   registry name is `Time`. Tests compare registry names.
 - **Components with a JSON form:**
-  - library: `Transform`, `RigidBody`, `Ground`, `AgentSpawn`, `PoseTrackPlayer`, and
-    `ModelRef { path, color }`;
+  - library: `Transform`, `RigidBody`, `Ground`, `AgentSpawn`, `PoseTrackPlayer`, `GaitCommand`, `GaitParams`,
+    `WalkRoutes { up, down, across, length, half_width, clear, centre, spawn_radius }` (degrees and metres: where a
+    walker's episodes go on a terrain) and `ModelRef { path, color }`;
   - `dynamical` only: `ModelRenderable`. A view-side system resolves `ModelRef` into `ModelRenderable`,
     because `ModelRenderable` needs the renderer's `ModelManager` (`renderer.cpp:39`) and has no
     default constructor.
@@ -160,6 +161,8 @@ void registerComponent(std::string name, ComponentInfo);
 | `GaitBase`, `GaitFootIK`, `GaitBalance`, `GaitChecks` | the kinematic walk: base animation, foot targets, pelvis placement, measurements | world | lib | every | after P13 |
 | `Fabrik`, `RigPoseApply` | solve every `IKTarget` into `RigPose`; `RigPose` onto the kinematic bodies | world | lib | every | after P13 |
 | `GaitView` | follow camera, panel and markers of the `ik_walk` scenes | host | `dynamical` | pre | after P13 |
+| `WorldTerrain` | marching cubes colliders of a world, around its `RigidBody` bodies and its ragdoll (`TerrainUsers`) | world | lib | every | sphere roller, terrain walker |
+| `GaitRoutes` | recording episodes of the kinematic walk: a fresh route in the slope band each, warm-up unrecorded ([reports/terrain-walker.md](reports/terrain-walker.md)) | world | lib | every | terrain walker |
 | `DriveTargets` | held targets → Jolt motors | world | lib | every | P6 |
 | `Contacts`, `Energy` | aggregate the per-sub-step recorders per tick | world | lib | every | P7 |
 | `TrainerActions`, `Policy`, `HeuristicActions` | actions from the bridge / ONNX (through `PolicyHandle`) / random or zero → `HeldDrive` | world | lib | act | P8, P11, P8 |
@@ -234,5 +237,8 @@ entities, so `ScenePass::record` keeps its single-registry, read-only rule.
 | `devita_train` / `devita_view` | as walker | H173 body, DeVita params, slope ground | P13 |
 | `ik_walk_slope` / `ik_walk_terrain` | `dynamical` | `common/ik_world.json`: the kinematic walk on a tilted plane or on the marching cubes terrain, with `GaitView` ([ik-gait.md](ik-gait.md)) | after P13 |
 | `ik_check` / `ik_check_terrain` | tests (`ScenarioRunner`) | The same worlds, headless | after P13 |
+| `walker_terrain_train` | `dynamical_train` | `common/humanbot_terrain_world.json`: the walker on the marching cubes terrain (`WorldTerrain`, `GroundTerrain`), episodes placed by `WalkRoutes` ([reports/terrain-walker.md](reports/terrain-walker.md)) | terrain walker |
+| `walker_terrain_eval` / `walker_terrain_view` | `dynamical_train` / `dynamical` | The same world with `Policy`; eval writes the stretches between target draws (`var.legs`), the view follows the walker over the terrain | terrain walker |
+| `walker_demo_gait` / `walker_demo_terrain` | `dynamical_train` | `common/ik_demo_world.json`: the kinematic walk recorded as GAIL demonstrations, on a plane or on the terrain (`GaitRoutes`, `mode=record-demo`) | terrain walker |
 
 Capture scripts live in `tests/capture/<name>.capture.json` ([phases.md](phases.md#capture-facility-p0)).

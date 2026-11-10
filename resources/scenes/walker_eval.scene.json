@@ -9,6 +9,7 @@
     "model": { "type": "string", "default": "" },
     "episodes": { "type": "int", "default": 100 },
     "out": { "type": "string", "default": "" },
+    "legs": { "type": "string", "default": "", "description": "a CSV, one row per stretch between two target draws" },
     "replay": { "type": "string", "default": "" },
     "stochastic": { "type": "int", "default": 0 },
     "cot_out": { "type": "string", "default": "" }

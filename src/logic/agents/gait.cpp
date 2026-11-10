@@ -311,7 +311,7 @@ void GaitBaseSys::tick(double h) {
         state.steepness = steepness;
         float wanted = std::max(g.command->speed, 0.f) * std::max(std::exp(-params.slope_slowdown * steepness), params.slope_speed_floor);
         // No step climbs or drops more than step_rise: on a wall the steps are short
-        if(steepness > 1e-3f) wanted = std::min(wanted, std::max(2.f * params.step_rise / (params.max_stride_time * steepness), 1.2f * params.min_speed));
+        if(steepness > 1e-3f && params.step_rise > 0.f) wanted = std::min(wanted, std::max(2.f * params.step_rise / (params.max_stride_time * steepness), 1.2f * params.min_speed));
         state.wanted_speed = g.command->speed > params.min_speed ? wanted : 0.f;
         state.speed = approach(state.speed, state.wanted_speed, (state.wanted_speed < state.speed ? params.braking : params.acceleration) * dt);
     }
@@ -979,6 +979,7 @@ void dy::registerGait() {
             f.read("knee_out", p.knee_out);
             f.read("yield_limits", p.yield_limits);
             f.read("slope_speed_floor", p.slope_speed_floor);
+            f.read("step_rise", p.step_rise);
             f.read("ankle_roll_extra", roll);
             f.read("ankle_yaw_extra", yaw);
             f.finish();
@@ -994,7 +995,7 @@ void dy::registerGait() {
                 { "stance_share", p.stance_share }, { "step_width", p.step_width }, { "strike_angle", glm::degrees(p.strike_angle) },
                 { "toe_angle", glm::degrees(p.toe_angle) }, { "swing_lift", p.swing_lift }, { "swing_clearance", p.swing_clearance },
                 { "leg_extension", p.leg_extension }, { "hip_height", p.hip_height }, { "lean_slope_gain", p.lean_slope_gain },
-                { "acceleration", p.acceleration }, { "turn_rate", p.turn_rate }, { "slope_slowdown", p.slope_slowdown }, { "slope_speed_floor", p.slope_speed_floor }, { "knee_out", p.knee_out }, { "yield_limits", p.yield_limits },
+                { "acceleration", p.acceleration }, { "turn_rate", p.turn_rate }, { "slope_slowdown", p.slope_slowdown }, { "slope_speed_floor", p.slope_speed_floor }, { "step_rise", p.step_rise }, { "knee_out", p.knee_out }, { "yield_limits", p.yield_limits },
                 { "ankle_roll_extra", glm::degrees(p.ankle_roll_extra) }, { "ankle_yaw_extra", glm::degrees(p.ankle_yaw_extra) } };
         }
     });

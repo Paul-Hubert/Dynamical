@@ -1,0 +1,22 @@
+{
+  "format_version": 1,
+  "name": "walker_terrain_view",
+  "include": ["common/desktop.json", "common/humanbot_terrain_world.json"],
+  "variables": {
+    "draw": { "type": "bool", "default": true },
+    "view": { "type": "bool", "default": true },
+    "num_worlds": { "type": "int", "default": 1 },
+    "model": { "type": "string", "default": "latest:runs/*/HeidelBotBehavior" },
+    "view_distance": { "type": "float", "default": 3.6, "description": "m from the camera to the walker" },
+    "view_side":     { "type": "float", "default": 75.0, "description": "degrees the camera is swung from behind the walker to its right" }
+  },
+  "renderer": { "passes": ["terrain", "model", "ui"], "vr": false },
+  "host": {
+    "pre": [ "Input", "UI", "Time", "PlayerControl", "DebugMenu", "ChunkManager", "ChunkGenerator",
+             { "name": "ModelWatcher", "params": { "model": "${model}" } },
+             "WorldStepper", { "name": "WalkerView", "params": { "distance": "${view_distance}", "height": 1.3, "azimuth": "${view_side}" } } ],
+    "post": [ { "name": "WorldView", "params": { "worlds": "all", "spacing": 0.0 } }, "Terrain" ]
+  },
+  "worlds": [ { "template": "humanbot_terrain_world", "count": "${num_worlds}",
+                "systems": { "replace": { "TrainerActions@act": "Policy@act" } } } ]
+}
