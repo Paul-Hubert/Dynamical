@@ -79,6 +79,8 @@ Fixes over the 2019 shader:
 
 ## Raymarched grass
 
+> Replaced since by rays baked against a 3D grass model: see [grass.md](grass.md). `raycast_data.bin` and the 2D baker described here are gone.
+
 The 2019 grass is back and on by default; it has no blade geometry. `GrassPass` redraws each terrain chunk as a shell lifted by the grass height.
 
 - For each of 3 layers, the fragment shader projects the view ray into a wind-animated tangent frame. It then looks up a baked 3D texture (128 × 128 positions × 32 ray angles) that stores the distance to the nearest blade and its normal.

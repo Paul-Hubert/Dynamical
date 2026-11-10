@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Dynamical is a C++20 Vulkan engine with a marching cubes voxel world (GPU meshing), raymarched grass, glTF models, Jolt physics, and OpenXR VR rendering alongside the desktop window. It uses an ECS architecture powered by EnTT.
+Dynamical is a C++20 Vulkan engine with a marching cubes voxel world (GPU meshing), grass looked up in baked rays, glTF models, Jolt physics, and OpenXR VR rendering alongside the desktop window. It uses an ECS architecture powered by EnTT.
 
 The previous 2D tile map simulation (tile rendering, heightmap world, SPH particles, AI) is archived in `archive/tilemap/` (not compiled).
 
@@ -25,7 +25,7 @@ cmake --build build --config Debug
 cd build && ./Debug/dynamical.exe fullscreen=false window_width=1280 window_height=720 vr_mode=1
 ```
 
-Shaders (`.glsl` in `src/renderer/shaders/`) are compiled to SPIR-V via `glslangValidator --target-env vulkan1.1` (subgroup ops) as part of the CMake build. Resources are copied to the build directory post-build. `-DDYNAMICAL_BUILD_TOOLS=ON` builds `tools/raycast`, which bakes `resources/raycast_data.bin` for the grass shader.
+Shaders (`.glsl` in `src/renderer/shaders/`) are compiled to SPIR-V via `glslangValidator --target-env vulkan1.1` (subgroup ops) as part of the CMake build. Resources are copied to the build directory post-build. `-DDYNAMICAL_BUILD_TOOLS=ON` builds `tools/raycast` (grass rays: bake ahead, OBJ of the grass model, comparison with ray tracing).
 
 On NixOS, a `flake.nix` development shell is provided.
 
@@ -50,6 +50,14 @@ Entry point is `src/main.cpp` → `Game::start()`. The game loop runs: `renderer
 - **Chunks**: 64³ marching cubes of 4 units, density sampled on a 67³ grid (1 sample border) in `[x][z][y]` layout, > 0 is solid
 - `ChunkManagerSys` streams chunk entities around the desktop camera and VR rig; `ChunkGeneratorSys` fills `ChunkVolume` with `TerrainGenerator` (FastNoise2) on the taskflow executor
 - `TerrainSys` (post tick) records the marching cubes compute shader into the compute command buffer; meshes stay on the GPU (vertex buffer + indirect draw per chunk slot, slots recycled after `NUM_FRAMES + 1` frames)
+
+### Grass (`src/logic/grass/`, `passes/grass_pass.cpp`, docs/grass.md)
+- No blade geometry: `GrassPass` draws the chunks again as a shell at the top of the grass; `grass.frag.glsl` looks each view ray up in rays baked against a generated tile of blades repeated to infinity (`GrassTracer`)
+- Baked (`bakeGrass`, in `dynamical_sim`): a 3D texture of rays at 45° (x, z, azimuth) and a 2D texture of rays from the top; RGBA8 = hit height, octahedral normal, blade id. A 45° ray is stored where it crosses the **middle** of the grass; the view ray is looked up where it crosses the middle too
+- Tile space is sheared around the ground by the lean of the blades (wind, terrain normal): roots do not move
+- Several layers (tall ones and an undergrowth) of the same tile at different sizes, heights and noise warps, closest hit wins; patches, blade colours, curved blades, blade shadows: one doc per feature in docs/grass/ (plan.md first)
+- `TerrainPass` darkens the terrain and pushes its depth back under the grass (`RenderSettings::grass_pass`): the grass hits may be a little under the real ground
+- `dynamical` bakes `resources/grass_raycast.bin` in the run directory when it is missing or its key is stale (never committed). `lookupGrass` mirrors the shader on the CPU (tests `GRASS.*` in `tests/unit/grass.cpp`, `raycast --preview`)
 
 ### Physics (`src/physics/`)
 - Jolt 5.5, fixed 60 Hz step (`PhysicsSys`, pre tick after gameplay systems), `Transform`s of dynamic bodies interpolated between the last two steps

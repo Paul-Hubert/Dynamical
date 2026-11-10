@@ -10,7 +10,7 @@ cmake_policy(SET CMP0110 NEW)
 option(DYNAMICAL_BUILD_VIEWER "Build dynamical (Vulkan, SDL, OpenXR, shaders)" ON)   # OFF in CI
 option(DYNAMICAL_TRAIN "Build the headless training executable" ON)
 option(DYNAMICAL_TESTS "Build the tests" ON)
-option(DYNAMICAL_BUILD_TOOLS "Build offline tools (grass raycast baker)" OFF)
+option(DYNAMICAL_BUILD_TOOLS "Build offline tools (grass raycast baker and preview)" OFF)
 option(DYNAMICAL_ONNX "Policy inference with the prebuilt ONNX Runtime (Windows x64)" ${WIN32})
 set(DYNAMICAL_TRAIN_NAME "TrainingEnv" CACHE STRING "Output name of dynamical_train")
 
@@ -275,8 +275,7 @@ endif()
 
 ### TOOLS
 if (DYNAMICAL_BUILD_TOOLS)
-    # Bakes resources/raycast_data.bin, the lookup texture used by the grass shader
+    # Grass lookup textures (logic/grass) : bake ahead, export the grass model, compare with ray tracing
     add_executable(raycast tools/raycast/main.cpp)
-    target_include_directories(raycast PRIVATE "./src" ${CEREAL_INCLUDE_DIRS})
-    target_link_libraries(raycast PRIVATE glm::glm)
+    target_link_libraries(raycast PRIVATE dynamical_sim imgdiff_core)
 endif()

@@ -9,6 +9,13 @@ layout(location = 0) out vec4 outColor;
 // Layer 0 : grass, layer 1 : rock
 layout(set = 1, binding = 0) uniform sampler2DArray u_color;
 
+// Only pushed back, under the grass : keeps the early depth test
+layout(depth_greater) out float gl_FragDepth;
+
+layout(push_constant) uniform Args {
+    float under_grass;  // height of the grass that the grass pass draws over the flat ground, 0 without it
+};
+
 layout(std140, set = 0, binding = 0) uniform View {
     mat4 viewproj;
     vec4 viewpos; // w : time
@@ -36,6 +43,17 @@ void main() {
 
     float light = max(dot(normal, sun_direction), 0.0);
     outColor.rgb = outColor.rgb * (light * 0.7 + 0.3);
+
+    // Under the grass (same slopes as grass.vert.glsl) : in its shade, and behind it. The grass pass
+    // only knows the ground as a plane under each pixel, its hits can end up a little under the terrain :
+    // the terrain steps back by the height of the grass and lets them through
+    gl_FragDepth = gl_FragCoord.z;
+    if(under_grass > 0.0) {
+        float covered = smoothstep(0.76, 0.88, normal.y);
+        outColor.rgb *= 1.0 - 0.8 * covered;
+        vec4 clip = viewproj * vec4(v_position + normalize(v_position - viewpos.xyz) * (under_grass * covered), 1.0);
+        gl_FragDepth = clamp(max(clip.z / clip.w, gl_FragCoord.z), 0.0, 1.0);
+    }
 
     float fog = 1.0 - exp(-length(v_position - viewpos.xyz) * 0.0006);
     outColor.rgb = mix(outColor.rgb, sky_color, fog);
