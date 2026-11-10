@@ -154,6 +154,10 @@ if (DYNAMICAL_TRAIN)
 
     add_executable(dynamical_train src/train_main.cpp)
     target_link_libraries(dynamical_train PRIVATE dynamical_train_core)
+    if (DYNAMICAL_ONNX)
+        target_link_libraries(dynamical_train_core PUBLIC dynamical_onnx)
+        copy_onnxruntime(dynamical_train)
+    endif()
     set_target_properties(dynamical_train PROPERTIES OUTPUT_NAME ${DYNAMICAL_TRAIN_NAME})
 
     # Deployed layout: the executable with resources/{scenes,prefabs,agents} next to it

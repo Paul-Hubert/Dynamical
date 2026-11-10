@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <string>
 
+#include "logic/agents/humanbot.h"
 #include "logic/components/model_ref.h"
 #include "logic/components/rigid_body.h"
 #include "logic/components/transform.h"
@@ -121,6 +122,56 @@ void WorldViewSys::tick(double dt) {
             }
             if(model == entt::null) continue;
             place(e, model, color, position, rotation, scale);
+        }
+    }
+
+    for(size_t wi = 0; wi < worlds->size(); wi++) {
+        uint32_t index = (uint32_t) wi;
+        if(!only.empty() && std::find(only.begin(), only.end(), index) == only.end()) continue;
+        World& world = (*worlds)[wi];
+        glm::vec3 offset = gridOffset(index, worlds->size(), spacing);
+        for(auto [e, transform, shape] : world.reg.view<Transform, WorldShape>().each()) {
+            glm::vec3 position = transform.position;
+            glm::quat rotation = transform.rotation;
+            if(auto* pose = world.reg.try_get<PhysicsPose>(e)) {
+                position = glm::mix(pose->prev_position, pose->position, alpha);
+                rotation = glm::normalize(glm::slerp(pose->prev_rotation, pose->rotation, alpha));
+            }
+            glm::vec4 color = bodyColor(e);
+            if(auto* ref = world.reg.try_get<ModelRef>(e)) color = ref->color;
+            if(!colors.empty()) color = colors[index % colors.size()];
+
+            entt::entity model = entt::null;
+            glm::vec3 scale(1.f);
+            if(shape.type == WorldShape::Type::Box) {
+                model = models->load(box_model);
+                scale = shape.half_extent * 2.f;
+            } else if(shape.type == WorldShape::Type::Sphere) {
+                model = models->load(sphere_model);
+                scale = glm::vec3(shape.half_extent.x * 2.f);
+            } else {
+                char key[64];
+                std::snprintf(key, sizeof(key), "capsule:%.6g:%.6g", shape.half_extent.x, shape.half_extent.y);
+                model = models->add(key, capsuleMesh(shape.half_extent.x, shape.half_extent.y));
+            }
+            if(model == entt::null) continue;
+            auto key = std::make_pair(index, e);
+            seen.push_back(key);
+            auto it = links.find(key);
+            entt::entity host;
+            if(it == links.end()) {
+                host = reg.create();
+                reg.emplace<Transform>(host);
+                reg.emplace<ModelRenderable>(host, model, color);
+                reg.emplace<WorldViewLink>(host, index, e);
+                links.emplace(key, host);
+            } else {
+                host = it->second;
+            }
+            auto& t = reg.get<Transform>(host);
+            t.position = offset + position;
+            t.rotation = rotation;
+            t.scale = scale;
         }
     }
 

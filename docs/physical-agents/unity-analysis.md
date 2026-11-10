@@ -162,7 +162,7 @@ Solver iterations come from the project default (20 / 20).
 | Initial gains | (0.5, 0.5) | `BotJoint.cs:246` |
 | `enablePreprocessing` | false | `BotJoint.cs:200` |
 | Max angular velocity | 20 rad/s per body (prefab); project default 10 | `BotJoint.cs:242`, `BotAgent.cs:141`, `DynamicsManager.asset:38` |
-| CCD | `ContinuousDynamic` on joint bodies; root UNVERIFIED | `BotJoint.cs:186` |
+| CCD | `ContinuousDynamic` on joint bodies and on the root (`m_CollisionDetection: 2`) | `BotJoint.cs:186`, prefab |
 | Break force | infinite while training | `BotAgent.cs:128-132` |
 
 **Drive zero = the rest pose:** `startLocalRotation` is captured at Initialize and OnEnable
@@ -315,6 +315,9 @@ Stats per decision and joint: `Bot Joint/Spring Factor`, `Damper Factor`, `Sprin
 
 ### 3.5 Push, pull (`HumanBotAgent.cs:398-459`)
 
+**Push, pull and random init are off in both reference lines:** 0 in the prefab, not set by `Training.unity`,
+`DeVitaArenaH173.unity` or their configs.
+
 - **Push:** per tick, probability `pushChance` 0.001. On a random body (15 joint bodies + root), an
   impulse `insideUnitSphere · pushForce · totalMass` with y = |y|, plus an angular impulse of the same
   scale. `pushForce` **5** in the prefab (the code default is 1).
@@ -376,7 +379,8 @@ D6 (−9.81) changes those constants.
 
 1. `P± = Σ` of the source's positive / negative work over the decision, divided by T.
 2. `E = posMult·P+ + negMult·P−`.
-3. `v_raw` = Hips horizontal displacement over T, projected onto the direction to the target.
+3. `v_raw` = horizontal displacement of `p.root` (the **Spine** bone origin; corrected 2026-11-09, this said Hips)
+   over T, projected onto the direction to the target.
 4. `v_s` = EMA of `v_raw`, seeded on the first decision, with `α = 1 − exp(−T/τ)`.
 5. `CoT = E / clamp(v_s, floor, max(floor, targetSpeed))`, for the whole body (not per kg).
 6. `gate = exp(−(v_s − targetSpeed)² / 2σ²)`.
@@ -433,7 +437,7 @@ multipliers 4.0 / 0.8333 and the gate widths.
 | dt | 2351990/141120000 s ≈ 1/60; `physicsRate` ∈ {60, 120, 240, 480} scales the decision period and `maxFrames` (`BotAgent.cs:99-117`) | **Reproduce the intent:** 30 Hz control, 33.3 s episodes |
 | Gravity | −10 | D6: −9.81 |
 | Solver | TGS 20 / 20, adaptive force on | Tune fresh |
-| Friction | μ 1 / 1, combine Max, patch friction | Reproduce: μ = 1, max combine |
+| Friction | μ 1 / 1, combine Max; `m_FrictionType: 2` with improved patch friction ticked (whether that is patch friction is unverified) | Reproduce: μ = 1, max combine |
 | Contact offset 0.04, bounce threshold 1, depenetration 20 | | Tune fresh |
 | Max angular velocity | 20 rad/s | Reproduce explicitly, or remove and log |
 | Angular damping | 0.05 | Intent only. 0 if energy closure needs it (part of the body version) |
@@ -455,6 +459,13 @@ multipliers 4.0 / 0.8333 and the gate widths.
   the finite difference of the kinematic bodies.
 - **Actions** are zeros (`Heuristic` is empty, `BotAgent.cs:224-227`).
 
+**Every episode start holds velocity spikes** (measured on `Demonstrations/HeidelBot.demo`). `Restart` pastes the
+agent to the spawn pose and sets `lastPosition` there, while the clone walks on. The first decision of an episode is
+the rest pose (1.8–58 m/s, stack zeroed). On every other episode the second decision jumps back to the clone, at
+distance / dt: 1.5 km/s at the first, up to 28 km/s. The spike lasts one tick and episodes are 1001 ticks, so only
+every other reset puts it on a decision tick. Outside those decisions the maximum is 3.37 m/s. The discriminator
+sees them raw: `RewardSignalSettings.network_settings.normalize` defaults to false (`settings.py:141`, `:207`).
+
 **The header couples to GAIL.**
 - Demos carry header x,z = 0, while the policy carries `tsv − v`, and the discriminator sees both.
 - So **GAIL implicitly rewards tracking the velocity command** (standing still when the target speed
@@ -465,9 +476,9 @@ multipliers 4.0 / 0.8333 and the gate widths.
 The recorded root takes root motion while the unbodied Hips bone stays at rest, so pelvis motion
 is folded into the hip and spine angles.
 
-**Clips (UNVERIFIED):**
-- flat: `BasicMotions@Walk`;
-- H173: `Walk1p500mps-h173` with Foot IK;
+**Clips** (both controllers have Foot IK on):
+- flat: `BasicMotions@Walk`, state speed 0.67;
+- H173: `Walk1p500mps-h173`, state speed 0.807316;
 - lean sets from SlopeGait.
 
 ---

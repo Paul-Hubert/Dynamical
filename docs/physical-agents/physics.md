@@ -91,7 +91,7 @@ One `SwingTwistConstraint` per joint, in `LocalToBodyCOM` space, pivot at the ch
 |---|---|
 | `axis` | twist axis. Forearms in Unity: L (0, 0, 1), R (0, 0, −1); after import (z mirrored): L (0, 0, −1), R (0, 0, 1) |
 | `secondaryAxis` | plane axis; normal = twist × plane |
-| low/high X limit | twist min/max. Reflection at import can swap the sign; the `[limits]` tests decide |
+| low/high X limit | twist min/max, the same numbers ([conventions.md](conventions.md)); T6.1 confirms them against Unity's limit probes |
 | Y limit (about the secondary axis) | plane half-cone |
 | Z limit (about axis × secondary) | normal half-cone |
 | elliptical cone | `ESwingType::Cone` |
@@ -100,8 +100,10 @@ One `SwingTwistConstraint` per joint, in `LocalToBodyCOM` space, pivot at the ch
 - **Wide swing limits.** The arm swing limits (174.8° / 112.7°) and the head Y limit (90°) are wide.
   Jolt's cone half-angles must stay below π. The importer clamps at 179° and logs it; `rig_anim`
   checks whether any pose reaches that.
-- **The knee rest pose** is moved to 2.1° (the 2° stop plus 0.1°) at import
-  ([agent-runtime.md](agent-runtime.md#actions-8--15)).
+- **The knee's spawn pose** is bent to 2.1° (the 2° stop plus 0.1°) at import; constraint frames and limits are
+  unchanged ([agent-runtime.md](agent-runtime.md#actions-8--15)).
+- **Targets are clamped to the limits** by `SetTargetOrientationCS`; Unity lets the drive push against the stop
+  (agent-runtime.md, Actions). Counted as a stat.
 
 ### Drives
 
@@ -113,9 +115,9 @@ One `SwingTwistConstraint` per joint, in `LocalToBodyCOM` space, pivot at the ch
   **`EMotorState::PositionAndVelocity`** (Jolt 5.6.0): the damper acts on `ω_rel − ω_target`, as Unity's
   SLERP drive does. Plain `Position` ignores the target velocity; on 5.5 this needed patch P-B ([jolt-readouts.md](jolt-readouts.md#2-drive-semantics-position-motors-ignore-the-target-angular-velocity)).
 - **Force mode.** Torque is not scaled by inertia, as in Unity's force-mode drive.
-- **Gain scale.** Jolt motor stiffness and damping are not Unity spring units, so M2 re-derives a
-  scale factor (`drive_gain_scale` in the params) from step-response tests. The default mean gains
-  (0.5 · 2983.68 / 0.5 · 336) are the starting point.
+- **Gain scale.** Both are in N·m/rad and N·m·s/rad; **`drive_gain_scale` is 1.0** (measured: S6.2 mean RMS 0.46° against the Unity recordings at every scale from 0.2 to 1.3, because an overdamped step response only depends on k/c). M2 fits it from
+  step-response tests, because the implicit integration differs: Jolt's force is `−k·C − (c + h·k)(ω − ω_t)`, so the
+  ω target weighs `c + h·k`. The default mean gains (0.5 · 2983.68 / 0.5 · 336) are the starting point.
 - **Scaled bodies** take `rotationSpring` / `rotationDamper` from their params file (H173: 2731.0933 /
   294.2495).
 

@@ -1,0 +1,11 @@
+{
+  "format_version": 1,
+  "name": "devita_train",
+  "include": ["common/humanbot_world.json"],
+  "variables": {
+    "num_worlds": { "type": "int", "default": 25 },
+    "body": { "type": "string", "default": "agents/bodies/heidelbot_notoes_h173.body.json" },
+    "params": { "type": "string", "default": "agents/params/devita_h173.params.json" }
+  },
+  "worlds": [ { "template": "humanbot_world", "count": "${num_worlds}" } ]
+}

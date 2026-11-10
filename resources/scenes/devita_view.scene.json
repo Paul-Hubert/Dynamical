@@ -1,0 +1,23 @@
+{
+  "format_version": 1,
+  "name": "devita_view",
+  "include": ["common/desktop.json", "common/humanbot_world.json"],
+  "variables": {
+    "draw": { "type": "bool", "default": true },
+    "view": { "type": "bool", "default": true },
+    "view_speed": { "type": "float", "default": 1.5 },
+    "num_worlds": { "type": "int", "default": 1 },
+    "body": { "type": "string", "default": "agents/bodies/heidelbot_notoes_h173.body.json" },
+    "params": { "type": "string", "default": "agents/params/devita_h173.params.json" },
+    "model": { "type": "string", "default": "latest:runs/*/AnySpeedBotBehavior" }
+  },
+  "renderer": { "passes": ["model", "ui"], "vr": false },
+  "host": {
+    "pre": [ "Input", "UI", "PlayerControl", "DebugMenu",
+             { "name": "ModelWatcher", "params": { "model": "${model}" } },
+             "WorldStepper", "WalkerView" ],
+    "post": [ { "name": "WorldView", "params": { "worlds": "all", "spacing": 4.0 } } ]
+  },
+  "worlds": [ { "template": "humanbot_world", "count": "${num_worlds}",
+                "systems": { "replace": { "TrainerActions@act": "Policy@act" } } } ]
+}

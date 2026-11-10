@@ -330,7 +330,7 @@ TEST_CASE("SR.7 episodes end truncated after max_decisions or off the field and 
             ends++;
             CHECK(io.truncated);
             bool found = false;
-            for(auto& [key, value] : io.stats) if(key == "Sphere/Out of bounds") { found = true; CHECK(value == 0.f); }
+            for(auto& entry : io.stats) if(entry.key == "Sphere/Out of bounds") { found = true; CHECK(entry.value == 0.f); }
             CHECK(found);
         }
         if(k == 21 || k == 41) CHECK(io.reward == 0.f);
@@ -351,7 +351,7 @@ TEST_CASE("SR.7 episodes end truncated after max_decisions or off the field and 
     CHECK(io.done);
     CHECK(io.truncated);
     float out = -1.f;
-    for(auto& [key, value] : io.stats) if(key == "Sphere/Out of bounds") out = value;
+    for(auto& entry : io.stats) if(entry.key == "Sphere/Out of bounds") out = entry.value;
     CHECK(out == 1.f);
     CHECK(!w.reg.ctx().get<Parked>().value);
     runner.step(period(runner));

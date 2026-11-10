@@ -41,8 +41,10 @@ with Unity's.
 
 ### Frames
 
-- **Segment forward** `f(s)` = the segment's rest forward axis in world space (Unity's +z, i.e. −z in
-  the engine after import).
+- **Segment forward** `f(s)` = the segment's own local forward axis, rotated by its current rotation:
+  `R_s · (0, 0, −1)` in the engine (Unity's local +z, after import).
+- **`safe_normalize(v)`** returns zero for a zero vector, as Unity's `.normalized` does. Every normalisation below
+  uses it: the flat walker commands speed 0 on half of its draws, and `glm::normalize` would give NaN.
 - **Heading frame** `H(s)`, yaw-only:
   - `x = normalize(horizontal(f(s)))`;
   - `y = world up`;
@@ -59,7 +61,7 @@ with Unity's.
 ### Header (3)
 
 ```
-tsv  = horizontal(target − Spine.anchor).normalized · target_speed      (0 while dying, 0 when Recording)
+tsv  = safe_normalize(horizontal(target − Spine.anchor)) · target_speed (0 while dying, 0 when Recording)
 v    = horizontal(Spine COM linear velocity)                             (Jolt body velocity: true COM velocity)
 d    = tsv − v                                                           (0 when Recording: see GAIL coupling)
 est  = max over feet of (Head.anchor.y − Foot.anchor.y)
@@ -101,13 +103,17 @@ u = (anchor_t − anchor_{t−1}) / h            → H(parent) components    (fi
 | target | `q = swing(swing_y, swing_z) · twist(twist)`, relative to rest | `SetTargetOrientationCS(q)` |
 | ex, ey, ez | `ω = e · maxTargetAngularVelocity` (rad/s, constraint axes) | motor target angular velocity; the sign is defined physically (positive ω turns the child positively about the axis) |
 
-- Initial gains (0.5, 0.5) at reset; targets at rest.
+- Every episode starts on a decision, so there are no ticks with stale gains or targets (Unity runs up to one).
+  A zero action means gains (0.5, 0.5) and the **middle of the twist range**, not rest.
 - No clipping in C++; the trainer clips with `clamp(−3, 3)/3`.
 - `maxTargetAngularVelocity` is an experiment variable: it flips the sign of net joint work (UA §2.4).
-- **Knee rest policy.** The knee's low twist stop is 2° while the rest pose is straight (UA §1.2). The
-  body importer bends the rest knee to **2.1°** (the stop plus 0.1°), so reset poses are inside the
-  limits. This bent rest pose is the drive's zero reference. Pose comparisons against Unity are made
-  **before** the knee move, or exclude the knee-descendant chain.
+- **Swing** is `exp(½ · (0, swing_y, swing_z))`. When a target leaves the elliptical cone, Jolt clamps it to the limit
+  surface (`SetTargetOrientationCS`). Unity keeps the target and pushes against the stop. This is a declared
+  difference; the `Physics/Target Clamped` stat counts it.
+- **Knee rest policy.** The knee's low twist stop is 2° while the rest pose is straight (UA §1.2). The body importer
+  bends only the **spawn pose** of the knee to **2.1°** (the stop plus 0.1°), so reset poses are inside the limits.
+  Constraint frames, limits and drive targets keep Unity's straight reference, so a = 0 is still mid-range.
+  Pose comparisons against Unity are made **before** the knee move, or exclude the knee-descendant chain.
 
 ## Task systems
 
@@ -116,8 +122,8 @@ u = (anchor_t − anchor_{t−1}) / h            → H(parent) components    (fi
 | Term | Definition | Default (flat walker / DeVita) |
 |---|---|---|
 | first decision | no reward on the first decision of an episode | |
-| `root` | `rootSpeed = ((Spine.anchor − at last decision)/T) · normalize(tsv)`; `r = min(rootSpeed, targetSpeed) · w / targetSpeed` (undivided when targetSpeed = 0); not while dying | 0.34 / 0 |
-| `energy` | UA §4.1 steps 1–7, fed by the **exact Jolt channel** (motor work per joint per sub-step); `v` from the **hips point** = pelvis body transform × the Hips rest local position (Unity measures the unbodied Hips transform) | weight 0 / 1; `energyScale` re-derived |
+| `root` | `rootSpeed = ((Spine.anchor − at last decision)/T) · safe_normalize(tsv_last)`; `r = min(rootSpeed, target_speed_last) · w / target_speed_last`, using the command **of the last decision**. At speed 0, `tsv_last` is zero, so r = 0 exactly; not while dying | 0.34 / 0 |
+| `energy` | UA §4.1 steps 1–7, fed by the **exact Jolt channel** (motor work per joint per sub-step); `v` from the **Spine bone origin** (`p.root`), the gate on the **live** target speed | weight 0 / 1; `energyScale` re-derived |
 | `life`, `dying`, `head*`, `win` | as UA §3.2 | 0 |
 | `collision` | off (weight 0) but `Collision/*` stats kept | |
 | `death` | `deathPenalty` on kill | −10 |
@@ -131,7 +137,7 @@ u = (anchor_t − anchor_{t−1}) / h            → H(parent) components    (fi
 - **Kill:** `est < dyingHeightFactor · est0` (0.7), with `dieOnFall`. `maxDyingFrames` 0 kills on the
   first dying tick. It is a terminal done with the death penalty.
 - **Truncation:** `episode_s` (33.3 s) gives an interrupted done (`max_step_reached`), plus the win
-  reward if alive.
+  reward if alive. It is 2000 ticks; Unity's `>` makes it 2001, which falls mid-window.
 
 ### Reset (explicit order; UA §3.4)
 
@@ -150,12 +156,19 @@ u = (anchor_t − anchor_{t−1}) / h            → H(parent) components    (fi
 6. If randomizing: random yaw; then random init with probability `randomInitChance` (+2 m, −4 m/s,
    random rotation).
 7. **Reset `AnchorHistory`, `ObsStack`, energy, contacts and reward windows**, then run `BodySync` once.
+8. Store the decision snapshot (Spine anchor, `tsv`, target speed) from the final pose, as Unity's `UpdateObjective`.
 
 - **Randomizing** = `randomize && training && !Recording`.
-- **Arc update:** every `arc_s` (6.67 s; defined in seconds, see [conventions.md](conventions.md#time)),
-  the target is re-placed and, unless continuous, the speed is redrawn.
+- **Arc update:** every `arc_s` (6.67 s, 400 ticks; defined in seconds, see [conventions.md](conventions.md#time);
+  Unity's is 401), the target is re-placed and, unless continuous, the speed is redrawn. **The redraw is not
+  overridden by an env `targetSpeed`**: only resets are. No reference line combines the two.
+- **Random init** rotates and lifts the whole body about the root origin and gives −4 m/s to the **root body only**
+  (`BotAgent.Randomize`); joint bodies stay at 0.
 
 ### Disturbances (UA §3.5)
+
+**All off in both reference lines** (`pushing`, `pulling`, `randomInit` are 0 in the prefab, and neither scene nor
+config sets them). P8 builds push behind its param; pull and random init wait for P15 (open-questions Q7).
 
 - **Push:** per tick with probability `pushChance`, on a random segment: `AddImpulse` and
   `AddAngularImpulse` of `pushForce · totalMass` with an upward-biased direction. `pushForce` default 5.
@@ -173,15 +186,19 @@ u = (anchor_t − anchor_{t−1}) / h            → H(parent) components    (fi
 
 ### Stats
 
-Stats keep their names: `Root/*`, `Head/*`, `Death/*`, `Win/*`, `Bot Joint/*` (UA §2.4),
-`EnergyProvider/*`, `DeVita/*`, `Slope/*`, `Collision/*`.
+Stats keep their names: `Root/*`, `Head/*`, `Death/*`, `Win/*`, `Environment/Total Frame Reward` (and its Dying and
+Alive variants), `Bot Joint/*` (UA §2.4), `EnergyProvider/*`, `DeVita/*`, `Slope/*`, `Collision/*`.
 
+- **Aggregation.** Stats carry their Unity aggregation (Average, MostRecent, Sum, Histogram) and are sent per agent,
+  not averaged per window. `AgentIO::stats` gains the method; `worlds_env.cpp` sends each value as it is (P8).
+- **Aggregated per key and window**, with Unity's aggregation method (one message per key, not per agent).
+- `Slope/Slope Angle to Target` needs a Unity `Terrain`, so neither line emits it.
 - `DeVita/*` follows UA §4.2 on the exact channel. `DeVita/Full GRF/*` is emitted with the same values,
   because on Jolt the exact channel already includes friction.
 - Use the ratio of sums.
 - **New stats (extras):**
   - `Body/Torso Pitch`, since lean is otherwise unmeasured;
-  - `Physics/Foot Penetration`, `Physics/Clamp Events`;
+  - `Physics/Foot Penetration`, `Physics/Clamp Events`, `Physics/Target Clamped`;
   - `Energy/Closure Residual`;
   - `Bridge/NaN`.
 - **Gate rule:** Unity's key set ⊆ the engine's key set, with the extras listed here.
@@ -198,3 +215,7 @@ struct Outbox    { std::vector<AgentStep> steps; std::vector<StatEntry> stats; }
 ```
 
 There is one outbox per world. `TrainHost` gathers them in world index order.
+
+**As built.** The sphere roller shipped `AgentIO` (`src/logic/agents/agent_io.h`), one agent per world, and
+`WorldsEnvironment` (`src/train/worlds_env.cpp`). They play the role of the outbox for now: P8 extends them
+(stacked sensor name, aggregation) and does not add a second path. The multi-agent outbox above is for M9.

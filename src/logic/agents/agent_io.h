@@ -9,6 +9,14 @@
 
 namespace dy {
 
+// A value for the trainer's stats side channel. aggregation: 0 average, 1 most recent, 2 sum, 3 histogram
+struct AgentStat {
+    std::string key;
+    float value = 0.f;
+    int aggregation = 0;
+    AgentStat(std::string key, float value, int aggregation = 0) : key(std::move(key)), value(value), aggregation(aggregation) {}
+};
+
 // The agent of a world as the training host sees it (one agent per world until the P8 runtime). World context
 // variable, created by the agent's systems in preinit. The host writes `action` between decision windows and
 // reads the rest after the Observe phase
@@ -25,7 +33,7 @@ struct AgentIO {
     float reward = 0.f;                 // over the window that just ended
     bool done = false;                  // the episode ended with this observation
     bool truncated = false;             // ... by a limit (time, bounds), not by a terminal state
-    std::vector<std::pair<std::string, float>> stats;  // this window's values, averaged by the host
+    std::vector<AgentStat> stats;       // this window's values, averaged over the agents by the host
 
     void configure(std::string behavior_name, int observations, int actions) {
         behavior = std::move(behavior_name);

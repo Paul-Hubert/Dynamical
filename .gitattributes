@@ -1,0 +1,3 @@
+# Generated data too large for plain git (docs/physical-agents/open-questions.md, Q5)
+resources/agents/tracks/*.track.bin filter=lfs diff=lfs merge=lfs -text
+resources/agents/golden/**/rollouts.json filter=lfs diff=lfs merge=lfs -text

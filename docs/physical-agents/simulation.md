@@ -59,8 +59,8 @@ the world template lists these systems in this order (names: [scenes.md](scenes.
 | 8 | `Task` | Every | Target re-placement (`arc`), speed bookkeeping |
 | 9 | `Stats` | Every | Accumulates per-episode stats |
 | 10 | `Termination` | Every | Kill and truncation. On a kill it **snapshots the terminal observation and reward** and sets `Parked` |
-| 11 | `Observation` | Observe | Pushes the observation for the window that ended. It does nothing while parked: the snapshot is used |
-| 12 | `Rewards` | Observe | Window reward terms |
+| 11 | `Rewards` | Observe | Window reward terms, against the decision snapshot of the window that ended (Spine anchor, `tsv`, target speed) |
+| 12 | `Observation` | Observe | Refreshes the snapshot to the live target, then pushes the observation, as Unity's `CalculateRewards` → `UpdateObjective` → observe. It does nothing while parked: the snapshot is used |
 | 13 | `Episode` | Observe | Writes `AgentStep`s to the `Outbox`; resets done agents and clears `Parked` |
 
 **Decided differences from Unity:**

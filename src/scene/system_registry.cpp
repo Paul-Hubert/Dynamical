@@ -4,6 +4,7 @@
 
 #include "component_registry.h"
 
+#include "logic/agents/humanbot.h"
 #include "logic/agents/sphere_roller.h"
 #include "logic/components/model_ref.h"
 #include "logic/components/rigid_body.h"
@@ -160,5 +161,6 @@ void dy::registerSimSystems() {
 
     registerSimComponents();
     registerSphereRoller();
+    registerHumanBot();
 
 }

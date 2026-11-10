@@ -1,5 +1,5 @@
 # Overlay: upstream vcpkg ports/joltphysics at 5.6.0 (port-version 1), static only like the 5.5 port this repo used
-# before. GPU compute backends off (JPH_USE_DX12/VK/MTL), no patches yet (P-A and P-C come in P7).
+# before. GPU compute backends off (JPH_USE_DX12/VK/MTL), patch P-C (post-solve contact impulses) applied, P-A not yet.
 vcpkg_check_linkage(ONLY_STATIC_LIBRARY)
 
 vcpkg_from_github(
@@ -8,6 +8,8 @@ vcpkg_from_github(
     REF "v${VERSION}"
     SHA512 bc6f2436bef91a6ffd09eee98186be645f6e9a9b3f65a7a645abf00432ac40ada03320c1fe946661817a94eda372cf8d88e4889991cdd25f1c16ecf9a4486677
     HEAD_REF master
+    PATCHES
+        contact-impulse-listener.patch
 )
 
 string(COMPARE EQUAL "${VCPKG_CRT_LINKAGE}" "static" USE_STATIC_CRT)

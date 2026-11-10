@@ -75,6 +75,7 @@ private:
     std::vector<Shot> shots;
     std::vector<InputEvent> inputs;
     size_t next = 0;
+    bool hide_ui = false;       // "hide_ui": true, the ImGui windows are drawn transparent (videos of what they would cover)
 
     bool have_spawn = false;
     glm::vec3 spawn_position;

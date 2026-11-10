@@ -85,7 +85,8 @@ bool WorldsEnvironment::step(const co::UnityRLInputProto& input, std::string& er
 void WorldsEnvironment::write(co::UnityOutputProto& output) {
 
     auto& infos = (*output.mutable_rl_output()->mutable_agentinfos())[behavior()];
-    std::map<std::string, std::pair<double, int>> stats;
+    struct Sum { double total = 0.; int count = 0; int aggregation = 0; };
+    std::map<std::string, Sum> stats;
 
     for(size_t i = 0; i < agents.size(); i++) {
         const auto& io = *agents[i];
@@ -104,17 +105,20 @@ void WorldsEnvironment::write(co::UnityOutputProto& output) {
         obs->set_observation_type(co::DEFAULT);
         obs->set_name(io.sensor_name);
         done[i] = io.done ? 1 : 0;
-        for(auto& [key, value] : io.stats) {
-            stats[key].first += value;
-            stats[key].second++;
+        for(auto& s : io.stats) {
+            auto& sum = stats[s.key];
+            sum.total += s.value;
+            sum.count++;
+            sum.aggregation = s.aggregation;
         }
     }
 
-    // One averaged value per key and window (stats_side_channel.py averages them over the summary period)
+    // One averaged value per key and window, with its Unity aggregation (stats_side_channel.py averages them over
+    // the summary period). Per-agent values would be one message per key, agent and decision
     if(!stats.empty()) {
         std::vector<mlagents::ChannelMessage> messages;
         for(auto& [key, sum] : stats) {
-            messages.push_back({ mlagents::statsChannel(), mlagents::writeStat(key, (float) (sum.first / sum.second), mlagents::StatAggregation::Average) });
+            messages.push_back({ mlagents::statsChannel(), mlagents::writeStat(key, (float) (sum.total / sum.count), (mlagents::StatAggregation) sum.aggregation) });
         }
         output.mutable_rl_output()->set_side_channel(mlagents::writeChannelMessages(messages));
     }

@@ -1,0 +1,25 @@
+{
+  "variables": {
+    "body":   { "type": "string", "default": "agents/bodies/heidelbot_notoes.body.json" },
+    "params": { "type": "string", "default": "agents/params/walker.params.json" },
+    "draw":   { "type": "bool",   "default": false },
+    "view":   { "type": "bool",   "default": false },
+    "view_speed": { "type": "float", "default": 1.36 },
+    "view_truncate": { "type": "bool", "default": false }
+  },
+  "templates": {
+    "humanbot_world": {
+      "physics": { "threads": 1, "max_bodies": 128, "max_body_pairs": 1024, "max_contacts": 1024, "temp_bytes": 8388608,
+                   "allow_sleeping": false, "friction_combine": "max", "restitution_combine": "min" },
+      "clock": { "physics_hz": 60, "control_hz": 30 },
+      "fixed": [
+        "RigidBody", "AgentFactory", "TrainerActions@act", "DriveTargets@act", "Disturbances", "PhysicsStep", "BodySync", "Energy", "EnergyFormulas",
+        "Task", "Termination", "DeVitaStepStat", "Rewards@observe", "Observation@observe", "Episode@observe"
+      ],
+      "entities": [
+        { "prefab": "ground_flat" },
+        { "HumanBotSpawn": { "body": "${body}", "params": "${params}", "draw": "${draw}", "view": "${view}", "view_speed": "${view_speed}", "view_truncate": "${view_truncate}" } }
+      ]
+    }
+  }
+}

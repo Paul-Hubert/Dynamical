@@ -45,6 +45,7 @@ public:
   `Policy` replacing `TrainerActions`. Randomisation is off by default: the scene variable `randomize` (bool, default false) feeds the params
   override `randomize`.
   The target is controllable from the panel (click to place, speed slider).
+  As in Unity outside training, episodes are not truncated and a fall still resets.
 - **Panels** (`AgentPanel`, ImGui/ImPlot):
   - joints: angle against limits, target against actual, motor torque, saturation;
   - reward terms over the episode;
@@ -81,6 +82,14 @@ deterministic actions.
    - joint velocities from the anchor finite differences.
 
    Episodes are 1000 ticks; randomisation is off; there is no death.
+
+   **Episode boundaries.** The track keeps playing across episodes, as Unity's clone does (`loop: false`). A new
+   episode only zeroes `ObsStack` and restarts `AnchorHistory` at the current frame. So engine demos have no
+   rest-pose frame and no velocity spike, unlike Unity's (a rest-pose frame each episode and, every other episode,
+   a frame up to 28 km/s; [review](humanbot-port-review.md#r4-demo-spikes)). Unity's random z offset is overwritten on the next tick and
+   is not reproduced.
+
+   **Length.** The requested count is a minimum: recording ends with the episode in progress, as in Unity.
 4. Writes a stock `.demo` (*verify* against the fork's `demo_loader.py`):
    - `DemonstrationMetaProto` in the first 32 bytes;
    - `BrainParametersProto` at offset 33;

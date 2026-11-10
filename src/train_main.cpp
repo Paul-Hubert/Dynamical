@@ -1,6 +1,9 @@
 #include <filesystem>
 #include <memory>
 
+#ifdef DYNAMICAL_ONNX
+#include "onnx/policy_systems.h"
+#endif
 #include "scene/run_args.h"
 #include "scene/scenario_runner.h"
 #include "scene/system_registry.h"
@@ -34,6 +37,9 @@ int main(int argc, char** argv) {
 
     JoltRuntime jolt;
     registerSimSystems();
+#ifdef DYNAMICAL_ONNX
+    registerPolicySystems();    // mode=eval
+#endif
 
     // Resources next to the executable: TrainingEnv.exe, resources/{scenes,prefabs,agents}
     SceneLoadOptions options;

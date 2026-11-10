@@ -36,12 +36,21 @@ private:
     // mode=train: the scene's agent worlds (WorldsEnvironment), recreated with the trainer's seed
     int agents();
 
+    // mode=record-demo: plays the scene's track kinematically and writes a .demo of its observations (zero actions).
+    // Scene variables: decisions (a minimum: recording ends with the episode in progress), out
+    int recordDemo();
+
+    // mode=eval: the scene's Policy worlds for var.episodes episodes, deterministic, a summary JSON at var.out
+    int eval();
+
     // The handshake, then RESET / STEP / QUIT against the environment `connected` makes from the trainer's seed
     int serve(const std::function<std::unique_ptr<TrainerEnvironment>(int64_t seed)>& connected);
 
     // -envParams= and -set:, before anything else (a missing file is fatal, as in Unity)
     bool loadEnvParams();
     void writeEnvParams(int64_t steps);
+    // The resolved environment parameters, as the worlds read them at each episode start
+    void pushEnvParams();
 
     const RunArgs& args;
     const TrainArgs& train;

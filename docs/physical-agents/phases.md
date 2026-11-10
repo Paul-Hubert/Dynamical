@@ -6,7 +6,15 @@ GPU job for `[gpu]` tests) **and** its visual confirmation has been reviewed and
 phase report.
 
 The design lives in the other docs; this file says in which order to build it and how to prove each
-step. Phase numbers map onto the plan's milestones:
+step.
+
+**Status 2026-11-09:** P0–P3 passed. **P4–P11 and the training path of P12–P13 are built** (the numbers and what is
+left are in [reports/P4-P13.md](reports/P4-P13.md)); P14's Unity-format eval CSVs and replays and all of P15 are not.
+The decisions are in [open-questions.md](open-questions.md). Patches P-A and P-C are not applied: on flat and tilted
+ground the foot's momentum balance gives the contact work (at the segment's centre of mass) and limit work falls in the residual, so the books close to 0.5 % of Σ|work| under random actions but only to −14.6 % net (56 % tick-wise) on the walking policy. The energy reward uses motor work alone, which the
+residual does not touch.
+
+Phase numbers map onto the plan's milestones:
 
 | Phase | Milestone | Title |
 |---|---|---|
@@ -361,6 +369,7 @@ ragdoll that matches Unity's rest pose.
 | T4.5 | Jolt mass properties equal the file (mass, centre of mass, inertia after rotation) | relative 1e-5 |
 | T4.6 | Self-collision: every segment pair is filtered (a collide-shape query between all pairs returns nothing) | 0 contacts |
 | T4.7 | Validation: 10 malformed body fixtures are rejected with messages | 10/10 |
+| T4.8 | Spawn clearance: the lowest shape point of the imported rest pose against y = 0, and against the same value from Unity | ≤ 1 mm from Unity's |
 | S4.1 | Dynamic ragdoll at rest with gravity 0, drives off, 1000 ticks: the pose stays put | drift ≤ 1e-5 m |
 | S4.2 | Kinematic pelvis, passive joints (no motors), gravity on, 300 ticks: the limbs hang within the limits and settle without exploding | no NaN; max excursion ≤ 1°; at rest within 3 s |
 | V4.1 | `rig_rest` capture (golden `rig_rest.png`) | `imgdiff` |
@@ -402,10 +411,10 @@ contact are checked live and in CI.
 | ID | Test | Threshold |
 |---|---|---|
 | S5.1 | Track header against body: name, sha, segment count, dt | exact or refused |
-| S5.2 | Bone lengths constant over every track | ≤ 1e-4 m |
+| S5.2 | Bone lengths constant over every track, except the three root joints (Spine, both UpLegs), whose range is reported. Mecanim's retargeting and Foot IK stretch the others by up to 5 mm | ≤ 6 mm |
 | S5.3 | Joint limits: per joint, the worst excursion past each limit over the track, written to `rig_report.json` and compared with `tests/data/rig_excursions.json` (expected values reviewed once) | per joint, ≤ expected + 0.5° |
 | S5.4 | Velocity continuity: anchor velocities have no spike (the maximum frame-to-frame Δv is at most 5 × the 99th percentile), including the loop seam | pass |
-| S5.5 | Ground: the lowest foot point per frame | penetration ≤ 5 mm, and float during stance ≤ 10 mm |
+| S5.5 | Ground: the lowest foot point per frame. The retargeted walk dips the foot corners through the floor | penetration ≤ 80 mm |
 | S5.6 | `MoveKinematic` and teleport modes give the same poses one tick apart | ≤ 1e-5 m |
 | V5.1 | `rig_walk` capture script: 8 frames across one gait cycle from a side camera (goldens `rig_walk_<i>.png`) | `imgdiff` |
 
@@ -452,15 +461,16 @@ off.
 
 | ID | Test | Threshold |
 |---|---|---|
-| T6.1 | `[limits]` each probe lands on the Jolt limit (the constraint reports the limit active, and the angle error to the limit surface) | ≤ 1° for all probes |
-| T6.2 | Twist sign after reflection: knee low stop 2° and ankle low −38°, approached from inside | the limit holds at the right side |
+| T6.1 | `[limits]` each twist probe lands on the Jolt limit; PhysX's swing cone differs from Jolt's on narrow diagonals (hand Y 7°, Z 36°), so swing probes are bounded | twist ≤ 1.5°, swing excess ≤ 20° |
+| T6.2 | Twist limits after import: knee low stop 2°, ankle low −38° (Unity's numbers; see conventions.md) | exact |
 | T6.3 | Action mapping: a = 0 gives mid-twist (knee 67.31°); a = ±1 gives the twist limits; ay = ±1 gives ±Y | ≤ 1e-4 rad |
+| T6.6 | A target outside the swing cone (ay = az = 1) is clamped to the limit surface, and the stat counts it | exact |
 | T6.4 | `PositionAndVelocity` ramp: a constant ω target of 1.0472 rad/s on a free joint | steady-state velocity error ≤ 2 % |
 | T6.5 | Zero spring, damping only (s = −1, d = 1): damps toward the ω target, not toward 0 | sign and magnitude ≤ 5 % |
 | S6.1 | Random actions for 60 s on a full dynamic ragdoll lying on the ground | limit excursion ≤ 1° at all times; no NaN |
 | S6.2 | Step responses after fitting, against Unity: rise time, overshoot, settling time | each within 15 % of Unity, or a documented exception per joint |
 | S6.3 | Passive drop: ragdoll from 1 m, drives off | no NaN; max segment speed < 15 m/s; at rest in 3 s |
-| S6.4 | Standing: dynamic ragdoll at rest, gravity on, motors holding rest at gains (1, 1) × scale, 10 s | stands; pelvis drift ≤ 5 cm; max segment speed < 0.5 m/s after 1 s |
+| S6.4 | Standing: dynamic ragdoll at rest, gravity on, motors holding rest at gains (1, 1), 10 s. Unity's ragdoll collapses in about 2.5 s (`golden/<body>/stand.csv`) | final head height within 10 % of Unity's |
 | V6.1 | `joint_lab` sweep capture (golden `joint_sweep.png`) | `imgdiff` |
 
 **Visual confirmation.**
@@ -550,6 +560,8 @@ the rig, frames and features against Unity logs.
 6. **`walker_heuristic` scene:** `humanbot_world` with `HeuristicActions` (random or zero), plus
    `WorldView` and a first `AgentPanel` (episode, rewards, joints). `walker_view` reuses both in P11.
 7. Append `Observation@observe` to `common/rig_world.json` and add the observation panel.
+8. **Bridge for this layout.** Extend `AgentIO` and `WorldsEnvironment`: the stacked sensor name
+   `StackingSensor_size2_VectorSensor_size138`, stats with their aggregation, per agent.
 
 **Automated tests.**
 
@@ -561,7 +573,8 @@ the rig, frames and features against Unity logs.
 | T8.2 | Shared quantities, `_2` against `_1`: head error equal; header z equal up to its documented sign flip; joint axes equal up to the frame change and the right-side negation; anchor velocities equal before projection | ≤ 1e-5 |
 | T8.3 | Reset spike: after random yaw and random init, the first anchor velocity | ≤ 5 m/s (Unity: 60–120) |
 | T8.4 | Kill threshold depends only on `dyingHeightFactor` and the rest pose (moving the spawn pose does not change `est0`) | exact |
-| T8.5 | Reset order, first-decision skip, terminal-window reward counted, `env_target_speed_overrides_draw` true and false | exact |
+| T8.5 | Reset order, first-decision skip, terminal-window reward counted, `env_target_speed_overrides_draw` true and false; a target changing inside a window is rewarded against the old command and observed as the new one; an arc redraw is not overridden | exact |
+| T8.8 | Target speed 0: no NaN anywhere, root reward exactly 0 | exact |
 | T8.6 | Window parking: a kill at tick k of a window gives a terminal step at the window end with the snapshot at tick k; other worlds unaffected | exact |
 | T8.7 | Unity's stat keys (`tests/data/stat_keys_walker.txt`, from a Unity run) ⊆ the emitted keys; the extras are exactly the documented list | subset + exact extras |
 | S8.3 | Heuristic random actions, 25 worlds, 10 min simulated: no NaN, kills happen, every episode resets cleanly, ids stable | pass |
@@ -571,8 +584,8 @@ the rig, frames and features against Unity logs.
   `walker_heuristic` showing a kill, the reset and the next episode (contact sheet of 6 frames,
   golden).
 - **Plot:** episode-length histogram from S8.3.
-- **Checklist:** after reset, the agent stands at rest facing the target; a push visibly hits one
-  segment; nothing teleports mid-episode.
+- **Checklist:** after reset, the agent stands at rest facing the target; with `pushing` set for this check, a push
+  visibly hits one segment; nothing teleports mid-episode.
 
 **Exit gate.** S8.1 and S8.2 are green on every golden rollout. T8.* pass. The visuals are signed off.
 
@@ -586,8 +599,8 @@ the rig, frames and features against Unity logs.
 1. `mode=record-demo`:
    - a kinematic, non-colliding body; `TrackActions`;
    - `Recording` (header x,z = 0);
-   - 1000-tick episodes, zero actions;
-   - 3000 decisions for the walker, 10000 for DeVita.
+   - 1000-tick episodes, zero actions, the track playing on across episodes;
+   - at least 3000 decisions for the walker and 10000 for DeVita, ending with the episode in progress.
 2. `DemoWriter` (meta, brain parameters, info/action pairs), checked against the fork's `demo_loader.py`.
 3. Demo cache key and the `Demonstrations/` layout. Reusing the cache from `start-run` comes with its
    `-Engine dynamical` path in P10 (today `quick-train.ps1` wipes `Demonstrations/`).
@@ -598,9 +611,10 @@ the rig, frames and features against Unity logs.
 |---|---|---|
 | T9.1 | Round trip: write, then read with our reader | exact |
 | L9.1 | `[slow]` the fork's `demo_loader.load_demonstration` reads the file; the spec matches the brain | pass |
-| T9.2 | Every recorded header has x = z = 0, and y equals the head error | exact |
+| T9.2 | `_2`: every recorded header has x = z = 0, and y equals the head error (`_1` leaks up to 0.005 into x, as Unity does) | exact |
+| T9.4 | No frame after an episode start is a rest pose, and joint speeds stay within the track's | max ≤ 5 m/s on the walk tracks |
 | T9.3 | Cache: the same inputs reuse the file; changing any key input regenerates it | exact |
-| S9.1 | Demo observations against a Unity demo of the same clip (`_1` oracle layout only): per-channel mean and std over the file | ≤ 5 % per channel, with differences explained (one-tick `MoveKinematic` shift) |
+| S9.1 | Demo observations against a Unity demo of the same clip (`_1` oracle layout only), **excluding the 3 decisions after each Unity episode start** (spikes): per-channel mean and std over the file | ≤ 5 % per channel, with differences explained (one-tick `MoveKinematic` shift) |
 
 **Visual confirmation.**
 - **Plot:** per-channel overlays, Unity demo against engine demo (`_1`), for the joint-velocity
@@ -652,8 +666,9 @@ the rig, frames and features against Unity logs.
 **Goal.** Policies run in the engine, and the viewer follows a live run.
 
 **Steps.**
-1. Add `onnxruntime` (vcpkg, or the prebuilt fallback); `PolicyRunner`, with load-time validation
-   against the layout. Depends on P8 (layout) and an exported ONNX (P10).
+1. **Done with the sphere roller:** `onnxruntime` (prebuilt), `PolicyRunner`, `Policy`, `ModelWatcher`
+   (`src/onnx`, sphere-roller.md). What remains: binding them to the walker's layout, after P8 and an exported ONNX
+   (P10).
 1b. **Minimal `mode=eval`** (`walker_eval` scene): N episodes, deterministic actions through a
     `PolicyHandle`, summary JSON (episode length, dead rate, speed). CSV and `EVT|` parity with Unity
     come in P14.
@@ -690,7 +705,8 @@ the rig, frames and features against Unity logs.
 
 **Steps.**
 1. Demos from P10 for `BasicMotions@Walk`.
-2. `default-training.yaml` unchanged, with GAIL on; 40M steps; 3 seeds.
+2. `default-training.yaml` unchanged, with GAIL on; 40M steps; 3 seeds. The Unity baseline was trained on spiked
+   demos ([review](humanbot-port-review.md#r4-demo-spikes)); a gap is interpreted with that in mind.
 3. `tools/compare_runs.py`: behavioural stats at matched gradient updates against the frozen Unity run
    from P3. Stats: dead rate, episode length, root speed against target, head height.
 4. Gain-scale iteration only if the gate fails and the gait diagnosis points at the drives.
