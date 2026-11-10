@@ -26,6 +26,22 @@ boxes; nothing else in the image changes. Evidence:
 
 `base_spawn`, `base_ring` and `base_probe.csv` are re-recorded on Jolt 5.6.0 with this reason.
 
+## Grass from baked 3D rays (2026-11-10)
+
+`GrassPass` no longer looks up 2D rays against circles (`raycast_data.bin`): it looks up rays baked against a
+generated grass model, at 45° and from the top (docs/grass.md). Every grass pixel of `base` changes, by design:
+blades instead of dots up close, a smooth green far away (the textures have mips), a shell 0.6 m high instead
+of 1 m that comes down to the ground at the rock. Boxes, rock, sky and UI are untouched; the probe goldens
+still match (S0.1, S1.1), and two runs give identical captures (V0.1: the baker and the wind are deterministic).
+
+The same day, on the same branch, the ten steps of docs/grass/plan.md: layers of several tile sizes and heights,
+height patches, an undergrowth layer, blade colours, curved blades, blade shadows, 256 texels per tile. The
+terrain pass now darkens the flat ground under the grass and pushes its depth back by the grass height
+(docs/grass/03-patches.md), so terrain pixels under the grass change too.
+
+`base_spawn` and `base_ring` are re-recorded once, after the last step, with this reason. `worlds_boxes*` have
+no grass pass and still match.
+
 | Date | Golden | Change | Base commit | Reason |
 |---|---|---|---|---|
 | 2026-10-31 | `images/base_spawn.png` | added | 9605a57 | master baseline, recorded in P0 before any behaviour change |
@@ -36,3 +52,5 @@ boxes; nothing else in the image changes. Evidence:
 | 2026-10-31 | `base_probe.csv` | replaced | de8e4fb | Jolt 5.6 friction model (see Jolt 5.6 drift note above) |
 | 2026-10-31 | `images/worlds_boxes.png` | added | cf3b065 | new golden (P2 V2.1): 4 box worlds at frame 300 |
 | 2026-10-31 | `images/worlds_boxes_close.png` | added | cf3b065 | new golden (P2 V2.1): close-up of world 3, capsule orientation |
+| 2026-11-10 | `images/base_spawn.png` | replaced | e580e24 | grass from baked 3D rays (see note above) |
+| 2026-11-10 | `images/base_ring.png` | replaced | e580e24 | grass from baked 3D rays (see note above) |

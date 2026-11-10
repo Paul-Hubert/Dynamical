@@ -4,7 +4,9 @@
 
 #include "util/util.h"
 
+#include <algorithm>
 #include <limits>
+#include <vector>
 
 using namespace dy;
 
@@ -100,16 +102,33 @@ std::shared_ptr<VmaImage> Transfer::createImage(const void* data, size_t real_si
     std::shared_ptr<VmaImage> image = std::make_shared<VmaImage>(ctx.device, &alloc_info, info);
 
     
-    // Data is tightly packed, layer after layer (2D arrays) or slice after slice (3D images)
-    auto range = vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, info.arrayLayers);
+    // Data is tightly packed : mip after mip, each one layer after layer (2D arrays) or slice after slice (3D images)
+    auto range = vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, info.mipLevels, 0, info.arrayLayers);
+
+    auto mipExtent = [&](uint32_t level) {
+        return vk::Extent3D(std::max(info.extent.width >> level, 1u), std::max(info.extent.height >> level, 1u), std::max(info.extent.depth >> level, 1u));
+    };
+    size_t texels = 0;
+    for(uint32_t level = 0; level < info.mipLevels; level++) {
+        auto extent = mipExtent(level);
+        texels += size_t(extent.width) * extent.height * extent.depth * info.arrayLayers;
+    }
+    const size_t texel_size = real_size / texels;
+
+    std::vector<vk::BufferImageCopy> regions;
+    size_t offset = 0;
+    for(uint32_t level = 0; level < info.mipLevels; level++) {
+        auto extent = mipExtent(level);
+        regions.push_back(vk::BufferImageCopy(offset, 0, 0, vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, level, 0, info.arrayLayers), vk::Offset3D(0, 0, 0), extent));
+        offset += size_t(extent.width) * extent.height * extent.depth * info.arrayLayers * texel_size;
+    }
 
     current.command.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eTransfer, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ImageMemoryBarrier(
         {}, vk::AccessFlagBits::eTransferWrite, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal,
 		VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image->image, range
     ));
     
-    current.command.copyBufferToImage(stage, image->image, vk::ImageLayout::eTransferDstOptimal,
-        vk::BufferImageCopy(0, 0, 0, vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, info.arrayLayers), vk::Offset3D(0, 0, 0), info.extent));
+    current.command.copyBufferToImage(stage, image->image, vk::ImageLayout::eTransferDstOptimal, regions);
     
     current.command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eAllCommands, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ImageMemoryBarrier(
 		vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eShaderRead, vk::ImageLayout::eTransferDstOptimal, layout,

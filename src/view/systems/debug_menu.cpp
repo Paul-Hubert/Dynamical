@@ -68,11 +68,28 @@ void DebugMenuSys::tick(double dt) {
 
         if(ImGui::CollapsingHeader("Grass")) {
             auto& grass = render.grass_params;
-            ImGui::SliderFloat("Tile size", &grass.tile_size, 0.01f, 1.f);
-            ImGui::SliderFloat("Height", &grass.height, 0.01f, 5.f);
+            ImGui::SliderFloat("Tile size", &grass.tile_size, 0.1f, 4.f);
+            ImGui::SliderFloat("Height", &grass.height, 0.01f, 3.f);
+            ImGui::SliderInt("Layers", &grass.layers, 1, 3);
+            ImGui::SliderFloat("Layer spread", &grass.layer_spread, 0.f, 1.f);
+            ImGui::SliderFloat("Undergrowth", &grass.undergrowth, 0.f, 1.f);
+            ImGui::SliderFloat("Patch size", &grass.patch_size, 4.f, 60.f);
+            ImGui::SliderFloat("Patch amount", &grass.patch_amount, 0.f, 0.9f);
+            ImGui::SliderFloat("Layer patches", &grass.layer_patch, 0.f, 1.f);
             ImGui::SliderFloat3("Base normal", &grass.base_normal[0], -1.f, 1.f);
-            ImGui::SliderFloat("Noise frequency", &grass.noise_frequency, 0.0001f, 1.f, "%.5g", ImGuiSliderFlags_Logarithmic);
-            ImGui::SliderFloat("Noise amplitude", &grass.noise_amplitude, 0.0001f, 1.f, "%.5g", ImGuiSliderFlags_Logarithmic);
+            ImGui::SliderFloat("Follow terrain", &grass.follow_terrain, 0.f, 1.f);
+            ImGui::SliderFloat("Wind strength", &grass.wind_strength, 0.f, 0.5f);
+            ImGui::SliderFloat("Wind speed", &grass.wind_speed, 0.f, 4.f);
+            ImGui::SliderFloat("Curve", &grass.curve, 0.f, 1.f);
+            ImGui::SliderFloat("Colour variation", &grass.colour_variation, 0.f, 1.f);
+            ImGui::SliderFloat("Dryness", &grass.dryness, 0.f, 1.f);
+            ImGui::SliderFloat("Shadow", &grass.shadow, 0.f, 1.f);
+            ImGui::SliderFloat("Canopy", &grass.canopy, 0.f, 1.f);
+            ImGui::SliderFloat("Silhouette", &grass.silhouette, 0.f, 1.f);
+            ImGui::SliderFloat("Azimuth dither", &grass.azimuth_dither, 0.f, 1.f);
+            ImGui::SliderFloat("Top blend start", &grass.top_start, 0.f, 0.95f);
+            ImGui::SliderFloat("Noise frequency", &grass.noise_frequency, 0.001f, 1.f, "%.5g", ImGuiSliderFlags_Logarithmic);
+            ImGui::SliderFloat("Noise amplitude", &grass.noise_amplitude, 0.f, 1.f);
         }
 
         if(ImGui::CollapsingHeader("VR", ImGuiTreeNodeFlags_DefaultOpen)) {

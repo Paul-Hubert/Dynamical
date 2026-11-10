@@ -53,7 +53,8 @@ TerrainPass::TerrainPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg)
     }, {});
 
     auto layouts = std::vector { ctx.view_layout, materialLayout };
-    layout = ctx.device->createPipelineLayout(vk::PipelineLayoutCreateInfo({}, layouts));
+    auto pcRange = vk::PushConstantRange(vk::ShaderStageFlagBits::eFragment, 0, sizeof(float));
+    layout = ctx.device->createPipelineLayout(vk::PipelineLayoutCreateInfo({}, layouts, pcRange));
 
 }
 
@@ -81,6 +82,11 @@ void TerrainPass::record(vk::CommandBuffer command, const RenderView& view) {
 
     command.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines[index(view.target)]);
     command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, 0, {view.view_set, materialSet}, {});
+
+    // Under the grass the ground is in its shade : what shows between the blades, and where the grass
+    // pass puts its hit a little under the terrain, is dark
+    float under_grass = settings && settings->grass && settings->grass_pass ? settings->grass_params.height : 0.f;
+    command.pushConstants(layout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(float), &under_grass);
 
     for(auto [entity, gpu] : creg.view<const ChunkGPU, const ChunkReady>().each()) {
         command.bindVertexBuffers(0, {buffers->vertices[gpu.slot]}, {0});
