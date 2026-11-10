@@ -228,5 +228,9 @@ print instead (GAIT.10).
 - **Steep ground is walked, not walked well:** past about 25° the joints leave their limits, the walker
   crouches and crawls. Seed 1337 is steep almost everywhere: the worst slope of a 32 m line has a median
   of 44°. Overhangs are not handled: the ground is read straight down.
-- **Imitation:** `Observation` already runs. Recording needs `walker_demo` to take this world instead
-  of `TrackActions`, and a decision on slopes in training, which is flat today.
+- **Imitation:** done in [reports/terrain-walker.md](reports/terrain-walker.md): `GaitRoutes` records this walk as GAIL
+  demonstrations (`walker_demo_gait`, `walker_demo_terrain`) at 1.36 m/s with limits that hold, and the physical walker
+  trained on them walks the terrain within 20° up, 7° down and 12° across.
+- **Descents:** at 1.36 m/s the walk crouches downhill (110 mm at −10°, 193 mm at −20°) and its swing knee passes 95°;
+  the shank then swings past horizontal, where the observation's heading frame of the shank flips. The demos stop at 7°
+  down for that reason. Shorter steps downhill and a pelvis that drops into each step would be the fix.
