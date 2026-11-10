@@ -8,7 +8,13 @@
 
 unity:      records the demo in the Editor, builds the player, trains. --scene is relative to Assets.
 dynamical:  freezes TrainingEnv.exe and resources into <results>/<run>_env, records the demo with mode=record-demo
-            (cached under <results>/demo_cache by track, body, layout and params), trains.
+            (cached under <results>/demo_cache), trains.
+            --demo-source track (default): the scene walker_demo plays a pose track; the cache key is the track, the
+            body, the layout and the number of decisions.
+            --demo-source gait: a scene of the kinematic walk (walker_demo_gait, walker_demo_terrain) records its
+            routes; the cache key is the frozen TrainingEnv.exe (the gait's code), every scene and prefab file (routes,
+            GaitParams), the body, the params, the layout, the scene's name, --demo-var and the number of decisions.
+            --env-var NAME=VALUE sets a variable of the training scene.
 
 Common to both:
 - the run lives in <results> (default build/runs): <run>/ (the trainer's), <run>.yaml, <run>_demos/, <run>.console.txt;
@@ -32,7 +38,18 @@ import sys
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-VENV = ROOT / "build" / "venv" / "Scripts"
+
+
+def venv_scripts():
+    """build/venv of this checkout, else of the main checkout (a git worktree has no venv of its own)."""
+    local = ROOT / "build" / "venv" / "Scripts"
+    if local.exists():
+        return local
+    common = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    return pathlib.Path(common).parent / "build" / "venv" / "Scripts" if common else local
+
+
+VENV = venv_scripts()
 BUILD = ROOT / "build" / "RelWithDebInfo"
 UNITY_PROJECT = pathlib.Path("C:/Users/Paul/Desktop/Dynamical-noToes")
 STRIDE = 65
@@ -144,6 +161,9 @@ def freeze_engine(dst):
     for sub in ("scenes", "prefabs", "agents"):
         if (ROOT / "resources" / sub).exists():
             shutil.copytree(ROOT / "resources" / sub, dst / "resources" / sub)
+    # The marching cubes table: read from the working directory, ROOT for every process started here; kept with the run
+    if (ROOT / "resources" / "mclookup.bin").exists():
+        shutil.copy2(ROOT / "resources" / "mclookup.bin", dst / "resources" / "mclookup.bin")
 
 
 def prepare_engine(args, results, out):
@@ -151,23 +171,43 @@ def prepare_engine(args, results, out):
     freeze_engine(env_dir)
     exe = env_dir / "TrainingEnv.exe"
     key = hashlib.sha256()
-    track = ROOT / "resources" / "agents" / "tracks" / f"{args.track}.track.json"
-    for f in (track, track.with_suffix("").with_suffix(".track.bin"), ROOT / "resources" / "agents" / "bodies" / f"{args.body}.body.json"):
-        key.update(sha256(f).encode())
-    key.update(args.layout.encode())
-    key.update(str(args.demo_decisions).encode())
+    body = ROOT / "resources" / "agents" / "bodies" / f"{args.body}.body.json"
+    demo_args = [f"scene={args.demo_scene}", "mode=record-demo", f"var.body=agents/bodies/{args.body}.body.json",
+                 f"var.params=agents/params/{args.params}.params.json", f"var.decisions={args.demo_decisions}"]
+    if args.demo_source == "track":
+        track = ROOT / "resources" / "agents" / "tracks" / f"{args.track}.track.json"
+        for f in (track, track.with_suffix("").with_suffix(".track.bin"), body):
+            key.update(sha256(f).encode())
+        key.update(args.layout.encode())
+        key.update(str(args.demo_decisions).encode())
+        demo_args.append(f"var.track=agents/tracks/{args.track}.track.json")
+    else:
+        # What a gait demo is made of: the code of the walk, the scenes (world, routes, GaitParams), the body and the
+        # params, as frozen for this run
+        frozen = env_dir / "resources"
+        files = [exe, frozen / "agents" / "bodies" / f"{args.body}.body.json", frozen / "agents" / "params" / f"{args.params}.params.json"]
+        files += sorted(p for sub in ("scenes", "prefabs") for p in (frozen / sub).rglob("*") if p.is_file())
+        for f in files:
+            key.update(f.relative_to(env_dir).as_posix().encode())
+            key.update(sha256(f).encode())
+        for text in ("gait", args.layout, args.demo_scene, str(args.demo_decisions), *sorted(args.demo_var)):
+            key.update(text.encode() + b"\0")
+        demo_args += [f"var.{v}" for v in args.demo_var]
     cached = results / "demo_cache" / f"{key.hexdigest()[:24]}.demo"
     if not cached.exists() or cached.stat().st_size == 0:
         cached.parent.mkdir(parents=True, exist_ok=True)
-        log(out, f"recording {cached.name}")
-        subprocess.run([str(exe), f"scene={args.demo_scene}", "mode=record-demo", f"var.track=agents/tracks/{args.track}.track.json",
-                        f"var.body=agents/bodies/{args.body}.body.json", f"var.params=agents/params/{args.params}.params.json",
-                        f"var.decisions={args.demo_decisions}", f"var.out={cached}"], check=True, stdout=out, stderr=subprocess.STDOUT)
+        log(out, f"recording {cached.name}: {' '.join(demo_args)}")
+        partial = cached.with_suffix(".partial")
+        subprocess.run([str(exe), *demo_args, f"var.out={partial}"], check=True, cwd=ROOT, stdout=out, stderr=subprocess.STDOUT)
+        partial.replace(cached)
+        cached.with_suffix(".txt").write_text(" ".join(demo_args) + "\n")
+    else:
+        log(out, f"demo {cached.name} from the cache")
     target = results / f"{args.run_id}_demos"
     target.mkdir(exist_ok=True)
     shutil.copy2(cached, target / cached.name)
     sha = git(ROOT, "rev-parse", "--short", "HEAD") + ("+dirty" if git(ROOT, "status", "--porcelain") else "")
-    return exe, target, [f"scene={args.scene}", "mode=train", f"threads={args.threads}", f"-envParamsOut={results / args.run_id / 'envparams.txt'}", f"-gitSha={sha}"], sha
+    return exe, target, [f"scene={args.scene}", *[f"var.{v}" for v in args.env_var], "mode=train", f"threads={args.threads}", f"-envParamsOut={results / args.run_id / 'envparams.txt'}", f"-gitSha={sha}"], sha
 
 
 def main():
@@ -185,7 +225,10 @@ def main():
     parser.add_argument("--body", default="heidelbot_notoes")
     parser.add_argument("--params", default="walker", help="dynamical: resources/agents/params/<name>.params.json (for the demo)")
     parser.add_argument("--layout", default="heidelbot_notoes_2")
-    parser.add_argument("--demo-scene", default="walker_demo")
+    parser.add_argument("--demo-source", choices=["track", "gait"], default="track", help="dynamical: a pose track, or the kinematic walk")
+    parser.add_argument("--demo-scene", default=None, help="dynamical: walker_demo (track), walker_demo_gait or walker_demo_terrain (gait)")
+    parser.add_argument("--demo-var", action="append", default=[], metavar="NAME=VALUE", help="dynamical: a variable of the demo scene, repeatable")
+    parser.add_argument("--env-var", action="append", default=[], metavar="NAME=VALUE", help="dynamical: a variable of the training scene, repeatable")
     parser.add_argument("--demo-decisions", type=int, default=3000)
     args = parser.parse_args()
 
@@ -198,6 +241,10 @@ def main():
         parser.error("needs an engine, --run-id and --config")
     if args.scene is None:
         args.scene = "AI/HeidelBot/Scenes/Training.unity" if args.engine == "unity" else "walker_train"
+    if args.demo_scene is None:
+        args.demo_scene = "walker_demo" if args.demo_source == "track" else "walker_demo_gait"
+    if args.demo_source == "track" and args.demo_var:
+        parser.error("--demo-var needs --demo-source gait")
 
     run_dir = results / args.run_id
     if run_dir.exists() and not args.resume:

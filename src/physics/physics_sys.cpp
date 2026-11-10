@@ -383,6 +383,24 @@ void WorldTerrainSys::tick(double h) {
         required.push_back(bounds);
     }
 
+    // A ragdoll: one box around its segments
+    if(auto* users = reg.ctx().find<TerrainUsers>(); users && !users->bodies.empty()) {
+        Bounds all { glm::vec3(1e30f), glm::vec3(-1e30f) };
+        for(JPH::BodyID id : users->bodies) {
+            JPH::BodyLockRead lock(lock_interface, id);
+            if(!lock.Succeeded()) continue;
+            const JPH::Body& b = lock.GetBody();
+            JPH::AABox box = b.GetWorldSpaceBounds();
+            Bounds bounds = grow(Bounds { toGlm(box.mMin), toGlm(box.mMax) }, toGlm(b.GetLinearVelocity()) * (float) h, margin);
+            all.min = glm::min(all.min, bounds.min);
+            all.max = glm::max(all.max, bounds.max);
+        }
+        if(all.min.x <= all.max.x) {
+            all.min.y -= below;
+            required.push_back(all);
+        }
+    }
+
     terrain->update(required, {}, clock.tick * clock.dt);
 
 }

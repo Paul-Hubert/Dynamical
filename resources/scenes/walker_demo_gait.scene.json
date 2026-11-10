@@ -1,0 +1,10 @@
+{
+  "format_version": 1,
+  "name": "walker_demo_gait",
+  "include": ["common/ik_demo_world.json"],
+  "variables": {
+    "decisions": { "type": "int", "default": 3000 },
+    "out": { "type": "string", "default": "" }
+  },
+  "worlds": [ { "template": "ik_demo_world", "count": 1 } ]
+}

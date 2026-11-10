@@ -33,6 +33,7 @@ struct AgentIO {
     float reward = 0.f;                 // over the window that just ended
     bool done = false;                  // the episode ended with this observation
     bool truncated = false;             // ... by a limit (time, bounds), not by a terminal state
+    bool recordable = true;             // false: this observation belongs to no episode (a demo's warm-up), recorders skip it
     std::vector<AgentStat> stats;       // this window's values, averaged over the agents by the host
 
     void configure(std::string behavior_name, int observations, int actions) {

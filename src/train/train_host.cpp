@@ -15,6 +15,7 @@
 #include "env_params_file.h"
 #include "logic/agents/agent_env_params.h"
 #include "logic/agents/agent_io.h"
+#include "logic/agents/ground_field.h"
 #include "logic/agents/humanbot.h"
 #ifdef DYNAMICAL_ONNX
 #include "onnx/policy_runner.h"
@@ -137,6 +138,9 @@ int TrainHost::recordDemo() {
         bool finished = false;
         while(!finished) {
             runner.step(period);
+            if(stopRequested()) return 1;
+            // A gait demo's warm-up between two routes belongs to no episode
+            if(!io.recordable) continue;
             mlagents::co::AgentInfoActionPairProto pair;
             auto* info = pair.mutable_agent_info();
             info->set_reward(0.f);
@@ -236,11 +240,14 @@ int TrainHost::eval() {
     std::string replay = vars.contains("replay") ? vars["replay"]["default"].get<std::string>() : "";
     std::vector<float> replay_data;
     bool replay_open = !replay.empty();
-    std::vector<glm::vec3> start(runner.worldCount());
-    for(size_t i = 0; i < runner.worldCount(); i++) {
-        auto& bot = runner.world(i).reg.ctx().get<HumanBot>();
-        start[i] = bot.state.position[bot.body->spine];
+    // var.legs=<file.csv>: one row per stretch between two target draws, with the ground it crossed
+    std::string legs_path = vars.contains("legs") ? vars["legs"]["default"].get<std::string>() : "";
+    std::ofstream legs;
+    if(!legs_path.empty()) {
+        legs.open(legs_path);
+        legs << "episode,world,leg,seconds,distance,progress,rise,pitch_deg,up_deg,down_deg,across_deg,mean_across_deg,strikes,fell,route_lost\n";
     }
+    double strikes = 0.;
     while(sum.n < episodes) {
         runner.step(period, &executor);
         if(replay_open) {
@@ -269,16 +276,32 @@ int TrainHost::eval() {
             sum.dead += bot.killed ? 1 : 0;
             double dt = reg.ctx().get<WorldClock>().dt;
             sum.seconds += bot.tick * dt;
-            sum.distance += glm::length(horizontal(bot.state.position[bot.body->spine] - start[i]));
+            // Along the path: the target moves during an episode (on a terrain, to another direction)
+            for(size_t l = 0; l < bot.legs.size(); l++) {
+                const WalkLeg& leg = bot.legs[l];
+                glm::vec3 moved = horizontal(leg.to - leg.from);
+                float distance = glm::length(moved), progress = glm::dot(moved, leg.direction);
+                sum.distance += distance;
+                strikes += leg.strikes;
+                if(!legs.is_open()) continue;
+                RouteSlope slope;
+                if(bot.ground) {
+                    glm::vec3 from(leg.from.x, bot.groundUnder(leg.from), leg.from.z);
+                    slope = measureRoute(*bot.ground, from, distance > 0.5f ? moved : leg.direction, std::max(distance, 0.5f), 0.3f, 0.25f);
+                }
+                const float deg = 57.2957795f;
+                legs << sum.n << "," << i << "," << l << "," << leg.ticks * dt << "," << distance << "," << progress << "," << slope.rise << ","
+                    << std::atan2(slope.rise, std::max(distance, 0.5f)) * deg << "," << slope.up * deg << "," << slope.down * deg << "," << slope.across * deg << ","
+                    << slope.mean_across * deg << "," << leg.strikes << "," << (leg.fell ? 1 : 0) << "," << (bot.route_lost && l + 1 == bot.legs.size() ? 1 : 0) << "\n";
+            }
             sum.head += bot.currentHeight();
             sum.n++;
-            // The next episode starts at this world's next window (parked): the distance restarts with it
-            start[i] = bot.body->segments[bot.body->spine].spawn_position;
         }
     }
     nlohmann::json summary = {
         { "model", model }, { "episodes", sum.n }, { "dead_rate", sum.dead / sum.n },
-        { "mean_length_ticks", sum.ticks / sum.n }, { "mean_speed", sum.distance / std::max(sum.seconds, 1e-9) }, { "mean_final_height", sum.head / sum.n } };
+        { "mean_length_ticks", sum.ticks / sum.n }, { "mean_speed", sum.distance / std::max(sum.seconds, 1e-9) }, { "mean_final_height", sum.head / sum.n },
+        { "steps_per_second", strikes / std::max(sum.seconds, 1e-9) }, { "step_length", sum.distance / std::max(strikes, 1.) } };
     // The energy books over every episode: net residual (S7.5) and tick-wise |residual|, both against sum |work|
     double abs_work = 0., abs_residual = 0., net_residual = 0.;
     double devita_pos = 0., devita_neg = 0., devita_stances = 0.;

@@ -1,0 +1,33 @@
+{
+  "variables": {
+    "body":   { "type": "string", "default": "agents/bodies/heidelbot_notoes.body.json" },
+    "params": { "type": "string", "default": "agents/params/walker.params.json" },
+    "draw":   { "type": "bool",   "default": false },
+    "view":   { "type": "bool",   "default": false },
+    "view_speed": { "type": "float", "default": 1.36 },
+    "view_truncate": { "type": "bool", "default": false },
+    "terrain_seed":  { "type": "int",   "default": 1337, "description": "base's terrain is seed 1337" },
+    "spawn_radius":  { "type": "float", "default": 1000.0, "description": "m around the origin where episodes start" },
+    "route_up":      { "type": "float", "default": 20.0, "description": "degrees: the steepest climb along a path the walker is sent on" },
+    "route_down":    { "type": "float", "default": 7.0, "description": "degrees: the steepest descent along it (beyond, the kinematic walk of the demos crouches until its shank swings past horizontal)" },
+    "route_across":  { "type": "float", "default": 12.0, "description": "degrees: the steepest slope across it" },
+    "route_length":  { "type": "float", "default": 12.0, "description": "m of path that must stay in the band: what the walker covers before its target moves, and a margin" }
+  },
+  "templates": {
+    "humanbot_terrain_world": {
+      "physics": { "threads": 1, "max_bodies": 128, "max_body_pairs": 1024, "max_contacts": 1024, "temp_bytes": 8388608,
+                   "allow_sleeping": false, "friction_combine": "max", "restitution_combine": "min" },
+      "clock": { "physics_hz": 60, "control_hz": 30 },
+      "fixed": [
+        "RigidBody", { "name": "WorldTerrain", "params": { "seed": "${terrain_seed}", "margin": 2.0, "below": 4.0 } },
+        { "name": "GroundTerrain", "params": { "seed": "${terrain_seed}" } },
+        "AgentFactory", "TrainerActions@act", "DriveTargets@act", "Disturbances", "PhysicsStep", "BodySync", "Energy", "EnergyFormulas",
+        "Task", "Termination", "DeVitaStepStat", "Rewards@observe", "Observation@observe", "Episode@observe"
+      ],
+      "entities": [
+        { "HumanBotSpawn": { "body": "${body}", "params": "${params}", "draw": "${draw}", "view": "${view}", "view_speed": "${view_speed}", "view_truncate": "${view_truncate}" },
+          "WalkRoutes": { "up": "${route_up}", "down": "${route_down}", "across": "${route_across}", "length": "${route_length}", "spawn_radius": "${spawn_radius}" } }
+      ]
+    }
+  }
+}

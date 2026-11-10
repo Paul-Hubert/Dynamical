@@ -25,6 +25,12 @@ struct Bounds {
     glm::vec3 max;
 };
 
+// Bodies that are no RigidBody component and need the terrain under them (a ragdoll's segments): world context
+// variable, read by WorldTerrain
+struct TerrainUsers {
+    std::vector<JPH::BodyID> bodies;
+};
+
 // Static Jolt mesh colliders for the marching cubes terrain, built on the CPU only where bodies are or are heading.
 //
 // The world is cut in fixed cells of cell_cubes^3 marching cubes. Cells overlapping a body's swept bounds this

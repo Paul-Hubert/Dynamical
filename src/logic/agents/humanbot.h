@@ -11,15 +11,18 @@
 #include <array>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "humanbot_assets.h"
 #include "logic/systems/system.h"
+#include "walk_routes.h"
 
 namespace dy {
 
 class PhysicsWorld;
+class GroundField;
 
 // The HumanBot walker on Jolt (docs/physical-agents/agent-runtime.md): one agent per world, its state in the world
 // context variable HumanBot, created by AgentFactory from the HumanBotSpawn component
@@ -155,6 +158,7 @@ struct SagittalWork {
 // DeVita's protocol: this episode's stances, published at its reset; the totals run over every episode (eval)
 struct DeVitaBooks {
     std::array<StanceWindow<SagittalWork>, 2> stance;
+    int strikes = 0;                            // stances begun, both feet, since the books were made
     float sum_pos = 0.f, sum_neg = 0.f;
     int stances = 0;
     double total_pos = 0., total_neg = 0.;
@@ -212,6 +216,14 @@ struct FormulaBooks {
     FormulaTotals totals;
 };
 
+// One stretch of an episode between two target draws, kept in eval (view_truncate): where the walker went and how
+struct WalkLeg {
+    glm::vec3 from = glm::vec3(0.f), to = glm::vec3(0.f);   // the spine at its start and at its end
+    glm::vec3 direction = glm::vec3(0.f);       // toward the target, horizontal
+    int ticks = 0, strikes = 0;                 // foot strikes: stances begun, both feet
+    bool fell = false;                          // the episode was killed on it
+};
+
 struct HumanBot {
     std::shared_ptr<const BodyDef> body;
     std::shared_ptr<const AgentParams> base_params;
@@ -255,7 +267,22 @@ struct HumanBot {
     float energy_speed = 0.f;                   // smoothed horizontal speed of the energy reward
     bool energy_speed_valid = false;
 
-    float currentHeight() const;                // Unity's EstimateHeight: head above the higher foot, on bone origins
+    // Ground that is not the level box at y = 0 (docs/physical-agents/terrain-walker.md)
+    std::shared_ptr<GroundField> ground;        // the world's ground field when it has one: heights are measured from it. Null on the flat ground prefab
+    std::optional<WalkRoutes> routes;           // set: episodes spawn and head where the ground stays in the slope band
+    glm::vec3 origin = glm::vec3(0.f);          // this episode's spawn point, on the ground
+    glm::vec3 spawn_spine = glm::vec3(0.f);     // the spine where this episode started
+    bool route_lost = false;                    // no direction in the band from where the walker stands: the episode is truncated
+    int spawn_tries = 0;                        // points drawn for this episode's spawn
+    std::vector<WalkLeg> legs;                  // this episode's, the last one open until the episode ends (eval only)
+    bool leg_open = false;
+
+    // Height of the ground under p, looking down from just above it; p.y without a ground field under it
+    float groundUnder(glm::vec3 p) const;
+
+    // Unity's EstimateHeight: the head above the lower foot, on bone origins. With a ground field, each one's height
+    // over the ground under it: on a slope a foot downhill of the head does not make the walker taller
+    float currentHeight() const;
     bool isDying() const { return currentHeight() < params.dying_height_factor * est0; }
 };
 

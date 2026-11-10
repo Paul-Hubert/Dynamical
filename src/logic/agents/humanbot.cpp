@@ -18,10 +18,13 @@
 
 #include "agent_env_params.h"
 #include "agent_io.h"
+#include "gait.h"
+#include "ground_field.h"
 #include "logic/components/model_ref.h"
 #include "logic/components/transform.h"
 #include "physics/physics_sys.h"
 #include "physics/physics_world.h"
+#include "physics/terrain_colliders.h"
 #include "scene/component_registry.h"
 #include "scene/system_registry.h"
 #include "scene/world.h"
@@ -103,6 +106,8 @@ void buildRagdoll(entt::registry& reg, HumanBot& bot) {
         settings.mMotionQuality = JPH::EMotionQuality::Discrete;
         settings.mAllowSleeping = false;
         settings.mCollideKinematicVsNonDynamic = bot.kinematic;
+        // The marching cubes mesh: a sole that crosses an edge between two triangles must not catch on it
+        settings.mEnhancedInternalEdgeRemoval = !bot.kinematic && reg.ctx().contains<std::shared_ptr<TerrainColliders>>();
         settings.mCollisionGroup = JPH::CollisionGroup(filter, 0, (JPH::CollisionGroup::SubGroupID) i);
         bot.bodies[i] = bodies.CreateAndAddBody(settings, JPH::EActivation::Activate);
     }
@@ -268,8 +273,27 @@ void drawSpeed(entt::registry& reg, HumanBot& bot, bool at_reset) {
     }
 }
 
-void placeTarget(entt::registry& reg, HumanBot& bot) {
+// direction: the one the spawn point was drawn with (terrain)
+void placeTarget(entt::registry& reg, HumanBot& bot, const glm::vec3* direction = nullptr) {
     glm::vec3 head = bot.state.position[bot.body->head];
+    if(bot.routes && bot.ground) {
+        // Where the ground stays in the slope band, in training and in eval alike. The target is far: the direction
+        // holds while the walker drifts
+        glm::vec3 toward;
+        if(direction) {
+            toward = *direction;
+        } else {
+            glm::vec3 spine = bot.state.position[bot.body->spine];
+            auto drawn = drawDirection(*bot.ground, reg.ctx().get<WorldRng>(), *bot.routes, glm::vec3(spine.x, bot.groundUnder(spine), spine.z));
+            if(!drawn) {
+                bot.route_lost = true;
+                return;
+            }
+            toward = *drawn;
+        }
+        bot.target = head + toward * 1000.f;
+        return;
+    }
     if(randomizing(bot) && bot.params.random_target) {
         auto& rng = reg.ctx().get<WorldRng>();
         float radius = (float) rng.uniform(20., 30.), angle = (float) rng.uniform(0., 2. * pi);
@@ -298,9 +322,42 @@ int arcTicks(const entt::registry& reg, const HumanBot& bot) {
 
 }
 
+float HumanBot::groundUnder(glm::vec3 p) const {
+    return ground ? ground->height(p.x, p.z, p.y + 1.f, p.y) : p.y;
+}
+
 float HumanBot::currentHeight() const {
     float head_y = state.position[body->head].y;
-    return std::max({ head_y - state.position[body->left_foot].y, head_y - state.position[body->right_foot].y, 0.f });
+    if(!ground) return std::max({ head_y - state.position[body->left_foot].y, head_y - state.position[body->right_foot].y, 0.f });
+    glm::vec3 head = state.position[body->head], left = state.position[body->left_foot], right = state.position[body->right_foot];
+    float above = head.y - groundUnder(head);
+    return std::max({ above - (left.y - groundUnder(left)), above - (right.y - groundUnder(right)), 0.f });
+}
+
+namespace {
+
+// Eval: the stretch walked toward one target
+void openLeg(HumanBot& bot) {
+    if(!bot.view_truncate) return;
+    WalkLeg leg;
+    leg.from = leg.to = bot.state.position[bot.body->spine];
+    leg.direction = safeNormalize(horizontal(bot.target - leg.from));
+    leg.strikes = bot.devita.strikes;
+    leg.ticks = bot.tick;
+    bot.legs.push_back(leg);
+    bot.leg_open = true;
+}
+
+void closeLeg(HumanBot& bot, bool fell) {
+    if(!bot.leg_open || bot.legs.empty()) return;
+    WalkLeg& leg = bot.legs.back();
+    leg.to = bot.state.position[bot.body->spine];
+    leg.strikes = bot.devita.strikes - leg.strikes;
+    leg.ticks = bot.tick - leg.ticks;
+    leg.fell = fell;
+    bot.leg_open = false;
+}
+
 }
 
 HeadingFrame dy::headingFrame(glm::quat rotation) {
@@ -395,12 +452,23 @@ void dy::resetHumanBot(entt::registry& reg) {
         glm::vec3 lift(0.f);
         glm::quat init(1.f, 0.f, 0.f, 0.f);
         glm::vec3 root_velocity(0.f);
+        // On a terrain the episode starts where the ground stays in the slope band, with a first direction that does
+        const bool routed = bot.routes && bot.ground;
+        RouteStart start;
+        bot.route_lost = false;
+        if(routed) {
+            start = drawStart(*bot.ground, rng, *bot.routes);
+            bot.origin = start.point;
+            bot.spawn_tries = start.tries;
+            if(!start.found) dy::log(dy::warning) << "HumanBot: no spawn point in the slope band after " << start.tries << " draws\n";
+        }
         // Placing the target needs the head where the reset leaves it (before the random yaw, as Unity)
         for(size_t i = 0; i < bot.bodies.size(); i++) {
             bot.state.position[i] = def.segments[i].spawn_position;
             bot.state.rotation[i] = def.segments[i].spawn_rotation;
+            if(routed) bot.state.position[i] += bot.origin;
         }
-        placeTarget(reg, bot);
+        placeTarget(reg, bot, routed ? &start.direction : nullptr);
         applySlope(reg, bot);
         if(randomizing(bot)) {
             if(bot.params.random_target) yaw = glm::angleAxis((float) rng.uniform(0., 2. * pi), glm::vec3(0.f, 1.f, 0.f));
@@ -410,11 +478,36 @@ void dy::resetHumanBot(entt::registry& reg) {
                 lift = glm::vec3(0.f, 2.f, 0.f);
                 root_velocity = glm::vec3(0.f, -4.f, 0.f);
             }
+        } else if(routed) {
+            // Eval and view: facing the first direction, as the flat walker faces its target
+            yaw = glm::angleAxis(std::atan2(-start.direction.x, -start.direction.z), glm::vec3(0.f, 1.f, 0.f));
         }
         glm::quat turn = glm::normalize(init * yaw);
+        // The spawn pose stands on y = 0: on a terrain it goes onto the ground at the spawn point, as low as its
+        // soles allow (level soles on a slope: one edge touches)
+        glm::vec3 onto(0.f);
+        if(routed) {
+            onto = bot.origin;
+            if(lift.y == 0.f) {
+                RigModel model(bot.body);
+                float raise = -1e9f;
+                for(int side = 0; side < 2; side++) {
+                    FootGeometry sole = footGeometry(model, side == 1);
+                    const SegmentDef& seg = def.segments[sole.segment];
+                    glm::vec3 position = onto + pivot + turn * (seg.spawn_position - pivot);
+                    glm::quat rotation = glm::normalize(turn * seg.spawn_rotation);
+                    for(int c = 0; c < 4; c++) {
+                        glm::vec3 corner = sole.corner(c, position, rotation);
+                        raise = std::max(raise, bot.ground->height(corner.x, corner.z, corner.y + 2.f, corner.y) - corner.y);
+                    }
+                }
+                onto.y += raise + 0.002f;
+            }
+        }
         for(size_t i = 0; i < bot.bodies.size(); i++) {
             const SegmentDef& seg = def.segments[i];
             glm::vec3 position = pivot + lift + turn * (seg.spawn_position - pivot);
+            if(routed) position += onto;
             glm::quat rotation = glm::normalize(turn * seg.spawn_rotation);
             bodies.SetPositionRotationAndVelocity(bot.bodies[i], JPH::RVec3(toJolt(position)), toJolt(rotation), toJolt(i == (size_t) def.pelvis ? root_velocity : glm::vec3(0.f)), JPH::Vec3::sZero());
             auto mp = JPH::BodyLockWrite(world.system().GetBodyLockInterface(), bot.bodies[i]);
@@ -430,6 +523,7 @@ void dy::resetHumanBot(entt::registry& reg) {
     }
 
     bot.previous_frame.fill(0.f);
+    bot.spawn_spine = bot.state.position[def.spine];
     bot.snapshot.spine = bot.state.position[def.spine];
     bot.snapshot.target_speed = bot.target_speed;
     bot.snapshot.tsv = safeNormalize(horizontal(bot.target - bot.snapshot.spine)) * bot.target_speed;
@@ -465,6 +559,9 @@ void dy::resetHumanBot(entt::registry& reg) {
     d.sum_pos = d.sum_neg = 0.f;
     d.stances = 0;
     d.stance = {};
+    bot.legs.clear();
+    bot.leg_open = false;
+    openLeg(bot);
     setPark(reg, false);
 
 }
@@ -501,9 +598,14 @@ void AgentFactorySys::init() {
     bot.view_truncate = spawn.view_truncate;
     bot.recording_ticks = spawn.max_recording_ticks;
     bot.target_speed = bot.base_params->target_speed;
+    if(auto* field = reg.ctx().find<std::shared_ptr<GroundField>>()) bot.ground = *field;
+    if(auto* routes = reg.try_get<WalkRoutes>(*view.begin())) bot.routes = *routes;
+    if(bot.routes && !bot.ground && !bot.kinematic) dy::log(dy::error) << "AgentFactory: WalkRoutes needs a ground field (GroundTerrain or GroundPlane before AgentFactory)\n";
     applyEnvParams(reg, bot);
     bot.params.total_mass = bot.base_params->total_mass;
     buildRagdoll(reg, bot);
+    // The terrain's colliders are built around these bodies (WorldTerrain)
+    if(reg.ctx().contains<std::shared_ptr<TerrainColliders>>()) reg.ctx().insert_or_assign(TerrainUsers { bot.bodies });
 
     agentIO(reg).configure(bot.base_params->behavior, humanbot_observations, humanbot_actions);
     agentIO(reg).sensor_name = "StackingSensor_size2_VectorSensor_size138";
@@ -654,8 +756,10 @@ void HumanBotTaskSys::tick(double h) {
     bot.arc_ticks++;
     if(bot.arc_ticks >= arcTicks(reg, bot)) {
         bot.arc_ticks = 0;
+        closeLeg(bot, false);
         placeTarget(reg, bot);
         if(!bot.continuous_speed_mode) drawSpeed(reg, bot, false);
+        openLeg(bot);
     }
 }
 
@@ -674,13 +778,16 @@ void TerminationSys::tick(double h) {
     if(bot.dying && bot.params.die_on_fall) {
         if(++bot.dying_ticks > bot.params.max_dying_frames) {
             bot.killed = true;
+            closeLeg(bot, true);
             setPark(reg, true);
             return;
         }
     } else if(bot.params.reset_on_alive) {
         bot.dying_ticks = 0;
     }
-    if(bot.tick >= episodeTicks(reg, bot)) bot.truncated = true;
+    // No direction in the slope band from here: the episode ends as at its time limit, with nothing lost or won
+    if(bot.tick >= episodeTicks(reg, bot) || bot.route_lost) bot.truncated = true;
+    if(bot.truncated) closeLeg(bot, false);
 
 }
 
@@ -737,11 +844,12 @@ void RewardsSys::tick(double h) {
         bot.head_max_speed = std::max(bot.head_max_speed, std::abs(head_speed));
         bot.head_max_error = std::max(bot.head_max_error, head_error);
         float head_y = bot.state.position[def.head].y;
+        if(bot.ground) head_y -= bot.groundUnder(bot.state.position[def.head]);
         bot.head_max_height = std::max(bot.head_max_height, head_y);
         bot.head_min_height = std::min(bot.head_min_height, head_y);
         bot.root_max_speed = std::max(bot.root_max_speed, std::abs(root_speed));
         bot.root_max_error = std::max(bot.root_max_error, root_error);
-        bot.root_max_distance = std::max(bot.root_max_distance, glm::length(horizontal(spine)));
+        bot.root_max_distance = std::max(bot.root_max_distance, glm::length(horizontal(bot.routes ? spine - bot.origin : spine)));
         float spring_norm = -(root_error / std::max(bot.root_max_error, 1e-3f)) * p.root_reward;
         stat("Head/Head Damper Speed", head_speed, histogram);
         stat("Head/Head Max Speed", bot.head_max_speed);
@@ -795,6 +903,19 @@ void RewardsSys::tick(double h) {
     } else if(bot.truncated) {
         reward += p.win_reward;
         stat("Win/Total Win Reward", p.win_reward, histogram);
+    }
+    if(bot.routes && bot.ground) {
+        // The ground under the walker, as its path meets it: degrees up along the commanded direction and across it
+        glm::vec3 along = safeNormalize(bot.snapshot.tsv);
+        if(auto hit = bot.ground->below(spine + glm::vec3(0.f, 1.f, 0.f), 8.f); hit && along != glm::vec3(0.f)) {
+            glm::vec3 right(-along.z, 0.f, along.x);
+            stat("Terrain/Slope Along", glm::degrees(std::atan2(-glm::dot(hit->normal, along), hit->normal.y)), histogram);
+            stat("Terrain/Slope Across", glm::degrees(std::abs(std::atan2(-glm::dot(hit->normal, right), hit->normal.y))), histogram);
+        }
+        if(bot.killed || bot.truncated) {
+            stat("Terrain/Route Lost", bot.route_lost && !bot.killed ? 1.f : 0.f);
+            stat("Terrain/Spawn Draws", (float) bot.spawn_tries);
+        }
     }
     if(bot.killed || bot.truncated) {
         stat("Win/Win Reward", bot.killed ? 0.f : p.win_reward);

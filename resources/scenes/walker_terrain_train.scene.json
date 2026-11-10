@@ -1,0 +1,7 @@
+{
+  "format_version": 1,
+  "name": "walker_terrain_train",
+  "include": ["common/humanbot_terrain_world.json"],
+  "variables": { "num_worlds": { "type": "int", "default": 25 } },
+  "worlds": [ { "template": "humanbot_terrain_world", "count": "${num_worlds}" } ]
+}

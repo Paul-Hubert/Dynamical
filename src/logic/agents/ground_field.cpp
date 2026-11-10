@@ -31,12 +31,19 @@ std::optional<GroundField::Hit> PlaneField::below(glm::vec3 from, float distance
     return Hit { glm::vec3(from.x, y, from.z), n };
 }
 
+std::optional<GroundField::Hit> PlaneField::top(float x, float z) const {
+    float y = origin.y - (n.x * (x - origin.x) + n.z * (z - origin.z)) / n.y;
+    return Hit { glm::vec3(x, y, z), n };
+}
+
 TerrainField::TerrainField(std::shared_ptr<TerrainGenerator> generator, std::shared_ptr<MarchingCubes> marching_cubes)
     : generator(std::move(generator)), marching_cubes(std::move(marching_cubes)) {}
 
 const TerrainField::Block& TerrainField::block(glm::ivec3 index) const {
     auto it = cache.find(index);
     if(it != cache.end()) return it->second;
+    // Callers use one block at a time: none is held across this call
+    if(cache.size() >= max_blocks) cache.clear();
     Block& b = cache[index];
     const glm::ivec3 start = index * block_cubes;
     const glm::ivec3 count(block_cubes + 1);
@@ -96,6 +103,12 @@ std::optional<GroundField::Hit> TerrainField::below(glm::vec3 from, float distan
     }
     return std::nullopt;
 
+}
+
+std::optional<GroundField::Hit> TerrainField::top(float x, float z) const {
+    // The heightfield part of the surface, moved by the overhangs by their amplitude at most
+    const float spread = generator->overhang_amplitude + 8.f;
+    return below(glm::vec3(x, generator->surfaceHeight(x, z) + spread, z), 2.f * spread);
 }
 
 GroundField& dy::groundField(entt::registry& reg) {

@@ -1,0 +1,33 @@
+{
+  "variables": {
+    "body":    { "type": "string", "default": "agents/bodies/heidelbot_notoes.body.json" },
+    "params":  { "type": "string", "default": "agents/params/walker.params.json" },
+    "draw":    { "type": "bool",   "default": false },
+    "speed":   { "type": "float",  "default": 1.36, "description": "m/s, horizontal, on every slope: the demos never slow down" },
+    "pitch":   { "type": "float",  "default": 0.0, "description": "degrees of the ground plane (walker_demo_gait)" },
+    "roll":    { "type": "float",  "default": 0.0 },
+    "warmup":  { "type": "float",  "default": 3.0, "description": "seconds walked on each route before it is recorded: the start and two strides (plus up to 1.2 s, drawn per route)" },
+    "episode_decisions": { "type": "int", "default": 150, "description": "recorded decisions per route" },
+    "spawn_radius": { "type": "float", "default": 20.0, "description": "m around the origin where routes start" },
+    "route_up":      { "type": "float", "default": 20.0, "description": "degrees: the steepest climb along a path the walker is sent on" },
+    "route_down":    { "type": "float", "default": 7.0, "description": "degrees: the steepest descent along it (beyond, the kinematic walk of the demos crouches until its shank swings past horizontal)" },
+    "route_across":  { "type": "float", "default": 12.0, "description": "degrees: the steepest slope across it" }
+  },
+  "templates": {
+    "ik_demo_world": {
+      "physics": { "threads": 1, "max_bodies": 64, "max_body_pairs": 1024, "max_contacts": 1024, "temp_bytes": 8388608,
+                   "allow_sleeping": false, "friction_combine": "max", "restitution_combine": "min" },
+      "clock": { "physics_hz": 60, "control_hz": 30 },
+      "fixed": [ "RigidBody", "AgentFactory", { "name": "GroundPlane", "params": { "pitch": "${pitch}", "roll": "${roll}" } },
+                 { "name": "GaitRoutes", "params": { "warmup": "${warmup}", "decisions": "${episode_decisions}" } },
+                 "GaitBase", "GaitFootIK", "GaitBalance", "Fabrik", "RigPoseApply", "PhysicsStep", "BodySync", "GaitChecks",
+                 "Observation@observe" ],
+      "entities": [
+        { "HumanBotSpawn": { "body": "${body}", "params": "${params}", "motion": "kinematic", "recording": true, "draw": "${draw}" },
+          "GaitCommand": { "speed": "${speed}" },
+          "GaitParams": { "slope_slowdown": 0.0, "step_rise": 0.0, "yield_limits": false },
+          "WalkRoutes": { "up": "${route_up}", "down": "${route_down}", "across": "${route_across}", "spawn_radius": "${spawn_radius}" } }
+      ]
+    }
+  }
+}
