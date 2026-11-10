@@ -106,8 +106,13 @@ void buildRagdoll(entt::registry& reg, HumanBot& bot) {
         settings.mMotionQuality = JPH::EMotionQuality::Discrete;
         settings.mAllowSleeping = false;
         settings.mCollideKinematicVsNonDynamic = bot.kinematic;
-        // The marching cubes mesh: a sole that crosses an edge between two triangles must not catch on it
-        settings.mEnhancedInternalEdgeRemoval = !bot.kinematic && reg.ctx().contains<std::shared_ptr<TerrainColliders>>();
+        // The marching cubes mesh has no thickness and edges: a fast limb is cast along its motion instead of
+        // stepping through the surface (with discrete steps a foot of the flat policy ended 0.5 m under it), and a
+        // sole that crosses an edge between two triangles does not catch on it. The flat ground keeps discrete steps
+        if(!bot.kinematic && reg.ctx().contains<std::shared_ptr<TerrainColliders>>()) {
+            settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
+            settings.mEnhancedInternalEdgeRemoval = true;
+        }
         settings.mCollisionGroup = JPH::CollisionGroup(filter, 0, (JPH::CollisionGroup::SubGroupID) i);
         bot.bodies[i] = bodies.CreateAndAddBody(settings, JPH::EActivation::Activate);
     }
