@@ -277,6 +277,8 @@ int TrainHost::eval() {
             double dt = reg.ctx().get<WorldClock>().dt;
             sum.seconds += bot.tick * dt;
             // Along the path: the target moves during an episode (on a terrain, to another direction)
+            size_t last = 0;
+            for(size_t l = 0; l < bot.legs.size(); l++) if(bot.legs[l].ticks > 0) last = l;
             for(size_t l = 0; l < bot.legs.size(); l++) {
                 const WalkLeg& leg = bot.legs[l];
                 // The target moves on the tick the episode ends on: that stretch was never walked
@@ -294,7 +296,7 @@ int TrainHost::eval() {
                 const float deg = 57.2957795f;
                 legs << sum.n << "," << i << "," << l << "," << leg.ticks * dt << "," << distance << "," << progress << "," << slope.rise << ","
                     << std::atan2(slope.rise, std::max(distance, 0.5f)) * deg << "," << slope.up * deg << "," << slope.down * deg << "," << slope.across * deg << ","
-                    << slope.mean_across * deg << "," << leg.strikes << "," << (leg.fell ? 1 : 0) << "," << (bot.route_lost && l + 1 == bot.legs.size() ? 1 : 0) << "\n";
+                    << slope.mean_across * deg << "," << leg.strikes << "," << (leg.fell ? 1 : 0) << "," << (bot.route_lost && !bot.killed && l == last ? 1 : 0) << "\n";
             }
             sum.head += bot.currentHeight();
             sum.n++;
