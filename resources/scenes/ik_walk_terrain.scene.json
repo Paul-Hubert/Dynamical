@@ -1,0 +1,21 @@
+{
+  "format_version": 1,
+  "name": "ik_walk_terrain",
+  "include": ["common/desktop.json", "common/ik_world.json"],
+  "variables": {
+    "draw":         { "type": "bool",  "default": true },
+    "terrain_seed": { "type": "int",   "default": 1337, "description": "the host's ChunkGenerator draws seed 1337" },
+    "start_x":      { "type": "float", "default": 0.0 },
+    "start_z":      { "type": "float", "default": 120.0, "description": "from (0, 120) at heading 90 the slopes stay under 18 degrees for 30 m" },
+    "heading":      { "type": "float", "default": 90.0 },
+    "view_distance": { "type": "float", "default": 3.4 },
+    "view_side":    { "type": "float", "default": 75.0 }
+  },
+  "renderer": { "passes": ["terrain", "model", "ui"], "vr": false },
+  "host": {
+    "pre": [ "Input", "UI", "Time", "PlayerControl", "DebugMenu", "ChunkManager", "ChunkGenerator", "WorldStepper", { "name": "GaitView", "params": { "distance": "${view_distance}", "azimuth": "${view_side}" } } ],
+    "post": [ { "name": "WorldView", "params": { "worlds": "all", "spacing": 0.0 } }, "Terrain" ]
+  },
+  "worlds": [ { "template": "ik_world", "count": 1,
+                "systems": { "replace": { "GroundPlane": { "name": "GroundTerrain", "params": { "seed": "${terrain_seed}" } } } } } ]
+}

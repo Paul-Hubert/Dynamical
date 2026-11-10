@@ -86,6 +86,11 @@ The values come from UA §1. The exporter reads the real ones; this doc never be
   pre-move pose is kept for the Unity comparison tests;
 - swing half-angles are clamped below 180° (with a log line).
 
+> **Edited after export (2026-11-10).** In both `heidelbot_notoes` body files the ankles' swing limits are wider
+> than Unity's: `y_deg` 29.1 (Unity 20.6167526) and `z_deg` 43.25 (Unity 30.7513733), with Unity's values kept as
+> `unity_y_deg` and `unity_z_deg`. The kinematic walk needs them on 15° side slopes ([ik-gait.md](ik-gait.md#joint-limits)).
+> A re-export restores Unity's values: apply the two numbers again.
+
 ## Pose tracks
 
 Baked once per clip and body version by playing the Mecanim controller with root motion at the

@@ -57,6 +57,13 @@ Entry point is `src/main.cpp` → `Game::start()`. The game loop runs: `renderer
 - **Terrain colliders** (`terrain_colliders.cpp`): the world is cut in cells of 16³ marching cubes; cells overlapping a body's swept bounds this frame are meshed on the CPU (`logic/terrain/marching_cubes.cpp`, shared vertices so Jolt can detect internal edges) and added as static `MeshShape` bodies before the step, in sorted order; cells on the predicted path (1 s) are prefetched on taskflow; idle cells are evicted after 5 s of simulation. Densities come from the loaded chunk volume or straight from `TerrainGenerator::sample`, so collision works without rendering or streaming
 - Dynamic bodies use `LinearCast` motion quality and enhanced internal edge removal
 
+### Kinematic walk (`src/logic/agents/`, docs/physical-agents/ik-gait.md)
+- Scenes `ik_walk_slope` (tilted plane) and `ik_walk_terrain`; headless `ik_check`, `ik_check_terrain`. Tests `IK.*` and `GAIT.*` in `tests/unit/ik_gait.cpp`
+- `RigPose` (joint angles) is written by `GaitBase` (procedural gait), corrected by `Fabrik`, applied by `RigPoseApply` (`MoveKinematic`)
+- **IK is component driven**: any system posts `IKTarget` entities for an `IKChain`; `Fabrik` solves them all in one batch (FABRIK, pole, joint limits). `GaitFootIK` owns the leg targets, `GaitBalance` places the pelvis through `solveChain()`
+- `GroundField` (plane or marching cubes surface from the density samples) is what feet are planted on, no collider
+- A planted foot comes before a joint limit (`GaitParams::yield_limits`): the walk covers any slope, realistic up to about 20°. The body files' ankle swing limits are wider than Unity's export (`unity_y_deg`, `unity_z_deg` keep the originals)
+
 ### Models (`src/renderer/model/`)
 - glTF 2.0 through tinygltf (`gltf_loader.cpp`), flattened into one vertex/index buffer with node transforms baked in. `ModelManager` (context variable) caches files; instances are entities with `Transform` + `ModelRenderable`
 

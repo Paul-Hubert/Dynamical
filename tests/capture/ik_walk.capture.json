@@ -1,0 +1,6 @@
+{
+  "scene": "ik_walk_slope",
+  "vars": { "pitch": "12", "roll": "8" },
+  "hide_ui": true,
+  "shots": [ { "frame": 300, "name": "ik_walk_a" }, { "frame": 312, "name": "ik_walk_b" }, { "frame": 324, "name": "ik_walk_c" }, { "frame": 336, "name": "ik_walk_d" } ]
+}

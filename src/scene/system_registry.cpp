@@ -4,7 +4,10 @@
 
 #include "component_registry.h"
 
+#include "logic/agents/gait.h"
+#include "logic/agents/ground_field.h"
 #include "logic/agents/humanbot.h"
+#include "logic/agents/ik.h"
 #include "logic/agents/sphere_roller.h"
 #include "logic/components/model_ref.h"
 #include "logic/components/rigid_body.h"
@@ -162,5 +165,8 @@ void dy::registerSimSystems() {
     registerSimComponents();
     registerSphereRoller();
     registerHumanBot();
+    registerIK();
+    registerGroundField();
+    registerGait();
 
 }

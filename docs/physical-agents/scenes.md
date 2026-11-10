@@ -156,6 +156,10 @@ void registerComponent(std::string name, ComponentInfo);
 | `BodySync` | segment states, anchor finite differences, joint angles | world | lib | every | P4 |
 | `TrackActions` | plays a `PoseTrack` kinematically (`MoveKinematic` or teleport) | world | lib | every | P5 |
 | `RigChecks` | limits, bone lengths, velocities, ground (geometric) | world | lib | every | P5 |
+| `GroundPlane`, `GroundTerrain` | the world's `GroundField` ([ik-gait.md](ik-gait.md)) | world | lib | preinit | after P13 |
+| `GaitBase`, `GaitFootIK`, `GaitBalance`, `GaitChecks` | the kinematic walk: base animation, foot targets, pelvis placement, measurements | world | lib | every | after P13 |
+| `Fabrik`, `RigPoseApply` | solve every `IKTarget` into `RigPose`; `RigPose` onto the kinematic bodies | world | lib | every | after P13 |
+| `GaitView` | follow camera, panel and markers of the `ik_walk` scenes | host | `dynamical` | pre | after P13 |
 | `DriveTargets` | held targets → Jolt motors | world | lib | every | P6 |
 | `Contacts`, `Energy` | aggregate the per-sub-step recorders per tick | world | lib | every | P7 |
 | `TrainerActions`, `Policy`, `HeuristicActions` | actions from the bridge / ONNX (through `PolicyHandle`) / random or zero → `HeldDrive` | world | lib | act | P8, P11, P8 |
@@ -228,5 +232,7 @@ entities, so `ScenePass::record` keeps its single-registry, read-only rule.
 | `walker_view` | `dynamical` | `humanbot_world` with `Policy`; `ModelWatcher`; variables `run`, `policy`, `replay` | P11 |
 | `walker_eval` | `dynamical_train` | `humanbot_world` with `Policy`; variables `policy`, `episodes` | P11 |
 | `devita_train` / `devita_view` | as walker | H173 body, DeVita params, slope ground | P13 |
+| `ik_walk_slope` / `ik_walk_terrain` | `dynamical` | `common/ik_world.json`: the kinematic walk on a tilted plane or on the marching cubes terrain, with `GaitView` ([ik-gait.md](ik-gait.md)) | after P13 |
+| `ik_check` / `ik_check_terrain` | tests (`ScenarioRunner`) | The same worlds, headless | after P13 |
 
 Capture scripts live in `tests/capture/<name>.capture.json` ([phases.md](phases.md#capture-facility-p0)).
