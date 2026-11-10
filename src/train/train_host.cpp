@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <thread>
 
 #include <google/protobuf/io/coded_stream.h>
@@ -222,9 +223,15 @@ int TrainHost::eval() {
         return 1;
     }
     auto policy = std::make_shared<PolicyRunner>(model, humanbot_observations, humanbot_actions);
+    // var.stochastic=1: sample the actions as in training (mean + noise) instead of the mean
+    bool stochastic = vars.contains("stochastic") && vars["stochastic"]["default"].get<int>() != 0;
+    // var.cot_out=<file>: per settled decision, 5 floats: positive W, negative W, torque variation N m/s, smoothed speed,
+    // target speed (the energy reward's inputs, so any multipliers, torque-rate weight and energyScale can be replayed)
+    std::string cot_path = vars.contains("cot_out") ? vars["cot_out"]["default"].get<std::string>() : "";
+    std::vector<float> cot_data;
     for(size_t i = 0; i < runner.worldCount(); i++) {
         auto& reg = runner.world(i).reg;
-        reg.ctx().insert_or_assign(PolicyHandle { policy, true });
+        reg.ctx().insert_or_assign(PolicyHandle { policy, !stochastic });
         reg.ctx().get<AgentIO>().reset_requested = true;
         runner.world(i).systems.fixed_observe_only();
     }
@@ -259,6 +266,20 @@ int TrainHost::eval() {
                     { "frames", frames }, { "segments", (int) rbot.body->segments.size() }, { "frame", "engine" }, { "state_speed", 1.f } };
                 std::ofstream(replay + ".track.json") << header.dump(1);
             }
+        }
+        for(size_t i = 0; !cot_path.empty() && i < runner.worldCount(); i++) {
+            auto& reg = runner.world(i).reg;
+            const auto& io = reg.ctx().get<AgentIO>();
+            const auto& bot = reg.ctx().get<HumanBot>();
+            if(io.done || bot.tick * reg.ctx().get<WorldClock>().dt < bot.params.stats_settle_seconds) continue;
+            float row[4] = { NAN, NAN, NAN, NAN };
+            const char* keys[4] = { "EnergyProvider/Positive Energy", "EnergyProvider/Negative Energy",
+                                    "EnergyProvider/Torque Variation Rate", "EnergyProvider/Smoothed Speed" };
+            for(const auto& s : io.stats)
+                for(int k = 0; k < 4; k++)
+                    if(s.key == keys[k]) row[k] = s.value;
+            if(std::isnan(row[0]) || std::isnan(row[2])) continue;
+            cot_data.insert(cot_data.end(), { row[0], row[1], row[2], row[3], bot.target_speed });
         }
         for(size_t i = 0; i < runner.worldCount(); i++) {
             auto& reg = runner.world(i).reg;
@@ -324,6 +345,11 @@ int TrainHost::eval() {
             { "closure_with_point_work_net", ratio(formulas.closure_point_net, formulas.closure_gross) },
             { "closure_with_point_work_tickwise", ratio(formulas.closure_point_tickwise, formulas.closure_gross) },
             { "contact_work_J", formulas.contact_work }, { "clamped_ticks", formulas.clamped_ticks } } } };
+    if(!cot_path.empty()) {
+        std::ofstream(cot_path, std::ios::binary).write(reinterpret_cast<const char*>(cot_data.data()), cot_data.size() * sizeof(float));
+        summary["cot_decisions"] = cot_data.size() / 5;
+    }
+    summary["stochastic"] = stochastic;
     dy::log(dy::info) << "eval " << summary.dump() << "\n";
     if(!out_path.empty()) std::ofstream(out_path) << summary.dump(2) << "\n";
     return 0;

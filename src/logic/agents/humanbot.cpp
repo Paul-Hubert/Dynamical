@@ -826,6 +826,7 @@ void RewardsSys::tick(double h) {
         io.stats.emplace_back("EnergyProvider/Cost of Transport", cot, 0);
         io.stats.emplace_back("EnergyProvider/Smoothed Speed", bot.energy_speed, 0);
         if(p.torque_rate_weight > 0.f) io.stats.emplace_back("EnergyProvider/Torque Rate Power", torque_rate_power, 0);
+        io.stats.emplace_back("EnergyProvider/Torque Variation Rate", bot.books.window_torque_variation / T, 0);
         if(bot.books.cum_abs_work > 0.) io.stats.emplace_back("Energy/Closure Residual", (float) (bot.books.cum_residual / bot.books.cum_abs_work), 0);
     }
     bot.books.window_pos = bot.books.window_neg = 0.f;
