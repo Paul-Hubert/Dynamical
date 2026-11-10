@@ -69,3 +69,9 @@ float TerrainGenerator::surfaceHeight(float x, float z) const {
     float scale = height_frequency;
     return base_level + height_amplitude * surface->GenSingle2D(x * scale, z * scale, seed);
 }
+
+void TerrainGenerator::surfaceHeights(glm::ivec2 start, glm::ivec2 count, float spacing, std::vector<float>& heights) const {
+    heights.resize((size_t) count.x * count.y);
+    surface->GenUniformGrid2D(heights.data(), start.x, start.y, count.x, count.y, height_frequency * spacing, seed);
+    for(float& height : heights) height = base_level + height_amplitude * height;
+}

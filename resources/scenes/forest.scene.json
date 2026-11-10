@@ -1,0 +1,24 @@
+{
+  "format_version": 1,
+  "name": "forest",
+  "include": ["common/desktop.json"],
+  "variables": {
+    "forest":      { "type": "string", "default": "forest/tautavel.forest.json", "description": "stands, layers and species (docs/forest.md)" },
+    "forest_seed": { "type": "int",    "default": 1,   "description": "places the forests and their plants" },
+    "patch_size":  { "type": "float",  "default": 320, "description": "metres : size of the forests and of the open land between them" },
+    "coverage":    { "type": "float",  "default": 0.5, "description": "part of the gentle land under forest" },
+    "max_slope":   { "type": "float",  "default": 24,  "description": "degrees : slope of the land no forest grows on" }
+  },
+
+  "renderer": { "passes": ["terrain", "grass", "vegetation", "model", "ui"], "vr": true },
+
+  "host": {
+    "pre": [
+      "Input", "UI", "Time", "PlayerControl", "VRControl", "DebugMenu",
+      "ChunkManager", "ChunkGenerator",
+      { "name": "Forest", "params": { "definition": "${forest}", "seed": "${forest_seed}", "patch_size": "${patch_size}", "coverage": "${coverage}", "max_slope": "${max_slope}" } },
+      "BoxThrower", "RigidBody", "TerrainColliders", "Physics"
+    ],
+    "post": ["Terrain"]
+  }
+}

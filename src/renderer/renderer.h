@@ -7,6 +7,7 @@
 #include "classic_render/classic_render.h"
 #include "vr_render/vr_render.h"
 #include "scene_pass.h"
+#include "tree_shade.h"
 #include "scene/scene_def.h"
 
 #include <chrono>
@@ -41,6 +42,7 @@ private:
     entt::registry& reg;
     Context ctx;
 
+    std::unique_ptr<TreeShade> tree_shade;
     std::unique_ptr<ClassicRender> classic;
     std::unique_ptr<VRRender> vr;
 

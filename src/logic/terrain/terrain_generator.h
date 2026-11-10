@@ -26,6 +26,9 @@ public:
     // Height of the heightfield part of the surface, good enough to place things on the ground
     float surfaceHeight(float x, float z) const;
 
+    // surfaceHeight on a grid : count.x * count.y heights at (start + (i, j)) * spacing, laid out [j][i]
+    void surfaceHeights(glm::ivec2 start, glm::ivec2 count, float spacing, std::vector<float>& heights) const;
+
     int seed;
     float base_level = 60.f;
     float height_amplitude = 90.f;

@@ -5,6 +5,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -15,6 +16,7 @@
 
 #include "logic/components/camera.h"
 #include "logic/terrain/chunk.h"
+#include "logic/vegetation/vegetation.h"
 #include "scene/run_args.h"
 #include "util/log.h"
 
@@ -73,6 +75,7 @@ Capture::Capture(entt::registry& reg, const RunArgs& args) : reg(reg), directory
                 Shot shot;
                 shot.frame = start + i * every;
                 shot.name = name + index;
+                shot.sequence = true;
                 shots.push_back(shot);
             }
         }
@@ -189,24 +192,39 @@ void Capture::beginFrame(uint64_t frame) {
 
 }
 
-bool Capture::terrainReady() const {
+bool dy::terrainReady(const entt::registry& reg) {
     auto pending = reg.view<ChunkC>(entt::exclude<ChunkGenerated, ChunkDestroying>);
     auto meshing = reg.view<ChunkMeshPending>(entt::exclude<ChunkDestroying>);
     return pending.begin() == pending.end() && meshing.begin() == meshing.end();
+}
+
+bool dy::vegetationReady(const entt::registry& reg) {
+    auto* stats = reg.ctx().find<VegetationStats>();
+    return !stats || stats->species_loading == 0;
 }
 
 bool Capture::due(uint64_t frame) {
 
     if(done() || failed() || frame < shots[next].frame) return false;
 
-    if(terrainReady()) {
+    if(!vegetationReady(reg)) {
+        waiting_from = frame + 1;
+        return false;
+    }
+
+    if(terrainReady(reg)) {
         if(frame > shots[next].frame) {
             dy::log(dy::warning) << "Capture " << shots[next].name << " : terrain ready at frame " << frame << " instead of " << shots[next].frame << "\n";
+            // A sequence keeps its pace : the frames after a late one are as late
+            if(shots[next].sequence) {
+                uint64_t late = frame - shots[next].frame;
+                for(size_t i = next; i < shots.size(); i++) shots[i].frame += late;
+            }
         }
         return true;
     }
 
-    if(frame >= shots[next].frame + max_wait) {
+    if(frame >= std::max(shots[next].frame, waiting_from) + max_wait) {
         error = "capture " + shots[next].name + ": terrain still loading after " + std::to_string(max_wait) + " frames";
     }
     return false;

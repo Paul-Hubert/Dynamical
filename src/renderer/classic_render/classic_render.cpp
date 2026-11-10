@@ -1,5 +1,7 @@
 #include "classic_render.h"
 
+#include "renderer/tree_shade.h"
+
 #include "util/log.h"
 
 #include "renderer/context/context.h"
@@ -17,8 +19,11 @@ per_frame(NUM_FRAMES) {
 
     auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, (uint32_t)per_frame.size()));
 
-    vk::DescriptorPoolSize size(vk::DescriptorType::eUniformBuffer, (uint32_t) per_frame.size());
-    descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo(vk::DescriptorPoolCreateFlags{}, (uint32_t) per_frame.size(), 1, &size));
+    auto sizes = std::vector {
+        vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, (uint32_t) per_frame.size()),
+        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, (uint32_t) per_frame.size()),
+    };
+    descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo(vk::DescriptorPoolCreateFlags{}, (uint32_t) per_frame.size(), sizes));
 
     for (int i = 0; i < per_frame.size(); i++) {
         auto& f = per_frame[i];
@@ -79,6 +84,13 @@ void ClassicRender::updateView(uint32_t frame_index, float time) {
     auto* ubo = per_frame[frame_index].pointer;
     ubo->view_projection = camera.getProjection(aspect) * camera.getView();
     ubo->position = glm::vec4(camera.position, time);
+    ubo->tree_shade = treeShadeView(reg);
+
+    // The map is replaced when plants come and go : the set of this frame is free to take the new one
+    auto image = vk::DescriptorImageInfo(ctx.tree_shade_sampler, ctx.tree_shade_view, vk::ImageLayout::eShaderReadOnlyOptimal);
+    ctx.device->updateDescriptorSets({
+        vk::WriteDescriptorSet(per_frame[frame_index].set, 1, 0, 1, vk::DescriptorType::eCombinedImageSampler, &image, nullptr, nullptr)
+        }, {});
 
 }
 

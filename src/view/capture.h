@@ -14,7 +14,7 @@ namespace dy {
 struct RunArgs;
 
 // Runs a capture script (capture=<script.json>): moves the desktop camera to each shot and writes the frame
-// to <capture_dir>/<name>.png. A shot waits until the terrain is generated and meshed.
+// to <capture_dir>/<name>.png. A shot waits until the terrain is generated and meshed and the plants are loaded.
 //
 // { "scene": "base", "shots": [ { "frame": 600, "name": "base_spawn",
 //                                 "camera": { "pos": [x, y, z], "look_at": [x, y, z] } } ] }
@@ -22,12 +22,18 @@ struct RunArgs;
 // camera position. The camera of a shot is held from the frame after the previous shot.
 //
 // "sequence": { "start": 120, "count": 600, "every": 2, "name": "frame" }: frames for a video, after the shots,
-// written as <name>_00000.png ... without moving the camera (a scene system may drive it).
+// written as <name>_00000.png ... without moving the camera (a scene system may drive it). When a frame has to wait
+// (terrain, plants), the ones after it are as late : the sequence keeps its pace.
 //
 // "input": [ { "frame": 610, "key": "W", "down": true }, { "frame": 700, "button": "left", "down": true, "mouse": [x, y] } ]
 // Scripted input goes through SDL's event queue, so InputSys and the systems after it see it as real input.
 // "mouse" places ImGui's cursor (the hidden window never has the OS cursor); the OS cursor is not touched.
 // "motion": [dx, dy] sends a relative mouse motion (PlayerControl's mouse look while the right button is down).
+// The chunks around the cameras are generated and meshed
+bool terrainReady(const entt::registry& reg);
+// No species of the vegetation library is still loading (true without vegetation)
+bool vegetationReady(const entt::registry& reg);
+
 class Capture {
 public:
     Capture(entt::registry& reg, const RunArgs& args);
@@ -46,7 +52,8 @@ public:
 
     std::string error;
 
-    // Shots wait at most this many frames for the terrain
+    // Shots wait at most this many frames for the terrain, once the plants are loaded (that takes seconds, whatever
+    // the frame rate)
     static constexpr uint64_t max_wait = 1200;
 
 private:
@@ -66,15 +73,15 @@ private:
         std::string name;
         std::optional<glm::vec3> pos, look_at, offset;
         std::optional<float> yaw, pitch;
+        bool sequence = false;
     };
-
-    bool terrainReady() const;
 
     entt::registry& reg;
     std::string directory;
     std::vector<Shot> shots;
     std::vector<InputEvent> inputs;
     size_t next = 0;
+    uint64_t waiting_from = 0;  // the wait for the terrain is counted from this frame
     bool hide_ui = false;       // "hide_ui": true, the ImGui windows are drawn transparent (videos of what they would cover)
 
     bool have_spawn = false;

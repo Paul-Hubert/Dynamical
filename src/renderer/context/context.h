@@ -32,7 +32,10 @@ public:
     Swapchain swap;
 
     // Set 0 of every scene pipeline : the ViewUBO of the desktop camera or of one VR eye
+    // and the shade of the plants (TreeShade, which owns both)
     vk::DescriptorSetLayout view_layout;
+    vk::ImageView tree_shade_view;
+    vk::Sampler tree_shade_sampler;
 
     uint32_t frame_index = 0;
 

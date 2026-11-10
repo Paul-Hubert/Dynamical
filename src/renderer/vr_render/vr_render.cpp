@@ -1,5 +1,7 @@
 #include "vr_render.h"
 
+#include "renderer/tree_shade.h"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -36,8 +38,11 @@ per_frame(NUM_FRAMES) {
 
     auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, (uint32_t) per_frame.size()));
 
-    vk::DescriptorPoolSize size(vk::DescriptorType::eUniformBuffer, (uint32_t) per_frame.size() * num_views);
-    descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, (uint32_t) per_frame.size() * num_views, 1, &size));
+    auto sizes = std::vector {
+        vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, (uint32_t) per_frame.size() * num_views),
+        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, (uint32_t) per_frame.size() * num_views),
+    };
+    descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, (uint32_t) per_frame.size() * num_views, sizes));
 
     for(size_t i = 0; i < per_frame.size(); i++) {
         auto& f = per_frame[i];
@@ -227,6 +232,12 @@ void VRRender::updateView(uint32_t frame_index, float time) {
         auto* ubo = per_frame[frame_index].eyes[v].pointer;
         ubo->view_projection = projection_fov(views[v].fov, vr_near, vr_far) * glm::inverse(world_from_eye);
         ubo->position = glm::vec4(glm::vec3(world_from_eye[3]), time);
+        ubo->tree_shade = treeShadeView(reg);
+
+        auto image = vk::DescriptorImageInfo(ctx.tree_shade_sampler, ctx.tree_shade_view, vk::ImageLayout::eShaderReadOnlyOptimal);
+        ctx.device->updateDescriptorSets({
+            vk::WriteDescriptorSet(per_frame[frame_index].eyes[v].set, 1, 0, 1, vk::DescriptorType::eCombinedImageSampler, &image, nullptr, nullptr)
+            }, {});
     }
 
 }

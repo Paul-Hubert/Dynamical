@@ -1,0 +1,63 @@
+{
+  "patch_size": 320,
+  "coverage": 0.5,
+  "edge": 0.1,
+  "max_slope": 24,
+  "slope_fade": 9,
+  "slope_reach": 48,
+  "stand_size": 130,
+
+  "stands": [
+    {
+      "name": "pines",
+      "layers": [
+        { "where": "forest", "spacing": 4.6, "fill": 0.9, "max_slope": 30, "scale": [1.0, 1.5],
+          "species": { "pine_aleppo_desktop_1_forest": 3, "pine_aleppo_desktop_2_forest": 3, "pine_aleppo_desktop_5_forest": 3,
+                       "pin_alep": 2, "pin_a_crochet_2": 1.5, "genevrier_adulte": 1 } },
+        { "where": "forest", "spacing": 5, "fill": 0.4, "clump": 22, "max_slope": 34, "scale": [0.7, 1.3],
+          "species": { "pistacia_lentiscus": 3, "pistacia_lentiscus_vieux": 1, "genevrier_jeune": 3, "genevrier_jeune_2": 2 } },
+        { "where": "forest", "spacing": 2.6, "fill": 0.5, "clump": 14, "max_slope": 38, "scale": [0.8, 1.5],
+          "species": { "herbe_grande": 3, "polypodium": 2, "plantago_lanceolata": 1 } }
+      ]
+    },
+    {
+      "name": "oaks",
+      "layers": [
+        { "where": "forest", "spacing": 6, "fill": 0.9, "max_slope": 30, "scale": [1.15, 1.7],
+          "species": { "quercus_pedonculata_adulte": 3, "quercus_pedonculata_vieux": 1, "quercus_pedonculata_jeune": 2,
+                       "quercus_ilex_adulte": 2, "quercus_ilex2": 2, "charme": 2 } },
+        { "where": "forest", "spacing": 5.5, "fill": 0.3, "clump": 24, "max_slope": 34, "scale": [0.7, 1.2],
+          "species": { "noisetier": 2, "jeune_noisetier": 3, "quercus_ilex_jeune": 2 } },
+        { "where": "forest", "spacing": 2.4, "fill": 0.6, "clump": 12, "max_slope": 38, "scale": [0.9, 1.8],
+          "species": { "polypodium": 5, "herbe_grande": 2, "apiaceae3": 1 } }
+      ]
+    },
+    {
+      "name": "alders and birches",
+      "layers": [
+        { "where": "forest", "spacing": 5.2, "fill": 0.9, "max_slope": 30, "scale": [1.0, 1.5],
+          "species": { "alder_desktop_forest": 3, "aulne": 1.5, "bouleau": 3, "bouleau_2": 1, "orme": 2, "peuplier": 1, "saule": 1 } },
+        { "where": "forest", "spacing": 4.5, "fill": 0.4, "clump": 20, "max_slope": 34, "scale": [0.7, 1.3],
+          "species": { "aulne_jeune": 3, "aulne_tres_jeune": 2, "bouleau_jeune": 2 } },
+        { "where": "forest", "spacing": 2.4, "fill": 0.55, "clump": 12, "max_slope": 38, "scale": [0.8, 1.5],
+          "species": { "apiaceae3": 2, "herbe_grande": 3, "polypodium": 2, "elymus_repens": 1 } }
+      ]
+    }
+  ],
+
+  "everywhere": [
+    { "where": "edge", "spacing": 5, "fill": 0.5, "max_slope": 34, "scale": [0.7, 1.3],
+      "species": { "bouleau_jeune": 2, "genevrier_jeune_2": 2, "pistacia_lentiscus_jeune": 2, "aulne_jeune": 1, "centaurea_diffusa": 1 } },
+    { "where": "edge", "spacing": 9, "fill": 0.35, "max_slope": 30, "scale": [0.6, 0.9],
+      "species": { "quercus_pedonculata_jeune": 2, "bouleau": 1, "pine_aleppo_desktop_4_coastal": 2, "noisetier": 1 } },
+
+    { "where": "open", "spacing": 60, "fill": 0.3, "max_slope": 22, "scale": [0.9, 1.3],
+      "species": { "pine_aleppo_desktop_3_field": 2, "alder_desktop_field": 1, "quercus_pedonculata_vieux": 1 } },
+    { "where": "open", "spacing": 18, "fill": 0.25, "clump": 70, "max_slope": 30, "scale": [0.7, 1.3],
+      "species": { "genevrier_jeune_2": 2, "centaurea_diffusa": 1, "genevrier_jeune": 1 } },
+    { "where": "open", "spacing": 3, "fill": 0.6, "clump": 26, "max_slope": 35, "scale": [0.8, 1.4],
+      "species": { "marguerite_2": 3, "centaurea_2": 2, "plantago_lanceolata": 2, "lapsana_2": 1 } },
+    { "where": "open", "spacing": 3.5, "fill": 0.4, "clump": 40, "max_slope": 35, "scale": [0.8, 1.5],
+      "species": { "herbe_grande": 3, "elymus_repens": 1 } }
+  ]
+}

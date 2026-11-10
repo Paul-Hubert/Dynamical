@@ -10,6 +10,8 @@ struct ViewUBO {
 
     glm::mat4 view_projection;
     glm::vec4 position; // xyz : camera position in world space, w : time in seconds
+    glm::vec4 tree_shade; // x : strength of the shade of the plants (TreeShade, binding 1), y : 1 / width of its map in metres,
+                          // z : distance from the camera where it ends
 
 };
 

@@ -36,11 +36,12 @@ per_frame(NUM_FRAMES) {
         f.compute_semaphore = ctx.device->createSemaphore({});
     }
 
-    classic = std::make_unique<ClassicRender>(ctx, reg);
-    vr = std::make_unique<VRRender>(ctx, reg);
-
     reg.ctx().emplace<ModelManager>(reg);
     reg.ctx().emplace<RenderSettings>();
+
+    tree_shade = std::make_unique<TreeShade>(ctx, reg);
+    classic = std::make_unique<ClassicRender>(ctx, reg);
+    vr = std::make_unique<VRRender>(ctx, reg);
 
     // Draw order as listed (base: opaque terrain, grass shells on top of it, models, then the desktop UI)
     for(const std::string& name : desc.passes) {
@@ -111,6 +112,7 @@ void Renderer::render() {
 
     ctx.transfer.check();
 
+    tree_shade->update();
     for(ScenePass* pass : pass_list) {
         pass->update(frame_index);
     }
@@ -215,6 +217,7 @@ Renderer::~Renderer() {
     pass_list.clear();
     vr.reset();
     classic.reset();
+    tree_shade.reset();
 
     for(auto& f : per_frame) {
         ctx.device->destroy(f.fence);

@@ -19,13 +19,13 @@
 using namespace dy;
 
 constexpr uint32_t max_materials = 1024;
-constexpr size_t max_jobs = 3;
+constexpr size_t max_jobs = 6;
 
 namespace {
 
 struct PlantPC {
     glm::mat4 model;
-    glm::vec4 tint;
+    glm::vec4 tint;     // w : height of the plant
     glm::vec4 params;   // x : alpha cutoff, y : billboard cards, z : normal map, w : subsurface
 };
 
@@ -205,6 +205,9 @@ void VegetationPass::finishJob(Job& job) {
 
     s.def = std::move(job.def);
     s.height = std::max(s.def.max.y, 0.01f);
+    // Sphere around the bounds, from the middle of the height
+    glm::vec3 reach = glm::max(glm::abs(s.def.min), glm::abs(s.def.max));
+    s.radius = glm::length(glm::vec3(reach.x, std::max(s.def.max.y - s.height * 0.5f, s.height * 0.5f - s.def.min.y), reach.z));
 
     s.vertices = ctx.transfer.createBuffer(job.vertices.data(), vk::BufferCreateInfo({}, job.vertices.size() * sizeof(VegetationVertex),
         vk::BufferUsageFlagBits::eVertexBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
@@ -268,6 +271,19 @@ void VegetationPass::update(uint32_t frame_index) {
     auto& stats = reg.ctx().get<VegetationStats>();
     stats = VegetationStats();
 
+    if(auto* preload = reg.ctx().find<VegetationPreload>()) {
+        for(uint32_t s : preload->species) {
+            if(s >= species.size() || species[s]) continue;
+            if(jobs.size() < max_jobs) request(s);
+            else stats.species_loading++;
+        }
+    }
+    for(auto& s : species) {
+        if(!s) continue;
+        if(s->state == Species::State::Ready) stats.species_loaded++;
+        if(s->state == Species::State::Loading) stats.species_loading++;
+    }
+
     auto* settings = reg.ctx().find<RenderSettings>();
     if(settings && !settings->vegetation) return;
     float lod_bias = settings ? settings->vegetation_params.lod_bias : 2.f;
@@ -280,11 +296,22 @@ void VegetationPass::update(uint32_t frame_index) {
         bool active = false;
         glm::vec3 position = glm::vec3(0.f);
         float tan_half_fov = 1.f;
+        // Plants outside this cone around `forward` are not drawn
+        bool cull = false;
+        glm::vec3 forward = glm::vec3(0.f, 0.f, -1.f);
+        float cone_sin = 0.f, cone_cos = 1.f;
     };
     std::array<Eye, NUM_RENDER_TARGETS> eyes;
 
     if(auto* camera = reg.ctx().find<Camera>(); camera && pipelines[index(RenderTarget::Desktop)]) {
-        eyes[index(RenderTarget::Desktop)] = { true, camera->position, std::tan(camera->fov * 0.5f) };
+        Eye& eye = eyes[index(RenderTarget::Desktop)];
+        eye = { true, camera->position, std::tan(camera->fov * 0.5f) };
+        // The cone around the corners of the widest window (21:9)
+        float cone = std::atan(eye.tan_half_fov * std::sqrt(1.f + 2.4f * 2.4f));
+        eye.cull = settings ? settings->vegetation_params.cull : true;
+        eye.forward = camera->forward();
+        eye.cone_sin = std::sin(cone);
+        eye.cone_cos = std::cos(cone);
     }
     auto* vr_input = reg.ctx().find<VRInput>();
     auto* rig = reg.ctx().find<VRRig>();
@@ -296,6 +323,7 @@ void VegetationPass::update(uint32_t frame_index) {
 
     // One level of detail per plant and target
 
+    bool unrequested = false;
     for(auto [entity, transform, plant] : reg.view<const Transform, const Plant>().each()) {
 
         stats.plants++;
@@ -303,6 +331,7 @@ void VegetationPass::update(uint32_t frame_index) {
 
         if(!species[plant.species]) {
             if(jobs.size() < max_jobs) request(plant.species);
+            else unrequested = true;
             continue;
         }
         const Species& s = *species[plant.species];
@@ -310,11 +339,20 @@ void VegetationPass::update(uint32_t frame_index) {
 
         float height = s.height * transform.scale.y;
         glm::vec3 center = transform.position + glm::vec3(0.f, height * 0.5f, 0.f);
-        glm::mat4 matrix = transform.matrix();
+        float radius = s.radius * transform.scale.y;
+        bool have_matrix = false;
+        glm::mat4 matrix;
 
         for(uint32_t target = 0; target < NUM_RENDER_TARGETS; target++) {
             const Eye& eye = eyes[target];
             if(!eye.active) continue;
+
+            if(eye.cull) {
+                glm::vec3 to = center - eye.position;
+                float along = glm::dot(to, eye.forward);
+                float aside = std::sqrt(std::max(glm::dot(to, to) - along * along, 0.f));
+                if(aside * eye.cone_cos - along * eye.cone_sin > radius) continue;
+            }
 
             int lod = -1;
             if(force_lod >= 0 || plant.lod >= 0) {
@@ -331,9 +369,14 @@ void VegetationPass::update(uint32_t frame_index) {
             }
             if(lod < 0) continue;
 
+            if(!have_matrix) {
+                matrix = transform.matrix();
+                have_matrix = true;
+            }
             instances[target].push_back({ plant.species, (uint32_t) lod, matrix });
         }
     }
+    if(unrequested) stats.species_loading++;
 
     for(auto& list : instances) {
         std::sort(list.begin(), list.end(), [](const Instance& a, const Instance& b) {
@@ -345,10 +388,6 @@ void VegetationPass::update(uint32_t frame_index) {
         stats.drawn++;
         for(auto& draw : species[instance.species]->def.lods[instance.lod].draws) stats.triangles += draw.index_count / 3;
     }
-    for(auto& s : species) {
-        if(s && s->state == Species::State::Ready) stats.species_loaded++;
-    }
-
 }
 
 void VegetationPass::record(vk::CommandBuffer command, const RenderView& view) {
@@ -396,7 +435,7 @@ void VegetationPass::record(vk::CommandBuffer command, const RenderView& view) {
 
             PlantPC pc;
             pc.model = instance.matrix;
-            pc.tint = material.tint;
+            pc.tint = glm::vec4(glm::vec3(material.tint), s.height * glm::length(glm::vec3(instance.matrix[1])));
             pc.params = glm::vec4(s.def.alpha_cutoff, material.billboard ? 1.f : 0.f,
                 normal_maps && material.has_normal ? 1.f : 0.f, subsurface && material.has_subsurface ? 1.f : 0.f);
             command.pushConstants(layout, stages, 0, sizeof(PlantPC), &pc);

@@ -44,7 +44,7 @@ Entry point is `src/main.cpp` → `Game::start()`. The game loop runs: `renderer
 - **Scene passes** (`scene_pass.h`, `passes/`): `TerrainPass`, `GrassPass`, `ModelPass`, `UIPass` (desktop only). Each builds one pipeline per target; `update()` runs on the main thread, `record()` runs concurrently for both targets and must only read shared state (use `const entt::registry&`)
 - **Frame sync** (`renderer.cpp`): per-frame fence; transfer → compute → graphics chained with semaphores; one graphics submit holds both targets' command buffers
 - **Context** (`context/`): VRContext (OpenXR instance first, it picks the Vulkan extensions and GPU) → Windu (SDL2) → Instance → Device (+ VMA) → Transfer → Compute → Swapchain
-- **Conventions**: world is Y up, -Z forward; projections are Vulkan clip space (Y flipped, depth 0..1); `ViewUBO` is set 0 of every scene pipeline
+- **Conventions**: world is Y up, -Z forward; projections are Vulkan clip space (Y flipped, depth 0..1); `ViewUBO` is set 0 binding 0 of every scene pipeline, the shade of the plants (`TreeShade`) binding 1
 
 ### Terrain (`src/logic/terrain/`, `src/renderer/terrain/`)
 - **Chunks**: 64³ marching cubes of 4 units, density sampled on a 67³ grid (1 sample border) in `[x][z][y]` layout, > 0 is solid
@@ -75,8 +75,16 @@ Entry point is `src/main.cpp` → `Game::start()`. The game loop runs: `renderer
 
 ### Vegetation (`src/logic/vegetation/`, `src/renderer/passes/vegetation_pass.*`, docs/vegetation.md)
 - Library of 80 SpeedTree 8 species in `resources/vegetation/` (generated, git ignored): `tools/speedtree_import.py --source <Tautavel> --lfs <lfs objects>` parses the Unity project's `.st` files (format in docs/vegetation.md). Read from the source tree when the build folder has none, the build does not copy it
-- Entities with `Transform` + `Plant` (species index) are drawn by `VegetationPass` (`"vegetation"` pass): species loaded on first use (taskflow, then Vulkan on the main thread), one level of detail per plant and target, billboard cards last. `vegetation.*.glsl`: alpha test, normal map, baked occlusion, subsurface. No wind, colliders or shadows
+- Entities with `Transform` + `Plant` (species index) are drawn by `VegetationPass` (`"vegetation"` pass): species loaded on first use (taskflow, then Vulkan on the main thread), one level of detail per plant and target, billboard cards last. `vegetation.*.glsl`: alpha test, normal map, baked occlusion, subsurface, shade of the plants around. Plants out of the desktop view are culled. No wind, colliders or shadow maps
 - Scene `vegetation_test`: `VegetationScatter` (random plants per chunk, from the chunk densities) and `VegetationLineup` (one of each species at the spawn, a copy per level of detail). Tests `VEG.*` in `tests/unit/vegetation.cpp`
+
+### Forests (`src/logic/vegetation/forest.*`, `src/renderer/tree_shade.*`, `src/view/camera_walk.*`, docs/forest.md)
+- Scenes `forest` (free camera, VR) and `forest_walk` (the camera walks through a forest; `tools/forest_video.py` makes the MP4). Tests `FOREST.*` in `tests/unit/forest.cpp`
+- `ForestField` (context variable, `std::shared_ptr`): cover 0..1 from patch noise times a mask on the slope of the heightfield (no forest over `max_slope`), and a stand (kind of forest); defined on an 8 m lattice anchored to the world
+- `resources/forest/tautavel.forest.json`: stands (pines, oaks, alders and birches) and `everywhere` layers. A layer is a world-anchored jittered grid (`spacing`) kept by `fill` times a function of the cover (`forest`, `edge`, `open`, `all`), optionally in clumps
+- `ForestSys` (`"Forest"`) puts each chunk's candidates on its ground (`ChunkForest`, destroyed with the chunk); plants do not depend on the chunk load order. Species are preloaded through `VegetationPreload`
+- `TreeShade` (renderer, always there): crown shadows splatted on a 2048 m wrapping map from the `Plant` signals, set 0 binding 1; `treeShade()` in the terrain, grass and vegetation fragment shaders. `ViewUBO::tree_shade` carries the strength (`RenderSettings::tree_shade`)
+- `CameraWalk`: picks a line (open, forest, open, gentle ground), routes around trunks and low branches on a grid (Dijkstra), walks the camera. Captures wait for `VegetationStats::species_loading == 0`, sequences keep their pace after a late frame
 
 ### Models (`src/renderer/model/`)
 - glTF 2.0 through tinygltf (`gltf_loader.cpp`), flattened into one vertex/index buffer with node transforms baked in. `ModelManager` (context variable) caches files; instances are entities with `Transform` + `ModelRenderable`

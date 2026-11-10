@@ -54,6 +54,7 @@ private:
         std::shared_ptr<VmaBuffer> indices;
         std::vector<Material> materials;
         float height = 1.f;
+        float radius = 1.f;     // of the sphere around the plant, centred at half its height
     };
 
     // CPU side of a species, filled on a worker thread

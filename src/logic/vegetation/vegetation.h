@@ -96,12 +96,18 @@ std::filesystem::path vegetationDirectory();
 // The context's library, loaded from vegetationDirectory() on first use (empty when there is none)
 VegetationLibrary& vegetationLibrary(entt::registry& reg);
 
+// Context variable : species the vegetation pass loads before any plant uses them
+struct VegetationPreload {
+    std::vector<uint32_t> species;
+};
+
 // Context variable written by VegetationPass, read by the debug menu
 struct VegetationStats {
     uint32_t plants = 0;            // Plant entities
     uint32_t drawn = 0;             // instances drawn on the desktop target
     uint32_t triangles = 0;
     uint32_t species_loaded = 0;
+    uint32_t species_loading = 0;   // asked for and not drawn yet : plants are missing
 };
 
 }

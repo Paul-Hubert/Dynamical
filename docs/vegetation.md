@@ -1,7 +1,8 @@
 # Vegetation
 
 Plants of the Tautavel Unity project (SpeedTree 8 `.st` files), converted to a library the engine draws with its own
-shader. No wind, no colliders, no shadows yet.
+shader. No wind, no colliders, no shadow maps: the shade under the plants is a map of crown shadows
+([forest.md](forest.md), which also has the forests these plants grow in).
 
 ## Building the library
 
@@ -71,9 +72,10 @@ the next.
     detail behind it. Positions are logged.
   Both select species with `species` (ids) or `categories`, cut down to `max_species` with `seed`.
 - `VegetationPass` (`"vegetation"` in a scene's passes): draws every `Transform` + `Plant`. A species is loaded when
-  a plant first uses it, files and mip levels on the taskflow executor, Vulkan objects on the main thread. One level
-  of detail per plant and render target, from Unity's screen heights times `lod_bias` (2). Back faces of bark are
-  culled, leaves are drawn from both sides.
+  a plant first uses it or when a `VegetationPreload` lists it, files and mip levels on the taskflow executor (6
+  species at a time), Vulkan objects on the main thread. One level of detail per plant and render target, from
+  Unity's screen heights times `lod_bias` (2). Plants outside a cone around the desktop camera's view are skipped.
+  Back faces of bark are culled, leaves are drawn from both sides.
 - `vegetation.vert.glsl` / `vegetation.frag.glsl`: alpha test, normal map (x and y only, z rebuilt, as Unity reads
   them), baked occlusion on the ambient light and half on the sun, light through the leaves from the subsurface map,
   a little specular from the smoothness. Billboard cards fade with their angle to the camera and are lit as if they
@@ -81,7 +83,8 @@ the next.
 - Textures: mip levels are filtered on the CPU, colors weighted by alpha, transparent texels filled with the colors
   around them (SpeedTree atlases are black there), alpha scaled to keep the coverage of the alpha test. Leaf atlases
   stop at 1/32 of their size: under that leaves blend with the twigs next to them.
-- Debug menu, Vegetation: counts, toggles for the pass, normal maps and subsurface, LOD bias, forced level.
+- Debug menu, Vegetation: counts, toggles for the pass, normal maps, subsurface and culling, the strength of the
+  shade under the plants, LOD bias, forced level.
 
 ## Looking at it
 
@@ -95,8 +98,8 @@ of the library: about 20 MB of video memory per 2048 texture, uncompressed.
 
 ## Not done
 
-- Wind (the data is in the `.st`, dropped by the importer), colliders, shadows.
+- Wind (the data is in the `.st`, dropped by the importer), colliders, real shadows.
 - Cross fade between levels of detail: they pop.
-- Instancing and frustum culling: one draw call per plant and material.
+- Instancing: one draw call per plant and material. No culling for the headset.
 - Texture compression (BC7 / BC5): the library is PNG, decoded and mipped at load.
 - Vegetation that is not SpeedTree (the FBX and prefab plants of the Unity project).

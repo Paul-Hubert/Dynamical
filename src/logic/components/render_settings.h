@@ -12,6 +12,7 @@ struct RenderSettings {
     bool grass_pass = false;    // set by GrassPass : this scene draws grass (the terrain is dark under it)
     bool models = true;
     bool vegetation = true;
+    float tree_shade = 0.85f;   // how dark it is under the plants (TreeShade), 0 : no shade
 
     // Plants of the vegetation library (VegetationPass)
     struct Vegetation {
@@ -19,6 +20,7 @@ struct RenderSettings {
         int force_lod = -1;         // >= 0 : every plant drawn with this level (clamped to the species' last)
         bool normal_maps = true;
         bool subsurface = true;
+        bool cull = true;           // plants out of the desktop camera's view are not drawn
     } vegetation_params;
 
     // Grass shells looked up in baked rays (grass.frag.glsl)

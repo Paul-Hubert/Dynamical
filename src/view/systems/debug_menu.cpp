@@ -97,12 +97,15 @@ void DebugMenuSys::tick(double dt) {
             if(ImGui::CollapsingHeader("Vegetation", ImGuiTreeNodeFlags_DefaultOpen)) {
                 auto& params = render.vegetation_params;
                 ImGui::Text("%u plants, %u drawn, %u triangles", vegetation->plants, vegetation->drawn, vegetation->triangles);
-                ImGui::Text("%u species loaded", vegetation->species_loaded);
+                ImGui::Text("%u species loaded, %u loading", vegetation->species_loaded, vegetation->species_loading);
                 ImGui::Checkbox("Vegetation", &render.vegetation);
                 ImGui::SameLine();
                 ImGui::Checkbox("Normal maps", &params.normal_maps);
                 ImGui::SameLine();
                 ImGui::Checkbox("Subsurface", &params.subsurface);
+                ImGui::SameLine();
+                ImGui::Checkbox("Cull", &params.cull);
+                ImGui::SliderFloat("Shade under the plants", &render.tree_shade, 0.f, 1.f);
                 ImGui::SliderFloat("LOD bias", &params.lod_bias, 0.25f, 16.f, "%.2f", ImGuiSliderFlags_Logarithmic);
                 ImGui::SliderInt("Force LOD (-1 : by distance)", &params.force_lod, -1, 5);
             }
