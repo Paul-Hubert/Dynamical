@@ -17,6 +17,7 @@
 #include "renderer/passes/terrain_pass.h"
 #include "renderer/passes/grass_pass.h"
 #include "renderer/passes/model_pass.h"
+#include "renderer/passes/vegetation_pass.h"
 #include "renderer/passes/ui_pass.h"
 
 #include "logic/components/frame_clock.h"
@@ -45,6 +46,7 @@ per_frame(NUM_FRAMES) {
     for(const std::string& name : desc.passes) {
         if(name == "terrain") passes.push_back(std::make_unique<TerrainPass>(ctx, reg));
         else if(name == "grass") passes.push_back(std::make_unique<GrassPass>(ctx, reg));
+        else if(name == "vegetation") passes.push_back(std::make_unique<VegetationPass>(ctx, reg));
         else if(name == "model") passes.push_back(std::make_unique<ModelPass>(ctx, reg));
         else if(name == "ui") passes.push_back(std::make_unique<UIPass>(ctx, reg));
         else dy::log(dy::error) << "Renderer : unknown pass " << name << "\n";

@@ -10,6 +10,7 @@
 #include "logic/components/vr.h"
 #include "logic/settings/settings.h"
 #include "logic/terrain/chunk.h"
+#include "logic/vegetation/vegetation.h"
 
 #include "renderer/terrain/terrain_sys.h"
 
@@ -90,6 +91,21 @@ void DebugMenuSys::tick(double dt) {
             ImGui::SliderFloat("Top blend start", &grass.top_start, 0.f, 0.95f);
             ImGui::SliderFloat("Noise frequency", &grass.noise_frequency, 0.001f, 1.f, "%.5g", ImGuiSliderFlags_Logarithmic);
             ImGui::SliderFloat("Noise amplitude", &grass.noise_amplitude, 0.f, 1.f);
+        }
+
+        if(auto* vegetation = reg.ctx().find<VegetationStats>()) {
+            if(ImGui::CollapsingHeader("Vegetation", ImGuiTreeNodeFlags_DefaultOpen)) {
+                auto& params = render.vegetation_params;
+                ImGui::Text("%u plants, %u drawn, %u triangles", vegetation->plants, vegetation->drawn, vegetation->triangles);
+                ImGui::Text("%u species loaded", vegetation->species_loaded);
+                ImGui::Checkbox("Vegetation", &render.vegetation);
+                ImGui::SameLine();
+                ImGui::Checkbox("Normal maps", &params.normal_maps);
+                ImGui::SameLine();
+                ImGui::Checkbox("Subsurface", &params.subsurface);
+                ImGui::SliderFloat("LOD bias", &params.lod_bias, 0.25f, 16.f, "%.2f", ImGuiSliderFlags_Logarithmic);
+                ImGui::SliderInt("Force LOD (-1 : by distance)", &params.force_lod, -1, 5);
+            }
         }
 
         if(ImGui::CollapsingHeader("VR", ImGuiTreeNodeFlags_DefaultOpen)) {

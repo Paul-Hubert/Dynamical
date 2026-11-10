@@ -64,7 +64,7 @@ struct SceneLoadOptions {
 };
 
 // Render passes a scene can list, in no particular order
-inline constexpr const char* scene_passes[] = { "terrain", "grass", "model", "ui" };
+inline constexpr const char* scene_passes[] = { "terrain", "grass", "vegetation", "model", "ui" };
 
 // name: resources/scenes/<name>.scene.json, or a path to a .json file.
 // vars: var.<name>=<value> from the command line, in order (last wins). Throws SceneError.

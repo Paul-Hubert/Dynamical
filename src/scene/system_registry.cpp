@@ -15,6 +15,7 @@
 #include "logic/components/transform.h"
 #include "logic/systems/box_drop.h"
 #include "logic/systems/chunk_systems.h"
+#include "logic/vegetation/vegetation_scatter.h"
 #include "physics/physics_sys.h"
 
 using namespace dy;
@@ -170,5 +171,6 @@ void dy::registerSimSystems() {
     registerGroundField();
     registerGait();
     registerWalkRoutes();
+    registerVegetation();
 
 }

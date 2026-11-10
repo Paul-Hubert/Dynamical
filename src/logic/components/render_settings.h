@@ -11,6 +11,15 @@ struct RenderSettings {
     bool grass = true;
     bool grass_pass = false;    // set by GrassPass : this scene draws grass (the terrain is dark under it)
     bool models = true;
+    bool vegetation = true;
+
+    // Plants of the vegetation library (VegetationPass)
+    struct Vegetation {
+        float lod_bias = 2.f;       // > 1 keeps the detailed levels further away (Unity's QualitySettings.lodBias)
+        int force_lod = -1;         // >= 0 : every plant drawn with this level (clamped to the species' last)
+        bool normal_maps = true;
+        bool subsurface = true;
+    } vegetation_params;
 
     // Grass shells looked up in baked rays (grass.frag.glsl)
     struct Grass {

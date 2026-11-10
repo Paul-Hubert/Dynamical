@@ -144,6 +144,60 @@ std::shared_ptr<VmaImage> Transfer::createImage(const void* data, size_t real_si
 }
 
 
+std::shared_ptr<VmaImage> Transfer::createImageMips(const void* data, const std::vector<size_t>& level_sizes, vk::ImageCreateInfo info, vk::ImageLayout layout) {
+
+    size_t total = 0;
+    for(size_t size : level_sizes) total += size;
+
+    VmaAllocationCreateInfo ainfo{};
+    ainfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    ainfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    auto binfo = vk::BufferCreateInfo({}, total, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, 1, &ctx.device.t_i);
+
+    current.stagingBuffers.push_back(VmaBuffer(ctx.device, &ainfo, binfo));
+    auto& stage = current.stagingBuffers.back();
+
+    VmaAllocationInfo inf;
+    vmaGetAllocationInfo(ctx.device, stage.allocation, &inf);
+
+    memcpy(inf.pMappedData, data, total);
+
+    VmaAllocationCreateInfo alloc_info{};
+    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    info.mipLevels = (uint32_t) level_sizes.size();
+    std::shared_ptr<VmaImage> image = std::make_shared<VmaImage>(ctx.device, &alloc_info, info);
+
+    auto range = vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, info.mipLevels, 0, info.arrayLayers);
+
+    current.command.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eTransfer, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ImageMemoryBarrier(
+        {}, vk::AccessFlagBits::eTransferWrite, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal,
+        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image->image, range
+    ));
+
+    std::vector<vk::BufferImageCopy> regions;
+    vk::DeviceSize offset = 0;
+    for(uint32_t level = 0; level < info.mipLevels; level++) {
+        vk::Extent3D extent(std::max(info.extent.width >> level, 1u), std::max(info.extent.height >> level, 1u), 1);
+        regions.push_back(vk::BufferImageCopy(offset, 0, 0, vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, level, 0, info.arrayLayers), vk::Offset3D(0, 0, 0), extent));
+        offset += level_sizes[level];
+    }
+    current.command.copyBufferToImage(stage, image->image, vk::ImageLayout::eTransferDstOptimal, regions);
+
+    current.command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eAllCommands, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ImageMemoryBarrier(
+        vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eShaderRead, vk::ImageLayout::eTransferDstOptimal, layout,
+        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image->image, range
+    ));
+
+    current.uploaded_images.push_back(image);
+
+    empty = false;
+
+    return image;
+
+}
+
+
 std::shared_ptr<VmaBuffer> Transfer::createBuffer(const void* data, vk::BufferCreateInfo info) {
     
     if(ctx.device.isDedicated()) {

@@ -1,0 +1,24 @@
+{
+  "format_version": 1,
+  "name": "vegetation_test",
+  "include": ["common/desktop.json"],
+  "variables": {
+    "per_chunk":   { "type": "int", "default": 40, "description": "plants scattered on each chunk crossing the surface (256 m wide)" },
+    "max_species": { "type": "int", "default": 6,  "description": "species picked among the trees of the library, 0 for all of them" },
+    "veg_seed":    { "type": "int", "default": 1,  "description": "picks the species and places the plants" },
+    "lods":        { "type": "bool", "default": true, "description": "behind each plant of the row at the spawn, one copy per level of detail" }
+  },
+
+  "renderer": { "passes": ["terrain", "grass", "vegetation", "model", "ui"], "vr": true },
+
+  "host": {
+    "pre": [
+      "Input", "UI", "Time", "PlayerControl", "VRControl", "DebugMenu",
+      "ChunkManager", "ChunkGenerator",
+      { "name": "VegetationLineup", "params": { "lods": "${lods}", "max_species": "${max_species}", "seed": "${veg_seed}", "categories": ["tree"] } },
+      { "name": "VegetationScatter", "params": { "per_chunk": "${per_chunk}", "max_species": "${max_species}", "seed": "${veg_seed}", "categories": ["tree"] } },
+      "BoxThrower", "RigidBody", "TerrainColliders", "Physics"
+    ],
+    "post": ["Terrain"]
+  }
+}

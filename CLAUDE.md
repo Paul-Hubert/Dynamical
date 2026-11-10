@@ -73,6 +73,11 @@ Entry point is `src/main.cpp` → `Game::start()`. The game loop runs: `renderer
 - **Terrain walker** (docs/physical-agents/reports/terrain-walker.md): `walker_terrain_train` trains the physical walker on the marching cubes terrain (`WorldTerrain` colliders, `GroundTerrain` field). `WalkRoutes` draws spawn points and target directions where the ground stays within 20° up, 7° down and 12° across; heights (fall test, head error, stats) are measured from the ground under the walker. `GaitRoutes` records the kinematic walk as GAIL demonstrations (`walker_demo_gait`, `walker_demo_terrain`; 1.36 m/s, limits hold). Tests `TW.*` in `tests/unit/terrain_walker.cpp`; `tools/terrain_eval.py` evaluates by slope band
 - A planted foot comes before a joint limit (`GaitParams::yield_limits`): the walk covers any slope, realistic up to about 20°. The body files' ankle swing limits are wider than Unity's export (`unity_y_deg`, `unity_z_deg` keep the originals)
 
+### Vegetation (`src/logic/vegetation/`, `src/renderer/passes/vegetation_pass.*`, docs/vegetation.md)
+- Library of 80 SpeedTree 8 species in `resources/vegetation/` (generated, git ignored): `tools/speedtree_import.py --source <Tautavel> --lfs <lfs objects>` parses the Unity project's `.st` files (format in docs/vegetation.md). Read from the source tree when the build folder has none, the build does not copy it
+- Entities with `Transform` + `Plant` (species index) are drawn by `VegetationPass` (`"vegetation"` pass): species loaded on first use (taskflow, then Vulkan on the main thread), one level of detail per plant and target, billboard cards last. `vegetation.*.glsl`: alpha test, normal map, baked occlusion, subsurface. No wind, colliders or shadows
+- Scene `vegetation_test`: `VegetationScatter` (random plants per chunk, from the chunk densities) and `VegetationLineup` (one of each species at the spawn, a copy per level of detail). Tests `VEG.*` in `tests/unit/vegetation.cpp`
+
 ### Models (`src/renderer/model/`)
 - glTF 2.0 through tinygltf (`gltf_loader.cpp`), flattened into one vertex/index buffer with node transforms baked in. `ModelManager` (context variable) caches files; instances are entities with `Transform` + `ModelRenderable`
 
