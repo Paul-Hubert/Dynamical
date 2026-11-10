@@ -1,0 +1,6 @@
+{
+  "format_version": 1,
+  "name": "ik_check",
+  "include": ["common/ik_world.json"],
+  "worlds": [ { "template": "ik_world", "count": 1 } ]
+}

@@ -1,0 +1,8 @@
+{
+  "format_version": 1,
+  "name": "ik_check_terrain",
+  "include": ["common/ik_world.json"],
+  "variables": { "terrain_seed": { "type": "int", "default": 1337 } },
+  "worlds": [ { "template": "ik_world", "count": 1,
+                "systems": { "replace": { "GroundPlane": { "name": "GroundTerrain", "params": { "seed": "${terrain_seed}" } } } } } ]
+}

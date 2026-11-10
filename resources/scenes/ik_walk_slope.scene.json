@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "name": "ik_walk_slope",
+  "include": ["common/desktop.json", "common/ik_world.json"],
+  "variables": {
+    "draw":          { "type": "bool",  "default": true },
+    "view_distance": { "type": "float", "default": 3.4, "description": "m from the camera to the walker" },
+    "view_side":     { "type": "float", "default": 75.0, "description": "degrees the camera is swung from behind the walker to its right" }
+  },
+  "renderer": { "passes": ["model", "ui"], "vr": false },
+  "host": {
+    "pre": [ "Input", "UI", "PlayerControl", "DebugMenu", "WorldStepper", { "name": "GaitView", "params": { "distance": "${view_distance}", "azimuth": "${view_side}" } } ],
+    "post": [ { "name": "WorldView", "params": { "worlds": "all", "spacing": 0.0 } } ]
+  },
+  "worlds": [ { "template": "ik_world", "count": 1 } ]
+}
