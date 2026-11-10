@@ -161,16 +161,16 @@ void dy::DeVitaStepStatSys::tick(double h) {
             float w_s = glm::dot(w.torque, ml) * glm::dot(w.omega, ml) * dt;
             if(w_s >= 0.f) pos += w_s; else neg -= w_s;
         }
-        const bool was = d.stance[side].in_stance;
         d.stance[side].step(loaded, bot.tick, dt, 3, 2.f,
             [&](SagittalWork& w) { w.pos += pos; w.neg += neg; },
             [&](const SagittalWork& w, int ticks, int start) {
+                // A step: a stance of 0.15 s or more, counted when it ends (a foot that bounces is not stepping)
+                if(ticks * dt >= 0.15f) d.strikes++;
                 if(ticks * dt < 0.15f || start * dt < bot.params.stats_settle_seconds) return;
                 d.sum_pos += w.pos;
                 d.sum_neg += w.neg;
                 d.stances++;
             });
-        if(!was && d.stance[side].in_stance) d.strikes++;
     }
 
 }

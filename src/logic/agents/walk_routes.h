@@ -15,7 +15,7 @@ namespace dy {
 class GroundField;
 class WorldRng;
 
-// Where a walker's episodes go on ground that is not level everywhere (docs/physical-agents/terrain-walker.md): the
+// Where a walker's episodes go on ground that is not level everywhere (docs/physical-agents/reports/terrain-walker.md): the
 // marching cubes terrain is steep almost everywhere, and the walker does not see it. Spawn points and target
 // directions are drawn until the ground along the path stays inside a slope band. Component of the entity with
 // HumanBotSpawn; angles in radians (degrees in JSON)
@@ -28,7 +28,7 @@ struct WalkRoutes {
     float clear = 1.5f;                         // m around a spawn point where the ground is no steeper than the least of the three, whatever the direction
     glm::vec2 centre = glm::vec2(0.f);          // spawn points are drawn within spawn_radius of it (x, z)
     float spawn_radius = 1000.f;
-    int direction_tries = 32;                   // directions tried from a point
+    int direction_tries = 96;                   // directions tried from a point, spread evenly around it
     int spawn_tries = 20000;                    // points tried for a spawn
 };
 
@@ -49,7 +49,7 @@ RouteSlope measureRoute(const GroundField& ground, glm::vec3 from, glm::vec3 dir
 
 bool inBand(const RouteSlope& slope, const WalkRoutes& routes);
 
-// A direction from `from` whose path stays in the band; none after direction_tries draws
+// A direction from `from` whose path stays in the band; none after direction_tries of them
 std::optional<glm::vec3> drawDirection(const GroundField& ground, WorldRng& rng, const WalkRoutes& routes, glm::vec3 from);
 
 struct RouteStart {

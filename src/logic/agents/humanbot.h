@@ -158,7 +158,7 @@ struct SagittalWork {
 // DeVita's protocol: this episode's stances, published at its reset; the totals run over every episode (eval)
 struct DeVitaBooks {
     std::array<StanceWindow<SagittalWork>, 2> stance;
-    int strikes = 0;                            // stances begun, both feet, since the books were made
+    int strikes = 0;                            // stances of 0.15 s or more ended, both feet, since the books were made: steps
     float sum_pos = 0.f, sum_neg = 0.f;
     int stances = 0;
     double total_pos = 0., total_neg = 0.;
@@ -220,7 +220,7 @@ struct FormulaBooks {
 struct WalkLeg {
     glm::vec3 from = glm::vec3(0.f), to = glm::vec3(0.f);   // the spine at its start and at its end
     glm::vec3 direction = glm::vec3(0.f);       // toward the target, horizontal
-    int ticks = 0, strikes = 0;                 // foot strikes: stances begun, both feet
+    int ticks = 0, strikes = 0;                 // steps: stances of 0.15 s or more that ended on it, both feet
     bool fell = false;                          // the episode was killed on it
 };
 
@@ -267,7 +267,7 @@ struct HumanBot {
     float energy_speed = 0.f;                   // smoothed horizontal speed of the energy reward
     bool energy_speed_valid = false;
 
-    // Ground that is not the level box at y = 0 (docs/physical-agents/terrain-walker.md)
+    // Ground that is not the level box at y = 0 (docs/physical-agents/reports/terrain-walker.md)
     std::shared_ptr<GroundField> ground;        // the world's ground field when it has one: heights are measured from it. Null on the flat ground prefab
     std::optional<WalkRoutes> routes;           // set: episodes spawn and head where the ground stays in the slope band
     glm::vec3 origin = glm::vec3(0.f);          // this episode's spawn point, on the ground

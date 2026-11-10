@@ -279,6 +279,8 @@ int TrainHost::eval() {
             // Along the path: the target moves during an episode (on a terrain, to another direction)
             for(size_t l = 0; l < bot.legs.size(); l++) {
                 const WalkLeg& leg = bot.legs[l];
+                // The target moves on the tick the episode ends on: that stretch was never walked
+                if(leg.ticks <= 0) continue;
                 glm::vec3 moved = horizontal(leg.to - leg.from);
                 float distance = glm::length(moved), progress = glm::dot(moved, leg.direction);
                 sum.distance += distance;

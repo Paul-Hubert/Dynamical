@@ -86,8 +86,11 @@ bool dy::inBand(const RouteSlope& slope, const WalkRoutes& routes) {
 }
 
 std::optional<glm::vec3> dy::drawDirection(const GroundField& ground, WorldRng& rng, const WalkRoutes& routes, glm::vec3 from) {
+    // From a drawn angle, golden-angle steps: the tries spread evenly around the walker, in no order. One in ten
+    // directions is in the band on the terrain, in a few narrow fans
+    const float first = (float) rng.uniform(0., two_pi), golden = 2.39996323f;
     for(int t = 0; t < routes.direction_tries; t++) {
-        float angle = (float) rng.uniform(0., two_pi);
+        float angle = first + golden * t;
         glm::vec3 direction(std::cos(angle), 0.f, std::sin(angle));
         if(inBand(measureRoute(ground, from, direction, routes.length, routes.half_width, 0.5f, &routes), routes)) return direction;
     }

@@ -219,6 +219,7 @@ def main():
     parser.add_argument("--num-envs", type=int, default=20)
     parser.add_argument("--results", default=str(ROOT / "build" / "runs"))
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--max-steps", type=int, help="replaces the config's max_steps (pilots)")
     parser.add_argument("--stop", metavar="RUN_ID")
     parser.add_argument("--threads", type=int, default=1, help="dynamical: workers per process")
     parser.add_argument("--track", default="heidelbot_notoes__BasicMotions@Walk")
@@ -259,6 +260,8 @@ def main():
         config = results / f"{args.run_id}.yaml"
         if not (args.resume and config.exists()):
             text = pathlib.Path(args.config).read_text()
+            if args.max_steps:
+                text = re.sub(r"max_steps: \S+", f"max_steps: {args.max_steps}", text)
             config.write_text(re.sub(r"demo_path: \S+", f"demo_path: {demos.as_posix()}", text))
 
         port = free_base_port()
