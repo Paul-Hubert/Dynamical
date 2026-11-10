@@ -15,7 +15,8 @@ once at load.
 | quaternion `(x, y, z, w)` | `(−x, −y, z, w)` |
 | angular velocity, torque (axial vectors) | `(−x, −y, z)` |
 | joint `axis`, `secondaryAxis` | as vectors; the importer then derives the constraint frame in the engine's handedness |
-| twist and swing limits | kept. Each twist limit is checked against the probes, because reflection can swap low and high |
+| twist limits | `[lo, hi]` unchanged. Unity's joint angle runs opposite the rotation about its axis, and the mirror negates that rotation: the two cancel. Knee `[2, 132.62]°` in the engine. Confirmed by the Unity limit probes to 0.001° (T6.1) |
+| swing limits | kept (symmetric) |
 | Unity forward (+z) | engine forward (−z) |
 
 - **Why mirroring z is safe.** Rigid-body physics is mirror-symmetric, and mirroring z maps Unity's
@@ -44,7 +45,7 @@ once at load.
 |---|---|---|
 | `h` | Physics tick, `1 / physics_hz`. Default 60 Hz, as Unity; 120, 240 and 480 Hz are allowed | params `physics_hz` (env `physicsRate`, fixed before the worlds exist) |
 | `decision_period` | Ticks per decision = `physics_hz / control_hz`. **30 Hz control** is the invariant (2 at 60 Hz) | params `control_hz` = 30 |
-| `episode_ticks` | Truncation = `max_frames_60hz · physics_hz / 60` (2000 at 60 Hz = 33.33 s); must be a whole number of windows | params `max_frames_60hz` (env `maxFrames`) |
+| `episode_ticks` | Truncation = `max_frames_60hz · physics_hz / 60` (2000 at 60 Hz = 33.33 s); must be a whole number of windows | params `max_frames_60hz` (no env param, as in Unity) |
 | `arc_ticks` | Target re-placement = `arc_frames_60hz · physics_hz / 60` (400 at 60 Hz). This deliberately scales with the rate; Unity does not | params `arc_frames_60hz` (env `arcFrames`) |
 | frame `dt` | Wall-clock frame time in `dynamical`; never fed to agent physics | `Game` |
 

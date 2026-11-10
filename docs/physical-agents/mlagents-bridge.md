@@ -131,7 +131,7 @@ Precedence, highest first (UA §9.3):
 - A missing or malformed `-envParams` file is fatal (exit 1), as in Unity.
 - **An unknown name logs a warning once.** Unity ignores it silently.
 - **Layout-defining parameters** (`springControl`, `angularVelocityControl`, `jointSpace`, `relativeVelocity`,
-  `normalizedVelocity`, `freezeObs` and the `*Obs` flags; one list in [assets.md](assets.md#agent-parameters)):
+  `normalizedVelocity`, `normalizeSpeedDiff`, `freezeObs` and the `*Obs` flags; one list in [assets.md](assets.md#agent-parameters)):
   - accepted silently when equal to the params file;
   - **fatal (exit 1, logged) when different**, because the layout cannot change at runtime.
 
@@ -144,7 +144,7 @@ Precedence, highest first (UA §9.3):
 | Body and drive | `rotationSpring`, `rotationDamper`, `maxTorque`, `torqueFactor`, `maxAngularVelocity`, `angularVelocityFactor`, `maxTargetAngularVelocity`, `totalMass`, `physicsRate` |
 | Task | `targetSpeed`, `continuousSpeed`, `targetSpeedMin`, `targetSpeedMax`, `randomize`, `randomTarget`, `randomSpeed`, `randomInit`, `randomInitChance`, `arcFrames`, `winDistance` |
 | Disturbances | `pushing`, `pushChance`, `pushForce`, `pulling`, `pullChance`, `pullForce` |
-| Rewards and termination | `rootReward`, `headSpringReward`, `headDamperReward`, `winReward`, `deathPenalty`, `dyingHeightFactor`, `maxDyingFrames`, `lifeReward`, `dyingReward`, `dieOnFall`, `resetOnAlive`, `collisionPenalty`, `rewardFactor`, `normalizeSpeedDiff` |
+| Rewards and termination | `rootReward`, `headSpringReward`, `headDamperReward`, `winReward`, `deathPenalty`, `dyingHeightFactor`, `maxDyingFrames`, `lifeReward`, `dyingReward`, `dieOnFall`, `resetOnAlive`, `collisionPenalty`, `rewardFactor` |
 | Energy | `energyBonusWeight`, `energyScale`, `energySpeedEdge`, `energyMinSpeedFloor`, `energyVelocitySmoothingTau`, `positiveEnergyMultiplier`, `negativeEnergyMultiplier`, `energySource` (0–2 mapped to 3 with a warning), `energyClosure`, `energyChargeResidual` and `energyFullGrf` (accepted, no-ops on Jolt, warned once), `statsSettleSeconds`, `useTorqueNotEnergy`, `energyLimitEpsDeg`, `energyRewardStyle`, `energyNormDivisor`, `energyNormOffset`, `energyMinSpeed`, `energyMaxSpeed`, `etaPositiveWork`, `etaNegativeWork` |
 | Slope (M7) | `slopeAngle`, `slopeRandom`, `slopeIncludeLevel`, `slopeSign`, `slopeCompensateSpeed`, `slopeFootReach`, `slopeLiftMargin` |
 | Misc | `selfColliding` (0 accepted; 1 is fatal: self-collision is not implemented), `freezeJointActions`, `pinFrozenJointDrive` |

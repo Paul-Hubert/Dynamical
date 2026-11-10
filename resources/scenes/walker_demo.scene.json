@@ -1,0 +1,11 @@
+{
+  "format_version": 1,
+  "name": "walker_demo",
+  "include": ["common/rig_world.json"],
+  "variables": {
+    "loop": { "type": "bool", "default": false },
+    "decisions": { "type": "int", "default": 3000 },
+    "out": { "type": "string", "default": "" }
+  },
+  "worlds": [ { "template": "rig_world", "count": 1 } ]
+}

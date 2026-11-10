@@ -4,7 +4,7 @@ How the HumanBot ragdolls, trained with ML-Agents in Unity today, are rebuilt in
 worlds, a JSON scene system, a headless training executable that the unchanged trainer launches as
 `TrainingEnv.exe`, and render scenes for rig validation and for watching policies.
 
-*Status 2026-10-31: design only.* The overview, decisions and milestones are in
+*Status 2026-11-09: P0–P3 built, P4 onward planned and reviewed.* The overview, decisions and milestones are in
 [`../physical-agents-plan.md`](../physical-agents-plan.md).
 
 ## Reading order
@@ -26,6 +26,8 @@ worlds, a JSON scene system, a headless training executable that the unchanged t
 | — | [unity-analysis.md](unity-analysis.md) | **Reference**: what the noToes Unity code computes, with file:line sources |
 | 12 | [phases.md](phases.md) | **The executable plan**: P0–P15 with steps, tests, visual sign-off and gates |
 | 13 | [diagram.md](diagram.md) | Spec and Claude Design prompt for the implementation-plan diagram |
+| — | [humanbot-port-review.md](humanbot-port-review.md) | **Review 2026-11-09**: the plan against the Unity sources, line-by-line accounting |
+| — | [open-questions.md](open-questions.md) | **Decisions needed for P4 onward**, each with a default |
 
 ## Rules for these docs
 

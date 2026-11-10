@@ -1,0 +1,2 @@
+{ "format_version": 1, "name": "rig_check", "include": ["common/rig_world.json"],
+  "worlds": [ { "template": "rig_world", "count": 1 } ] }

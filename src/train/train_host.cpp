@@ -6,9 +6,24 @@
 #include <chrono>
 #include <thread>
 
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+
+#include <filesystem>
+#include <fstream>
+
 #include "env_params_file.h"
+#include "logic/agents/agent_env_params.h"
+#include "logic/agents/agent_io.h"
+#include "logic/agents/humanbot.h"
+#ifdef DYNAMICAL_ONNX
+#include "onnx/policy_runner.h"
+#endif
 #include "mlagents/client.h"
 #include "mlagents/side_channels.h"
+#include "mlagents_envs/communicator_objects/agent_info_action_pair.pb.h"
+#include "mlagents_envs/communicator_objects/brain_parameters.pb.h"
+#include "mlagents_envs/communicator_objects/demonstration_meta.pb.h"
 #include "null_env.h"
 #include "worlds_env.h"
 #include "process_control.h"
@@ -39,6 +54,8 @@ int TrainHost::run() {
     if(mode == "bench") return bench();
     if(mode == "null") return null();
     if(mode == "train") return agents();
+    if(mode == "record-demo") return recordDemo();
+    if(mode == "eval") return eval();
 
     dy::log(dy::error) << "mode=" << mode << " is not available yet\n";
     return 1;
@@ -77,6 +94,241 @@ void TrainHost::writeEnvParams(int64_t steps) {
     } else {
         dy::log(dy::warning) << "EnvParams: could not write " << train.env_params_out << ", will retry on the next change\n";
     }
+}
+
+void TrainHost::pushEnvParams() {
+    auto values = env_params.resolved();
+    for(size_t i = 0; i < runner.worldCount(); i++) {
+        auto& reg = runner.world(i).reg;
+        if(auto* existing = reg.ctx().find<AgentEnvParams>()) existing->values = values;
+        else reg.ctx().emplace<AgentEnvParams>().values = values;
+    }
+}
+
+int TrainHost::recordDemo() {
+
+    if(runner.worldCount() != 1) {
+        dy::log(dy::error) << "mode=record-demo needs exactly one world\n";
+        return 1;
+    }
+    const auto& vars = runner.scene().resolved["variables"];
+    int decisions = sceneInt(runner.scene(), "decisions", 3000);
+    std::string out_path = vars.contains("out") ? vars["out"]["default"].get<std::string>() : "";
+    if(out_path.empty()) {
+        dy::log(dy::error) << "mode=record-demo needs var.out=<file.demo>\n";
+        return 1;
+    }
+
+    auto& world = runner.world(0);
+    auto& io = world.reg.ctx().get<AgentIO>();
+    int period = (int) world.reg.ctx().get<WorldClock>().decision_period;
+
+    mlagents::co::DemonstrationMetaProto meta;
+    meta.set_api_version(1);
+    meta.set_demonstration_name(std::filesystem::path(out_path).stem().string().substr(0, 16));
+
+    std::string records;
+    int steps = 0, episodes = 0;
+    {
+        google::protobuf::io::StringOutputStream stream(&records);
+        google::protobuf::io::CodedOutputStream coded(&stream);
+        // Warm up one window: the anchor velocities are valid from the second observation of the track
+        runner.step(period);
+        bool finished = false;
+        while(!finished) {
+            runner.step(period);
+            mlagents::co::AgentInfoActionPairProto pair;
+            auto* info = pair.mutable_agent_info();
+            info->set_reward(0.f);
+            info->set_done(io.done);
+            info->set_max_step_reached(io.done);
+            info->set_id(0);
+            auto* obs = info->add_observations();
+            obs->add_shape(io.observation_size);
+            obs->set_compression_type(mlagents::co::NONE);
+            obs->mutable_float_data()->mutable_data()->Add(io.observation.begin(), io.observation.end());
+            obs->add_dimension_properties(0);
+            obs->set_observation_type(mlagents::co::DEFAULT);
+            obs->set_name(io.sensor_name);
+            auto* act = pair.mutable_action_info();
+            act->mutable_continuous_actions()->Resize(io.action_size, 0.f);
+            coded.WriteVarint32((uint32_t) pair.ByteSizeLong());
+            pair.SerializeToCodedStream(&coded);
+            steps++;
+            if(io.done) {
+                episodes++;
+                if(steps >= decisions) finished = true;
+            }
+        }
+    }
+
+    meta.set_number_steps(steps);
+    meta.set_number_episodes(episodes);
+    meta.set_mean_reward(0.f);
+
+    mlagents::co::BrainParametersProto brain;
+    brain.set_brain_name(io.behavior + "?team=0");
+    brain.set_is_training(false);
+    brain.mutable_action_spec()->set_num_continuous_actions(io.action_size);
+    brain.mutable_action_spec()->set_num_discrete_actions(0);
+
+    std::ofstream out(out_path, std::ios::binary);
+    if(!out) {
+        dy::log(dy::error) << "Cannot write " << out_path << "\n";
+        return 1;
+    }
+    {
+        // The metadata in its 32-byte header, the brain from byte 33, then the records: demo_loader.py's layout
+        std::string header;
+        {
+            google::protobuf::io::StringOutputStream s(&header);
+            google::protobuf::io::CodedOutputStream c(&s);
+            c.WriteVarint32((uint32_t) meta.ByteSizeLong());
+            meta.SerializeToCodedStream(&c);
+        }
+        if(header.size() > 33) {
+            dy::log(dy::error) << "Demo metadata too long\n";
+            return 1;
+        }
+        header.resize(33, '\0');
+        out.write(header.data(), header.size());
+        std::string body;
+        {
+            google::protobuf::io::StringOutputStream s(&body);
+            google::protobuf::io::CodedOutputStream c(&s);
+            c.WriteVarint32((uint32_t) brain.ByteSizeLong());
+            brain.SerializeToCodedStream(&c);
+        }
+        out.write(body.data(), body.size());
+        out.write(records.data(), records.size());
+    }
+    dy::log(dy::info) << "Demo " << out_path << ": " << steps << " decisions, " << episodes << " episodes\n";
+    return 0;
+
+}
+
+int TrainHost::eval() {
+
+#ifndef DYNAMICAL_ONNX
+    dy::log(dy::error) << "mode=eval needs a build with ONNX Runtime\n";
+    return 1;
+#else
+    const auto& vars = runner.scene().resolved["variables"];
+    std::string model = vars.contains("model") ? vars["model"]["default"].get<std::string>() : "";
+    std::string out_path = vars.contains("out") ? vars["out"]["default"].get<std::string>() : "";
+    int episodes = sceneInt(runner.scene(), "episodes", 100);
+    if(model.empty()) {
+        dy::log(dy::error) << "mode=eval needs var.model=<file.onnx>\n";
+        return 1;
+    }
+    auto policy = std::make_shared<PolicyRunner>(model, humanbot_observations, humanbot_actions);
+    for(size_t i = 0; i < runner.worldCount(); i++) {
+        auto& reg = runner.world(i).reg;
+        reg.ctx().insert_or_assign(PolicyHandle { policy, true });
+        reg.ctx().get<AgentIO>().reset_requested = true;
+        runner.world(i).systems.fixed_observe_only();
+    }
+    int period = (int) runner.world(0).reg.ctx().get<WorldClock>().decision_period;
+    tf::Executor executor(std::max(1u, std::thread::hardware_concurrency() / 2));
+
+    struct Sum { double ticks = 0, dead = 0, distance = 0, seconds = 0, head = 0; int n = 0; } sum;
+    // var.replay=<prefix>: the first episode of world 0 as a pose track (playable in rig_anim, var.track=...)
+    std::string replay = vars.contains("replay") ? vars["replay"]["default"].get<std::string>() : "";
+    std::vector<float> replay_data;
+    bool replay_open = !replay.empty();
+    std::vector<glm::vec3> start(runner.worldCount());
+    for(size_t i = 0; i < runner.worldCount(); i++) {
+        auto& bot = runner.world(i).reg.ctx().get<HumanBot>();
+        start[i] = bot.state.position[bot.body->spine];
+    }
+    while(sum.n < episodes) {
+        runner.step(period, &executor);
+        if(replay_open) {
+            auto& bot = runner.world(0).reg.ctx().get<HumanBot>();
+            for(size_t i = 0; i < bot.body->segments.size(); i++) {
+                glm::vec3 p = bot.state.position[i];
+                glm::quat q = bot.state.rotation[i];
+                replay_data.insert(replay_data.end(), { p.x, p.y, p.z, q.x, q.y, q.z, q.w });
+            }
+            if(runner.world(0).reg.ctx().get<AgentIO>().done || replay_data.size() > 16 * 7 * 4000) {
+                replay_open = false;
+                auto& rbot = runner.world(0).reg.ctx().get<HumanBot>();
+                int frames = (int) (replay_data.size() / (16 * 7));
+                std::ofstream(replay + ".track.bin", std::ios::binary).write(reinterpret_cast<const char*>(replay_data.data()), replay_data.size() * sizeof(float));
+                nlohmann::json header = { { "format_version", 1 }, { "body", rbot.body->name }, { "controller", "replay" }, { "dt", (float) (runner.world(0).reg.ctx().get<WorldClock>().dt * period) },
+                    { "frames", frames }, { "segments", (int) rbot.body->segments.size() }, { "frame", "engine" }, { "state_speed", 1.f } };
+                std::ofstream(replay + ".track.json") << header.dump(1);
+            }
+        }
+        for(size_t i = 0; i < runner.worldCount(); i++) {
+            auto& reg = runner.world(i).reg;
+            auto& io = reg.ctx().get<AgentIO>();
+            auto& bot = reg.ctx().get<HumanBot>();
+            if(!io.done) continue;
+            sum.ticks += bot.tick;
+            sum.dead += bot.killed ? 1 : 0;
+            double dt = reg.ctx().get<WorldClock>().dt;
+            sum.seconds += bot.tick * dt;
+            sum.distance += glm::length(horizontal(bot.state.position[bot.body->spine] - start[i]));
+            sum.head += bot.currentHeight();
+            sum.n++;
+            // The next episode starts at this world's next window (parked): the distance restarts with it
+            start[i] = bot.body->segments[bot.body->spine].spawn_position;
+        }
+    }
+    nlohmann::json summary = {
+        { "model", model }, { "episodes", sum.n }, { "dead_rate", sum.dead / sum.n },
+        { "mean_length_ticks", sum.ticks / sum.n }, { "mean_speed", sum.distance / std::max(sum.seconds, 1e-9) }, { "mean_final_height", sum.head / sum.n } };
+    // The energy books over every episode: net residual (S7.5) and tick-wise |residual|, both against sum |work|
+    double abs_work = 0., abs_residual = 0., net_residual = 0.;
+    double devita_pos = 0., devita_neg = 0., devita_stances = 0.;
+    FormulaTotals formulas;
+    for(size_t i = 0; i < runner.worldCount(); i++) {
+        const auto& books = runner.world(i).reg.ctx().get<HumanBot>().books;
+        abs_work += books.cum_abs_work;
+        abs_residual += books.cum_residual;
+        net_residual += books.cum_net_residual;
+        const auto& devita = runner.world(i).reg.ctx().get<HumanBot>().devita;
+        devita_pos += devita.total_pos;
+        devita_neg += devita.total_neg;
+        devita_stances += (double) devita.total_stances;
+        formulas += runner.world(i).reg.ctx().get<HumanBot>().formulas.totals;
+    }
+    if(devita_pos > 0.) {
+        summary["devita_neg_pos"] = devita_neg / devita_pos;
+        summary["devita_pos_per_stance"] = devita_pos / devita_stances;
+        summary["devita_neg_per_stance"] = devita_neg / devita_stances;
+        summary["devita_stances"] = devita_stances;
+    }
+    summary["closure_net"] = net_residual / std::max(abs_work, 1e-9);
+    summary["closure_tickwise"] = abs_residual / std::max(abs_work, 1e-9);
+    auto split = [](const WorkSum& w) { return nlohmann::json { { "pos", w.pos }, { "neg", w.neg } }; };
+    auto ratio = [](double a, double b) { return b > 0. ? a / b : 0.; };
+    summary["energy_formulas"] = {
+        { "ticks", formulas.ticks }, { "seconds", formulas.seconds }, { "metres", formulas.metres }, { "stances", formulas.stances },
+        { "torque_variation_Nm", formulas.torque_variation },
+        { "full_body", { { "internal_abs_delta_L", formulas.lagrangian_abs }, { "internal_L", split(formulas.lagrangian) }, { "body_energy", split(formulas.body_energy) },
+                         { "rne", split(formulas.rne) }, { "drive", split(formulas.drive) } } },
+        { "devita_stance", { { "rne_sagittal", split(formulas.rne_sagittal) }, { "drive_sagittal", split(formulas.drive_sagittal) },
+                             { "rne_3d", split(formulas.rne_stance_3d) }, { "drive_3d", split(formulas.drive_stance_3d) } } },
+        { "verification", {
+            { "rne_force_vs_jolt_point_lambda", ratio(formulas.point_error, formulas.point_reference) },
+            { "rne_torque_vs_motor_no_limit", ratio(formulas.torque_error_free, formulas.torque_reference_free) },
+            { "joint_ticks_no_limit", formulas.joint_ticks_free }, { "joint_ticks_limit", formulas.joint_ticks_limit },
+            { "limit_torque_share", ratio(formulas.limit_torque, formulas.limit_torque + formulas.torque_reference_free) },
+            { "jolt_contact_vs_momentum_balance", ratio(formulas.contact_error, formulas.contact_reference) },
+            { "root_residual_force_vs_weight", ratio(formulas.root_linear, formulas.weight_impulse) },
+            { "root_residual_torque_nms_per_tick", ratio(formulas.root_angular, (double) formulas.ticks) },
+            { "closure_net", ratio(formulas.closure_net, formulas.closure_gross) },
+            { "closure_tickwise", ratio(formulas.closure_tickwise, formulas.closure_gross) },
+            { "closure_with_point_work_net", ratio(formulas.closure_point_net, formulas.closure_gross) },
+            { "closure_with_point_work_tickwise", ratio(formulas.closure_point_tickwise, formulas.closure_gross) },
+            { "contact_work_J", formulas.contact_work }, { "clamped_ticks", formulas.clamped_ticks } } } };
+    dy::log(dy::info) << "eval " << summary.dump() << "\n";
+    if(!out_path.empty()) std::ofstream(out_path) << summary.dump(2) << "\n";
+    return 0;
+#endif
+
 }
 
 int TrainHost::bench() {
@@ -134,6 +386,7 @@ int TrainHost::agents() {
     return serve([&, worlds, threads](int64_t seed) {
         // The worlds again, seeded from the trainer's seed (it includes the worker id)
         runner.restart((uint64_t) seed);
+        pushEnvParams();
         auto env = std::make_unique<WorldsEnvironment>(runner, threads);
         dy::log(dy::info) << "Scene " << runner.scene().name << ": " << worlds << " worlds of " << env->behavior() << " ("
             << env->agent(0).observation_size << " observations, " << env->agent(0).action_size << " actions, decision every "
@@ -211,6 +464,7 @@ int TrainHost::serve(const std::function<std::unique_ptr<TrainerEnvironment>(int
             }
         }
         writeEnvParams(steps);
+        if(!messages.empty()) pushEnvParams();
 
         if(rl.command() == co::QUIT) {
             dy::log(dy::info) << "QUIT received: exiting\n";

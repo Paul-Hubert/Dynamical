@@ -29,7 +29,7 @@ BUILD = ROOT / "build"
 EXE = BUILD / "RelWithDebInfo" / "dynamical.exe"
 
 
-SCENES = {"SphereRoller": "sphere_view", "WheelRoller": "wheel_view"}
+SCENES = {"SphereRoller": "sphere_view", "WheelRoller": "wheel_view", "HeidelBotBehavior": "walker_view", "AnySpeedBotBehavior": "devita_view"}
 
 
 def newest_checkpoint(run_dir):
@@ -82,6 +82,8 @@ def main():
         "vars": {"num_worlds": "1"} | ({} if args.heuristic else {"model": model}),
         # Half a second first: the first decisions are taken and the terrain around the spawn point is meshed
         "sequence": {"start": 30, "count": count, "every": 60 // args.fps, "name": "frame"},
+        # The walker views frame the body in the middle of the window, under the debug panels
+        "hide_ui": scene in ("walker_view", "devita_view"),
     }
     (frames / "capture.json").write_text(json.dumps(script, indent=2))
 

@@ -73,8 +73,9 @@ The world lives in a shared fragment, so the same world runs rendered (`rig_anim
 | Rest pose | The rest pose **before the knee move** equals the body file's Unity rest pose (imported) to 1e-5 m. After the move, joint angles read 0 except the knees (2.1°) | M1 gate |
 | Track ↔ body | Track body name and `body_sha256` match the loaded body; segment count matches; `dt` equals world dt to a relative 1e-5 | loader |
 | Joint limits | Every frame: each joint's twist and swing (computed by `BodySync`) are inside the limits. The panel reports the margin and the worst frame per joint | M1, M2 (cross-check of the twist sign and the elliptical cone against the limit probes) |
-| Bone lengths | Parent-to-child anchor distance is constant over the track to 1e-4 m | Bake quality |
+| Bone lengths | Parent-to-child anchor distance constant over the track to 6 mm (Mecanim retargeting and Foot IK stretch bones), except the three root joints (Spine, both UpLegs), where the clone's Hips animates under the root: those are reported, not checked | Bake quality |
 | Velocities | Finite-difference linear and angular velocities are free of spikes at loop seams | M5 (demo angular velocity) |
+| Heading frames | Share of frames where `\|horizontal(f(s))\| < 0.1` per segment (the fallback path of `H(s)`), reported | Layout `_2` |
 | Ground | Lowest foot point per frame against y = 0: penetration and float, contact on/off per foot | Stance stats, M5 |
 | Observation | Observation vector printed with element names from the layout; optional diff against a golden file of the same frame | M3 |
 | Root motion | Root path, heading and speed plotted against the track's tag speed | Demo and target-speed sanity |

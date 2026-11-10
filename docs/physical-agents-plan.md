@@ -1,6 +1,7 @@
 # HumanBot physical agents in Dynamical — plan
 
-*2026-10-31 · Plan only; nothing is built.*
+*2026-11-09 · P0–P3 built. P4 onward is reviewed against the Unity sources
+([review](physical-agents/humanbot-port-review.md)) and waits on [open questions](physical-agents/open-questions.md).*
 
 **This engine becomes the new `TrainingEnv.exe`.** It simulates the HumanBot noToes walker as a
 **first-class C++ / Jolt implementation** and speaks the stock ML-Agents protocol to the unchanged
@@ -116,6 +117,10 @@ M5b needs the M3 layout and an exported ONNX (M4). It can run alongside M6.
   behaviourally at matched updates.
 - **The GAIL header coupling** (UA §6): demos zero the velocity header, so GAIL rewards command
   tracking. `_2` keeps the coupling on purpose.
+- **The Unity baseline trained on spiked demos** (UA §6, review R4): joint speeds up to 28 km/s reach the
+  discriminator raw at every other demo episode start. Engine demos have none, so P12's comparison carries that
+  confound.
+- **No flat-walker reference run exists** for the noToes body (open-questions Q2). It gates P12.
 - **Jolt patch maintenance.** P-A and P-C live in an overlay port on 5.6.0. Upstream them; re-verify on
   every Jolt bump.
 - **The scene port could regress `base`.** P0 pins master's behaviour; P1 gates on it.

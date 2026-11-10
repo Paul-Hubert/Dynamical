@@ -38,6 +38,7 @@ Capture::Capture(entt::registry& reg, const RunArgs& args) : reg(reg), directory
 
     try {
         nlohmann::json script = nlohmann::json::parse(file);
+        hide_ui = script.value("hide_ui", false);
 
         for(auto& j : script.value("shots", nlohmann::json::array())) {
             Shot shot;
@@ -161,6 +162,7 @@ void Capture::sendInput(uint64_t frame) {
 void Capture::beginFrame(uint64_t frame) {
 
     sendInput(frame);
+    if(hide_ui) ImGui::GetStyle().Alpha = 0.f;
 
     auto& camera = reg.ctx().get<Camera>();
     if(!have_spawn) {

@@ -1,0 +1,12 @@
+{
+  "format_version": 1,
+  "name": "rig_anim",
+  "include": ["common/desktop.json", "common/rig_world.json"],
+  "variables": { "draw": { "type": "bool", "default": true } },
+  "renderer": { "passes": ["model", "ui"], "vr": false },
+  "host": {
+    "pre": [ "Input", "UI", "PlayerControl", "DebugMenu", "WorldStepper", "WalkerView" ],
+    "post": [ { "name": "WorldView", "params": { "worlds": "all", "spacing": 0.0 } } ]
+  },
+  "worlds": [ { "template": "rig_world", "count": 1 } ]
+}

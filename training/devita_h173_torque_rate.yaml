@@ -1,0 +1,62 @@
+# The DeVita H173 line on TrainingEnv.exe: devita-h173-pn-equal-80m.yaml with the exact Jolt energy channel.
+# energyScale 643 = 587 x 1.095, what the corrected motor axes add to the gross work of the 587 policy, so that the same gait
+# earns the same reward. default_settings as the Unity config.
+default_settings:
+    trainer_type: ppo
+    hyperparameters:
+        batch_size: 5000
+        buffer_size: 50000
+        learning_rate: 1.0e-4
+        beta: 4.0e-5
+        epsilon: 0.15
+        num_epoch: 2
+    network_settings:
+        deterministic: false
+        normalize: true
+        hidden_units: 512
+        num_layers: 3
+    reward_signals:
+        extrinsic:
+            strength: 1
+            gamma: 0.95
+        gail:
+            strength: 0.5
+            gamma: 0.95
+            learning_rate: 1.0e-5
+            use_actions: false
+            use_vail: false
+            demo_path: Demonstrations
+    threaded: false
+    max_steps: 80000000
+    checkpoint_interval: 10000000
+    keep_checkpoints: 20
+    time_horizon: 200
+    summary_freq: 100000
+
+environment_parameters:
+    depth: 0
+    energyPenalty: 0
+    rootReward: 0
+    continuousSpeed: 0
+    targetSpeed: 1.5
+    slopeAngle: 0
+    slopeSign: 0
+    slopeRandom: 0
+    slopeCompensateSpeed: 1
+    physicsRate: 60
+    energySource: 3
+    positiveEnergyMultiplier: 4.0
+    negativeEnergyMultiplier: 0.8333
+    energyScale: 2765
+    torqueRateWeight: 0.05704
+    energyBonusWeight: 1.0
+    energyMinSpeedFloor: 0.5
+    maxTargetAngularVelocity: 1.0472
+    rotationSpring: 2731.0933
+    rotationDamper: 294.2495
+    maxAngularVelocity: 20.9044
+    energySpeedEdge: 0.35
+    energyVelocitySmoothingTau: 0.3
+
+env_settings:
+    seed: 42

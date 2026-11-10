@@ -1,0 +1,23 @@
+{
+  "variables": {
+    "body":  { "type": "string", "default": "agents/bodies/heidelbot_notoes.body.json" },
+    "track": { "type": "string", "default": "agents/tracks/heidelbot_notoes__BasicMotions@Walk.track.json" },
+    "params": { "type": "string", "default": "agents/params/walker.params.json" },
+    "draw":  { "type": "bool",   "default": false },
+    "loop":  { "type": "bool",   "default": true }
+  },
+  "templates": {
+    "rig_world": {
+      "physics": { "threads": 1, "max_bodies": 64, "max_body_pairs": 1024, "max_contacts": 1024, "temp_bytes": 8388608,
+                   "allow_sleeping": false, "friction_combine": "max", "restitution_combine": "min" },
+      "clock": { "physics_hz": 60, "control_hz": 30 },
+      "fixed": [ "RigidBody", "AgentFactory", "TrackActions", "PhysicsStep", "BodySync", "Task", "Termination",
+                 "Rewards@observe", "Observation@observe", "Episode@observe" ],
+      "entities": [
+        { "prefab": "ground_flat" },
+        { "HumanBotSpawn": { "body": "${body}", "params": "${params}", "motion": "kinematic", "recording": true, "draw": "${draw}" },
+          "PoseTrackPlayer": { "track": "${track}", "loop": "${loop}" } }
+      ]
+    }
+  }
+}

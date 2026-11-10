@@ -54,7 +54,7 @@ executables load scenes with the same loader: `dynamical scene=<name>` and `dyna
       "fixed": [
         "TrainerActions@act", "DriveTargets", "Disturbances", "PhysicsStep", "BodySync",
         "Contacts", "Energy", "Task", "Stats", "Termination",
-        "Observation@observe", "Rewards@observe", "Episode@observe"
+        "Rewards@observe", "Observation@observe", "Episode@observe"
       ],
       "entities": [
         { "prefab": "ground_flat" },

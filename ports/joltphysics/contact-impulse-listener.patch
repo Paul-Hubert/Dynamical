@@ -1,0 +1,140 @@
+diff --git a/Jolt/Physics/Constraints/ContactConstraintManager.cpp b/Jolt/Physics/Constraints/ContactConstraintManager.cpp
+index efb7aee..7dbd395 100644
+--- a/Jolt/Physics/Constraints/ContactConstraintManager.cpp
++++ b/Jolt/Physics/Constraints/ContactConstraintManager.cpp
+@@ -1817,7 +1817,7 @@ bool ContactConstraintManager::SolveVelocityConstraints(const uint32 *inConstrai
+ }
+ 
+ template <EMotionType Type1, EMotionType Type2>
+-void ContactConstraintManager::sStoreAppliedImpulses(ContactConstraintBase &ioConstraint, ManifoldCache &inManifoldCache)
++void ContactConstraintManager::sStoreAppliedImpulses(ContactConstraintBase &ioConstraint, ManifoldCache &inManifoldCache, ContactImpulseListener *inListener)
+ {
+ 	ContactConstraint<Type1, Type2> &constraint = static_cast<ContactConstraint<Type1, Type2> &>(ioConstraint);
+ 	CachedManifold &cached_manifold = inManifoldCache.FromHandle(constraint.mCachedManifoldHandle)->GetValue();
+@@ -1832,12 +1832,39 @@ void ContactConstraintManager::sStoreAppliedImpulses(ContactConstraintBase &ioCo
+ 	cached_manifold.mFrictionLambda[0] = constraint.mFrictionConstraint1.GetTotalLambda();
+ 	cached_manifold.mFrictionLambda[1] = constraint.mFrictionConstraint2.GetTotalLambda();
+ 	cached_manifold.mAngularFrictionLambda = constraint.mAngularFrictionConstraint.GetTotalLambda();
++
++	if (inListener != nullptr)
++	{
++		// The bodies are still at their start of step pose: positions are integrated after this
++		ContactImpulseReport report;
++		report.mBody1 = constraint.mBody1->GetID();
++		report.mBody2 = constraint.mBody2->GetID();
++		report.mNormal = constraint.GetWorldSpaceNormal();
++		constraint.GetTangents(report.mTangent1, report.mTangent2);
++		report.mNumPoints = constraint.mNumContactPoints;
++		RMat44 transform1 = constraint.mBody1->GetCenterOfMassTransform();
++		RMat44 transform2 = constraint.mBody2->GetCenterOfMassTransform();
++		RVec3 friction_point = RVec3::sZero();
++		for (uint32 i = 0; i < constraint.mNumContactPoints; ++i)
++		{
++			const CachedContactPoint &ccp = cached_manifold.mContactPoints[i];
++			RVec3 p = 0.5_r * (transform1 * Vec3::sLoadFloat3Unsafe(ccp.mPosition1) + transform2 * Vec3::sLoadFloat3Unsafe(ccp.mPosition2));
++			report.mPoints[i] = p;
++			report.mNormalLambda[i] = ccp.mNonPenetrationLambda;
++			friction_point += p;
++		}
++		report.mFrictionPoint = friction_point / Real(max(constraint.mNumContactPoints, uint32(1)));
++		report.mFrictionLambda[0] = cached_manifold.mFrictionLambda[0];
++		report.mFrictionLambda[1] = cached_manifold.mFrictionLambda[1];
++		report.mAngularFrictionLambda = cached_manifold.mAngularFrictionLambda;
++		inListener->OnContactSolved(report);
++	}
+ }
+ 
+ void ContactConstraintManager::StoreAppliedImpulses(const uint32 *inConstraintOffsetBegin, const uint32 *inConstraintOffsetEnd) const
+ {
+ 	// Build dispatch table
+-	using DispatchFunc = void (*)(ContactConstraintBase &, ManifoldCache &);
++	using DispatchFunc = void (*)(ContactConstraintBase &, ManifoldCache &, ContactImpulseListener *);
+ 	static const DispatchFunc table[3][3] = {
+ 		{
+ 			nullptr, // Static vs static doesn't exist
+@@ -1873,7 +1900,7 @@ void ContactConstraintManager::StoreAppliedImpulses(const uint32 *inConstraintOf
+ 			next_constraint = nullptr;
+ 
+ 		// Dispatch to the correct templated form
+-		table[(int)constraint.mBody1->GetMotionType()][(int)constraint.mBody2->GetMotionType()](constraint, *mWriteCache);
++		table[(int)constraint.mBody1->GetMotionType()][(int)constraint.mBody2->GetMotionType()](constraint, *mWriteCache, mContactImpulseListener);
+ 	}
+ }
+ 
+diff --git a/Jolt/Physics/Constraints/ContactConstraintManager.h b/Jolt/Physics/Constraints/ContactConstraintManager.h
+index d76f3fc..a03bbe7 100644
+--- a/Jolt/Physics/Constraints/ContactConstraintManager.h
++++ b/Jolt/Physics/Constraints/ContactConstraintManager.h
+@@ -29,6 +29,31 @@ class PhysicsUpdateContext;
+ /// A contact constraint manager manages all contacts between two bodies
+ ///
+ /// WARNING: This class is an internal part of PhysicsSystem, it has no functions that can be called by users of the library.
++/// One contact manifold after the velocity solve of a collision step (the impulses Jolt keeps for its warm start).
++/// Normal and points act on body 2 with +, on body 1 with -.
++struct ContactImpulseReport
++{
++	BodyID						mBody1;
++	BodyID						mBody2;
++	Vec3						mNormal;											///< World space, from body 1 to body 2
++	Vec3						mTangent1;
++	Vec3						mTangent2;
++	uint32						mNumPoints = 0;
++	RVec3						mPoints[64];										///< World space: where each normal impulse acts
++	float						mNormalLambda[64];
++	RVec3						mFrictionPoint;										///< World space: where the linear friction impulse acts
++	float						mFrictionLambda[2];
++	float						mAngularFrictionLambda;								///< About mNormal
++};
++
++/// Called after the velocity solve of every collision step, from the solver jobs: must be thread safe
++class ContactImpulseListener
++{
++public:
++	virtual						~ContactImpulseListener() = default;
++	virtual void				OnContactSolved(const ContactImpulseReport &inReport) = 0;
++};
++
+ class JPH_EXPORT ContactConstraintManager : public NonCopyable
+ {
+ public:
+@@ -47,6 +72,9 @@ public:
+ 	void						SetContactListener(ContactListener *inListener)						{ mContactListener = inListener; }
+ 	ContactListener *			GetContactListener() const											{ return mContactListener; }
+ 
++	/// Listener that gets the solved impulses of every contact, null for none
++	void						SetContactImpulseListener(ContactImpulseListener *inListener)		{ mContactImpulseListener = inListener; }
++
+ 	/// Callback function to combine the restitution or friction of two bodies
+ 	/// Note that when merging manifolds (when PhysicsSettings::mUseManifoldReduction is true) you will only get a callback for the merged manifold.
+ 	/// It is not possible in that case to get all sub shape ID pairs that were colliding, you'll get the first encountered pair.
+@@ -538,7 +566,7 @@ private:
+ 
+ 	/// Internal helper function to store lambdas applied during sSolveVelocityConstraint.
+ 	template <EMotionType Type1, EMotionType Type2>
+-	static void					sStoreAppliedImpulses(ContactConstraintBase &ioConstraint, ManifoldCache &inManifoldCache);
++	static void					sStoreAppliedImpulses(ContactConstraintBase &ioConstraint, ManifoldCache &inManifoldCache, ContactImpulseListener *inListener);
+ 
+ 	/// Internal helper function to solve a single position constraint. Templated to the motion type to reduce the amount of branches and calculations.
+ 	template <EMotionType Type1, EMotionType Type2>
+@@ -549,6 +577,7 @@ private:
+ 
+ 	/// Listener that is notified whenever a contact point between two bodies is added/updated/removed
+ 	ContactListener *			mContactListener = nullptr;
++	ContactImpulseListener *	mContactImpulseListener = nullptr;
+ 
+ 	/// Functions that are used to combine friction and restitution of 2 bodies
+ 	CombineFunction				mCombineFriction = [](const Body &inBody1, const SubShapeID &, const Body &inBody2, const SubShapeID &) { return Sqrt(inBody1.GetFriction() * inBody2.GetFriction()); };
+diff --git a/Jolt/Physics/PhysicsSystem.h b/Jolt/Physics/PhysicsSystem.h
+index b244a51..6713124 100644
+--- a/Jolt/Physics/PhysicsSystem.h
++++ b/Jolt/Physics/PhysicsSystem.h
+@@ -67,6 +67,9 @@ public:
+ 	void						SetContactListener(ContactListener *inListener)				{ mContactManager.SetContactListener(inListener); }
+ 	ContactListener *			GetContactListener() const									{ return mContactManager.GetContactListener(); }
+ 
++	/// Listener that gets the solved impulses of every contact after each collision step's velocity solve
++	void						SetContactImpulseListener(ContactImpulseListener *inListener) { mContactManager.SetContactImpulseListener(inListener); }
++
+ 	/// Listener that is notified whenever a contact point between a soft body and another body
+ 	void						SetSoftBodyContactListener(SoftBodyContactListener *inListener) { mSoftBodyContactListener = inListener; }
+ 	SoftBodyContactListener *	GetSoftBodyContactListener() const							{ return mSoftBodyContactListener; }

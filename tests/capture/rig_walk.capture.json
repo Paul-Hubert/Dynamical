@@ -1,0 +1,1 @@
+{ "scene": "rig_anim", "shots": [ { "frame": 120, "name": "rig_walk_a" }, { "frame": 180, "name": "rig_walk_b" } ] }

@@ -70,6 +70,8 @@ The values come from UA §1. The exporter reads the real ones; this doc never be
   - centre of mass and inertia (`physx_readback`; nothing in code sets them, so PhysX derives them from
     the colliders);
   - the auto-configured connected anchors.
+- **Shapes are written in world space** (centre, rotation, world-scaled sizes), the importer takes them into the
+  segment's frame. Joints carry `anchor_world` and `connected_anchor_world`.
 - Export per-shape transforms, including the foot child objects and their 1.0517 scale. Drop triggers.
 - Export compound children with their source names. The pelvis capsule sits on the unbodied Hips.
 - Export the **joint order explicitly** (UA §1.4). Never derive it from hierarchy and side.
@@ -97,6 +99,8 @@ controller's state speed, at the physics rate (UA §6, §9.2).
   "frame": "unity_left_handed" }
 ```
 
+- **Length.** `frames ≥ 2 · decisions + episode_ticks`: recording runs to the end of the episode in progress
+  (10 155 decisions for a request of 10 000 in the Unity demo, 20 310 ticks).
 - `.track.bin`: little-endian float32, frame-major. Per frame and per segment, in body order:
   `pos.xyz, rot.xyzw` (7 floats).
 - **World poses of the 16 bodies**, matched by name, as Unity's recorder copies them. No retargeting
@@ -122,17 +126,19 @@ initialisation and every episode start ([mlagents-bridge.md](mlagents-bridge.md#
   | `decisionPeriod` | 2 | 5 |
   | `maxAngularVelocity` | 20 | 10 |
   | `totalMass` | 70 | 80 |
+  | `minSpeedFloor`, `speedEdgeWidth` (energy provider) | 0.1, 0.15 | 0.5, 0.35 |
   | `normalizeSpeedDiff`, `relativeVelocity`, `normalizedVelocity`, `targetSpeedObs`, `dyingObs` | off | on |
 - **One file per line:**
 
   | File | Content |
   |---|---|
+  | (format) | `unity_parameters` / `unity_energy`: Unity's serialized fields verbatim. `Training.unity` has no `EnergyRewardProvider`, so its energy block is empty |
   | `walker.params.json` | `Training.unity`: behaviour `HeidelBotBehavior`, body `heidelbot_notoes`, 70 kg, `energyBonusWeight 0`, `rootReward 0.34`, randomised target and speed |
   | `devita_h173.params.json` | `DeVitaArenaH173.unity`: behaviour `AnySpeedBotBehavior`, body `heidelbot_notoes_h173`, 69 kg, `rootReward 0` |
 
   Config env params (gains, energy, slope) arrive at runtime as env params, as in Unity.
 - **Layout-defining flags are file-only.** `springControl`, `angularVelocityControl`, `jointSpace`,
-  `*Obs`, `freezeObs`, `normalizedVelocity` and `relativeVelocity` select the layout. **This is the one
+  `*Obs`, `freezeObs`, `normalizedVelocity`, `relativeVelocity` and `normalizeSpeedDiff` select the layout. **This is the one
   list.** An env param equal to the file value is accepted. A different value is fatal (exit 1).
 - **Durations** are Unity's 60 Hz counts: `physics_hz` (60), `control_hz` (30), `max_frames_60hz`
   (2000), `arc_frames_60hz` (400), `substeps` (default 1).
