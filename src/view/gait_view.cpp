@@ -113,11 +113,42 @@ void GaitViewSys::tick(double dt) {
     view_heading += turn * (1.f - std::exp(-(float) dt * 1.5f));
 
     if(camera) {
-        // From behind the walker, swung to its side by the azimuth
-        float a = view_heading + glm::radians(azimuth);
-        glm::vec3 back(std::sin(a), 0.f, std::cos(a));
-        glm::vec3 eye = focus + back * distance + up * (height - 1.f);
-        if(auto hit = ground.below(eye + up * 50.f, 100.f)) eye.y = std::max(eye.y, hit->point.y + 0.3f);
+        // From behind the walker, swung to its side by the azimuth; on a slope that would hide the feet, from the
+        // other side, from higher or from behind: the first place that sees both feet, kept while it does
+        struct Place { float side, turn, lift; };
+        const Place places[] = { { 1.f, 0.f, 0.f }, { -1.f, 0.f, 0.f }, { 1.f, 0.f, 1.5f }, { -1.f, 0.f, 1.5f }, { 1.f, 60.f, 2.f }, { -1.f, 60.f, 2.f },
+            { 1.f, 0.f, 3.5f }, { -1.f, 0.f, 3.5f }, { 1.f, 100.f, 4.f } };
+        const int count = (int) (sizeof(places) / sizeof(places[0]));
+        auto at = [&](const Place& place) {
+            float a = view_heading + place.side * glm::radians(azimuth + place.turn);
+            glm::vec3 e = focus + glm::vec3(std::sin(a), 0.f, std::cos(a)) * distance + up * (height - 1.f + place.lift);
+            if(auto hit = ground.below(e + up * 50.f, 100.f)) e.y = std::max(e.y, hit->point.y + 0.4f);
+            return e;
+        };
+        auto sees = [&](glm::vec3 from, glm::vec3 to) {
+            for(int i = 1; i < 16; i++) {
+                glm::vec3 point = glm::mix(from, to, i / 16.f);
+                if(auto hit = ground.below(point + up * 30.f, 60.f)) {
+                    if(hit->point.y > point.y - 0.03f) return false;
+                }
+            }
+            return true;
+        };
+        auto clear = [&](const Place& place) {
+            glm::vec3 e = at(place);
+            if(!state.feet_ready) return true;
+            for(const FootState& f : state.foot) if(!sees(e, f.position + up * 0.12f)) return false;
+            return sees(e, focus);
+        };
+        if(!clear(places[std::clamp(view_choice, 0, count - 1)])) {
+            view_choice = count - 1;
+            for(int i = 0; i < count; i++) if(clear(places[i])) { view_choice = i; break; }
+        } else if(view_choice != 0 && clear(places[0])) {
+            view_choice = 0;
+        }
+        glm::vec3 wanted = at(places[view_choice]);
+        if(glm::length(eye - focus) > 4.f * distance + 8.f) eye = wanted;      // the first frame, or a jump of the walker
+        eye = glm::mix(eye, wanted, 1.f - std::exp(-(float) dt * 2.5f));
         glm::vec3 d = glm::normalize(focus - up * 0.25f - eye);
         auto& cam = reg.ctx().get<Camera>();
         cam.position = eye;
@@ -216,7 +247,7 @@ void GaitViewSys::tick(double dt) {
         ImGui::Text("under the ground %.1f / %.1f mm", report->penetration * 1e3f, report->max_penetration * 1e3f);
         ImGui::Text("slip %.1f / %.1f mm", report->slip * 1e3f, report->max_slip * 1e3f);
         ImGui::Text("stance IK %.1f mm %.1f deg / %.1f mm %.1f deg", report->ik_position * 1e3f, report->ik_rotation * deg, report->max_ik_position * 1e3f, report->max_ik_rotation * deg);
-        ImGui::Text("limits took %.1f / %.1f deg", report->ik_limit * deg, report->max_ik_limit * deg);
+        ImGui::Text("limits took or gave %.1f / %.1f deg", report->ik_limit * deg, report->max_ik_limit * deg);
         ImGui::Text("past the body file's limits %.1f / %.1f deg", report->body_limit_excess * deg, report->max_body_limit_excess * deg);
         ImGui::Text("steps %d", report->steps);
     }
@@ -228,6 +259,7 @@ void GaitViewSys::tick(double dt) {
         ImGui::SliderFloat("step width (m)", &params->step_width, 0.05f, 0.3f, "%.2f");
         ImGui::SliderFloat("slope slowdown", &params->slope_slowdown, 0.f, 3.5f, "%.1f");
         ImGui::SliderFloat("lean per slope", &params->lean_slope_gain, 0.f, 1.f, "%.2f");
+        ImGui::Checkbox("joint limits give way to a planted foot", &params->yield_limits);
     }
     ImGui::End();
 

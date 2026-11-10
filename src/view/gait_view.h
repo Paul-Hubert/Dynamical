@@ -12,7 +12,7 @@
 namespace dy {
 
 // Host system of the ik_walk scenes (docs/physical-agents/ik-gait.md): a camera that follows one world's kinematic
-// walker, a panel to command it (speed, heading, the test plane's tilt) and read its checks, and markers: the
+// walker from where the ground does not hide its feet (the asked side first, then the other side, higher, behind), a panel to command it (speed, heading, the test plane's tilt) and read its checks, and markers: the
 // test plane with a metre grid, the soles' prints (orange on the heel edge, green flat, blue on the toe edge, grey
 // where the swing foot will land), the legs' IK targets, the centre of mass over its ground point (red), the
 // extrapolated centre of mass (magenta) and the outline of the prints it must stay between. After WorldStepper.
@@ -33,7 +33,8 @@ private:
     int world = 0;
     float distance = 3.4f, height = 1.3f, azimuth = 75.f;
     bool camera = true, markers = true, panel = true;
-    glm::vec3 focus = glm::vec3(0.f);
+    glm::vec3 focus = glm::vec3(0.f), eye = glm::vec3(0.f);
+    int view_choice = 0;                        // which side and height the camera took to see the feet
     float view_heading = 0.f;
     bool has_focus = false;
 

@@ -48,9 +48,12 @@ struct GaitParams {
     float ankle_margin = 0.035f;                // the heel rises when the ankle is this close to its dorsiflexion stop
     float knee_follow = 0.5f;                   // in a turn the knee points this share of the way from the pelvis' forward to the foot's
     float knee_out = 0.5f;                      // the knee points this share of the way from the walker's forward to the foot's toes
-    // Added to the ankles' swing limits for the IK: the body file's 20.6 and 30.8 degrees do not reach a 15 degree
-    // side slope. About the foot's long axis (roll) and about the sole's normal (yaw)
-    float ankle_roll_extra = 0.148f, ankle_yaw_extra = 0.218f;
+    // Added to the ankles' swing limits for the IK only, about the foot's long axis (roll) and the sole's normal
+    // (yaw). 0: the body file's, which were widened for 15 degree side slopes (assets.md)
+    float ankle_roll_extra = 0.f, ankle_yaw_extra = 0.f;
+    // A planted foot comes first: where a leg cannot put its foot on its print inside the joint limits, the limits
+    // give way (steep ground). false: the limits always hold and the foot misses its print
+    bool yield_limits = true;
     // Pelvis and trunk
     float leg_extension = 0.992f;               // most of the thigh + shank length a leg stretches to (the knee keeps 14 degrees)
     float hip_height = 1.f;                     // the hips' height over the ankles in mid stance, as a share of that reach
@@ -62,7 +65,13 @@ struct GaitParams {
     float arm_swing = 0.32f, arm_bias = 0.05f, elbow = 0.17f, elbow_swing = 0.2f;
     // Command following
     float acceleration = 1.f, turn_rate = 0.7f, min_speed = 0.05f;
-    float slope_slowdown = 1.5f;                // the speed walked is the command times exp(-slope_slowdown * |tan slope|)
+    float slope_slowdown = 1.5f;                // the speed walked is the command times exp(-slope_slowdown * |tan slope|),
+    float slope_speed_floor = 0.25f;            // ... and no less than this share of it, however steep,
+    float step_rise = 0.35f;                    // ... but slow enough that a step climbs or drops no more than this, m
+    float look_ahead = 0.8f;                    // m ahead of the walker where a steeper slope already slows it
+    float braking = 2.5f;                       // m/s2, slowing down (acceleration is for speeding up)
+    float max_print_rise = 0.5f;                // m between a foot's landing and the other foot's print: the step shortens to keep it
+    float max_print_tilt = 1.31f;               // radians: steeper ground than this (75 degrees) is stood on at this tilt
     // Balance
     int balance_iterations = 8;
     float balance_tolerance = 3e-4f;
@@ -133,6 +142,7 @@ struct GaitState {
     float capture_offset = 0.f;                 // the heel lands this far behind the extrapolated centre of mass
     float sway = 0.f;                           // lateral offset of the centre of mass target, along the walker's right
     float slope_pitch = 0.f, slope_roll = 0.f;  // of the ground along and across the heading (uphill, right side up)
+    float steepness = 0.f;                      // tan of the steepest slope under or just ahead of the walker
     float lean = 0.f;
     glm::vec3 hip_centre = glm::vec3(0.f);      // between the hip joints, before GaitBalance
     glm::vec3 pivot = glm::vec3(0.f);           // the same point in the pelvis frame
@@ -181,7 +191,8 @@ struct GaitReport {
     float swing_ik_position = 0.f, max_swing_ik_position = 0.f;     // ... of the legs in swing
     float swing_ik_rotation = 0.f, max_swing_ik_rotation = 0.f;
     float max_relief = 0.f;                                 // radians, the most heel rise an ankle stop asked for
-    float ik_limit = 0.f, max_ik_limit = 0.f;               // radians the IK limits took away
+    float ik_limit = 0.f, max_ik_limit = 0.f;               // radians the IK limits took away, or would have where they gave way
+    int yielded = 0;                                        // ticks on which a leg's limits gave way, since settle
     float capture_error = 0.f, max_capture_error = 0.f;     // m between a heel strike and where the rule puts it
     float max_com_error = 0.f, max_outside = 0.f;
     float min_lateral_margin = 1.f;
@@ -230,7 +241,8 @@ public:
 // The sole of a foot segment of the body
 FootGeometry footGeometry(const RigModel& model, bool right);
 // A sole of this geometry on the ground around (x, z), its toes toward `yaw`
-Footprint fitFootprint(const GroundField& ground, const FootGeometry& foot, glm::vec2 centre, float yaw, float from_y);
+// (no steeper than max_tilt, radians from level)
+Footprint fitFootprint(const GroundField& ground, const FootGeometry& foot, glm::vec2 centre, float yaw, float from_y, float max_tilt = 1.31f);
 // The foot segment standing on a print, pitched about its heel edge (pivot +1, toes up for a positive pitch) or
 // its toe edge (pivot -1)
 void footPose(const FootGeometry& foot, const Footprint& print, float pitch, int pivot, glm::vec3& position, glm::quat& rotation);

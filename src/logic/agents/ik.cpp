@@ -116,7 +116,19 @@ FabrikResult dy::fabrik(std::vector<glm::vec3>& p, const std::vector<float>& len
 }
 
 IKSolve dy::solveChain(const RigModel& model, RigPose& pose, const std::vector<int>& joints, glm::vec3 pole_rest,
-    const IKGoal& goal, bool limits) {
+    const IKGoal& goal, bool limits, bool yield) {
+
+    if(limits && yield) {
+        std::vector<glm::quat> before;
+        for(int j : joints) before.push_back(pose.joint[j]);
+        IKSolve held = solveChain(model, pose, joints, pole_rest, goal, true, false);
+        if(held.position_error <= ik_yield_position && held.rotation_error <= ik_yield_rotation) return held;
+        for(size_t i = 0; i < joints.size(); i++) pose.joint[joints[i]] = before[i];
+        IKSolve free = solveChain(model, pose, joints, pole_rest, goal, false, false);
+        free.limit_excess = held.limit_excess;
+        free.yielded = true;
+        return free;
+    }
 
     IKSolve solve;
     const BodyDef& def = *model.body;
@@ -254,7 +266,7 @@ void FabrikSys::tick(double h) {
         if(total < 1.f) {
             for(int j : chain.joints) before.push_back(pose->joint[j]);
         }
-        IKSolve solve = solveChain(*rig->model, *pose, chain.joints, chain.pole_rest, goal, chain.limits);
+        IKSolve solve = solveChain(*rig->model, *pose, chain.joints, chain.pole_rest, goal, chain.limits, chain.yield);
         if(total < 1.f) {
             for(size_t i = 0; i < chain.joints.size(); i++) {
                 glm::quat& q = pose->joint[chain.joints[i]];
@@ -266,6 +278,7 @@ void FabrikSys::tick(double h) {
         chain.position_error = solve.position_error;
         chain.rotation_error = solve.rotation_error;
         chain.limit_excess = solve.limit_excess;
+        chain.yielded = solve.yielded;
     }
 
 }

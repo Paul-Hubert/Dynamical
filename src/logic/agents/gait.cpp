@@ -144,7 +144,7 @@ void stancePitch(const GaitParams& params, const GaitState& state, FootState& f,
 void swingPose(const GaitParams& params, const FootState& f, float sw, glm::vec3& position, glm::quat& rotation) {
     glm::vec3 to_position;
     glm::quat to_rotation;
-    footPose(f.geometry, f.next, f.strike, +1, to_position, to_rotation);
+    footPose(f.geometry, f.next, f.strike, f.strike >= 0.f ? +1 : -1, to_position, to_rotation);
     // The foot leaves fast enough to stay under the hip that walks away from it
     float e = smooth(sw);
     position = glm::mix(f.from_position, to_position, e);
@@ -199,7 +199,7 @@ FootGeometry dy::footGeometry(const RigModel& model, bool right) {
 
 }
 
-Footprint dy::fitFootprint(const GroundField& ground, const FootGeometry& foot, glm::vec2 centre, float yaw, float from_y) {
+Footprint dy::fitFootprint(const GroundField& ground, const FootGeometry& foot, glm::vec2 centre, float yaw, float from_y, float max_tilt) {
 
     Footprint p;
     const glm::vec3 toes = headingDir(yaw);
@@ -219,6 +219,12 @@ Footprint dy::fitFootprint(const GroundField& ground, const FootGeometry& foot, 
         float l = glm::length(normal);
         normal = l > 1e-9f ? normal / l : up;
         if(normal.y < 0.f) normal = -normal;
+        if(normal.y < std::cos(max_tilt)) {
+            // A wall: the sole keeps the steepest tilt it is allowed, facing the same way
+            glm::vec3 flat(normal.x, 0.f, normal.z);
+            float l = glm::length(flat);
+            normal = l > 1e-6f ? flat / l * std::sin(max_tilt) + up * std::cos(max_tilt) : up;
+        }
         glm::vec3 mean = 0.25f * (g[0] + g[1] + g[2] + g[3]);
         p.centre.y = mean.y - (normal.x * (centre.x - mean.x) + normal.z * (centre.y - mean.z)) / normal.y;
         p.rotation = soleFrame(toes, normal);
@@ -290,9 +296,25 @@ void GaitBaseSys::tick(double h) {
     }
 
     // The command, at the rates the walker can follow
-    const float steepness = std::hypot(std::tan(state.slope_pitch), std::tan(state.slope_roll));
-    state.wanted_speed = std::max(g.command->speed, 0.f) * std::exp(-params.slope_slowdown * steepness);
-    state.speed = approach(state.speed, state.wanted_speed, params.acceleration * dt);
+    // Slopes slow the walker: the one under its feet, and the one it is about to reach
+    {
+        float steepness = std::hypot(std::tan(state.slope_pitch), std::tan(state.slope_roll));
+        if(state.started) {
+            const glm::vec3 forward = state.direction();
+            float here = ground.height(state.centre.x, state.centre.z, state.centre.y + 2.f, state.centre.y);
+            for(float d : { 0.5f * params.look_ahead, params.look_ahead }) {
+                glm::vec3 at = state.centre + forward * d;
+                float there = ground.height(at.x, at.z, state.centre.y + 2.f + 4.f * d, here);
+                steepness = std::max(steepness, std::abs(there - here) / d);
+            }
+        }
+        state.steepness = steepness;
+        float wanted = std::max(g.command->speed, 0.f) * std::max(std::exp(-params.slope_slowdown * steepness), params.slope_speed_floor);
+        // No step climbs or drops more than step_rise: on a wall the steps are short
+        if(steepness > 1e-3f) wanted = std::min(wanted, std::max(2.f * params.step_rise / (params.max_stride_time * steepness), 1.2f * params.min_speed));
+        state.wanted_speed = g.command->speed > params.min_speed ? wanted : 0.f;
+        state.speed = approach(state.speed, state.wanted_speed, (state.wanted_speed < state.speed ? params.braking : params.acceleration) * dt);
+    }
     state.heading = wrapAngle(state.heading + std::clamp(wrapAngle(g.command->heading - state.heading), -params.turn_rate * dt, params.turn_rate * dt));
     state.moving = g.command->speed > params.min_speed || state.speed > params.min_speed;
 
@@ -310,8 +332,13 @@ void GaitBaseSys::tick(double h) {
     const float step_time = 0.5f * state.stride_time;
     state.capture_offset = state.step_length / (std::exp(state.omega * step_time) - 1.f);
 
-    // The clock stops only when both feet are down
-    const bool both_down = !state.feet_ready || (state.foot[0].stance && state.foot[1].stance);
+    // The clock stops only when both feet are down side by side: a walker that stops takes the step that brings
+    // its feet together
+    bool both_down = true;
+    if(state.feet_ready) {
+        float apart = glm::dot(state.foot[0].current.centre - state.foot[1].current.centre, state.direction());
+        both_down = state.foot[0].stance && state.foot[1].stance && std::abs(apart) < 0.06f;
+    }
     if(state.moving || !both_down) {
         state.phase += dt / state.stride_time;
         state.phase -= std::floor(state.phase);
@@ -396,7 +423,7 @@ void GaitFootIKSys::tick(double h) {
             FootState& f = state.foot[i];
             const FootGeometry& geo = f.geometry;
             glm::vec3 at = state.centre + right * (geo.side * 0.5f * params.step_width);
-            f.current = f.next = fitFootprint(ground, geo, glm::vec2(at.x, at.z), state.heading + geo.toe_out, state.centre.y + 1.5f);
+            f.current = f.next = fitFootprint(ground, geo, glm::vec2(at.x, at.z), state.heading + geo.toe_out, state.centre.y + 1.5f, params.max_print_tilt);
             f.stance = true;
             f.toe_latched = false;
             f.strike = f.toe = 0.f;
@@ -421,7 +448,7 @@ void GaitFootIKSys::tick(double h) {
     if(state.ground_version != ground.version) {
         for(FootState& f : state.foot) {
             glm::vec3 toes = f.current.rotation * glm::vec3(0.f, 0.f, -1.f);
-            f.current = fitFootprint(ground, f.geometry, glm::vec2(f.current.centre.x, f.current.centre.z), std::atan2(-toes.x, -toes.z), f.current.centre.y + 4.f);
+            f.current = fitFootprint(ground, f.geometry, glm::vec2(f.current.centre.x, f.current.centre.z), std::atan2(-toes.x, -toes.z), f.current.centre.y + 4.f, params.max_print_tilt);
             f.planned = false;
         }
         state.ground_version = ground.version;
@@ -454,16 +481,16 @@ void GaitFootIKSys::tick(double h) {
     };
 
     // Positive: past the dorsiflexion stop (the toes should drop); negative: past the plantarflexion stop
-    auto flexionOver = [&](const FootState& f) {
-        const FootGeometry& geo = f.geometry;
-        IKGoal goal { f.position + f.rotation * model.anchor_child[geo.ankle], f.rotation, true, kneePole(geo, f.rotation, params, dir) };
-        solveChain(model, trial, { geo.hip, geo.knee, geo.ankle }, glm::vec3(0.f, 0.f, -1.f), goal, false);
+    auto flexionOverAt = [&](RigPose& body, const FootGeometry& geo, glm::vec3 position, glm::quat rotation) {
+        IKGoal goal { position + rotation * model.anchor_child[geo.ankle], rotation, true, kneePole(geo, rotation, params, dir) };
+        solveChain(model, body, { geo.hip, geo.knee, geo.ankle }, glm::vec3(0.f, 0.f, -1.f), goal, false);
         const JointLimit& limit = model.limits[geo.ankle];
-        float twist = swingTwist(trial.joint[geo.ankle]).twist;
+        float twist = swingTwist(body.joint[geo.ankle]).twist;
         if(twist < limit.twist_min + params.ankle_margin) return limit.twist_min + params.ankle_margin - twist;
         if(twist > limit.twist_max - params.ankle_margin) return limit.twist_max - params.ankle_margin - twist;
         return 0.f;
     };
+    auto flexionOver = [&](const FootState& f) { return flexionOverAt(trial, f.geometry, f.position, f.rotation); };
 
     for(int i = 0; i < 2; i++) {
         FootState& f = state.foot[i];
@@ -488,8 +515,8 @@ void GaitFootIKSys::tick(double h) {
         }
 
         if(f.stance) {
-            if(!state.moving && state.foot[1 - i].stance) {
-                // Standing: the soles settle flat
+            if(!state.moving) {
+                // Standing, or closing the last step: the soles settle flat
                 float keep = std::exp(-dt / 0.2f);
                 f.strike *= keep;
                 f.toe *= keep;
@@ -579,9 +606,39 @@ void GaitFootIKSys::tick(double h) {
                 glm::vec3 heel = centre_then + then * (ahead - state.capture_offset) + then_right * (geo.side * 0.5f * params.step_width);
                 const float yaw = heading + geo.toe_out;
                 glm::vec3 centre = heel + headingDir(yaw) * geo.half_length;
-                f.next = fitFootprint(ground, geo, glm::vec2(centre.x, centre.z), yaw, std::max(f.current.centre.y, state.centre.y) + 2.f);
+                const float from_y = std::max(f.current.centre.y, state.centre.y) + 2.f + params.max_print_rise;
+                f.next = fitFootprint(ground, geo, glm::vec2(centre.x, centre.z), yaw, from_y, params.max_print_tilt);
+                // A landing too far above or below the other foot comes back toward where this foot left, until a
+                // leg can span it (the edge of a drop, the foot of a wall)
+                const float other = state.foot[1 - i].current.centre.y;
+                if(std::abs(f.next.centre.y - other) > params.max_print_rise) {
+                    glm::vec2 far(centre.x, centre.z), near(f.current.centre.x, f.current.centre.z);
+                    float keep = 0.f, drop = 1.f;
+                    for(int pass = 0; pass < 8; pass++) {
+                        float mid = 0.5f * (keep + drop);
+                        Footprint trial = fitFootprint(ground, geo, glm::mix(near, far, mid), yaw, from_y, params.max_print_tilt);
+                        (std::abs(trial.centre.y - other) > params.max_print_rise ? drop : keep) = mid;
+                    }
+                    f.next = fitFootprint(ground, geo, glm::mix(near, far, keep), yaw, from_y, params.max_print_tilt);
+                }
                 // Uphill the foot lands flatter
                 f.strike = std::clamp(params.strike_angle * state.amplitude - std::max(state.slope_pitch, 0.f), 0.f, params.strike_angle * 1.25f);
+                // ... and no flatter than its ankle will allow under the hips as they will be then: on a steep climb
+                // it lands on its toe edge
+                {
+                    RigPose then_pose = trial;
+                    glm::vec3 moved = centre_then - state.centre;
+                    moved.y = ground.height(centre_then.x, centre_then.z, from_y, state.centre.y) - state.centre.y;
+                    then_pose.root_position += moved;
+                    for(int pass = 0; pass < 3; pass++) {
+                        glm::vec3 position;
+                        glm::quat rotation;
+                        footPose(geo, f.next, f.strike, f.strike >= 0.f ? +1 : -1, position, rotation);
+                        float over = flexionOverAt(then_pose, geo, position, rotation);
+                        if(std::abs(over) < 1e-4f) break;
+                        f.strike -= over;
+                    }
+                }
 
                 // Enough lift for the sole to clear the ground on its way
                 f.lift = params.swing_lift * std::clamp(state.amplitude, 0.3f, 1.f);
@@ -612,6 +669,19 @@ void GaitFootIKSys::tick(double h) {
                 f.rotation = glm::normalize(glm::angleAxis(-over, f.rotation * (geo.sole_rotation * glm::vec3(1.f, 0.f, 0.f))) * f.rotation);
                 f.relief += over;
             }
+            // ... and its swing cone: in the air the foot takes the rotation its ankle allows, and turns to its
+            // landing rotation as it comes down
+            {
+                IKGoal goal { f.position + f.rotation * model.anchor_child[geo.ankle], f.rotation, true, kneePole(geo, f.rotation, params, dir) };
+                RigPose held = trial;
+                IKSolve solve = solveChain(model, held, { geo.hip, geo.knee, geo.ankle }, glm::vec3(0.f, 0.f, -1.f), goal, true, false);
+                if(solve.rotation_error > 1e-4f) {
+                    SegmentPoses poses;
+                    model.forward(held, poses);
+                    f.rotation = glm::normalize(glm::slerp(poses.rotation[geo.segment], f.rotation, smooth((sw - 0.6f) / 0.35f)));
+                    f.relief += solve.rotation_error;
+                }
+            }
             if(f.relief != 0.f) {
                 float gap = 1e9f;
                 for(int c = 0; c < 4; c++) {
@@ -624,6 +694,7 @@ void GaitFootIKSys::tick(double h) {
         }
 
         f.pole = kneePole(geo, f.rotation, params, dir);
+        reg.get<IKChain>(f.chain).yield = params.yield_limits;
         auto& target = reg.get<IKTarget>(f.target);
         target.position = f.position + f.rotation * model.anchor_child[geo.ankle];
         target.rotation = f.rotation;
@@ -690,7 +761,7 @@ void GaitBalanceSys::tick(double h) {
         hip.y = height(hip);
         pose.root_position = hip - pose.root_rotation * state.pivot;
         solved = pose;
-        for(int i = 0; i < 2; i++) solveChain(model, solved, chains[i]->joints, chains[i]->pole_rest, goals[i], chains[i]->limits);
+        for(int i = 0; i < 2; i++) solveChain(model, solved, chains[i]->joints, chains[i]->pole_rest, goals[i], chains[i]->limits, chains[i]->yield);
         model.forward(solved, poses);
         com = model.centerOfMass(poses);
         glm::vec2 error(state.com_target.x - com.x, state.com_target.y - com.z);
@@ -850,6 +921,7 @@ void GaitChecksSys::tick(double h) {
     report.max_swing_ik_position = std::max(report.max_swing_ik_position, report.swing_ik_position);
     report.max_swing_ik_rotation = std::max(report.max_swing_ik_rotation, report.swing_ik_rotation);
     report.max_relief = std::max(report.max_relief, relief);
+    for(const FootState& f : state.foot) if(reg.get<IKChain>(f.chain).yielded) { report.yielded++; break; }
     report.max_gap = std::max(report.max_gap, gap);
     if(balance) {
         if(balance->captured) report.max_capture_error = std::max(report.max_capture_error, std::abs(balance->capture_error));
@@ -905,6 +977,8 @@ void dy::registerGait() {
             f.read("turn_rate", p.turn_rate);
             f.read("slope_slowdown", p.slope_slowdown);
             f.read("knee_out", p.knee_out);
+            f.read("yield_limits", p.yield_limits);
+            f.read("slope_speed_floor", p.slope_speed_floor);
             f.read("ankle_roll_extra", roll);
             f.read("ankle_yaw_extra", yaw);
             f.finish();
@@ -920,7 +994,7 @@ void dy::registerGait() {
                 { "stance_share", p.stance_share }, { "step_width", p.step_width }, { "strike_angle", glm::degrees(p.strike_angle) },
                 { "toe_angle", glm::degrees(p.toe_angle) }, { "swing_lift", p.swing_lift }, { "swing_clearance", p.swing_clearance },
                 { "leg_extension", p.leg_extension }, { "hip_height", p.hip_height }, { "lean_slope_gain", p.lean_slope_gain },
-                { "acceleration", p.acceleration }, { "turn_rate", p.turn_rate }, { "slope_slowdown", p.slope_slowdown }, { "knee_out", p.knee_out },
+                { "acceleration", p.acceleration }, { "turn_rate", p.turn_rate }, { "slope_slowdown", p.slope_slowdown }, { "slope_speed_floor", p.slope_speed_floor }, { "knee_out", p.knee_out }, { "yield_limits", p.yield_limits },
                 { "ankle_roll_extra", glm::degrees(p.ankle_roll_extra) }, { "ankle_yaw_extra", glm::degrees(p.ankle_yaw_extra) } };
         }
     });

@@ -81,12 +81,13 @@ std::string describe(const GaitReport& r) {
 }
 
 // The thresholds of docs/physical-agents/ik-gait.md
-void checkWalk(const GaitReport& r, float speed) {
+// over_limits: degrees a planted foot may take its leg past the joint limits (they give way, GaitParams::yield_limits)
+void checkWalk(const GaitReport& r, float speed, float over_limits = 0.1f) {
     CHECK(r.max_contact_error < 5e-3f);
     CHECK(r.max_penetration < 5e-3f);
     CHECK(r.max_slip < 2e-3f);
     CHECK(r.max_sole_angle * deg < 1.f);
-    CHECK(r.max_limit_excess * deg < 0.1f);
+    CHECK(r.max_limit_excess * deg < over_limits);
     CHECK(r.max_ik_position < 2e-3f);
     CHECK(r.max_com_error < 1e-3f);
     CHECK(r.max_outside < 1e-3f);
@@ -328,10 +329,10 @@ TEST_CASE("GAIT.2 slopes up, down and across, at several headings") {
         csv << c.pitch << "," << c.roll << "," << c.heading << "," << r.steps << "," << r.mean_speed << "," << r.max_contact_error * 1e3f << "," << r.max_penetration * 1e3f << ","
             << r.max_slip * 1e3f << "," << r.max_sole_angle * deg << "," << r.max_ik_position * 1e3f << "," << r.max_ik_rotation * deg << "," << r.max_ik_limit * deg << ","
             << r.max_body_limit_excess * deg << "," << r.worst_joint << "," << r.max_capture_error * 1e3f << "," << r.min_lateral_margin * 1e3f << "\n";
-        checkWalk(r, slopeSpeed(1.36f, c.pitch, c.roll));
+        // At the edge of the range (20 degrees up and 15 across) a landing foot takes its ankle a degree past its cone
+        checkWalk(r, slopeSpeed(1.36f, c.pitch, c.roll), 1.5f);
         CHECK(r.max_ik_rotation * deg < 1.f);
-        // The ankles go past the body file's swing limits by no more than the IK was given
-        CHECK(r.max_body_limit_excess < std::max(GaitParams().ankle_roll_extra, GaitParams().ankle_yaw_extra));
+        CHECK(r.max_body_limit_excess * deg < 1.5f);
     }
 }
 
@@ -462,7 +463,7 @@ TEST_CASE("GAIT.6 the marching cubes terrain, on routes whose slopes stay in ran
         CHECK(r.max_penetration < 5e-3f);
         CHECK(r.max_slip < 2e-3f);
         CHECK(over < 5e-3f);
-        CHECK(r.max_limit_excess * deg < 0.1f);
+        CHECK(r.max_limit_excess * deg < 1.5f);
         CHECK(r.max_ik_position < 2e-3f);
         CHECK(r.max_ik_rotation * deg < 1.f);
         CHECK(r.max_outside < 1e-3f);
@@ -470,19 +471,76 @@ TEST_CASE("GAIT.6 the marching cubes terrain, on routes whose slopes stay in ran
     }
 }
 
-TEST_CASE("GAIT.7 ground steeper than the walk is made for degrades it without breaking it") {
+TEST_CASE("GAIT.7 any slope: on steep ground the feet stay planted and the joint limits give way") {
     if(!haveBody() || !std::filesystem::exists("resources/mclookup.bin")) return;
-    // 35 degrees up, then the terrain's origin, where slopes pass 45 degrees
-    for(int n = 0; n < 2; n++) {
-        Walk w = n == 0 ? walk("ik_check", { { "pitch", "35" } }, 12.) : walk("ik_check_terrain", {}, 30.);
+    struct Route { const char* scene; float pitch, x, z, heading; double seconds; };
+    const Route routes[] = {
+        { "ik_check", 35.f, 0.f, 0.f, 0.f, 15. }, { "ik_check", -35.f, 0.f, 0.f, 0.f, 15. }, { "ik_check", 50.f, 0.f, 0.f, 60.f, 15. },
+        // The terrain's origin, where slopes pass 45 degrees
+        { "ik_check_terrain", 0.f, 0.f, 0.f, 0.f, 40. }, { "ik_check_terrain", 0.f, 0.f, 0.f, 120.f, 40. }, { "ik_check_terrain", 0.f, 0.f, 0.f, 250.f, 40. },
+    };
+    for(const Route& route : routes) {
+        float steepest = 0.f, over = 0.f;
+        Walk w = walk(route.scene, { { "pitch", std::to_string(route.pitch) }, { "start_x", std::to_string(route.x) }, { "start_z", std::to_string(route.z) }, { "heading", std::to_string(route.heading) } },
+            route.seconds, [&](World& world, int) {
+                auto view = world.reg.view<GaitState, GaitReport>();
+                if(view.begin() == view.end()) return;
+                const auto& state = world.reg.get<GaitState>(*view.begin());
+                const auto& report = world.reg.get<GaitReport>(*view.begin());
+                steepest = std::max(steepest, std::hypot(state.slope_pitch, state.slope_roll));
+                float gap = 0.f;
+                for(const FootState& f : state.foot) if(f.stance) gap = std::max(gap, f.current.gap);
+                if(state.time > report.settle) over = std::max(over, report.contact_error - gap);
+            });
         const GaitReport& r = w.report;
-        const std::string where = n == 0 ? "35 degrees: " : "terrain from the origin: ";
-        MESSAGE(where, describe(r));
+        const std::string where = std::string(route.scene) + " pitch " + std::to_string((int) route.pitch) + " from " + std::to_string((int) route.x) + " " + std::to_string((int) route.z) + " heading " + std::to_string((int) route.heading);
+        MESSAGE(where, ": steepest ", steepest * deg, " deg, limits gave way on ", r.yielded, " of ", r.ticks, " ticks | ", describe(r));
         CHECK(std::isfinite(w.balance.com.x + w.balance.com.y + w.balance.com.z));
-        CHECK(r.max_limit_excess * deg < 0.1f);        // the joints stay inside the IK limits whatever the ground
         CHECK(r.steps > 8);
-        CHECK(w.hash != 0);
+        CHECK(steepest * deg > 30.f);
+        CHECK(over < 5e-3f);
+        CHECK(r.max_penetration < 5e-3f);
+        CHECK(r.max_slip < 2e-3f);
+        CHECK(r.max_ik_position < 2e-3f);
+        CHECK(r.max_ik_rotation * deg < 1.f);
     }
+}
+
+TEST_CASE("GAIT.11 a wall: the walker slows to short steps and stays whole") {
+    if(!haveBody() || !std::filesystem::exists("resources/mclookup.bin")) return;
+    // This line crosses an 80 degree face
+    float steepest = 0.f, slowest = 10.f;
+    Walk w = walk("ik_check_terrain", { { "start_x", "40" }, { "start_z", "40" }, { "heading", "180" } }, 90., [&](World& world, int tick) {
+        auto view = world.reg.view<GaitState>();
+        if(view.begin() == view.end() || tick < 300) return;
+        const auto& state = world.reg.get<GaitState>(*view.begin());
+        steepest = std::max(steepest, std::atan(state.steepness));
+        slowest = std::min(slowest, state.speed);
+    });
+    const GaitReport& r = w.report;
+    MESSAGE("steepest ", steepest * deg, " deg, slowest ", slowest, " m/s, limits gave way on ", r.yielded, " of ", r.ticks, " ticks | ", describe(r));
+    CHECK(std::isfinite(w.balance.com.x + w.balance.com.y + w.balance.com.z));
+    CHECK(steepest * deg > 70.f);
+    CHECK(slowest < 0.3f);
+    CHECK(slowest > 0.05f);
+    CHECK(r.steps > 60);
+    CHECK(r.max_ik_position < 0.05f);
+    CHECK(r.max_penetration < 0.05f);
+}
+
+TEST_CASE("GAIT.10 with limits that hold, steep ground costs the foot its print, never the joints their limits") {
+    if(!haveBody()) return;
+    ScenarioRunner runner("ik_check", { { "pitch", "35" } }, SceneLoadOptions {});
+    auto& world = runner.world(0);
+    world.tick();
+    entt::entity e = *world.reg.view<GaitParams>().begin();
+    world.reg.get<GaitParams>(e).yield_limits = false;
+    for(int t = 0; t < 900; t++) world.tick();
+    const GaitReport& r = world.reg.get<GaitReport>(e);
+    MESSAGE(describe(r));
+    CHECK(r.yielded == 0);
+    CHECK(r.max_limit_excess * deg < 0.1f);
+    CHECK(r.max_ik_rotation * deg > 1.f);
 }
 
 }

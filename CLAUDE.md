@@ -62,6 +62,7 @@ Entry point is `src/main.cpp` → `Game::start()`. The game loop runs: `renderer
 - `RigPose` (joint angles) is written by `GaitBase` (procedural gait), corrected by `Fabrik`, applied by `RigPoseApply` (`MoveKinematic`)
 - **IK is component driven**: any system posts `IKTarget` entities for an `IKChain`; `Fabrik` solves them all in one batch (FABRIK, pole, joint limits). `GaitFootIK` owns the leg targets, `GaitBalance` places the pelvis through `solveChain()`
 - `GroundField` (plane or marching cubes surface from the density samples) is what feet are planted on, no collider
+- A planted foot comes before a joint limit (`GaitParams::yield_limits`): the walk covers any slope, realistic up to about 20°. The body files' ankle swing limits are wider than Unity's export (`unity_y_deg`, `unity_z_deg` keep the originals)
 
 ### Models (`src/renderer/model/`)
 - glTF 2.0 through tinygltf (`gltf_loader.cpp`), flattened into one vertex/index buffer with node transforms baked in. `ModelManager` (context variable) caches files; instances are entities with `Transform` + `ModelRenderable`
