@@ -155,8 +155,14 @@ Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     // Actually just set every queue to the same one
     t_i = c_i = g_i;
 
+    // Optional features
+    if(physical.getFeatures().samplerAnisotropy) {
+        requiredFeatures.samplerAnisotropy = true;
+        sampler_anisotropy = true;
+    }
+
     // Create Device
-    
+
     logical = physical.createDevice(vk::DeviceCreateInfo({}, countF, pqinfo.data(), 0, nullptr, (uint32_t) extensions.size(), extensions.data(), &requiredFeatures));
     
     VULKAN_HPP_DEFAULT_DISPATCHER.init(logical);

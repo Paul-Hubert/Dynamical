@@ -38,6 +38,8 @@ public :
     vk::Queue graphics, compute, transfer;
     uint32_t g_i = 0, c_i = 0, t_i = 0;
 
+    bool sampler_anisotropy = false;    // enabled when the GPU has it
+
     
     vk::PhysicalDevice physical;
     vk::Device logical;
