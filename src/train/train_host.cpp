@@ -49,7 +49,10 @@ int sceneInt(const SceneDef& scene, const char* name, int fallback) {
 int TrainHost::run() {
 
     std::string mode = args.mode.empty() ? "train" : args.mode;
-    if(mode == "train" && WorldsEnvironment::check(runner).empty()) behavior = runner.world(0).reg.ctx().get<AgentIO>().behavior;
+    if(mode == "train" && WorldsEnvironment::check(runner).empty()) {
+        // envparams.txt names one behaviour: the first by name when the scene has several
+        if(auto names = WorldsEnvironment::behaviors(runner); !names.empty()) behavior = names[0];
+    }
 
     if(!loadEnvParams()) return 1;
 
@@ -160,6 +163,23 @@ int TrainHost::recordDemo() {
             obs->add_dimension_properties(0);
             obs->set_observation_type(mlagents::co::DEFAULT);
             obs->set_name(io.sensor_name);
+            // The agent's other sensors (a walker's order): a demonstration has the layout of the behaviour
+            for(const AgentSensor& sensor : io.sensors) {
+                auto* more = info->add_observations();
+                more->set_compression_type(mlagents::co::NONE);
+                more->mutable_float_data()->mutable_data()->Add(sensor.data.begin(), sensor.data.end());
+                if(sensor.rows > 0) {
+                    more->add_shape(sensor.rows);
+                    more->add_shape(sensor.size);
+                    more->add_dimension_properties(4);
+                    more->add_dimension_properties(1);
+                } else {
+                    more->add_shape(sensor.size);
+                    more->add_dimension_properties(0);
+                }
+                more->set_observation_type(mlagents::co::DEFAULT);
+                more->set_name(sensor.name);
+            }
             auto* act = pair.mutable_action_info();
             act->mutable_continuous_actions()->Resize(io.action_size, 0.f);
             coded.WriteVarint32((uint32_t) pair.ByteSizeLong());
@@ -438,7 +458,7 @@ int TrainHost::agents() {
         dy::log(dy::error) << "Scene " << runner.scene().name << " cannot train: " << error << "\n";
         return 1;
     }
-    behavior = runner.world(0).reg.ctx().get<AgentIO>().behavior;
+    if(auto names = WorldsEnvironment::behaviors(runner); !names.empty()) behavior = names[0];
     const size_t worlds = runner.worldCount();
     const unsigned threads = args.threads > 0 ? (unsigned) args.threads : 1u;
 
@@ -447,9 +467,8 @@ int TrainHost::agents() {
         runner.restart((uint64_t) seed);
         pushEnvParams();
         auto env = std::make_unique<WorldsEnvironment>(runner, threads);
-        dy::log(dy::info) << "Scene " << runner.scene().name << ": " << worlds << " worlds of " << env->behavior() << " ("
-            << env->agent(0).observation_size << " observations, " << env->agent(0).action_size << " actions, decision every "
-            << env->decisionPeriod() << " ticks), " << threads << " threads\n";
+        dy::log(dy::info) << "Scene " << runner.scene().name << ": " << worlds << " worlds, " << env->describe() << ", a window every "
+            << env->decisionPeriod() << " ticks, " << threads << " threads\n";
         return env;
     });
 

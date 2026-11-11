@@ -382,17 +382,21 @@ float sunShadow(vec2 point, float height, vec2 heading, float reach, float lod) 
 
 }
 
-// Which kinds of plants grow at a root (logic/grass/grass_species.h, grassSpeciesAt) : each kind has its
-// own noise in octaves, a channel of a texture that repeats, read at three scales. The patches overlap :
-// the kind whose noise is the highest is the first tall layer, and those within `overlap` of it grow
-// with it, the second and the third layer (the first kind again where there is none).
+// Which kinds of plants grow at a root, and how many of each (logic/grass/grass_species.h, grassSpeciesAt).
+// Each kind has its own noise in octaves, a channel of a texture that repeats, read at three scales. The
+// three kinds whose noises are the highest are the tall layers. Patches have no edge : a kind is as dense
+// as its noise is over the next one's, from every plant of its tile half a blend width inside its patch to
+// none as far outside (keep : the part of the plants that stay, the first ones of their tile's order, which
+// are spread evenly). Where two patches meet each has half of its plants.
 // Small kinds grow where the grass is short (tallness : 0 its shortest, 1 its tallest), tall ones where it
-// is not, and both over a band around species_low : there the best small kind is the undergrowth of the
-// tall ones (under : -1 for short meadow grass)
-void species(vec2 root, float tallness, out ivec3 kind, out int under) {
-    under = -1;
+// is not : the height of the grass adds to the noise of ones and takes from the others' over a band
+// around species_low, they blend like any two kinds.
+// under : part of the short meadow grass that stays under the tall kinds, none under the small plants
+void species(vec2 root, float tallness, out ivec3 kind, out vec3 keep, out float under) {
     if(forced_kind >= 0 || species_size <= 0.0) {
         kind = ivec3(max(forced_kind, 0));
+        keep = vec3(1.0);
+        under = ((small_mask >> kind.x) & 1) != 0 ? 0.0 : 1.0;
         return;
     }
     // How much the place is for the tall kinds, -1 to 1 over the band
@@ -406,14 +410,12 @@ void species(vec2 root, float tallness, out ivec3 kind, out int under) {
         textureLod(u_species, at * 0.73 + vec2(0.59, 0.13), 0.0));
     kind = ivec3(-1);
     vec3 best = vec3(-1e9);
-    float best_small = -1e9;
+    float best_small = -1e9, best_tall = -1e9;
     for(int k = 0; k < kinds; k++) {
         bool small = ((small_mask >> k) & 1) != 0;
         float value = read[k / 4][k % 4] + kindAbundance(k) + (small ? -tall : tall);
-        if(small && value > best_small) {
-            best_small = value;
-            under = k;
-        }
+        if(small) best_small = max(best_small, value);
+        else best_tall = max(best_tall, value);
         if(value > best.x) {
             best = vec3(value, best.xy);
             kind = ivec3(k, kind.xy);
@@ -425,13 +427,35 @@ void species(vec2 root, float tallness, out ivec3 kind, out int under) {
             kind.z = k;
         }
     }
-    float margin = species_margin * species_overlap;
-    if(kind.y < 0 || best.y <= best.x - margin) kind.y = kind.x;
-    if(kind.z < 0 || best.z <= best.x - margin) kind.z = kind.x;
-    // Small plants under the tall ones in the band only, and nothing under the small ones
+    // The first kind against the second, the others against the first
+    float width = max(species_margin * species_overlap, 1e-3);
+    keep = clamp(0.5 + vec3(best.x - best.y, best.y - best.x, best.z - best.x) / width, 0.0, 1.0);
+    // Where no other kind is close the layers are all of the first one, as dense
+    if(kind.y < 0 || keep.y <= 0.0) {
+        kind.y = kind.x;
+        keep.y = keep.x;
+    }
+    if(kind.z < 0 || keep.z <= 0.0) {
+        kind.z = kind.x;
+        keep.z = keep.x;
+    }
     bool first_small = ((small_mask >> kind.x) & 1) != 0;
-    if(first_small) under = -2;
-    else if(tall >= 1.0 || species_overlap <= 0.0) under = -1;
+    under = first_small ? 0.0 : clamp(0.5 + (best_tall - best_small) / width, 0.0, 1.0);
+}
+
+// Id of the plant a layer met (hitTexel) : its rank in the order of its tile, 0 the first plant to 1 the last
+float hitPlant(vec2 tile_middle, vec2 heading, vec2 dx, vec2 dy, float push, float dither, int lower, float weight) {
+    if(weight > 0.5) {
+        if(lower == elevations - 1) {
+            return textureGrad(u_top_id, vec3(tile_middle, ray_kind), dx, dy).r;
+        }
+        lower++;
+    }
+    vec2 layers;
+    float second;
+    azimuthLayers(lower, heading, layers, second);
+    second = mix(second, step(dither, second), push);
+    return textureGrad(u_oblique_id, vec3(tile_middle, second > 0.5 ? layers.y : layers.x), dx, dy).r;
 }
 
 void main() {
@@ -508,8 +532,10 @@ void main() {
 
     // The plants of the place : small ones where the grass is short, in patches of each kind
     ivec3 kinds_here;
-    int kind_under;
-    species(patch_root, (v_height / grass_height - (1.0 - patch_amount)) / max(patch_amount, 1e-3), kinds_here, kind_under);
+    vec3 kinds_keep;
+    float under_keep;
+    species(patch_root, (v_height / grass_height - (1.0 - patch_amount)) / max(patch_amount, 1e-3), kinds_here, kinds_keep, under_keep);
+    bool hit_bare = false;      // the plant that was met is not there : the ground of its layer
     int layers = layer_bits & 255;
 
     int count = layers + (undergrowth > 0.0 ? 1 : 0);
@@ -517,21 +543,21 @@ void main() {
 
         bool is_undergrowth = n == layers;
         int i = is_undergrowth ? max_layers - 1 : n;
-        // The undergrowth is short meadow grass under the tall kinds, small plants where both grow, and
-        // nothing under the small plants
-        if(is_undergrowth && kind_under == -2) {
+        // The undergrowth is short meadow grass under the tall kinds, nothing under the small plants.
+        // keep : the part of the plants of the layer that are there (species)
+        float keep = is_undergrowth ? under_keep : kinds_keep[min(n, 2)];
+        if(keep <= 0.0) {
             continue;
         }
-        bool small_under = is_undergrowth && kind_under >= 0;
-        int kind = is_undergrowth ? (forced_kind >= 0 ? forced_kind : max(kind_under, 0)) : kinds_here[min(n, 2)];
-        float tile = tile_size * kindTile(kind) * (small_under ? 1.0 : mix(1.0, layer_scales[i], is_undergrowth ? 1.0 : layer_spread));
+        int kind = is_undergrowth ? max(forced_kind, 0) : kinds_here[min(n, 2)];
+        float tile = tile_size * kindTile(kind) * mix(1.0, layer_scales[i], is_undergrowth ? 1.0 : layer_spread);
         // No taller than the kind is, nor than the grass of the place
         float kind_top = min(grass_height * kindHeight(kind), v_height);
         // Each layer has its own patches, three in patch_size, under the height map of the shell
         // (grass.vert.glsl) : where one is short the others show
         float patch_noise = textureLod(u_noise, patch_root / (patch_size * 10.0 / 3.0) + vec2(0.17, 0.59) * float(i + 1), 0.0)[i % 3];
         float layer_height = kind_top * (1.0 - layer_patch * clamp(0.5 + 1.5 * patch_noise, 0.0, 1.0));
-        if(is_undergrowth && !small_under) {
+        if(is_undergrowth) {
             layer_height = kind_top * undergrowth * (1.0 - 0.5 * layer_patch * clamp(0.5 + 1.5 * patch_noise, 0.0, 1.0));
         }
         if(layer_height < 0.02 * grass_height) {
@@ -593,6 +619,20 @@ void main() {
         }
         lookup(tile_middle, heading, reach, flight, dx, dy, push, dither, layer_hit, layer_baked, layer_ahead, layer_lower, layer_weight);
 
+        // Towards the edge of its patch a kind loses its plants one by one, the last of the order of its
+        // tile first : what is left stays spread evenly. A plant that is not there leaves the ground of
+        // its layer, the other layers show behind it. Far away texels are means of plants : as many pixels
+        bool bare = false;
+        if(keep < 0.999) {
+            float plant = hitPlant(tile_middle, heading, dx, dy, push, dither.x, layer_lower, layer_weight);
+            if(mix(plant, dither.y, smoothstep(1.0, 3.0, lod)) >= keep) {
+                bare = true;
+                layer_hit = 0.0;
+                layer_baked = 0.0;
+                layer_ahead = 0.0;
+            }
+        }
+
         float layer_distance = (v_height - layer_hit * layer_height) / fall;
         if(layer_distance < hit_distance) {
             hit_distance = layer_distance;
@@ -615,6 +655,7 @@ void main() {
             hit_tile = tile;
             hit_layer_height = layer_height;
             hit_undergrowth = is_undergrowth;
+            hit_bare = bare;
             hit_kind = kind;
         }
 
@@ -642,7 +683,7 @@ void main() {
     float hit_id = 0.5;
     vec3 hit_colour = root_color;
     ray_kind = hit_kind;
-    if(hit_distance < 1e30) {
+    if(hit_distance < 1e30 && !hit_bare) {
         vec3 texel = hitTexel(hit_middle, hit_heading, hit_dx, hit_dy, hit_push, hit_dither, hit_lower, hit_weight, hit_colour);
         vec3 stored_normal = decodeNormal(texel.xy);
         tile_normal = vec3(stored_normal.xz * hit_turned, stored_normal.y).xzy;
@@ -690,7 +731,8 @@ void main() {
     // texels are means of blades (id 0.5) : the same part of the colour instead
     float dry_part = dryness * 1.5 * clamp(0.5 + 1.5 * hit_noise.y, 0.0, 1.0);
     dry_part = mix(dry_part, 1.0, 0.7 * (1.0 - soil_grass));    // the last ones before the soil are dry
-    float dry = mix(smoothstep(0.0, 0.06, dry_part - hit_id), dry_part, smoothstep(1.0, 3.0, hit_lod));
+    // (the id is the rank of the plant in its tile, which the species and the soil thin by : another order here)
+    float dry = mix(smoothstep(0.0, 0.06, dry_part - fract(hit_id * 5.3 + 0.37)), dry_part, smoothstep(1.0, 3.0, hit_lod));
     color = mix(color, mix(dry_root_color, dry_tip_color, baked), dry);
 
     // The sun ray through the blade that was met, in the tile space of its layer (far away the

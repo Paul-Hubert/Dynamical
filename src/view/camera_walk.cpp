@@ -8,10 +8,13 @@
 #include <vector>
 
 #include "logic/agents/ground_field.h"
+#include "logic/animals/herd.h"
 #include "logic/components/camera.h"
+#include "logic/components/render_settings.h"
 #include "logic/components/transform.h"
 #include "logic/terrain/chunk.h"
 #include "logic/terrain/marching_cubes.h"
+#include "logic/terrain/soil.h"
 #include "logic/terrain/terrain_generator.h"
 #include "logic/vegetation/forest.h"
 #include "logic/vegetation/vegetation.h"
@@ -34,6 +37,12 @@ float wrap(float angle) {
     return angle;
 }
 
+// Critically damped : the value is at its target after about 3 x settle seconds
+void follow(float& value, float& rate, float target, float settle, float h) {
+    rate += ((target - value) / (settle * settle) - 2.f * rate / settle) * h;
+    value += rate * h;
+}
+
 }
 
 CameraWalkSys::CameraWalkSys(entt::registry& reg, const nlohmann::json& params) : System(reg) {
@@ -42,6 +51,9 @@ CameraWalkSys::CameraWalkSys(entt::registry& reg, const nlohmann::json& params) 
     eye_height = params.value("eye_height", eye_height);
     sway = params.value("sway", sway);
     search = params.value("search", search);
+    open_lead = params.value("lead", open_lead);
+    soil = params.value("soil", soil);
+    herds = params.value("herds", herds);
     auto s = params.find("start");
     auto h = params.find("heading");
     if(s != params.end() && s->is_array() && s->size() == 2 && h != params.end() && h->is_number()) {
@@ -53,6 +65,57 @@ CameraWalkSys::CameraWalkSys(entt::registry& reg, const nlohmann::json& params) 
 
 void CameraWalkSys::preinit() {
     reg.ctx().emplace<CameraWalk>();
+}
+
+float CameraWalkSys::soilOn(glm::vec2 from, glm::vec2 dir, float lead) const {
+    if(!soil_field) return 0.f;
+    const float stride = 3.f;
+    float metres[soil::kinds] = {};
+    for(float s = 0.f; s <= distance; s += stride) {
+        if(s > lead && s < distance - lead) continue;
+        glm::vec2 p = from + dir * s;
+        glm::vec4 here = soil_field->sample(p.x, p.y);
+        for(int kind = 0; kind < soil::kinds; kind++) {
+            if(here[kind] > 0.5f) metres[kind] += stride;
+        }
+    }
+    // Each of the three kinds for a few steps rather than one of them all along
+    float crossed = 0.f, length = 0.f;
+    for(float m : metres) {
+        crossed += m >= 2.f * stride ? 1.f : 0.f;
+        length += std::min(m, 30.f);
+    }
+    const float kinds = (float) soil::kinds;
+    return 0.5f * crossed / kinds + 0.5f * length / (30.f * kinds);
+}
+
+float CameraWalkSys::herdsBy(glm::vec2 from, glm::vec2 dir, float lead) {
+    auto* found = reg.ctx().find<HerdSys*>();
+    if(!found || !*found || (*found)->def().kinds.empty()) return 0.f;
+    HerdSys& sys = **found;
+    const float cell = sys.def().params.cell;
+    const glm::vec2 to = from + dir * distance, aside(dir.y, -dir.x);
+    glm::ivec2 low = glm::ivec2(glm::floor((glm::min(from, to) - herds) / cell)), high = glm::ivec2(glm::floor((glm::max(from, to) + herds) / cell));
+    float seen = 0.f;
+    for(int cx = low.x; cx <= high.x; cx++) {
+        for(int cz = low.y; cz <= high.y; cz++) {
+            uint64_t key = ((uint64_t) (uint32_t) cx << 32) | (uint32_t) cz;
+            auto known = herd_homes.find(key);
+            if(known == herd_homes.end()) {
+                HerdSys::Herd herd;
+                bool has = sys.describe(glm::ivec2(cx, cz), herd);
+                known = herd_homes.emplace(key, glm::vec3(herd.home, has ? 1.f : 0.f)).first;
+            }
+            if(known->second.z < 0.5f) continue;
+            glm::vec2 home = glm::vec2(known->second) - from;
+            float s = glm::dot(home, dir), t = std::abs(glm::dot(home, aside));
+            // By the side of the walk, not in its way, and not behind its start or after its end. Trees hide
+            // the ones of the forest
+            if(s < 10.f || s > distance - 10.f || t < 8.f || t > herds) continue;
+            seen += (1.f - 0.5f * t / herds) * (s < lead || s > distance - lead ? 1.f : 0.3f);
+        }
+    }
+    return std::min(seen / 2.f, 1.f);
 }
 
 // The line that best goes from open land through forest to open land again, on gentle ground
@@ -86,7 +149,7 @@ void CameraWalkSys::plan() {
     };
 
     // Open for the first and the last `lead` metres, forest in between
-    const float lead = std::min(45.f, distance * 0.18f);
+    const float lead = open_lead > 0.f ? std::min(open_lead, distance * 0.4f) : std::min(45.f, distance * 0.18f);
     const float margin = 20.f;
     struct Line {
         float score;
@@ -126,6 +189,7 @@ void CameraWalkSys::plan() {
                 float score = forest / forest_count - 2.f * open / open_count - densest + 0.6f * std::max(stand_max - stand_min, 0.f)
                     - 0.1f * std::sqrt(x * x + z * z) / search
                     - std::max(steep / count - 5.f, 0.f) / 10.f - std::max(steepest - 14.f, 0.f) / 14.f;
+                if(soil > 0.f) score += soil * soilOn(from, dir, lead);
                 lines.push_back({ score, from, yaw });
             }
         }
@@ -133,8 +197,12 @@ void CameraWalkSys::plan() {
     if(lines.empty()) return;
 
     // Among the best ones, the gentlest real ground : the heightfield does not have the bumps and the overhangs
-    size_t keep = std::min(lines.size(), (size_t) 30);
+    size_t keep = std::min(lines.size(), (size_t) (herds > 0.f ? 60 : 30));
     std::partial_sort(lines.begin(), lines.begin() + keep, lines.end(), [](const Line& a, const Line& b) { return a.score > b.score; });
+    // The herds are only looked for along these
+    if(herds > 0.f) {
+        for(size_t i = 0; i < keep; i++) lines[i].score += herdsBy(lines[i].start, along(lines[i].heading), lead);
+    }
     Line best = lines[0];
     float best_score = -1e9f;
     for(size_t i = 0; i < keep; i++) {
@@ -169,6 +237,10 @@ void CameraWalkSys::plan() {
     has_line = true;
     dy::log(dy::info) << "CameraWalk : from " << start.x << " " << start.y << " heading " << glm::degrees(heading) << " degrees for "
         << distance << " m (score " << best_score << ")\n";
+    if(soil > 0.f || herds > 0.f) {
+        dy::log(dy::info) << "CameraWalk : soil " << soilOn(start, along(heading), lead) << ", herds " << (herds > 0.f ? herdsBy(start, along(heading), lead) : 0.f)
+            << " of 1 along it\n";
+    }
 
 }
 
@@ -184,15 +256,76 @@ float CameraWalkSys::groundHeight(float x, float z, float near_y) const {
 void CameraWalkSys::place() {
     auto& camera = reg.ctx().get<Camera>();
     camera.position = glm::vec3(position.x, height, position.y);
-    // Looks from side to side and a little up and down, along the slope
-    camera.yaw = direction + glm::radians(sway) * std::sin((float) time * 2.f * pi / 13.f);
-    camera.pitch = std::clamp(0.6f * std::atan(climb) + 0.03f + 0.05f * std::sin((float) time * 2.f * pi / 9.f), -1.f, 1.f);
+    // Looks from side to side and a little up and down, along the slope, or at what look() found
+    const float at = std::clamp(looking, 0.f, 1.f);
+    camera.yaw = direction + (1.f - at) * glm::radians(sway) * std::sin((float) time * 2.f * pi / 13.f) + at * look_yaw;
+    float ahead = 0.6f * std::atan(climb) + 0.03f + 0.05f * std::sin((float) time * 2.f * pi / 9.f);
+    camera.pitch = std::clamp(ahead + at * (look_pitch - ahead), -1.f, 1.f);
+}
+
+void CameraWalkSys::look(float h) {
+
+    float want = 0.f, yaw = look_yaw, pitch = look_pitch;
+    float nearest = herds;
+
+    // The nearest herd, when it is not behind
+    if(herds > 0.f) {
+        if(auto* stats = reg.ctx().find<HerdStats>()) {
+            glm::ivec2 watched = watching;
+            for(auto& herd : stats->list) {
+                glm::vec2 to = glm::vec2(herd.centre.x, herd.centre.z) - position;
+                float away = glm::length(to);
+                if(away >= nearest || away < 2.f) continue;
+                float bearing = wrap(std::atan2(-to.x, -to.y) - direction);
+                if(std::abs(bearing) > glm::radians(115.f)) continue;
+                nearest = away;
+                watched = herd.cell;
+                want = 1.f;
+                yaw = std::clamp(bearing, -glm::radians(85.f), glm::radians(85.f));
+                pitch = std::atan2(herd.centre.y + 0.8f - height, away);
+            }
+            if(want > 0.f && watched != watching) {
+                watching = watched;
+                for(auto& herd : stats->list) {
+                    if(herd.cell != watched) continue;
+                    dy::log(dy::info) << "CameraWalk : " << herd.kind << ", " << herd.animals << " animals " << nearest << " m away, after "
+                        << reg.ctx().get<CameraWalk>().progress << " m\n";
+                }
+            }
+        }
+    }
+
+    // The mud, the stones or the sand a few steps ahead : down at them, unless the herd is close
+    if(soil_field) {
+        glm::vec2 ahead = position + along(direction) * 4.f;
+        glm::vec4 here = soil_field->sample(ahead.x, ahead.y);
+        float bare = glm::smoothstep(0.4f, 0.7f, std::max(here.x, std::max(here.y, here.z)));
+        if(want > 0.f) bare *= glm::smoothstep(0.4f * herds, 0.75f * herds, nearest);
+        // Not straight down : the relief of the stones shows at a grazing angle
+        const float down = -std::atan2(eye_height, 5.5f);
+        yaw = want > 0.f ? glm::mix(yaw, 0.f, bare) : 0.f;
+        pitch = want > 0.f ? glm::mix(pitch, down, bare) : down;
+        want = std::max(want, bare);
+    }
+
+    follow(looking, looking_rate, want, 0.5f, h);
+    if(want > 0.f) {
+        follow(look_yaw, look_yaw_rate, yaw, 0.4f, h);
+        follow(look_pitch, look_pitch_rate, pitch, 0.4f, h);
+    }
+
 }
 
 void CameraWalkSys::init() {
 
     if(auto* generator = reg.ctx().find<std::shared_ptr<TerrainGenerator>>()) {
         ground = std::make_shared<TerrainField>(*generator, std::make_shared<MarchingCubes>());
+    }
+
+    // The patches the terrain pass draws (SoilMaps)
+    if(soil > 0.f) {
+        auto* settings = reg.ctx().find<RenderSettings>();
+        if(!settings || settings->soil) soil_field = std::make_shared<SoilField>(settings ? settings->soil_params : SoilParams());
     }
 
     if(!has_line && ground) plan();
@@ -413,7 +546,7 @@ void CameraWalkSys::tick(double dt) {
     frames++;
 
     // The plants are counted by the renderer, a frame late; a Forest plants a few chunks a frame
-    if(!walk.started && frames > 4 && terrainReady(reg) && vegetationReady(reg)) {
+    if(!walk.started && frames > 4 && terrainReady(reg) && vegetationReady(reg) && (herds <= 0.f || animalsReady(reg))) {
         auto unplanted = reg.view<ChunkVolume>(entt::exclude<ChunkForest, ChunkDestroying>);
         if(!reg.ctx().find<std::shared_ptr<ForestField>>() || unplanted.begin() == unplanted.end()) {
             route();
@@ -421,6 +554,12 @@ void CameraWalkSys::tick(double dt) {
         }
     }
     if(!walk.started || walk.finished || dt <= 0.) {
+        place();
+        return;
+    }
+
+    // Herds come with the walk, and their animals are loaded as they do : it waits for them, as a capture does
+    if(herds > 0.f && !animalsReady(reg)) {
         place();
         return;
     }
@@ -463,6 +602,7 @@ void CameraWalkSys::tick(double dt) {
     walk.progress = glm::dot(position - start, along(heading));
     if(walk.progress >= distance || path_at + 2 >= path.size()) walk.finished = true;
 
+    if(soil_field || herds > 0.f) look(h);
     place();
 
 }

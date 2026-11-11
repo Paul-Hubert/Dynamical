@@ -195,6 +195,7 @@ build/venv/Scripts/python tools/animal_sheets.py                                
 build/venv/Scripts/python tools/train_animal.py --species deer_red --ranges walk_basic --max-steps 20000000
 build/venv/Scripts/python tools/animal_eval.py --run animal_deer_red_walk_basic
 build/venv/Scripts/python tools/animal_video.py --species deer_red --run animal_deer_red_walk_basic
+build/venv/Scripts/python tools/animal_orders_video.py --run animal_deer_red_walk_basic   # one take through every order of its ranges
 ```
 
 - `src/logic/animals/animal_body.{h,cpp}`: `generateAnimalBody` (which joints are bodies, shapes and masses from the

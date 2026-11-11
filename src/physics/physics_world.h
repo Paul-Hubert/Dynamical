@@ -19,13 +19,15 @@
 namespace dy {
 
 // Object layers (physics.md): agents collide with arena geometry and moving props, never with each other
-// (self-collision inside a ragdoll is a group filter); sensors only see what moves
+// (self-collision inside a ragdoll is a group filter); sensors only see what moves. Animals of a sandbox
+// (docs/action-agents.md) are ragdolls that do collide with each other: a wolf's head on a deer
 namespace PhysicsLayers {
     constexpr JPH::ObjectLayer static_layer = 0;   // STATIC: terrain colliders, ground, static bodies
     constexpr JPH::ObjectLayer moving_layer = 1;   // MOVING: dynamic and kinematic props
     constexpr JPH::ObjectLayer agent_layer = 2;    // AGENT: ragdoll segments
     constexpr JPH::ObjectLayer sensor_layer = 3;   // SENSOR: triggers
-    constexpr JPH::ObjectLayer count = 4;
+    constexpr JPH::ObjectLayer animal_layer = 4;   // ANIMAL: ragdoll segments that collide with other ragdolls of the layer
+    constexpr JPH::ObjectLayer count = 5;
 
     // Broad phase: NON_MOVING (static) and MOVING (everything else)
     constexpr JPH::uint8 non_moving_bp = 0;
@@ -34,9 +36,11 @@ namespace PhysicsLayers {
     constexpr bool collide(JPH::ObjectLayer a, JPH::ObjectLayer b) {
         if(a > b) return collide(b, a);
         switch(a) {
-        case static_layer: return b == moving_layer || b == agent_layer;
+        case static_layer: return b == moving_layer || b == agent_layer || b == animal_layer;
         case moving_layer: return true;
         case agent_layer: return b == sensor_layer;
+        case sensor_layer: return b == animal_layer;
+        case animal_layer: return true;
         default: return false;
         }
     }

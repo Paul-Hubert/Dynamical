@@ -5,6 +5,7 @@
 #include <Jolt/Physics/Body/BodyLockInterface.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -39,19 +40,6 @@ float wrapAngle(float a) {
     return a;
 }
 
-void readState(entt::registry& reg, AnimalBot& bot) {
-    auto& bodies = physicsWorld(reg).bodies();
-    for(size_t i = 0; i < bot.parts.bodies.size(); i++) {
-        JPH::RVec3 p;
-        JPH::Quat q;
-        bodies.GetPositionAndRotation(bot.parts.bodies[i], p, q);
-        bot.position[i] = toGlm(JPH::Vec3(p));
-        bot.rotation[i] = toGlm(q);
-        bot.linear[i] = toGlm(bodies.GetLinearVelocity(bot.parts.bodies[i]));
-        bot.angular[i] = toGlm(bodies.GetAngularVelocity(bot.parts.bodies[i]));
-    }
-}
-
 void applyEnvParams(entt::registry& reg, AnimalBot& bot) {
     AnimalParams p = *bot.base_params;
     if(auto* env = reg.ctx().find<AgentEnvParams>()) {
@@ -64,6 +52,8 @@ void applyEnvParams(entt::registry& reg, AnimalBot& bot) {
         f("fallHeight", p.fall_height);
         f("softResistance", p.soft_resistance);
         f("softLift", p.soft_lift);
+        f("headReward", p.head_reward);
+        f("modeReward", p.mode_reward);
         b("dieOnFall", p.die_on_fall);
         b("randomYaw", p.random_yaw);
     }
@@ -131,6 +121,323 @@ float piece(float a, float lo, float mid, float hi) {
     return a >= 0.f ? mid + a * (hi - mid) : mid + a * (mid - lo);
 }
 
+void findHead(AnimalBot& bot);
+
+// A new order of the single animal's task: the mode, the head offsets that go with it, and how fast it may go then
+void drawOrder(AnimalBot& bot, WorldRng& rng) {
+    const double u = rng.uniform();
+    bot.mode = u < 0.45 ? (int) AnimalMode::Move : u < 0.62 ? (int) AnimalMode::Feed : u < 0.8 ? (int) AnimalMode::Attack
+        : u < 0.9 ? (int) AnimalMode::Mate : (int) AnimalMode::Rest;
+    glm::vec2 head(0.f);
+    switch((AnimalMode) bot.mode) {
+    case AnimalMode::Move:
+        if(rng.uniform() < 0.5) head = glm::vec2((float) rng.uniform(-0.8, 0.8), (float) rng.uniform(-0.3, 0.3));
+        break;
+    case AnimalMode::Feed:
+        head = glm::vec2((float) rng.uniform(-0.3, 0.3), (float) rng.uniform(-animal_head_down, -0.5));
+        break;
+    case AnimalMode::Attack:
+        head = glm::vec2((float) rng.uniform(-0.6, 0.6), (float) rng.uniform(-0.5, 0.3));
+        break;
+    default:
+        head = glm::vec2((float) rng.uniform(-0.2, 0.2), (float) rng.uniform(-0.2, 0.2));
+        break;
+    }
+    bot.head = clampHead(head);
+    bot.order_until = bot.command.time + (float) rng.uniform(2., 6.);
+}
+
+// What a mode leaves of the speed the command drew
+float orderSpeed(int mode) {
+    switch((AnimalMode) mode) {
+    case AnimalMode::Feed: return 0.15f;
+    case AnimalMode::Mate: case AnimalMode::Rest: return 0.f;
+    default: return 1.f;
+    }
+}
+
+}
+
+const char* dy::animalModeName(int mode) {
+    static const char* const names[animal_modes] = { "move", "feed", "attack", "mate", "rest" };
+    return mode >= 0 && mode < animal_modes ? names[mode] : "?";
+}
+
+glm::vec2 dy::clampHead(glm::vec2 head) {
+    return glm::vec2(std::clamp(head.x, -animal_head_yaw, animal_head_yaw), std::clamp(head.y, -animal_head_down, animal_head_up));
+}
+
+glm::vec3 AnimalBot::headDirection() const {
+    glm::vec3 d = rotation[head_segment] * muzzle;
+    float length = glm::length(d);
+    return length > 1e-6f ? d / length : rotation[head_segment] * glm::vec3(0.f, 0.f, -1.f);
+}
+
+glm::vec3 AnimalBot::askedHeadDirection(glm::vec2 asked) const {
+    // In the trunk's heading frame (x forward, y up, z to the right): the standing direction, pitched then turned
+    const float elevation = std::asin(std::clamp(head_stand.y, -1.f, 1.f)) + asked.y;
+    const float azimuth = std::atan2(-head_stand.z, head_stand.x) + asked.x;
+    glm::vec3 local(std::cos(elevation) * std::cos(azimuth), std::sin(elevation), -std::cos(elevation) * std::sin(azimuth));
+    HeadingFrame frame = headingFrame(rotation[0]);
+    return local.x * frame.x + local.y * frame.y + local.z * frame.z;
+}
+
+void dy::observeOrder(const AnimalBot& bot, float* out) {
+    out[0] = bot.head.x / animal_head_yaw;
+    out[1] = bot.head.y / animal_head_down;
+    for(int m = 0; m < animal_modes; m++) out[2 + m] = bot.mode == m ? 1.f : 0.f;
+}
+
+AnimalRating dy::rateAnimal(const AnimalBot& bot, double window) {
+
+    AnimalRating r;
+    const AnimalParams& p = bot.params;
+    const AnimalBody& body = *bot.body;
+    const glm::vec3 trunk = bot.position[0];
+    r.velocity = (trunk - bot.snapshot_trunk) / (float) window;
+    r.along = glm::dot(r.velocity, bot.snapshot_direction);
+    r.root = std::min(r.along, bot.snapshot_speed) * p.root_reward;
+    if(bot.snapshot_speed > 0.f) r.root /= bot.snapshot_speed;
+    HeadingFrame frame = headingFrame(bot.rotation[0]);
+    r.heading_error = std::acos(std::clamp(glm::dot(frame.x, bot.snapshot_direction), -1.f, 1.f));
+
+    const glm::vec3 muzzle = bot.muzzlePoint();
+    r.muzzle_height = muzzle.y - bot.groundUnder(muzzle);
+    if(!bot.orders) return r;
+
+    r.head_error = std::acos(std::clamp(glm::dot(bot.headDirection(), bot.askedHeadDirection(bot.snapshot_head)), -1.f, 1.f));
+    r.head = p.head_reward * std::exp(-r.head_error * r.head_error / (2.f * 0.35f * 0.35f));
+
+    const float v0 = std::max(body.walk_speed, 1e-3f);
+    float mode = 0.f;
+    switch((AnimalMode) bot.snapshot_mode) {
+    case AnimalMode::Move:
+        break;
+    case AnimalMode::Feed:
+        // The muzzle down to the ground
+        mode = std::exp(-std::max(r.muzzle_height, 0.f) / (0.25f * body.stand_height));
+        break;
+    case AnimalMode::Attack: {
+        // The head thrown where it points
+        const glm::vec3 head_velocity = bot.origin_velocity[bot.head_segment];
+        mode = std::clamp(glm::dot(head_velocity, bot.headDirection()) / (2.f * v0), 0.f, 1.f);
+        break;
+    }
+    case AnimalMode::Mate:
+        mode = std::exp(-glm::length(horizontal(r.velocity)) / (0.3f * v0));
+        break;
+    case AnimalMode::Rest: {
+        float moving = 0.f;
+        for(const glm::vec3& v : bot.origin_velocity) moving += glm::length(v);
+        mode = std::exp(-moving / (float) bot.origin_velocity.size() / (0.2f * v0));
+        break;
+    }
+    }
+    r.mode = p.mode_reward * mode;
+    return r;
+
+}
+
+namespace {
+
+// The head: the segment named so, else the one of the trunk's chain that reaches furthest forward. Its muzzle: the
+// front of its shape, low, where it stands
+void findHead(AnimalBot& bot) {
+    const AnimalBody& body = *bot.body;
+    const BodyDef& def = body.def;
+    int head = -1;
+    for(size_t i = 0; i < def.segments.size(); i++) {
+        std::string name = def.segments[i].name;
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return (char) std::tolower(c); });
+        if(name.find("head") != std::string::npos) head = (int) i;
+    }
+    if(head < 0) {
+        float front = 1e9f;
+        for(size_t i = 0; i < def.segments.size(); i++) {
+            if(body.may_touch[i] || def.segments[i].role == "leg") continue;
+            if(def.segments[i].spawn_position.z < front) {
+                front = def.segments[i].spawn_position.z;
+                head = (int) i;
+            }
+        }
+    }
+    bot.head_segment = std::max(head, 0);
+
+    const SegmentDef& segment = def.segments[bot.head_segment];
+    const ShapeDef& shape = segment.shapes[0];
+    // The support point of the shape forward and a little down, at the standing pose (the animal looks down -z)
+    const glm::vec3 world(0.f, -0.45f, -0.9f);
+    const glm::quat to_shape = glm::inverse(segment.spawn_rotation * shape.rotation);
+    const glm::vec3 d = glm::normalize(to_shape * world);
+    glm::vec3 support(0.f);
+    if(shape.type == ShapeDef::Type::Box) {
+        // A corner only along the axes the direction really has: the middle of a face or of an edge otherwise
+        for(int a = 0; a < 3; a++) support[a] = std::abs(d[a]) > 0.35f ? (d[a] > 0.f ? shape.half_extents[a] : -shape.half_extents[a]) : 0.f;
+    } else {
+        if(shape.type == ShapeDef::Type::Capsule) support.y = d.y > 0.f ? shape.half_height : -shape.half_height;
+        support += d * shape.radius;
+    }
+    bot.muzzle = shape.center + shape.rotation * support;
+
+    // Where the head points standing, in the trunk's heading frame
+    HeadingFrame frame = headingFrame(def.segments[0].spawn_rotation);
+    glm::vec3 direction = segment.spawn_rotation * bot.muzzle;
+    float length = glm::length(direction);
+    bot.head_stand = length > 1e-6f ? frame.project(direction / length) : glm::vec3(1.f, 0.f, 0.f);
+}
+
+}
+
+void dy::readAnimalState(entt::registry& reg, AnimalBot& bot) {
+    auto& bodies = physicsWorld(reg).bodies();
+    for(size_t i = 0; i < bot.parts.bodies.size(); i++) {
+        JPH::RVec3 p;
+        JPH::Quat q;
+        bodies.GetPositionAndRotation(bot.parts.bodies[i], p, q);
+        bot.position[i] = toGlm(JPH::Vec3(p));
+        bot.rotation[i] = toGlm(q);
+        bot.linear[i] = toGlm(bodies.GetLinearVelocity(bot.parts.bodies[i]));
+        bot.angular[i] = toGlm(bodies.GetAngularVelocity(bot.parts.bodies[i]));
+    }
+}
+
+void dy::buildAnimalRagdoll(entt::registry& reg, AnimalBot& bot, const AnimalBuild& options) {
+    const AnimalBody& body = *bot.body;
+    const BodyDef& def = body.def;
+    RagdollBuild build;
+    build.total_mass = body.mass;
+    build.max_angular_velocity = body.max_angular_velocity;
+    build.kinematic = bot.kinematic;
+    build.cast = reg.ctx().contains<std::shared_ptr<TerrainColliders>>();
+    build.group = options.group;
+    build.animal_layer = options.collide;
+    buildRagdollParts(physicsWorld(reg), def, build, bot.parts);
+
+    const size_t n = def.segments.size();
+    bot.position.assign(n, glm::vec3(0.f));
+    bot.linear.assign(n, glm::vec3(0.f));
+    bot.angular.assign(n, glm::vec3(0.f));
+    bot.rotation.assign(n, glm::quat(1.f, 0.f, 0.f, 0.f));
+    bot.origin_previous.assign(n, glm::vec3(0.f));
+    bot.origin_velocity.assign(n, glm::vec3(0.f));
+    bot.frame_size = animal_header + 9 * (int) n;
+    bot.previous_frame.assign(bot.frame_size, 0.f);
+    bot.built = true;
+    readAnimalState(reg, bot);
+    findHead(bot);
+}
+
+void dy::destroyAnimalRagdoll(entt::registry& reg, AnimalBot& bot) {
+    if(!bot.built) return;
+    destroyRagdollParts(physicsWorld(reg), bot.parts);
+    bot.built = false;
+}
+
+void dy::standAnimalBot(entt::registry& reg, AnimalBot& bot, glm::vec3 origin, float yaw, bool on_field) {
+    const AnimalBody& body = *bot.body;
+    const BodyDef& def = body.def;
+    auto& bodies = physicsWorld(reg).bodies();
+    const glm::quat turn = glm::angleAxis(yaw, glm::vec3(0.f, 1.f, 0.f));
+    const glm::vec3 pivot(def.segments[0].spawn_position.x, 0.f, def.segments[0].spawn_position.z);
+    std::vector<glm::vec3> positions(def.segments.size());
+    std::vector<glm::quat> rotations(def.segments.size());
+    for(size_t i = 0; i < def.segments.size(); i++) {
+        positions[i] = origin + turn * (def.segments[i].spawn_position - pivot);
+        rotations[i] = glm::normalize(turn * def.segments[i].spawn_rotation);
+    }
+    if(on_field) {
+        // The standing pose stands on y = 0: onto the ground, as low as its soles allow
+        float raise = -1e9f;
+        for(size_t i = 0; i < def.segments.size(); i++) {
+            if(!body.is_foot[i]) continue;
+            const ShapeDef& shape = def.segments[i].shapes[0];
+            for(int c = 0; c < 4; c++) {
+                glm::vec3 corner = positions[i] + rotations[i] * (shape.center + shape.rotation * (shape.half_extents * glm::vec3(c & 1 ? 1.f : -1.f, -1.f, c & 2 ? 1.f : -1.f)));
+                raise = std::max(raise, bot.ground->height(corner.x, corner.z, corner.y + 2.f * body.height, corner.y) - corner.y);
+            }
+        }
+        if(raise > -1e8f) for(auto& p : positions) p.y += raise + 0.002f;
+    }
+    for(size_t i = 0; i < def.segments.size(); i++) {
+        bodies.SetPositionRotationAndVelocity(bot.parts.bodies[i], JPH::RVec3(toJolt(positions[i])), toJolt(rotations[i]), JPH::Vec3::sZero(), JPH::Vec3::sZero());
+    }
+    for(auto& c : bot.parts.constraints) c->ResetWarmStart();
+    readAnimalState(reg, bot);
+    for(size_t i = 0; i < def.segments.size(); i++) {
+        bot.origin_previous[i] = bot.position[i];
+        bot.origin_velocity[i] = glm::vec3(0.f);
+    }
+    bot.history_valid = true;
+}
+
+void dy::driveAnimalBot(AnimalBot& bot, const float* action, float strength) {
+    const AnimalBody& body = *bot.body;
+    for(size_t j = 0; j < body.def.joints.size(); j++) {
+        const JointDef& joint = body.def.joints[j];
+        const AnimalJointDrive& drive = body.drives[j];
+        auto* c = bot.parts.constraints[j].GetPtr();
+        const float* a = action + animal_actions_per_joint * j;
+        auto value = [&](int i) { float v = a[i]; return std::isfinite(v) ? std::clamp(v, -1.f, 1.f) : 0.f; };
+
+        // Gains never reach zero: a spring without stiffness is a rigid one to Jolt
+        float spring = 0.02f + 0.98f * (value(0) + 1.f) * 0.5f, damper = 0.02f + 0.98f * (value(1) + 1.f) * 0.5f;
+        for(auto* motor : { &c->GetSwingMotorSettings(), &c->GetTwistMotorSettings() }) {
+            motor->mSpringSettings.mStiffness = drive.stiffness * spring * strength;
+            motor->mSpringSettings.mDamping = drive.damping * damper;
+            motor->SetTorqueLimit(drive.max_torque * strength);
+        }
+        JPH::EMotorState state = bot.limp ? JPH::EMotorState::Off : JPH::EMotorState::PositionAndVelocity;
+        if(c->GetSwingMotorState() != state) {
+            c->SetSwingMotorState(state);
+            c->SetTwistMotorState(state);
+            // Limp: no drive, the little friction a dead joint has (without any a hanging leg swings for ever)
+            c->SetMaxFrictionTorque(bot.limp ? 0.0005f * drive.max_torque : 0.f);
+        }
+
+        // Each component from its limit to its limit through the standing pose: a zero action stands
+        float twist = piece(value(2), joint.twist_min, drive.stand.x, joint.twist_max);
+        float swing_y = piece(value(3), -joint.swing_y, drive.stand.y, joint.swing_y);
+        float swing_z = piece(value(4), -joint.swing_z, drive.stand.z, joint.swing_z);
+        glm::quat q = constraintRotation(twist, swing_y, swing_z);
+        c->SetTargetOrientationCS(toJolt(q));
+        JPH::Quat applied = c->GetTargetOrientationCS();
+        if(std::abs(glm::dot(toGlm(applied), q)) < 0.99999f) bot.target_clamps++;
+
+        glm::vec3 omega(value(5), value(6), value(7));
+        c->SetTargetAngularVelocityCS(toJolt(omega * body.max_target_angular_velocity));
+    }
+    bot.decisions++;
+    bot.window_ticks = 0;
+}
+
+void dy::syncAnimalBot(entt::registry& reg, AnimalBot& bot, double h) {
+    readAnimalState(reg, bot);
+    for(size_t i = 0; i < bot.position.size(); i++) {
+        if(bot.history_valid && h > 0.) bot.origin_velocity[i] = (bot.position[i] - bot.origin_previous[i]) / (float) h;
+        else bot.origin_velocity[i] = glm::vec3(0.f);
+        bot.origin_previous[i] = bot.position[i];
+    }
+    bot.history_valid = true;
+    bot.tick++;
+    bot.window_ticks++;
+}
+
+void dy::loadAnimalAssets(AnimalBot& bot, const AnimalSpawn& spawn) {
+    bot.spawn = spawn;
+    bot.body = loadAnimalBody(animalBodyPath(spawn.body));
+    bot.base_params = loadAnimalParams(libraryResourceFile(spawn.params).string());
+    {
+        const std::string path = libraryResourceFile(spawn.ranges).string();
+        std::ifstream in(path, std::ios::binary);
+        if(!in) throw AssetError(path + ": cannot open");
+        bot.ranges = GaitRanges::parse(nlohmann::json::parse(in));
+        bot.ranges_hash = fileSha256(path);
+    }
+    bot.kinematic = spawn.kinematic;
+    bot.recording = spawn.recording;
+    bot.draw = spawn.draw;
+    bot.view = spawn.view;
+    bot.view_truncate = spawn.view_truncate;
 }
 
 AnimalParams dy::parseAnimalParams(const nlohmann::json& j) {
@@ -147,6 +454,8 @@ AnimalParams dy::parseAnimalParams(const nlohmann::json& j) {
     p.random_yaw = j.value("random_yaw", p.random_yaw);
     p.soft_resistance = j.value("soft_resistance", p.soft_resistance);
     p.soft_lift = j.value("soft_lift", p.soft_lift);
+    p.head_reward = j.value("head_reward", p.head_reward);
+    p.mode_reward = j.value("mode_reward", p.mode_reward);
     return p;
 }
 
@@ -245,8 +554,6 @@ void dy::resetAnimalBot(entt::registry& reg) {
         // The player starts another walk at its next tick
         bot.demo_restart = true;
     } else {
-        auto& world = physicsWorld(reg);
-        auto& bodies = world.bodies();
 
         // The depth of soft ground this episode: the ranges', or the scene's
         bot.soft_depth = 0.f;
@@ -262,37 +569,7 @@ void dy::resetAnimalBot(entt::registry& reg) {
             yaw = std::atan2(-start.direction.x, -start.direction.z);
             if(!start.found) dy::log(dy::warning) << "AnimalBot: no spawn point in the slope band after " << start.tries << " draws\n";
         }
-        const glm::quat turn = glm::angleAxis(yaw, glm::vec3(0.f, 1.f, 0.f));
-        const glm::vec3 pivot(def.segments[0].spawn_position.x, 0.f, def.segments[0].spawn_position.z);
-        std::vector<glm::vec3> positions(def.segments.size());
-        std::vector<glm::quat> rotations(def.segments.size());
-        for(size_t i = 0; i < def.segments.size(); i++) {
-            positions[i] = bot.origin + turn * (def.segments[i].spawn_position - pivot);
-            rotations[i] = glm::normalize(turn * def.segments[i].spawn_rotation);
-        }
-        if(routed) {
-            // The standing pose stands on y = 0: onto the ground, as low as its soles allow
-            float raise = -1e9f;
-            for(size_t i = 0; i < def.segments.size(); i++) {
-                if(!body.is_foot[i]) continue;
-                const ShapeDef& shape = def.segments[i].shapes[0];
-                for(int c = 0; c < 4; c++) {
-                    glm::vec3 corner = positions[i] + rotations[i] * (shape.center + shape.rotation * (shape.half_extents * glm::vec3(c & 1 ? 1.f : -1.f, -1.f, c & 2 ? 1.f : -1.f)));
-                    raise = std::max(raise, bot.ground->height(corner.x, corner.z, corner.y + 2.f * body.height, corner.y) - corner.y);
-                }
-            }
-            if(raise > -1e8f) for(auto& p : positions) p.y += raise + 0.002f;
-        }
-        for(size_t i = 0; i < def.segments.size(); i++) {
-            bodies.SetPositionRotationAndVelocity(bot.parts.bodies[i], JPH::RVec3(toJolt(positions[i])), toJolt(rotations[i]), JPH::Vec3::sZero(), JPH::Vec3::sZero());
-        }
-        for(auto& c : bot.parts.constraints) c->ResetWarmStart();
-        readState(reg, bot);
-        for(size_t i = 0; i < def.segments.size(); i++) {
-            bot.origin_previous[i] = bot.position[i];
-            bot.origin_velocity[i] = glm::vec3(0.f);
-        }
-        bot.history_valid = true;
+        standAnimalBot(reg, bot, bot.origin, yaw, routed);
         beginCommand(reg, bot, yaw, body.walk_speed);
     }
 
@@ -300,6 +577,17 @@ void dy::resetAnimalBot(entt::registry& reg) {
     bot.snapshot_trunk = bot.position[0];
     bot.snapshot_direction = bot.command.direction();
     bot.snapshot_speed = bot.command.speed;
+    bot.mode = bot.snapshot_mode = 0;
+    bot.head = bot.snapshot_head = glm::vec2(0.f);
+    bot.order_until = 0.f;
+    if(bot.orders && !bot.kinematic) {
+        drawOrder(bot, rng);
+        bot.command.wanted_speed *= orderSpeed(bot.mode);
+        bot.command.speed = bot.command.wanted_speed;
+        bot.snapshot_speed = bot.command.speed;
+        bot.snapshot_mode = bot.mode;
+        bot.snapshot_head = bot.head;
+    }
 
     bot.tick = bot.decisions = bot.window_ticks = 0;
     bot.killed = bot.truncated = bot.pending_reset = false;
@@ -335,50 +623,23 @@ void AnimalFactorySys::init() {
     const auto& spawn = reg.get<AnimalSpawn>(*view.begin());
 
     auto& bot = reg.ctx().emplace<AnimalBot>();
-    bot.spawn = spawn;
-    bot.body = loadAnimalBody(animalBodyPath(spawn.body));
-    bot.base_params = loadAnimalParams(libraryResourceFile(spawn.params).string());
-    {
-        const std::string path = libraryResourceFile(spawn.ranges).string();
-        std::ifstream in(path, std::ios::binary);
-        if(!in) throw AssetError(path + ": cannot open");
-        bot.ranges = GaitRanges::parse(nlohmann::json::parse(in));
-        bot.ranges_hash = fileSha256(path);
-    }
-    bot.kinematic = spawn.kinematic;
-    bot.recording = spawn.recording;
-    bot.draw = spawn.draw;
-    bot.view = spawn.view;
-    bot.view_truncate = spawn.view_truncate;
+    loadAnimalAssets(bot, spawn);
     if(auto* field = reg.ctx().find<std::shared_ptr<GroundField>>()) bot.ground = *field;
     if(auto* routes = reg.try_get<WalkRoutes>(*view.begin())) bot.routes = *routes;
     applyEnvParams(reg, bot);
 
+    buildAnimalRagdoll(reg, bot);
+    if(reg.ctx().contains<std::shared_ptr<TerrainColliders>>()) reg.ctx().insert_or_assign(TerrainUsers { bot.parts.bodies });
     const AnimalBody& body = *bot.body;
     const BodyDef& def = body.def;
-    RagdollBuild build;
-    build.total_mass = body.mass;
-    build.max_angular_velocity = body.max_angular_velocity;
-    build.kinematic = bot.kinematic;
-    build.cast = reg.ctx().contains<std::shared_ptr<TerrainColliders>>();
-    buildRagdollParts(physicsWorld(reg), def, build, bot.parts);
-    if(reg.ctx().contains<std::shared_ptr<TerrainColliders>>()) reg.ctx().insert_or_assign(TerrainUsers { bot.parts.bodies });
-
     const size_t n = def.segments.size();
-    bot.position.assign(n, glm::vec3(0.f));
-    bot.linear.assign(n, glm::vec3(0.f));
-    bot.angular.assign(n, glm::vec3(0.f));
-    bot.rotation.assign(n, glm::quat(1.f, 0.f, 0.f, 0.f));
-    bot.origin_previous.assign(n, glm::vec3(0.f));
-    bot.origin_velocity.assign(n, glm::vec3(0.f));
-    bot.frame_size = animal_header + 9 * (int) n;
-    bot.previous_frame.assign(bot.frame_size, 0.f);
-    bot.built = true;
-    readState(reg, bot);
 
     auto& io = agentIO(reg);
     io.configure(body.behavior, bot.observationSize(), bot.actionSize());
     io.sensor_name = "StackingSensor_size2_VectorSensor_size" + std::to_string(bot.frame_size);
+    bot.orders = spawn.orders;
+    io.sensors.clear();
+    if(bot.orders) io.addVector("nogail_order", animal_order_size);
 
     if(bot.draw) {
         for(size_t i = 0; i < n; i++) {
@@ -404,9 +665,7 @@ void AnimalFactorySys::init() {
 
 void AnimalFactorySys::finish() {
     auto* bot = reg.ctx().find<AnimalBot>();
-    if(!bot || !bot->built) return;
-    destroyRagdollParts(physicsWorld(reg), bot->parts);
-    bot->built = false;
+    if(bot) destroyAnimalRagdoll(reg, *bot);
 }
 
 // AnimalDrive
@@ -416,45 +675,7 @@ void AnimalDriveSys::tick(double h) {
     auto& bot = reg.ctx().get<AnimalBot>();
     auto& io = agentIO(reg);
     if(!bot.built || bot.kinematic) return;
-    const AnimalBody& body = *bot.body;
-
-    for(size_t j = 0; j < body.def.joints.size(); j++) {
-        const JointDef& joint = body.def.joints[j];
-        const AnimalJointDrive& drive = body.drives[j];
-        auto* c = bot.parts.constraints[j].GetPtr();
-        const float* a = io.action.data() + animal_actions_per_joint * j;
-        auto value = [&](int i) { float v = a[i]; return std::isfinite(v) ? std::clamp(v, -1.f, 1.f) : 0.f; };
-
-        // Gains never reach zero: a spring without stiffness is a rigid one to Jolt
-        float spring = 0.02f + 0.98f * (value(0) + 1.f) * 0.5f, damper = 0.02f + 0.98f * (value(1) + 1.f) * 0.5f;
-        for(auto* motor : { &c->GetSwingMotorSettings(), &c->GetTwistMotorSettings() }) {
-            motor->mSpringSettings.mStiffness = drive.stiffness * spring;
-            motor->mSpringSettings.mDamping = drive.damping * damper;
-            motor->SetTorqueLimit(drive.max_torque);
-        }
-        JPH::EMotorState state = bot.limp ? JPH::EMotorState::Off : JPH::EMotorState::PositionAndVelocity;
-        if(c->GetSwingMotorState() != state) {
-            c->SetSwingMotorState(state);
-            c->SetTwistMotorState(state);
-            // Limp: no drive, the little friction a dead joint has (without any a hanging leg swings for ever)
-            c->SetMaxFrictionTorque(bot.limp ? 0.0005f * drive.max_torque : 0.f);
-        }
-
-        // Each component from its limit to its limit through the standing pose: a zero action stands
-        float twist = piece(value(2), joint.twist_min, drive.stand.x, joint.twist_max);
-        float swing_y = piece(value(3), -joint.swing_y, drive.stand.y, joint.swing_y);
-        float swing_z = piece(value(4), -joint.swing_z, drive.stand.z, joint.swing_z);
-        glm::quat q = constraintRotation(twist, swing_y, swing_z);
-        c->SetTargetOrientationCS(toJolt(q));
-        JPH::Quat applied = c->GetTargetOrientationCS();
-        if(std::abs(glm::dot(toGlm(applied), q)) < 0.99999f) bot.target_clamps++;
-
-        glm::vec3 omega(value(5), value(6), value(7));
-        c->SetTargetAngularVelocityCS(toJolt(omega * body.max_target_angular_velocity));
-    }
-
-    bot.decisions++;
-    bot.window_ticks = 0;
+    driveAnimalBot(bot, io.action.data());
 
 }
 
@@ -464,15 +685,7 @@ void AnimalSyncSys::tick(double h) {
 
     auto& bot = reg.ctx().get<AnimalBot>();
     if(!bot.built) return;
-    readState(reg, bot);
-    for(size_t i = 0; i < bot.position.size(); i++) {
-        if(bot.history_valid && h > 0.) bot.origin_velocity[i] = (bot.position[i] - bot.origin_previous[i]) / (float) h;
-        else bot.origin_velocity[i] = glm::vec3(0.f);
-        bot.origin_previous[i] = bot.position[i];
-    }
-    bot.history_valid = true;
-    bot.tick++;
-    bot.window_ticks++;
+    syncAnimalBot(reg, bot, h);
 
     if(bot.draw) {
         for(auto [e, shape, transform] : reg.view<WorldShape, Transform>().each()) {
@@ -496,7 +709,20 @@ void AnimalSyncSys::tick(double h) {
 void AnimalTaskSys::tick(double h) {
     auto& bot = reg.ctx().get<AnimalBot>();
     if(!bot.built || bot.kinematic) return;
+    const float before = bot.command.until;
     advanceCommand(reg, bot, bot.position[0], bot.body->walk_speed, (float) h);
+    if(!bot.orders) return;
+    // The order changes at its own pace; a mode that stands still holds the speed of every command drawn under it
+    const bool redrawn = bot.command.until != before;
+    if(bot.command.time >= bot.order_until) {
+        const float full = orderSpeed(bot.mode) > 0.f ? bot.command.wanted_speed / orderSpeed(bot.mode) : -1.f;
+        drawOrder(bot, reg.ctx().get<WorldRng>());
+        // The command in force is rescaled to the new mode (from a mode that stood still: drawn again)
+        if(full >= 0.f) bot.command.wanted_speed = full * orderSpeed(bot.mode);
+        else bot.command.until = bot.command.time;
+    } else if(redrawn) {
+        bot.command.wanted_speed *= orderSpeed(bot.mode);
+    }
 }
 
 // AnimalTermination
@@ -540,18 +766,17 @@ void AnimalRewardsSys::tick(double h) {
     const AnimalBody& body = *bot.body;
     const double window = std::max(bot.window_ticks, 1) * clock.dt;
     const glm::vec3 trunk = bot.position[0];
-    const glm::vec3 velocity = (trunk - bot.snapshot_trunk) / (float) window;
-    const float along = glm::dot(velocity, bot.snapshot_direction);
-    float root = std::min(along, bot.snapshot_speed) * p.root_reward;
-    if(bot.snapshot_speed > 0.f) root /= bot.snapshot_speed;
+    const AnimalRating rating = rateAnimal(bot, window);
+    const glm::vec3 velocity = rating.velocity;
+    const float along = rating.along;
+    const float root = rating.root;
 
-    float reward = p.life_reward + root;
+    float reward = p.life_reward + root + rating.head + rating.mode;
 
     io.stats.clear();
     auto stat = [&](const char* key, float value, int aggregation = 0) { io.stats.emplace_back(key, value, aggregation); };
     const int histogram = 3;
-    HeadingFrame frame = headingFrame(bot.rotation[0]);
-    const float heading_error = std::acos(std::clamp(glm::dot(frame.x, bot.snapshot_direction), -1.f, 1.f));
+    const float heading_error = rating.heading_error;
     stat("Root/Root Speed", along, histogram);
     stat("Root/Root Damper Reward", root, histogram);
     stat("Root/Root Horizontal Velocity", glm::length(horizontal(velocity)), histogram);
@@ -561,6 +786,12 @@ void AnimalRewardsSys::tick(double h) {
     stat("Animal/Trunk Height", bot.trunkHeight() / body.stand_height, histogram);
     stat("Animal/Target Clamped", (float) bot.target_clamps);
     if(bot.soft_depth > 0.f) stat("Animal/Soft Depth", bot.soft_depth / body.height);
+    if(bot.orders) {
+        stat("Order/Head Reward", rating.head);
+        stat("Order/Head Error", glm::degrees(rating.head_error));
+        stat(("Order/Reward " + std::string(animalModeName(bot.snapshot_mode))).c_str(), rating.mode);
+        if(bot.snapshot_mode == (int) AnimalMode::Feed) stat("Order/Feed Muzzle Height", rating.muzzle_height / body.stand_height);
+    }
     stat("Death/Alive", bot.killed ? 0.f : 1.f);
 
     bot.episode.distance += glm::length(horizontal(trunk - bot.snapshot_trunk));
@@ -600,6 +831,9 @@ void AnimalObservationSys::tick(double h) {
     bot.snapshot_trunk = bot.position[0];
     bot.snapshot_direction = bot.command.direction();
     bot.snapshot_speed = bot.command.speed;
+    bot.snapshot_mode = bot.mode;
+    bot.snapshot_head = bot.head;
+    if(bot.orders && !io.sensors.empty()) observeOrder(bot, io.sensors[0].data.data());
 
     if(bot.recording) {
         io.recordable = bot.warm_left <= 0 && !bot.demo_restart;
@@ -969,6 +1203,7 @@ void dy::registerAnimalAgents() {
             f.read("warmup", s.warmup);
             f.read("soft_depth", s.soft_depth);
             f.read("heading", s.heading);
+            f.read("orders", s.orders);
             f.finish();
             if(s.body.empty()) throw ComponentError("/body", "a body file or a species is required");
             if(motion != "dynamic" && motion != "kinematic") throw ComponentError("/motion", "dynamic or kinematic");
@@ -980,7 +1215,8 @@ void dy::registerAnimalAgents() {
             auto& s = reg.get<AnimalSpawn>(e);
             return nlohmann::json { { "body", s.body }, { "params", s.params }, { "ranges", s.ranges }, { "gait", s.gait }, { "motion", s.kinematic ? "kinematic" : "dynamic" },
                 { "recording", s.recording }, { "draw", s.draw }, { "view", s.view }, { "view_truncate", s.view_truncate }, { "speed", s.speed },
-                { "recording_decisions", s.recording_decisions }, { "warmup", s.warmup }, { "soft_depth", s.soft_depth }, { "heading", s.heading } };
+                { "recording_decisions", s.recording_decisions }, { "warmup", s.warmup }, { "soft_depth", s.soft_depth }, { "heading", s.heading },
+                { "orders", s.orders } };
         }
     });
 
@@ -996,4 +1232,8 @@ void dy::registerAnimalAgents() {
     registerSystem("AnimalGaitPlayer", systemInfo<AnimalGaitPlayerSys>(SystemScope::World));
     registerSystem("AnimalChecks", systemInfo<AnimalChecksSys>(SystemScope::World));
 
+}
+
+void dy::applyAnimalEnvParams(entt::registry& reg, AnimalBot& bot) {
+    applyEnvParams(reg, bot);
 }

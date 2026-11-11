@@ -1,0 +1,10 @@
+{
+  "format_version": 1,
+  "name": "sandbox_puppet",
+  "include": ["common/sandbox_world.json"],
+  "variables": {
+    "num_worlds": { "type": "int",  "default": 8 },
+    "puppet":     { "type": "bool", "default": true }
+  },
+  "worlds": [ { "template": "sandbox_world", "count": "${num_worlds}" } ]
+}

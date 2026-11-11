@@ -20,7 +20,7 @@ const float elevation_step = 0.39269908170f;    // 22.5 degrees
 const float flat_patience = 4.f;
 
 // Bump when the baker or the meaning of the texels changes : cached files become stale
-const uint32_t bake_version = 4;
+const uint32_t bake_version = 5;
 const char file_magic[8] = {'D', 'Y', 'G', 'R', 'A', 'S', '3', '\0'};
 
 int floorDiv(int a, int b) {

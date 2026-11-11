@@ -107,3 +107,52 @@ void MarchingCubes::mesh(const float* values, glm::ivec3 samples, float cube_siz
     }
 
 }
+
+glm::vec3 MarchingCubes::vertexNormal(const std::function<float(glm::ivec3)>& density, glm::ivec3 low, int axis) const {
+
+    glm::ivec3 along(0), u(0), v(0);
+    along[axis] = 1;
+    u[(axis + 1) % 3] = 1;
+    v[(axis + 2) % 3] = 1;
+
+    glm::vec3 sum(0.f);
+
+    // The same order whichever cube asks : every copy of the vertex gets the same normal
+    for(int k = 0; k < 4; k++) {
+
+        glm::ivec3 cube = low - u * (k & 1) - v * (k >> 1);
+
+        float d[8];
+        uint32_t config = 0;
+        for(int i = 0; i < 8; i++) {
+            d[i] = density(cube + corners[i]);
+            if(d[i] > 0.f) config |= 1u << i;
+        }
+
+        // The edge, among the twelve of this cube
+        int shared = -1;
+        for(int e = 0; e < 12; e++) {
+            glm::ivec3 a = corners[edges[e][0]], b = corners[edges[e][1]];
+            if(glm::min(a, b) == low - cube && glm::abs(b - a) == along) shared = e;
+        }
+
+        // Where the ground crosses an edge of the cube, in cubes from low
+        auto vertexOn = [&](int e) {
+            int a = edges[e][0], b = edges[e][1];
+            float t = -d[a] / (d[b] - d[a]);
+            return glm::mix(glm::vec3(cube + corners[a] - low), glm::vec3(cube + corners[b] - low), t);
+        };
+
+        const int8_t* entry = &table[config * 16];
+        for(int i = 0; i < 15 && entry[i] >= 0; i += 3) {
+            if(entry[i] != shared && entry[i + 1] != shared && entry[i + 2] != shared) continue;
+            glm::vec3 a = vertexOn(entry[i]), b = vertexOn(entry[i + 1]), c = vertexOn(entry[i + 2]);
+            sum += glm::cross(b - a, c - a);
+        }
+
+    }
+
+    // The triangles of the table are counter clockwise seen from outside the solid (TERRAIN.1, TERRAIN.2)
+    return sum;
+
+}

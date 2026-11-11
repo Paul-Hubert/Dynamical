@@ -19,9 +19,9 @@ namespace dy {
 struct GrassSpeciesParams {
     float size = 40.f;      // metres : the first octave of the noises, about the size of a patch. 0 : the meadow everywhere
     float low = 0.4f;       // small plants where the grass is under that part of the way from its shortest to its tallest
-    // How much the patches overlap, 0 to 1 : kinds whose noise is within overlap x margin of the best one grow
-    // together, and small and tall plants both grow over overlap x band of the heights around `low`. 0 : one
-    // kind at a place, small plants on one side of a line
+    // How wide the patches blend into each other, 0 to 1 : a kind goes from all of its plants to none over
+    // overlap x margin of its noise against the next kind's, and small and tall plants trade places over
+    // overlap x band of the heights around `low`. 0 : one kind at a place, edges like lines
     float overlap = 0.5f;
 };
 
@@ -47,12 +47,14 @@ namespace grass_species {
 std::vector<int8_t> bakeSpeciesNoise(uint32_t seed = 4242);
 
 struct GrassSpecies {
-    // The tall layers of the grass, the first to the third : the kind whose noise is the highest, then those
-    // close enough to it to grow with it (the first kind again where there is none)
+    // The tall layers of the grass, the first to the third : the kinds whose noises are the highest
     GrassKind kinds[3] = {GrassKind::Meadow, GrassKind::Meadow, GrassKind::Meadow};
-    // Under them : short meadow grass (-1), a small kind where small and tall plants both grow (its index),
-    // nothing under small plants (-2)
-    int under = -1;
+    // The part of the plants of each that are there, those of the lowest ids (GrassModel::ids) : 1 inside the
+    // patch of the kind, a half where it meets the next one, less outside. A layer with no kind of its own is
+    // the first kind again
+    float keep[3] = {1.f, 1.f, 1.f};
+    // Of the short meadow grass under the tall kinds : none under the small plants
+    float under = 1.f;
 };
 
 // tallness : height of the grass at the place, 0 its shortest and 1 its tallest (GrassHeightField::sample)

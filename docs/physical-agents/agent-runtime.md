@@ -219,3 +219,7 @@ There is one outbox per world. `TrainHost` gathers them in world index order.
 **As built.** The sphere roller shipped `AgentIO` (`src/logic/agents/agent_io.h`), one agent per world, and
 `WorldsEnvironment` (`src/train/worlds_env.cpp`). They play the role of the outbox for now: P8 extends them
 (stacked sensor name, aggregation) and does not add a second path. The multi-agent outbox above is for M9.
+
+**Several agents in a world (2026-11-11).** `AgentIO` can also be a component: every entity that has one is an
+agent, of any behaviour, with discrete branches, further sensors (buffers) and its own decision rate.
+`WorldsEnvironment` gathers them by behaviour at every exchange. See docs/action-agents.md, scene `pursuit`.

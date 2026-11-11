@@ -84,15 +84,13 @@ GrassSpecies grassSpeciesAt(const std::vector<int8_t>& noise, const GrassSpecies
     glm::vec4 read[3];
     for(int i = 0; i < 3; i++) read[i] = sample(noise, at * grass_species::scales[i] + grass_species::shifts[i]);
 
-    int kind[3] = {-1, -1, -1}, under = -1;
-    float best[3] = {-1e9f, -1e9f, -1e9f}, best_small = -1e9f;
+    int kind[3] = {-1, -1, -1};
+    float best[3] = {-1e9f, -1e9f, -1e9f}, best_small = -1e9f, best_tall = -1e9f;
     for(int k = 0; k < grass_kinds; k++) {
         const GrassKindInfo& info = grassKindInfo(static_cast<GrassKind>(k));
         float value = read[k / 4][k % 4] + info.abundance + (info.small ? -tall : tall);
-        if(info.small && value > best_small) {
-            best_small = value;
-            under = k;
-        }
+        if(info.small) best_small = std::max(best_small, value);
+        else best_tall = std::max(best_tall, value);
         for(int rank = 0; rank < 3; rank++) {
             if(value <= best[rank]) continue;
             for(int moved = 2; moved > rank; moved--) {
@@ -104,16 +102,22 @@ GrassSpecies grassSpeciesAt(const std::vector<int8_t>& noise, const GrassSpecies
             break;
         }
     }
-    const float margin = grass_species::margin * overlap;
+
+    // The first kind against the second, the others against the first : all of its plants half a blend
+    // width inside its patch, none as far outside
+    const float width = std::max(grass_species::margin * overlap, 1e-3f);
+    out.keep[0] = std::clamp(0.5f + (best[0] - best[1]) / width, 0.f, 1.f);
     for(int rank = 1; rank < 3; rank++) {
-        if(kind[rank] < 0 || best[rank] <= best[0] - margin) kind[rank] = kind[0];
+        out.keep[rank] = std::clamp(0.5f + (best[rank] - best[0]) / width, 0.f, 1.f);
+        // Where no other kind is close the layers are all of the first one, as dense
+        if(kind[rank] < 0 || out.keep[rank] <= 0.f) {
+            kind[rank] = kind[0];
+            out.keep[rank] = out.keep[0];
+        }
     }
     for(int rank = 0; rank < 3; rank++) out.kinds[rank] = static_cast<GrassKind>(kind[rank]);
 
-    // Small plants under the tall ones in the band only, and nothing under the small ones
-    if(grassKindInfo(out.kinds[0]).small) out.under = -2;
-    else if(tall >= 1.f || overlap <= 0.f) out.under = -1;
-    else out.under = under;
+    out.under = grassKindInfo(out.kinds[0]).small ? 0.f : std::clamp(0.5f + (best_tall - best_small) / width, 0.f, 1.f);
     return out;
 
 }

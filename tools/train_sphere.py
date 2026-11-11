@@ -6,6 +6,8 @@
 
 - --scene picks the body: sphere_roll (0.25 m, 10 kg, behaviour SphereRoller, training/sphere_roller_ppo.yaml) or
   wheel_roll (the walker's hip height, 69 kg, behaviour WheelRoller, training/wheel_roller_ppo.yaml).
+  pursuit is not a sphere: chasers and runners on a field, two behaviours in one run (training/pursuit_ppo.yaml,
+  docs/action-agents.md).
 - --init-path starts the network (and its normaliser) from a checkpoint .pt instead of from scratch, e.g. the small
   sphere's build/runs/sphere_mc_night_20261031/SphereRoller/checkpoint.pt: it sets the behaviour's init_path.
 
@@ -34,7 +36,7 @@ import time
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 VENV = ROOT / "build" / "venv" / "Scripts"
 BUILD = ROOT / "build" / "RelWithDebInfo"
-CONFIGS = {"sphere_roll": "sphere_roller_ppo.yaml", "wheel_roll": "wheel_roller_ppo.yaml"}
+CONFIGS = {"sphere_roll": "sphere_roller_ppo.yaml", "wheel_roll": "wheel_roller_ppo.yaml", "pursuit": "pursuit_ppo.yaml"}
 
 
 def freeze_env(dst):
@@ -71,6 +73,7 @@ def main():
     parser.add_argument("--threads", type=int, default=1, help="TrainingEnv workers per process")
     parser.add_argument("--config", help="default: the scene's, training/" + ", training/".join(CONFIGS.values()))
     parser.add_argument("--init-path", help="a checkpoint .pt to start from")
+    parser.add_argument("--var", action="append", default=[], metavar="NAME=VALUE", help="a scene variable (var.NAME=VALUE), repeatable")
     parser.add_argument("--results", default=str(ROOT / "build" / "runs"))
     parser.add_argument("--base-port", type=int, default=5305)
     parser.add_argument("--resume", action="store_true")
@@ -112,7 +115,7 @@ def main():
     cmd = [str(VENV / "mlagents-learn.exe"), str(config), f"--env={env_dir / 'TrainingEnv'}", f"--num-envs={args.num_envs}",
            "--no-graphics", f"--run-id={args.run_id}", f"--results-dir={results}", f"--base-port={args.base_port}",
            "--resume" if args.resume else "--seed=-1",
-           "--env-args", f"scene={args.scene}", "mode=train", f"threads={args.threads}"]
+           "--env-args", f"scene={args.scene}", "mode=train", f"threads={args.threads}"] + [f"var.{v}" for v in args.var]
     wandb_dir = results / f"{args.run_id}_wandb"
     wandb_dir.mkdir(parents=True, exist_ok=True)
     environment = dict(os.environ, WANDB_MODE="offline", WANDB_SILENT="true", WANDB_DIR=str(wandb_dir),

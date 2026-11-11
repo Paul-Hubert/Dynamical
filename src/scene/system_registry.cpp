@@ -8,6 +8,7 @@
 #include "logic/agents/ground_field.h"
 #include "logic/agents/humanbot.h"
 #include "logic/agents/ik.h"
+#include "logic/agents/pursuit.h"
 #include "logic/agents/sphere_roller.h"
 #include "logic/agents/walk_routes.h"
 #include "logic/components/model_ref.h"
@@ -17,6 +18,7 @@
 #include "logic/systems/chunk_systems.h"
 #include "logic/animals/animal.h"
 #include "logic/animals/animal_agent.h"
+#include "logic/sandbox/sandbox.h"
 #include "logic/vegetation/forest.h"
 #include "logic/vegetation/vegetation_scatter.h"
 #include "physics/physics_sys.h"
@@ -169,6 +171,7 @@ void dy::registerSimSystems() {
 
     registerSimComponents();
     registerSphereRoller();
+    registerPursuit();
     registerHumanBot();
     registerIK();
     registerGroundField();
@@ -178,5 +181,6 @@ void dy::registerSimSystems() {
     registerForest();
     registerAnimals();
     registerAnimalAgents();
+    registerSandbox();
 
 }

@@ -31,6 +31,18 @@ constexpr int animal_header = 7;
 constexpr int animal_stack = 2;
 constexpr int animal_actions_per_joint = 8;
 
+// The order next to the walk command (docs/action-agents.md): what the animal is doing and where its head is asked to
+// point. A second sensor of the walker, "nogail_order": the head's yaw and pitch offsets over their limits and the mode
+// as a one-hot. GAIL's discriminator does not see it (the fork hides sensors named nogail), so the demonstrations of
+// the procedural walk stay what they are
+enum class AnimalMode : int { Move, Feed, Attack, Mate, Rest };
+constexpr int animal_modes = 5;
+constexpr int animal_order_size = 2 + animal_modes;
+constexpr float animal_head_yaw = 1.f;          // radians to either side
+constexpr float animal_head_down = 1.1f;        // radians down
+constexpr float animal_head_up = 0.5f;
+const char* animalModeName(int mode);
+
 // resources/agents/params/animal.params.json: what every species shares. Env params of the same names override
 struct AnimalParams {
     std::string file_hash;
@@ -45,6 +57,9 @@ struct AnimalParams {
     bool random_yaw = true;                 // episodes start facing anywhere
     float soft_resistance = 3.f;            // soft ground: how hard the layer holds a body, in weights of that body per m/s sideways
     float soft_lift = 0.25f;                // ... and upwards, as a part of that
+    float head_reward = 0.1f;               // with orders, per decision: the head where it is asked to point
+    float mode_reward = 0.15f;              // ... and what the mode asks: the muzzle down (feed), the head thrown forward
+                                            // (attack), standing still (mate), everything still (rest)
 };
 
 AnimalParams parseAnimalParams(const nlohmann::json& json);
@@ -66,6 +81,7 @@ struct AnimalSpawn {
     float warmup = 2.f;                     // seconds walked before a walk is recorded (plus up to a cycle, drawn)
     float heading = -1.f;                   // >= 0: recorded walks start with this heading, degrees (0 looks down -z); else drawn
     float soft_depth = -1.f;                // >= 0: this depth of soft ground, in heights, instead of the ranges'
+    bool orders = false;                    // modes and head offsets are drawn next to the commands, the order sensor is on
 };
 
 // How an episode ended, kept in eval
@@ -106,6 +122,17 @@ struct AnimalBot {
     glm::vec3 snapshot_trunk = glm::vec3(0.f), snapshot_direction = glm::vec3(0.f, 0.f, -1.f);
     float snapshot_speed = 0.f;
 
+    // The order (AnimalMode, head offsets), and the one the last observation carried
+    bool orders = false;
+    int mode = 0;
+    glm::vec2 head = glm::vec2(0.f);        // yaw to the left and pitch up asked of the head, radians from where it points standing
+    float order_until = 0.f;                // seconds of the episode at which the next order is drawn (the single animal's task)
+    int snapshot_mode = 0;
+    glm::vec2 snapshot_head = glm::vec2(0.f);
+    int head_segment = 0;
+    glm::vec3 muzzle = glm::vec3(0.f);      // the front of the head, in the head segment's frame
+    glm::vec3 head_stand = glm::vec3(1.f, 0.f, 0.f);    // from the head's origin to the muzzle, in the trunk's heading frame, standing
+
     int frame_size = 0;                     // animal_header + 9 x segments
     std::vector<float> previous_frame;
 
@@ -139,7 +166,31 @@ struct AnimalBot {
     // 0: standing; 1: the trunk under fall_height of its standing height; 2: a body that is neither a foot nor a
     // lower leg on the ground (`segment`)
     int fallen(int* segment = nullptr) const;
+
+    // The muzzle in the world, and where the head points (from its origin to the muzzle)
+    glm::vec3 muzzlePoint() const { return position[head_segment] + rotation[head_segment] * muzzle; }
+    glm::vec3 headDirection() const;
+    // Where the head would point with the offsets `asked` (yaw, pitch), for the trunk as it is
+    glm::vec3 askedHeadDirection(glm::vec2 asked) const;
 };
+
+// What a decision window is worth to the walker: along the command, and with orders the head and the mode
+struct AnimalRating {
+    glm::vec3 velocity = glm::vec3(0.f);    // of the trunk over the window
+    float along = 0.f;                      // m/s along the commanded heading
+    float root = 0.f;                       // the command's reward
+    float heading_error = 0.f;              // radians between the trunk's heading and the command
+    float head = 0.f, mode = 0.f;           // the order's rewards
+    float head_error = 0.f;                 // radians between where the head points and where it is asked to
+    float muzzle_height = 0.f;              // m over the ground
+};
+AnimalRating rateAnimal(const AnimalBot& bot, double window);
+
+// The order of a bot as its sensor holds it (animal_order_size values)
+void observeOrder(const AnimalBot& bot, float* out);
+
+// A head offset inside its limits
+glm::vec2 clampHead(glm::vec2 head);
 
 // The lowest point of a segment's shape, world
 glm::vec3 lowestPoint(const SegmentDef& segment, glm::vec3 position, glm::quat rotation);
@@ -150,6 +201,33 @@ glm::vec3 lowestPoint(const SegmentDef& segment, glm::vec3 position, glm::quat r
 void observeAnimal(const AnimalBot& bot, float* out);
 
 void resetAnimalBot(entt::registry& reg);
+
+// What the systems below do for the world's animal, for any AnimalBot (the sandbox holds many, as components:
+// docs/action-agents.md)
+
+// The body, the params and the ranges a spawn names
+void loadAnimalAssets(AnimalBot& bot, const AnimalSpawn& spawn);
+
+struct AnimalBuild {
+    uint32_t group = 0;                     // the ragdoll's collision group: one per animal of a world
+    bool collide = false;                   // with the other animals (PhysicsLayers::animal_layer)
+};
+// The ragdoll of bot.body in the world, at its rest pose, and the bot's arrays
+void buildAnimalRagdoll(entt::registry& reg, AnimalBot& bot, const AnimalBuild& options = {});
+void destroyAnimalRagdoll(entt::registry& reg, AnimalBot& bot);
+
+// The bodies in the standing pose, the trunk over `origin`, heading `yaw`, at rest; on_field: raised onto bot.ground
+void standAnimalBot(entt::registry& reg, AnimalBot& bot, glm::vec3 origin, float yaw, bool on_field);
+
+// A window's action (animal_actions_per_joint values a joint) as motor gains and targets; strength: of the drives
+// (1: the body file's)
+void driveAnimalBot(AnimalBot& bot, const float* action, float strength = 1.f);
+
+void readAnimalState(entt::registry& reg, AnimalBot& bot);
+// bot.params: the base params with the world's environment parameters over them
+void applyAnimalEnvParams(entt::registry& reg, AnimalBot& bot);
+// After a physics step: the segments' states and the finite differences of their origins
+void syncAnimalBot(entt::registry& reg, AnimalBot& bot, double h);
 
 class AnimalFactorySys : public System {
 public:

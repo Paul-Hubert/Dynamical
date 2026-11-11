@@ -17,7 +17,7 @@ namespace dy {
 // Vertex written by the marching cubes shader, 32 bytes
 struct TerrainVertex {
     glm::vec3 pos;
-    glm::vec2 normal;   // octahedral, in -1..1 (decodeNormal of terrain.vert.glsl)
+    glm::vec2 normal;   // sum of the triangles around the vertex (vertexNormal of marchingcubes.comp.glsl), octahedral, in -1..1 (decodeNormal of terrain.vert.glsl)
     glm::vec3 curve;    // how the ground bends : second derivatives of its height, xx, xz, zz (logic/terrain/ground_curve.h)
 };
 

@@ -1,0 +1,11 @@
+{
+  "format_version": 1,
+  "name": "sandbox_heuristic",
+  "include": ["common/sandbox_world.json"],
+  "variables": {
+    "num_worlds": { "type": "int",  "default": 1 },
+    "puppet":     { "type": "bool", "default": true }
+  },
+  "worlds": [ { "template": "sandbox_world", "count": "${num_worlds}",
+                "systems": { "replace": { "TrainerActions@act": "SandboxHeuristic@act" } } } ]
+}

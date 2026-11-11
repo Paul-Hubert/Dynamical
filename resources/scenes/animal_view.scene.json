@@ -33,6 +33,21 @@
       "type": "string",
       "default": "",
       "description": "an .onnx policy of the species; empty: zero actions, the standing pose held"
+    },
+    "orders": {
+      "type": "string",
+      "default": "",
+      "description": "a JSON list of [seconds, speed, radius]: the commands one after the other instead of the draws (AnimalAgentView)"
+    },
+    "marks": {
+      "type": "float",
+      "default": 0.0,
+      "description": "m: a chequer of this size on the ground around the animal"
+    },
+    "view_log": {
+      "type": "string",
+      "default": "",
+      "description": "a file: a line per frame (command, position, speed)"
     }
   },
   "renderer": {
@@ -60,7 +75,10 @@
         "name": "AnimalAgentView",
         "params": {
           "distance": "${view_distance}",
-          "azimuth": "${view_side}"
+          "azimuth": "${view_side}",
+          "orders": "${orders}",
+          "marks": "${marks}",
+          "log": "${view_log}"
         }
       }
     ],

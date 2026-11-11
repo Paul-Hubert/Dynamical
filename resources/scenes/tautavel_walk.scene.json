@@ -1,0 +1,38 @@
+{
+  "format_version": 1,
+  "name": "tautavel_walk",
+  "include": ["common/desktop.json"],
+  "variables": {
+    "forest":      { "type": "string", "default": "forest/tautavel.forest.json", "description": "stands, layers and species (docs/forest.md)" },
+    "forest_seed": { "type": "int",    "default": 2,   "description": "places the forests and their plants, so it picks the walk too" },
+    "patch_size":  { "type": "float",  "default": 320, "description": "metres : size of the forests and of the open land between them" },
+    "coverage":    { "type": "float",  "default": 0.5, "description": "part of the gentle land under forest" },
+    "max_slope":   { "type": "float",  "default": 24,  "description": "degrees : slope of the land no forest grows on" },
+    "herds":       { "type": "string", "default": "herds/tautavel.herds.json", "description": "kinds of herds and their animals (docs/animals.md)" },
+    "herd_seed":   { "type": "int",    "default": 1,   "description": "places the herds" },
+    "herd_cell":   { "type": "float",  "default": 70,  "description": "metres : one herd at most per cell of this size" },
+    "herd_density": { "type": "float", "default": 0.9, "description": "part of the cells that have a herd" },
+    "herd_range":  { "type": "float",  "default": 30,  "description": "metres : how far from its home a herd goes (they stay by the walk)" },
+    "herd_radius": { "type": "float",  "default": 260, "description": "metres : herds this close to the camera exist" },
+    "distance":    { "type": "float",  "default": 330, "description": "metres walked : open land, a forest, open land" },
+    "lead":        { "type": "float",  "default": 100, "description": "metres of open land before the forest and after it" },
+    "speed":       { "type": "float",  "default": 3.3, "description": "m/s" },
+    "eye_height":  { "type": "float",  "default": 1.7 },
+    "soil":        { "type": "float",  "default": 1,   "description": "how much the walk is picked for the mud, the stones and the sand it crosses; 0 : not looked at" },
+    "watch":       { "type": "float",  "default": 45,  "description": "metres : the camera turns to the herds this close; 0 : not looked at" }
+  },
+
+  "renderer": { "passes": ["terrain", "grass", "vegetation", "animals", "model", "ui"], "vr": false },
+
+  "host": {
+    "pre": [
+      "Input", "UI", "Time", "PlayerControl", "DebugMenu",
+      "ChunkManager", "ChunkGenerator",
+      { "name": "Forest", "params": { "definition": "${forest}", "seed": "${forest_seed}", "patch_size": "${patch_size}", "coverage": "${coverage}", "max_slope": "${max_slope}" } },
+      { "name": "Herds", "params": { "definition": "${herds}", "seed": "${herd_seed}", "cell": "${herd_cell}", "density": "${herd_density}", "range": "${herd_range}", "radius": "${herd_radius}" } },
+      { "name": "CameraWalk", "params": { "distance": "${distance}", "speed": "${speed}", "eye_height": "${eye_height}", "lead": "${lead}", "soil": "${soil}", "herds": "${watch}" } },
+      "AnimalAnimation", "AnimalGait"
+    ],
+    "post": ["Terrain"]
+  }
+}

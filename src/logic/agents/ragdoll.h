@@ -24,6 +24,9 @@ struct RagdollBuild {
     float max_angular_velocity = 20.f;
     bool kinematic = false;
     bool cast = false;              // LinearCast and enhanced internal edge removal: on a mesh without thickness
+    uint32_t group = 0;             // collision group: the segments of a ragdoll never collide with each other, ragdolls of
+                                    // different groups do when their layer lets them
+    bool animal_layer = false;      // PhysicsLayers::animal_layer instead of agent_layer: collides with the other ragdolls of it
 };
 
 struct RagdollParts {

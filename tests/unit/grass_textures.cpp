@@ -250,7 +250,7 @@ TEST_CASE("GRASS.12 the colour map holds what each ray met : green by the height
 
 }
 
-TEST_CASE("GRASS.13 every kind has its patches, they overlap, the small plants are where the grass is short") {
+TEST_CASE("GRASS.13 every kind has its patches, they blend into each other, the small plants are where the grass is short") {
 
     std::vector<int8_t> noise = bakeSpeciesNoise();
     REQUIRE(noise.size() == size_t(grass_species::size) * grass_species::size * 4);
@@ -266,7 +266,8 @@ TEST_CASE("GRASS.13 every kind has its patches, they overlap, the small plants a
     GrassSpeciesParams params, apart;
     apart.overlap = 0.f;
     GrassHeightField heights;
-    int seen[grass_kinds] = {}, changes = 0, places = 0, mixed = 0, both = 0;
+    int seen[grass_kinds] = {}, changes = 0, places = 0, thinned = 0, two = 0, whole = 0;
+    float largest_step = 0.f, before_keep = 1.f;
     GrassKind before = GrassKind::Meadow;
     for(int z = 0; z < 300; z++) {
         for(int x = 0; x < 300; x++) {
@@ -274,25 +275,39 @@ TEST_CASE("GRASS.13 every kind has its patches, they overlap, the small plants a
             float tallness = heights.sample(world.x, world.y);
             GrassSpecies here = grassSpeciesAt(noise, params, world, tallness);
             const bool small = grassKindInfo(here.kinds[0]).small;
-            const float band = grass_species::band * params.overlap;
-            // Away from the band of heights where both grow : small plants in the short grass only
-            if(std::abs(tallness - params.low) >= band) {
+            // Away from the band of heights where they trade places : small plants in the short grass only
+            if(std::abs(tallness - params.low) >= grass_species::band * params.overlap) {
                 REQUIRE(small == (tallness < params.low));
-                REQUIRE(here.under < 0);
                 REQUIRE(grassKindInfo(here.kinds[1]).small == small);
+                REQUIRE(here.under == (small ? 0.f : 1.f));
             }
-            REQUIRE((here.under == -2) == small);
-            if(here.under >= 0) REQUIRE(grassKindInfo(static_cast<GrassKind>(here.under)).small);
-            mixed += here.kinds[1] != here.kinds[0];
-            both += here.under >= 0 || grassKindInfo(here.kinds[1]).small != small;
-            // Without overlap : one kind at a place, small plants on one side of a line
+            // The first kind keeps half of its plants at least, the second half at most, together all of a tile
+            REQUIRE(here.keep[0] >= 0.5f);
+            REQUIRE(here.keep[0] <= 1.f);
+            if(here.kinds[1] != here.kinds[0]) {
+                REQUIRE(here.keep[1] > 0.f);
+                REQUIRE(here.keep[1] <= 0.5f);
+                REQUIRE(here.keep[0] + here.keep[1] == doctest::Approx(1.f).epsilon(1e-3));
+                two++;
+            } else {
+                REQUIRE(here.keep[1] == here.keep[0]);
+            }
+            if(small) REQUIRE(here.under == 0.f);
+            thinned += here.keep[0] < 0.999f;
+            whole += here.keep[0] >= 0.999f;
+
+            // No edge : along a row, where the first kind stays the same its plants come and go a few at a time
+            if(x > 0 && here.kinds[0] == before) largest_step = std::max(largest_step, std::abs(here.keep[0] - before_keep));
+            before_keep = here.keep[0];
+
+            // Without overlap : one kind at a place, all of its plants
             GrassSpecies alone = grassSpeciesAt(noise, apart, world, tallness);
-            REQUIRE(alone.kinds[1] == alone.kinds[0]);
-            REQUIRE(alone.kinds[2] == alone.kinds[0]);
+            // (two noises may be the same to the byte)
+            REQUIRE((alone.kinds[1] == alone.kinds[0] || alone.keep[1] == 0.5f));
             if(std::abs(tallness - apart.low) > 0.002f) {
                 REQUIRE(grassKindInfo(alone.kinds[0]).small == (tallness < apart.low));
-                REQUIRE(alone.under == (tallness < apart.low ? -2 : -1));
             }
+
             seen[int(here.kinds[0])]++;
             changes += x > 0 && here.kinds[0] != before;
             before = here.kinds[0];
@@ -306,16 +321,62 @@ TEST_CASE("GRASS.13 every kind has its patches, they overlap, the small plants a
     }
     CHECK(changes < places / 4);
 
-    // The patches overlap : two kinds together over a good part of the land, not everywhere, and small
-    // plants with tall ones somewhere
-    INFO(mixed << " places of " << places << " with two kinds, " << both << " with small and tall plants");
-    CHECK(mixed > places / 5);
-    CHECK(mixed < places * 9 / 10);
-    CHECK(both > places / 100);
+    // Blended over a good part of the land, whole patches in between
+    INFO(two << " places of " << places << " with two kinds, " << thinned << " with a first kind thinned, " << whole
+        << " whole; largest step of the first kind over 3 m " << largest_step);
+    CHECK(two > places / 5);
+    CHECK(whole > places / 10);
+    CHECK(largest_step < 0.5f);
 
     // No patches : the meadow
     params.size = 0.f;
     CHECK(grassSpeciesAt(noise, params, glm::vec2(12.f, 7.f), 0.f).kinds[0] == GrassKind::Meadow);
+
+}
+
+TEST_CASE("GRASS.14 the plants of a tile stand apart, and so do the first ones of their order") {
+
+    const int count = 100;
+    std::vector<glm::vec3> sites = grassTileSites(7, count);
+    REQUIRE(sites.size() == count);
+    CHECK(sites == grassTileSites(7, count));
+
+    // Nearest neighbour on the tile as it repeats, among the first n plants : a grid would have 1 / sqrt(n)
+    auto nearest = [&](int n) {
+        float least = 4.f;
+        for(int i = 0; i < n; i++) {
+            for(int j = 0; j < i; j++) {
+                float dx = std::abs(sites[i].x - sites[j].x), dy = std::abs(sites[i].y - sites[j].y);
+                dx = std::min(dx, 1.f - dx);
+                dy = std::min(dy, 1.f - dy);
+                least = std::min(least, std::sqrt(dx * dx + dy * dy));
+            }
+        }
+        return least;
+    };
+    for(int n : {10, 25, 50, 100}) {
+        CAPTURE(n);
+        CHECK(nearest(n) > 0.45f / std::sqrt(float(n)));
+    }
+    for(int i = 0; i < count; i++) {
+        CHECK(sites[i].x >= 0.f);
+        CHECK(sites[i].x < 1.f);
+        CHECK(sites[i].z == doctest::Approx((i + 0.5f) / count));
+    }
+
+    // The plants of every kind have those ids : a plant is thinned whole
+    for(int kind = 0; kind < grass_kinds; kind++) {
+        GrassModelParams params;
+        params.kind = static_cast<GrassKind>(kind);
+        GrassModel model = generateGrassTile(params);
+        float low = 1.f, high = 0.f;
+        for(float id : model.ids) {
+            low = std::min(low, id);
+            high = std::max(high, id);
+        }
+        CHECK(low < 0.07f);
+        CHECK(high > 0.93f);
+    }
 
 }
 

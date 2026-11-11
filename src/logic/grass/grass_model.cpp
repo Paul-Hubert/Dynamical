@@ -77,8 +77,40 @@ glm::vec3 tangent(const Spine& spine, float s) {
 }
 
 // The pieces plants are made of, in metres
+// Where the plants of a tile stand : spread evenly (each one the best of many candidates, the furthest
+// from those before it, on the tile as it repeats), in an order whose first plants are spread evenly too.
+// xy in 0..1, z : the rank of the plant in that order, 0..1
+std::vector<glm::vec3> tileSites(Rng& rng, int count) {
+    std::vector<glm::vec3> sites;
+    sites.reserve(count);
+    for(int i = 0; i < count; i++) {
+        glm::vec2 best(rng.next(), rng.next());
+        float best_distance = -1.f;
+        int candidates = i == 0 ? 1 : 8 * i + 16;
+        for(int c = 0; c < candidates; c++) {
+            float x = rng.next();
+            float y = rng.next();
+            float nearest = 4.f;
+            for(auto& site : sites) {
+                float dx = std::abs(x - site.x), dy = std::abs(y - site.y);
+                dx = std::min(dx, 1.f - dx);
+                dy = std::min(dy, 1.f - dy);
+                nearest = std::min(nearest, dx * dx + dy * dy);
+            }
+            if(nearest > best_distance) {
+                best_distance = nearest;
+                best = glm::vec2(x, y);
+            }
+        }
+        sites.push_back(glm::vec3(best, (i + 0.5f) / count));
+    }
+    return sites;
+}
+
 struct Builder {
     GrassModel& model;
+    std::vector<float> shades;      // one per vertex : each blade and leaf a little lighter or darker
+    float plant = 0.5f;             // id of the plant that is being built : its rank among those of the tile
 
     uint32_t begin() const { return static_cast<uint32_t>(model.vertices.size()); }
 
@@ -94,7 +126,8 @@ struct Builder {
     }
 
     void end(float id, GrassPart part, bool count = true) {
-        model.ids.resize(model.vertices.size(), id);
+        model.ids.resize(model.vertices.size(), plant);
+        shades.resize(model.vertices.size(), 0.85f + 0.3f * id);
         model.parts.resize(model.vertices.size(), static_cast<uint8_t>(part));
         if(count) model.blades++;
     }
@@ -205,15 +238,12 @@ struct Builder {
     }
 };
 
-// n x n plants on a jittered grid : plant(center)
+// n x n plants spread over the tile (tileSites) : plant(center)
 template<class Plant>
-void scatter(Rng& rng, int n, float tile, const Plant& plant) {
-    for(int tz = 0; tz < n; tz++) {
-        for(int tx = 0; tx < n; tx++) {
-            float x = (tx + rng.range(0.15f, 0.85f)) / n;
-            float z = (tz + rng.range(0.15f, 0.85f)) / n;
-            plant(glm::vec2(x, z) * tile);
-        }
+void scatter(Builder& b, Rng& rng, int n, float tile, const Plant& plant) {
+    for(glm::vec3 site : tileSites(rng, n * n)) {
+        b.plant = site.z;
+        plant(glm::vec2(site.x, site.y) * tile);
     }
 }
 
@@ -253,7 +283,7 @@ Stalk stalk(Rng& rng, glm::vec2 center, float height_min, float height_max, floa
 }
 
 void fescue(Builder& b, Rng& rng, float tile) {
-    scatter(rng, 11, tile, [&](glm::vec2 center) {
+    scatter(b, rng, 11, tile, [&](glm::vec2 center) {
         int count = 9 + int(rng.next() * 6.f);
         float height = 0.3f * rng.range(0.5f, 1.f);
         tuft(b, rng, center, count, 0.012f, 0.5f * height, height, 0.0035f, 0.5f, 0.45f, 6, 0.5f);
@@ -261,7 +291,7 @@ void fescue(Builder& b, Rng& rng, float tile) {
 }
 
 void cocksfoot(Builder& b, Rng& rng, float tile) {
-    scatter(rng, 5, tile, [&](glm::vec2 center) {
+    scatter(b, rng, 5, tile, [&](glm::vec2 center) {
         int count = 9 + int(rng.next() * 5.f);
         float height = 0.6f * rng.range(0.6f, 1.f);
         tuft(b, rng, center, count, 0.04f, 0.5f * height, height, 0.024f, 0.7f, 0.9f, 8, 0.3f);
@@ -270,7 +300,7 @@ void cocksfoot(Builder& b, Rng& rng, float tile) {
 
 // Spikelets on either side of the stem, in one plane, close to it
 void ryegrass(Builder& b, Rng& rng, float tile) {
-    scatter(rng, 7, tile, [&](glm::vec2 center) {
+    scatter(b, rng, 7, tile, [&](glm::vec2 center) {
         footTuft(b, rng, center, 0.15f, 0.35f, 0.005f);
         if(rng.next() > 0.6f) return;
         Stalk stem = stalk(rng, center, 0.5f, 0.7f, 0.02f, 0.1f);
@@ -290,7 +320,7 @@ void ryegrass(Builder& b, Rng& rng, float tile) {
 }
 
 void timothy(Builder& b, Rng& rng, float tile) {
-    scatter(rng, 6, tile, [&](glm::vec2 center) {
+    scatter(b, rng, 6, tile, [&](glm::vec2 center) {
         footTuft(b, rng, center, 0.2f, 0.45f, 0.007f);
         if(rng.next() > 0.6f) return;
         Stalk stem = stalk(rng, center, 0.5f, 0.75f, 0.01f, 0.06f);
@@ -304,7 +334,7 @@ void timothy(Builder& b, Rng& rng, float tile) {
 
 // Whorls of thin branches, a spikelet hanging at the end of each
 void oat(Builder& b, Rng& rng, float tile) {
-    scatter(rng, 7, tile, [&](glm::vec2 center) {
+    scatter(b, rng, 7, tile, [&](glm::vec2 center) {
         footTuft(b, rng, center, 0.2f, 0.5f, 0.008f);
         if(rng.next() > 0.35f) return;
         Stalk stem = stalk(rng, center, 0.7f, 0.9f, 0.03f, 0.12f);
@@ -329,7 +359,7 @@ void oat(Builder& b, Rng& rng, float tile) {
 }
 
 void cloverLeaves(Builder& b, Rng& rng, float tile) {
-    scatter(rng, 13, tile, [&](glm::vec2 center) {
+    scatter(b, rng, 13, tile, [&](glm::vec2 center) {
         Stalk stem = stalk(rng, center, 0.035f, 0.11f, 0.f, 0.f);
         stem.reach = stem.height * rng.range(0.1f, 0.6f);
         float id = rng.next();
@@ -347,7 +377,7 @@ void cloverLeaves(Builder& b, Rng& rng, float tile) {
 
 // Round heads of florets over the leaves
 void cloverHeads(Builder& b, Rng& rng, float tile) {
-    scatter(rng, 4, tile, [&](glm::vec2 center) {
+    scatter(b, rng, 4, tile, [&](glm::vec2 center) {
         if(rng.next() > 0.7f) return;
         Stalk stem = stalk(rng, center, 0.12f, 0.17f, 0.01f, 0.04f);
         float id = rng.next();
@@ -366,7 +396,7 @@ void cloverHeads(Builder& b, Rng& rng, float tile) {
 }
 
 void plantain(Builder& b, Rng& rng, float tile) {
-    scatter(rng, 3, tile, [&](glm::vec2 center) {
+    scatter(b, rng, 3, tile, [&](glm::vec2 center) {
         int leaves = 8 + int(rng.next() * 5.f);
         float start = rng.next() * two_pi;
         for(int i = 0; i < leaves; i++) {
@@ -397,7 +427,7 @@ void plantain(Builder& b, Rng& rng, float tile) {
 }
 
 void dandelion(Builder& b, Rng& rng, float tile) {
-    scatter(rng, 3, tile, [&](glm::vec2 center) {
+    scatter(b, rng, 3, tile, [&](glm::vec2 center) {
         int leaves = 9 + int(rng.next() * 5.f);
         float start = rng.next() * two_pi;
         for(int i = 0; i < leaves; i++) {
@@ -448,15 +478,18 @@ void dandelion(Builder& b, Rng& rng, float tile) {
     });
 }
 
-void meadow(GrassModel& model, Rng& rng, const GrassModelParams& params) {
+void meadow(GrassModel& model, std::vector<float>& shades, Rng& rng, const GrassModelParams& params) {
 
     const int tufts = std::max(params.tufts, 1);
     const int levels = std::max(params.segments, 2);
+    const std::vector<glm::vec3> sites = tileSites(rng, tufts * tufts);
 
     for(int tz = 0; tz < tufts; tz++) {
         for(int tx = 0; tx < tufts; tx++) {
 
-            glm::vec2 center((tx + rng.range(0.1f, 0.9f)) / tufts, (tz + rng.range(0.1f, 0.9f)) / tufts);
+            // A tuft is a plant : its blades have its id
+            const glm::vec3 site = sites[size_t(tz) * tufts + tx];
+            glm::vec2 center(site.x, site.y);
             float tuft_height = rng.range(params.height_min, params.height_max);
             int count = params.blades_min + int(rng.next() * (params.blades_max - params.blades_min + 1));
             count = std::clamp(count, 1, std::max(params.blades_max, 1));
@@ -496,7 +529,8 @@ void meadow(GrassModel& model, Rng& rng, const GrassModelParams& params) {
                 }
                 uint32_t tip = static_cast<uint32_t>(model.vertices.size());
                 model.vertices.push_back(spine(1.f));
-                model.ids.resize(model.vertices.size(), id);
+                model.ids.resize(model.vertices.size(), site.z);
+                shades.resize(model.vertices.size(), 0.85f + 0.3f * id);
 
                 for(int level = 0; level + 1 < levels; level++) {
                     uint32_t l0 = base + level * 3, m0 = l0 + 1, r0 = l0 + 2;
@@ -536,6 +570,11 @@ bool grassKindFromName(const std::string& name, GrassKind& kind) {
     return false;
 }
 
+std::vector<glm::vec3> grassTileSites(uint32_t seed, int count) {
+    Rng rng(seed);
+    return tileSites(rng, count);
+}
+
 GrassModel generateGrassTile(const GrassModelParams& params) {
 
     GrassModel model;
@@ -554,7 +593,7 @@ GrassModel generateGrassTile(const GrassModelParams& params) {
         case GrassKind::CloverFlower: cloverLeaves(builder, rng, tile); cloverHeads(builder, rng, tile); break;
         case GrassKind::Plantain: plantain(builder, rng, tile); break;
         case GrassKind::Dandelion: dandelion(builder, rng, tile); break;
-        default: meadow(model, rng, params); break;
+        default: meadow(model, builder.shades, rng, params); break;
     }
 
     // The tallest tip at max_height
@@ -600,6 +639,8 @@ GrassModel generateGrassTile(const GrassModelParams& params) {
             case GrassPart::Flower: model.colours[i] = info.flower; break;
             case GrassPart::Seed: model.colours[i] = info.seed; break;
         }
+        // Flowers and seeds keep their colour, what is green is lighter or darker from a blade to the next
+        if(model.parts[i] <= static_cast<uint8_t>(GrassPart::Leaf)) model.colours[i] *= builder.shades[i];
     }
 
     return model;

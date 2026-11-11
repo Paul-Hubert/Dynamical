@@ -73,7 +73,7 @@ void dy::buildRagdollParts(PhysicsWorld& world, const BodyDef& def, const Ragdol
     for(size_t i = 0; i < def.segments.size(); i++) {
         const SegmentDef& seg = def.segments[i];
         JPH::BodyCreationSettings settings(segmentShape(seg), JPH::RVec3(toJolt(seg.rest_position)), toJolt(seg.rest_rotation),
-            build.kinematic ? JPH::EMotionType::Kinematic : JPH::EMotionType::Dynamic, PhysicsLayers::agent_layer);
+            build.kinematic ? JPH::EMotionType::Kinematic : JPH::EMotionType::Dynamic, build.animal_layer ? PhysicsLayers::animal_layer : PhysicsLayers::agent_layer);
         settings.mOverrideMassProperties = JPH::EOverrideMassProperties::MassAndInertiaProvided;
         settings.mMassPropertiesOverride.mMass = build.total_mass * seg.percentage / 100.f;
         settings.mMassPropertiesOverride.mInertia = ragdollInertia(seg.inertia, seg.inertia_rotation, mass_scale);
@@ -92,7 +92,9 @@ void dy::buildRagdollParts(PhysicsWorld& world, const BodyDef& def, const Ragdol
             settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
             settings.mEnhancedInternalEdgeRemoval = true;
         }
-        settings.mCollisionGroup = JPH::CollisionGroup(filter, 0, (JPH::CollisionGroup::SubGroupID) i);
+        settings.mCollisionGroup = JPH::CollisionGroup(filter, build.group, (JPH::CollisionGroup::SubGroupID) i);
+        // Whose segment this is, for a contact listener
+        settings.mUserData = ((uint64_t) build.group << 32) | (uint64_t) i;
         out.bodies[i] = bodies.CreateAndAddBody(settings, JPH::EActivation::Activate);
     }
 

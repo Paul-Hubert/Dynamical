@@ -1,0 +1,7 @@
+{
+  "format_version": 1,
+  "name": "sandbox_train",
+  "include": ["common/sandbox_world.json"],
+  "variables": { "num_worlds": { "type": "int", "default": 4 } },
+  "worlds": [ { "template": "sandbox_world", "count": "${num_worlds}" } ]
+}

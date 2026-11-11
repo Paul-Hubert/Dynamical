@@ -26,7 +26,7 @@ Scene variables: `forest_seed`, `patch_size`, `coverage`, `max_slope`, `forest` 
 | `src/renderer/tree_shade.{h,cpp}` | `TreeShade`: the map of crown shadows, binding 1 of the view set |
 | `src/view/camera_walk.{h,cpp}` | `CameraWalk`: picks a line through a forest, routes around the plants, walks the camera |
 | `resources/scenes/forest.scene.json`, `forest_walk.scene.json` | The scenes |
-| `tools/forest_video.py` | Renders `forest_walk` to an MP4 |
+| `tools/forest_video.py` | Renders `forest_walk` to an MP4 (`--scene` for another walk) |
 | `tests/unit/forest.cpp` | `FOREST.1` to `FOREST.3`, and `FOREST.map` (a map of the forests, skipped by default) |
 
 ## Where the forests are
@@ -119,6 +119,10 @@ walk renders 3000 frames in 27 s at 1280 × 720 on an RTX 5080, loading included
    then smoothed.
 3. **Walk**: toward the point of the path 4 m ahead with a critically damped turn, the eye following the ground
    without its bumps, the view swaying a little from side to side.
+
+`lead`, `soil` and `herds` (all off in `forest_walk`) make it a walk over the open land too: the soil patches it
+crosses and the herds along it count in the choice of the line, and the camera looks at them
+([tautavel-walk.md](tautavel-walk.md)).
 
 Capture sequences keep their pace when a frame has to wait (terrain, plants): the frames after it are as late.
 

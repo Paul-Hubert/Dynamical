@@ -28,6 +28,19 @@ const ivec3 offsets[24] = {
     ivec3(0,0,1), ivec3(0,1,1)
 };
 
+// Corner i of a cube, bit i of its configuration
+const ivec3 corners[8] = {
+    ivec3(0,0,0), ivec3(1,0,0), ivec3(1,0,1), ivec3(0,0,1),
+    ivec3(0,1,0), ivec3(1,1,0), ivec3(1,1,1), ivec3(0,1,1)
+};
+
+// The edges as pairs of those corners : offsets[i] is corners[edge_corners[i]]
+const int edge_corners[24] = {
+    0,1, 1,2, 2,3, 3,0,
+    4,5, 5,6, 6,7, 7,4,
+    0,4, 1,5, 2,6, 3,7
+};
+
 // Triangles per cube configuration
 const uint trinum[256] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 2, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 3, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 3, 2, 3, 3, 2, 3, 4, 4, 3, 3, 4, 4, 3, 4, 5, 5, 2, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 3, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 4, 2, 3, 3, 4, 3, 4, 2, 3, 3, 4, 4, 5, 4, 5, 3, 2, 3, 4, 4, 3, 4, 5, 3, 2, 4, 5, 5, 4, 5, 2, 4, 1, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 3, 2, 3, 3, 4, 3, 4, 4, 5, 3, 2, 4, 3, 4, 3, 5, 2, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 4, 3, 4, 4, 3, 4, 5, 5, 4, 4, 3, 5, 2, 5, 4, 2, 1, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 2, 3, 3, 2, 3, 4, 4, 5, 4, 5, 5, 2, 4, 3, 5, 4, 3, 2, 4, 1, 3, 4, 4, 5, 4, 5, 3, 4, 4, 5, 5, 2, 3, 4, 2, 1, 2, 3, 3, 2, 3, 4, 2, 1, 3, 2, 4, 1, 2, 1, 1, 0};
 
@@ -74,6 +87,64 @@ vec2 encodeNormal(vec3 n) {
         e = (1.0 - abs(e.yx)) * vec2(e.x >= 0.0 ? 1.0 : -1.0, e.y >= 0.0 ? 1.0 : -1.0);
     }
     return e;
+}
+
+// Normal of the vertex on a grid edge (low : its sample of lower coordinates, axis : unit vector along it) :
+// the sum of the normals of the triangles that meet there, each as long as twice its area, pointing out of
+// the solid. Those triangles are in the four cubes around the edge, which the border of the densities covers
+// on the sides of the chunk : the neighbour chunk finds the same normal there.
+// The cubes come in the same order whichever of them asks : every copy of the vertex gets the same normal.
+// MarchingCubes::vertexNormal of logic/terrain/marching_cubes.cpp
+vec3 vertexNormal(ivec3 low, ivec3 axis) {
+
+    ivec3 u = axis.zxy, v = axis.yzx;
+    vec3 sum = vec3(0.0);
+
+    for(int k = 0; k < 4; k++) {
+
+        ivec3 cube = low - u * (k & 1) - v * (k >> 1);
+
+        float d[8];
+        uint config = 0u;
+        for(int i = 0; i < 8; i++) {
+            d[i] = values(cube + corners[i]);
+            config |= d[i] > 0.0 ? 1u << i : 0u;
+        }
+
+        // The edge, among the twelve of this cube
+        int own = -1;
+        for(int e = 0; e < 12; e++) {
+            ivec3 a = offsets[e * 2], b = offsets[e * 2 + 1];
+            if(min(a, b) == low - cube && abs(b - a) == axis) {
+                own = e;
+            }
+        }
+
+        uint count = trinum[config] * 3u;
+        for(uint i = 0u; i < count; i += 3u) {
+            ivec3 edges = ivec3(
+                texelFetch(triTable, int(config * 16u + i)).r,
+                texelFetch(triTable, int(config * 16u + i + 1u)).r,
+                texelFetch(triTable, int(config * 16u + i + 2u)).r);
+            if(edges.x != own && edges.y != own && edges.z != own) {
+                continue;
+            }
+
+            // Where the ground crosses the three edges, in cubes from low
+            vec3 corner[3];
+            for(int j = 0; j < 3; j++) {
+                int a = edge_corners[edges[j] * 2], b = edge_corners[edges[j] * 2 + 1];
+                float t = (-d[a]) / (d[b] - d[a]);
+                corner[j] = mix(vec3(cube + corners[a] - low), vec3(cube + corners[b] - low), t);
+            }
+            sum += cross(corner[1] - corner[0], corner[2] - corner[0]);
+        }
+
+    }
+
+    // The triangles of the table are counter clockwise seen from outside the solid
+    return sum;
+
 }
 
 // How the ground bends at a sample : second derivatives of its height (xx, xz, zz), per metre.
@@ -155,18 +226,25 @@ void main() {
         float t = (-density1) / (density2 - density1);
         vec3 vertex = mix(vec3(a1), vec3(a2), t) * size + pos;
 
-        // Density grows toward the inside : the outward normal is minus its gradient
-        vec3 norm1 = vec3(
-            values(a1.x - 1, a1.y, a1.z) - values(a1.x + 1, a1.y, a1.z),
-            values(a1.x, a1.y - 1, a1.z) - values(a1.x, a1.y + 1, a1.z),
-            values(a1.x, a1.y, a1.z - 1) - values(a1.x, a1.y, a1.z + 1)
-        );
-        vec3 norm2 = vec3(
-            values(a2.x - 1, a2.y, a2.z) - values(a2.x + 1, a2.y, a2.z),
-            values(a2.x, a2.y - 1, a2.z) - values(a2.x, a2.y + 1, a2.z),
-            values(a2.x, a2.y, a2.z - 1) - values(a2.x, a2.y, a2.z + 1)
-        );
-        vec2 normal = encodeNormal(normalize(mix(norm1, norm2, t)));
+        // The sum of the triangles around the vertex : what the mesh looks like, and the same on every copy
+        // of the vertex, so that it can be interpolated over the triangles
+        vec3 norm = vertexNormal(min(a1, a2), abs(a2 - a1));
+        if(dot(norm, norm) < 1e-12) {
+            // Triangles without area (a density of exactly 0 on a sample) : minus the gradient of the density,
+            // which grows toward the inside
+            vec3 norm1 = vec3(
+                values(a1.x - 1, a1.y, a1.z) - values(a1.x + 1, a1.y, a1.z),
+                values(a1.x, a1.y - 1, a1.z) - values(a1.x, a1.y + 1, a1.z),
+                values(a1.x, a1.y, a1.z - 1) - values(a1.x, a1.y, a1.z + 1)
+            );
+            vec3 norm2 = vec3(
+                values(a2.x - 1, a2.y, a2.z) - values(a2.x + 1, a2.y, a2.z),
+                values(a2.x, a2.y - 1, a2.z) - values(a2.x, a2.y + 1, a2.z),
+                values(a2.x, a2.y, a2.z - 1) - values(a2.x, a2.y, a2.z + 1)
+            );
+            norm = mix(norm1, norm2, t);
+        }
+        vec2 normal = encodeNormal(normalize(norm));
 
         // How the ground bends there : where it falls away, the grass has the air behind it (grass.frag.glsl)
         vec3 curve = mix(groundCurve(a1), groundCurve(a2), t);

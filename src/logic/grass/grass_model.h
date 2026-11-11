@@ -49,7 +49,10 @@ inline const glm::vec3 grass_tip_colour(0.26f, 0.5f, 0.12f);
 struct GrassModel {
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> normals;     // smooth, one per vertex
-    std::vector<float> ids;             // one per vertex : a random value in 0..1, the same over a blade
+    // One per vertex, the same over a plant (a tuft of blades, a rosette, a stem and its head) : its rank
+    // among the plants of the tile, 0..1. The plants stand apart from each other and so do the first ones
+    // of that order : those under any value are spread evenly (the species and the soil thin the plants by it)
+    std::vector<float> ids;
     std::vector<uint8_t> parts;         // one per vertex : GrassPart
     std::vector<glm::vec3> colours;     // one per vertex, linear : what the rays bake in their colour map
     std::vector<uint32_t> indices;      // triangles
@@ -78,6 +81,10 @@ struct GrassModelParams {
 
 // Deterministic for a seed
 GrassModel generateGrassTile(const GrassModelParams& params = {});
+
+// Where `count` plants stand on a tile, xy in 0..1, and their id (z) : each the furthest of many candidates
+// from the ones before it, on the tile as it repeats
+std::vector<glm::vec3> grassTileSites(uint32_t seed, int count);
 
 // Wavefront OBJ of the tile, to look at the model in another tool : a group per part.
 // metres : in the proportions it was modelled at, else the 1 x 1 tile the rays are baked on
