@@ -1,0 +1,10 @@
+{
+  "scene": "forest",
+  "hide_ui": true,
+  "shots": [
+    { "frame": 300, "name": "lighting_edge", "camera": { "pos": [10, 0, 20], "above": 3, "yaw": 0.6, "pitch": -0.2 } },
+    { "frame": 360, "name": "lighting_wide", "camera": { "pos": [40, 110, 60], "look_at": [0, 70, -40] } },
+    { "frame": 420, "name": "lighting_crown", "camera": { "pos": [150, 0, 60], "above": 2.5, "yaw": 4.0, "pitch": -0.1 } },
+    { "frame": 480, "name": "lighting_sky", "camera": { "pos": [0, 120, 0], "look_at": [40, 190, 40] } }
+  ]
+}

@@ -42,6 +42,20 @@ terrain pass now darkens the flat ground under the grass and pushes its depth ba
 `base_spawn` and `base_ring` are re-recorded once, after the last step, with this reason. `worlds_boxes*` have
 no grass pass and still match.
 
+## Sky and lights (lighting L1 to L9, 2026-11-11)
+
+The goldens had not followed master since the grass rays: they show `base` without the soil patches, their
+textures, the height map of the grass or the Soil lines of the debug menu, which master 00d9400 has. They are
+re-recorded once, on the lighting branch, where every scene also changes by design (docs/lighting.md, docs/lighting/built.md):
+
+- the sky is drawn (a gradient, the disc of the sun) where the clear colour was, and far things fade into it;
+- the ambient light is the sky's (bluer, a little brighter on what faces up) and the ground's bounce;
+- the debug menu has a Sky section, and with ray tracing a Lighting one.
+
+The goldens are the pictures **without ray tracing** (`tools/visual_test.py` passes `ray_tracing=false` to
+`golden` and `repeat`): with it they depend on the GPU. The sun of `base` is stopped in captures, where the
+shaders had it before. Probes are untouched (S0.1, S1.1 pass), two runs give identical captures (V0.1).
+
 | Date | Golden | Change | Base commit | Reason |
 |---|---|---|---|---|
 | 2026-10-31 | `images/base_spawn.png` | added | 9605a57 | master baseline, recorded in P0 before any behaviour change |
@@ -54,3 +68,7 @@ no grass pass and still match.
 | 2026-10-31 | `images/worlds_boxes_close.png` | added | cf3b065 | new golden (P2 V2.1): close-up of world 3, capsule orientation |
 | 2026-11-10 | `images/base_spawn.png` | replaced | e580e24 | grass from baked 3D rays (see note above) |
 | 2026-11-10 | `images/base_ring.png` | replaced | e580e24 | grass from baked 3D rays (see note above) |
+| 2026-11-11 | `images/base_spawn.png` | replaced | 6db72a6 | master's soil, grass and menu changes, then the sky and the lights (see note above) |
+| 2026-11-11 | `images/base_ring.png` | replaced | 6db72a6 | master's soil, grass and menu changes, then the sky and the lights (see note above) |
+| 2026-11-11 | `images/worlds_boxes.png` | replaced | 6db72a6 | the sky and the lights, the Sky section of the menu (see note above) |
+| 2026-11-11 | `images/worlds_boxes_close.png` | replaced | 6db72a6 | the sky and the lights, the Sky section of the menu (see note above) |

@@ -1,0 +1,9 @@
+{
+  "scene": "animals_test",
+  "hide_ui": true,
+  "vars": { "clips": "walk", "time": 8 },
+  "shots": [
+    { "frame": 400, "name": "animals_shadows" },
+    { "frame": 440, "name": "animals_shadows_above", "camera": { "offset": [0, 6, 0], "pitch": -0.7 } }
+  ]
+}

@@ -4,10 +4,11 @@ Ray traced lighting on the geometry the engine already keeps on the GPU: the chu
 models and the animals become acceleration structures (`VK_KHR_acceleration_structure`), rays are cast with ray
 queries (`VK_KHR_ray_query`) from the compute and fragment shaders. The sun, the moon and the sky bounce into
 probes baked per chunk and refreshed all the time; shadows near the viewer are traced per pixel, soft, through
-leaves that tint the light; torches cast traced shadows and bounce through the same probes. The terrain can be
-edited, the lighting follows.
+leaves that tint the light; torches cast traced shadows and bounce through the same probes.
 
-Nothing of this is implemented. This document holds the decisions, the layouts and the order of the work.
+This document holds the decisions, the layouts and the order of the work. Milestones L1 to L9 are implemented:
+[lighting/built.md](lighting/built.md) says where the code is, where it differs from what follows, how to run
+it and what it costs.
 
 ## Decisions
 
@@ -22,7 +23,7 @@ Nothing of this is implemented. This document holds the decisions, the layouts a
 | Plants in the rays | Full trees (level of detail 0) with alpha tested leaves that let tinted light through; far away a box with a baked 3D texture of the plant |
 | Far plants on screen | Drawn from the same baked 3D texture, in place of SpeedTree's billboard cards |
 | Other occluders | glTF models, animals, physics boxes, VR hands. Grass only receives |
-| Terrain | Editable, as a full edit system (stored, persisted, physics and plants react) |
+| Terrain | Not edited for now. An edit system comes later (last section); the lighting only needs one event from it |
 | GPUs without ray tracing | The engine starts and looks as it does today (`TreeShade`, billboards), torches light without shadows |
 | Frame budget | Quality tiers in `RenderSettings`, one choice per target (desktop, VR) |
 | Between runs | Nothing kept, probes are baked again |
@@ -47,7 +48,7 @@ Nothing of this is implemented. This document holds the decisions, the layouts a
 
 ```
 transfer   uploads (as today)
-compute    marching cubes of new and edited chunks
+compute    marching cubes of new chunks
            skinning of the animals near the viewer        -> vertex buffers
            BLAS builds (chunks, species, models), refits (animals)
            TLAS build or refit
@@ -70,7 +71,6 @@ graphics shaders trace against the TLAS of their own frame.
 | `ProbeVolume` | `src/renderer/lighting/` | Bricks of probes per chunk, their atlas and indirection, the update pass |
 | `SunVisibility` | `src/renderer/lighting/` | Per target: the rays to the sun, their history, the composite |
 | `PlantVolumes` | `src/renderer/lighting/` | The baked 3D textures of each species, for rays and for drawing |
-| `TerrainEdits` | `src/logic/terrain/` (in `dynamical_sim`) | Edits of the density, brushes, persistence |
 
 ## Sky, sun and moon
 
@@ -120,7 +120,7 @@ then, `NUM_FRAMES` frames after the mesh. `ChunkLit` marks a chunk whose BLAS is
 in mind: fill the buffer with NaN and build with the maximum count, no wait but every BLAS sized for 32 768
 triangles.)
 
-Built for fast tracing, not compacted while edits may come; a chunk left alone for a few seconds is compacted.
+Built for fast tracing, then compacted.
 The BLAS follows the slot's life: freed `NUM_FRAMES + 1` frames after the chunk.
 
 ### Plants
@@ -230,7 +230,7 @@ find theirs; the terrain and the grass get the brick pushed per draw like their 
 
 ### Which probes are traced
 
-From the chunk's densities and plants, on the CPU when the chunk is generated or edited:
+From the chunk's densities and plants, on the CPU when the chunk is generated:
 
 - **In the rock** (density > 0): never traced. They take the mean of their valid neighbours, so that filtering
   does not pull black into the ground's light.
@@ -248,8 +248,8 @@ once, then the rays correct it. Its first updates blend fast.
 
 ### Update
 
-Every frame a compute pass takes a list of active probes, nearest chunks first, new bricks and probes near an
-edit or a torch before the others, until the tier's ray budget is spent. Per probe:
+Every frame a compute pass takes a list of active probes, nearest chunks first, new bricks and probes near a
+torch before the others, until the tier's ray budget is spent. Per probe:
 
 1. `rays_per_probe` (32 to 128) directions, a spherical Fibonacci set turned by a rotation drawn per frame.
 2. Each ray finds its closest hit (leaves pass the alpha test, then stop the ray with the probability of their
@@ -327,28 +327,10 @@ ray traced variants of those shaders), not filtered.
 and for the whole frame: `probe_rays_per_frame`, `rays_per_probe`. Values to tune on the measures of each
 milestone. The plant range is shared (one TLAS): the larger of the two targets'.
 
-## Terrain edits
-
-A project of its own, with its own document when it starts; what the lighting needs from it is one event.
-
-- **Store**: `TerrainEdits` (context variable, `dynamical_sim`) keeps a delta of the density per edited chunk,
-  on the same 67³ samples, allocated on the first edit. Density = generator + delta. Kept when the chunk
-  unloads, written to disk per chunk (`saves/<world>/edits/`), read back when it loads.
-- **Brushes**: add and remove in a sphere, smooth, flatten; from the VR hand and from the mouse. Samples on a
-  chunk's border belong to several chunks and are written in all of them. Undo as a list of strokes.
-- **One source of density**: everything that reads `TerrainGenerator::sample` or a `ChunkVolume` (terrain
-  colliders, `GroundField`, `TerrainField`, forests) goes through generator + edits, loaded or not.
-- **What reacts**, from a `ChunkEdited` signal with the bounds of the stroke:
-  - `TerrainSys` meshes the chunk again into a new slot and swaps when it is ready (frames in flight keep the old)
-  - the collider cells that overlap are dropped and rebuilt, sleeping bodies there are woken
-  - plants whose ground moved are put back on it or removed, the soil and grass height maps are baked again
-  - lighting: the chunk's BLAS is rebuilt, the probes of the stroke's surroundings are classified again and
-    jump the queue with a fast blend
-
 ## Fallback
 
 Without ray tracing: `Sky`, the `Lights` UBO and unshadowed torches work; shading is today's, straight into the
-swapchain, with `TreeShade` following the sun and billboards far away. No probes. Terrain edits work. Headless
+swapchain, with `TreeShade` following the sun and billboards far away. No probes. Headless
 and training runs have no renderer and are not concerned.
 
 ## Order of the work
@@ -364,19 +346,13 @@ and training runs have no renderer and are not concerned.
 | L7 | `PlantVolumes`: bake, far plants as boxes in the rays, then on screen | Whole view distance in the rays, round far trees |
 | L8 | Animals: skinning pass, refits | Herds cast shadows |
 | L9 | Moon and night, tiers tuned per target | A full day in VR |
-| E1 | `TerrainEdits`, one source of density, re-mesh, lighting hook | A debug stroke relights |
-| E2 | Colliders and ground fields | Bodies fall in the hole |
-| E3 | Plants, soil and grass maps | |
-| E4 | Brushes in VR and on the desktop, persistence, undo | |
 
-L1 to L5 in order; L6 to L9 and the E track can be taken in any order after L5 (E1's lighting hook after L2).
+L1 to L5 in order; L6 to L9 can be taken in any order after L5.
 
 ## Tests and captures
 
 - `LIGHT.*` in `tests/unit/lighting.cpp`: the sky model (sun path, colours), L1 projection and evaluation
   mirrored on the CPU, probe classification on known densities, brick allocation and the wrapping indirection.
-- `EDIT.*` in `tests/unit/terrain_edits.cpp`: brushes, shared border samples, save and load, the one source of
-  density.
 - Captures wait for `LightingStats::probes_pending == 0` and a settled history (as they wait for the species),
   with the sun stopped. Fixed-clock runs update a fixed number of probes a frame with seeds from the frame
   number. Goldens with ray tracing depend on the GPU; the fallback's are the reference of the test suite.
@@ -386,3 +362,10 @@ L1 to L5 in order; L6 to L9 and the E track can be taken in any order after L5 (
 - How good a far tree looks from its volume, against the billboards (L7).
 - Memory of the probes at 4 m (330 MB) and of the plant volumes (300 MB): the compact layouts if needed.
 - What rays through leaves cost in a thick forest, for both VR eyes (L3).
+
+## Later: terrain edits
+
+Not part of this work. When the terrain becomes editable (a delta of the density per chunk, brushes, one source
+of density for the colliders, the ground fields and the forests), the lighting reacts to one signal with the
+bounds of a stroke: the chunk's BLAS is rebuilt from its new mesh, the probes around the stroke are classified
+again and jump the queue with a fast blend.

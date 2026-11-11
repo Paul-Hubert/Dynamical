@@ -1,0 +1,10 @@
+{
+  "scene": "forest_torch",
+  "hide_ui": true,
+  "vars": { "speed": 4 },
+  "shots": [
+    { "frame": 1500, "name": "torch_open" },
+    { "frame": 2400, "name": "torch_edge" },
+    { "frame": 3000, "name": "torch_forest" }
+  ]
+}

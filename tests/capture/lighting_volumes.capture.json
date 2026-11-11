@@ -1,0 +1,11 @@
+{
+  "scene": "vegetation_test",
+  "hide_ui": true,
+  "vars": { "per_chunk": 0 },
+  "shots": [
+    { "frame": 300, "name": "volumes_spawn" },
+    { "frame": 340, "name": "volumes_side", "camera": { "pos": [-62, 26, -112], "look_at": [-24.8, 17, -112] } },
+    { "frame": 380, "name": "volumes_far", "camera": { "pos": [-110, 40, -100], "look_at": [-24.8, 17, -112] } },
+    { "frame": 420, "name": "volumes_above", "camera": { "pos": [-45, 60, -112], "look_at": [-24.8, 15, -112] } }
+  ]
+}
