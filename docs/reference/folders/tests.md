@@ -9,7 +9,7 @@ The doctest suite `dynamical_tests` plus CMake-script and Python-driven tests. `
 | File | Contents |
 |---|---|
 | `main.cpp` | doctest runner: creates a `JoltRuntime`, calls `registerSimSystems()` and, with `DYNAMICAL_ONNX`, `registerPolicySystems()` |
-| `import_table.cmake` | T1.2: `dumpbin /dependents` of TrainingEnv.exe must not list vulkan-1, SDL2 or openxr_loader |
+| `import_table.cmake` | T1.2: the `dumpbin` output for TrainingEnv.exe must not list vulkan-1, SDL2 or openxr_loader |
 | `train_cwd.cmake` | T1.7: run dynamical_train from another directory; relative `-envParamsOut` lands there, resources found next to the executable, no `config.6.json` created |
 
 ## Systems defined here
