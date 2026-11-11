@@ -18,7 +18,7 @@
   "renderer": { "passes": ["terrain", "grass", "model", "ui"], "vr": true },
   "host": {
     "pre": [
-      "Input", "UI", "Time", "PlayerControl", "DebugMenu", "ChunkManager", "ChunkGenerator",
+      "Input", "UI", "Time", "PlayerControl", "DebugMenu", { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator",
       { "name": "ModelWatcher", "params": { "model": "${model}", "models": { "1": "${desktop_model}" } } },
       "WorldStepper",
       { "name": "VRRoller", "params": { "world": 0, "lean_speed": "${lean_speed}", "lean_range": "${lean_range}" } },

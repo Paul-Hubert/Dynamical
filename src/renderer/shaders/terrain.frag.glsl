@@ -1,4 +1,5 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 // The ground. Seen from above : earth (under the grass of the grass pass), and patches of mud, stones and
 // sand where the soil map of the chunk says so (logic/terrain/soil.h). Steep faces : rock, laid on the two
@@ -9,8 +10,6 @@
 
 layout(location = 0) in vec3 v_position;
 layout(location = 1) in vec3 v_normal;
-
-layout(location = 0) out vec4 outColor;
 
 // Without the ground textures. Layer 0 : earth under the grass, layer 1 : rock
 layout(set = 1, binding = 0) uniform sampler2DArray u_color;
@@ -41,45 +40,12 @@ layout(push_constant) uniform Args {
     float relief[3];    // depth of the relief of the mud, the stones and the sand, in metres : 0 flat
 };
 
-layout(std140, set = 0, binding = 0) uniform View {
-    mat4 viewproj;
-    vec4 viewpos; // w : time
-    vec4 tree_shade; // x : strength, y : 1 / width of the map in metres, z : distance where it ends
-};
-
-// Shadows of the crowns of the plants on the ground, seen from above (renderer/tree_shade.h)
-layout(set = 0, binding = 1) uniform sampler2D u_tree_shade;
+// The view, the lights, the shade of the plants (treeShade), outColor
+#include "include/scene.glsl"
 
 // Mud (r), stones (g) and sand (b) over each chunk, a layer each : 0.5 on the edge of a patch, more
 // inside. a : how tall the grass is next to them (renderer/terrain/soil_maps.h). Texel (i, j) is on the vertices i, j cubes from the origin of the chunk
 layout(set = 0, binding = 2) uniform sampler2DArray u_soil;
-
-const vec3 sun_direction = normalize(vec3(0.5, 1.0, 0.5));
-const vec3 sky_color = vec3(0.45, 0.6, 0.8);
-
-float shadeHash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float shadeNoise(vec2 p) {
-    vec2 cell = floor(p), f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(mix(shadeHash(cell), shadeHash(cell + vec2(1, 0)), f.x),
-               mix(shadeHash(cell + vec2(0, 1)), shadeHash(cell + vec2(1, 1)), f.x), f.y);
-}
-
-// How much of the sun the plants hide from a point `above` its ground : 0 in the open, tree_shade.x under
-// thick crowns. The map only knows how thick the crowns are : a noise lets flecks of sun through them
-float treeShade(vec3 position, float above) {
-    if(tree_shade.x <= 0.0) return 0.0;
-    float far = length(position - viewpos.xyz);
-    if(far >= tree_shade.z) return 0.0;
-    vec2 ground = position.xz - sun_direction.xz / sun_direction.y * above;
-    float depth = texture(u_tree_shade, ground * tree_shade.y).r * 4.0;
-    float flecks = mix(0.6 * shadeNoise(ground * 0.7) + 0.4 * shadeNoise(ground * 2.1 + 17.0), 0.5, smoothstep(25.0, 80.0, far));
-    float shade = 1.0 - exp(-depth * (0.2 + 1.6 * flecks));
-    return tree_shade.x * shade * (1.0 - smoothstep(0.75 * tree_shade.z, tree_shade.z, far));
-}
 
 // The soil maps have a texel every 4 m : a patch would have straight edges. The maps are read a few
 // metres off (never more than their border of one texel), further over tens of metres and less over one,
@@ -359,13 +325,14 @@ void main() {
 
     // Under the plants : little sun, and less of the sky
     float shade = treeShade(v_position, 0.0);
-    float light = max(dot(lit_normal, sun_direction), 0.0) * (1.0 - shade);
-    vec3 color = s_color * (light * 0.7 * mix(1.0, s_occlusion, 0.5) + 0.3 * (1.0 - 0.35 * shade) * s_occlusion);
+    float light = max(dot(lit_normal, sun_direction), 0.0);
+    vec3 sunlit = s_color * light_color.rgb * (light * mix(1.0, s_occlusion, 0.5));
+    vec3 unlit = s_color * (ambientLight(v_position, lit_normal, shade) * s_occlusion + pointLights(v_position, lit_normal, 0.0));
 
     // Wet mud shines, stones a little
     vec3 half_way = normalize(sun_direction - view);
     float shine = 0.4 * s_gloss * s_gloss * pow(max(dot(lit_normal, half_way), 0.0), 8.0 + 120.0 * s_gloss);
-    color += vec3(1.0, 0.97, 0.9) * shine * smoothstep(0.0, 0.15, dot(normal, sun_direction)) * (1.0 - shade);
+    sunlit += light_color.rgb * (1.4 * shine * smoothstep(0.0, 0.15, dot(normal, sun_direction)));
 
     // Under the grass (same slopes as grass.vert.glsl) : in its shade, and behind it. The grass pass
     // only knows the ground as a plane under each pixel, its hits can end up a little under the terrain :
@@ -378,13 +345,14 @@ void main() {
     }
     if(under_grass > 0.0) {
         float covered = smoothstep(0.76, 0.88, normal.y);
-        color *= 1.0 - 0.8 * covered * grassy * (1.0 - 0.7 * s_bare);
+        float under = 1.0 - 0.8 * covered * grassy * (1.0 - 0.7 * s_bare);
+        unlit *= under;
+        sunlit *= under;
         float behind = under_grass * covered * grass_tall * smoothstep(0.0, 0.15, grassy);
         vec4 clip = viewproj * vec4(v_position + view * behind, 1.0);
         gl_FragDepth = clamp(max(clip.z / clip.w, gl_FragDepth), 0.0, 1.0);
     }
 
-    float fog = 1.0 - exp(-far * 0.0006);
-    outColor = vec4(mix(color, sky_color, fog), 1.0);
+    writeLit(unlit, sunlit, shade, v_position, 1.0);
 
 }

@@ -51,7 +51,7 @@ void ModelPass::createPipeline(RenderTarget target, vk::RenderPass renderpass) {
 
     GraphicsPipelineDesc desc;
     desc.vertex_shader = "./resources/shaders/model.vert.glsl.spv";
-    desc.fragment_shader = "./resources/shaders/model.frag.glsl.spv";
+    desc.fragment_shader = sceneFragmentShader(ctx, "model");
     desc.bindings = {
         vk::VertexInputBindingDescription(0, sizeof(ModelVertex), vk::VertexInputRate::eVertex),
     };

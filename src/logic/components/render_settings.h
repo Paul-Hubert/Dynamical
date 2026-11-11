@@ -19,6 +19,29 @@ struct RenderSettings {
     bool animals = true;
     float tree_shade = 0.85f;   // how dark it is under the plants (TreeShade), 0 : no shade
 
+    // Ray traced lighting (docs/lighting.md) : what a target pays for, by tier. Nothing of it without the GPU's ray queries
+    enum class LightingTier : int { Off, Low, Medium, High };
+    struct Lighting {
+        LightingTier tier = LightingTier::Medium;
+        float traced_range = 60.f;          // metres : the sun is traced per pixel within, read from the probes beyond. 0 : probes only
+        int sun_rays = 1;                   // a pixel
+        float plant_geometry_range = 120.f; // metres : plants are their leaves in the rays within, a box beyond
+        int shadowed_torches = 2;           // a pixel
+        int animals = 32;                   // with a shadow
+
+        static Lighting of(LightingTier tier) {
+            switch(tier) {
+                case LightingTier::Off: return { tier, 0.f, 0, 60.f, 0, 0 };
+                case LightingTier::Low: return { tier, 25.f, 1, 60.f, 1, 8 };
+                case LightingTier::Medium: return { tier, 60.f, 1, 120.f, 2, 32 };
+                default: return { LightingTier::High, 150.f, 2, 250.f, 4, 128 };
+            }
+        }
+    };
+    Lighting lighting[2] = { Lighting::of(LightingTier::High), Lighting::of(LightingTier::Medium) };    // desktop, VR
+    int probe_rays_per_frame = 1000000;
+    int rays_per_probe = 64;
+
     // Patches of mud, stones and sand in the ground, a map per chunk (SoilMaps, docs/ground.md) : no grass on them
     bool soil = true;
     SoilParams soil_params;

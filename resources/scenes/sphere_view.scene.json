@@ -9,7 +9,7 @@
   "renderer": { "passes": ["terrain", "model", "ui"], "vr": false },
   "host": {
     "pre": [
-      "Input", "UI", "PlayerControl", "DebugMenu", "ChunkManager", "ChunkGenerator",
+      "Input", "UI", "PlayerControl", "DebugMenu", { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator",
       { "name": "ModelWatcher", "params": { "model": "${model}" } },
       "WorldStepper",
       { "name": "SphereView", "params": { "world": 0 } }

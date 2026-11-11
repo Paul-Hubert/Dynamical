@@ -97,7 +97,7 @@ void AnimalPass::createPipeline(RenderTarget target, vk::RenderPass renderpass) 
 
     GraphicsPipelineDesc desc;
     desc.vertex_shader = "./resources/shaders/animal.vert.glsl.spv";
-    desc.fragment_shader = "./resources/shaders/animal.frag.glsl.spv";
+    desc.fragment_shader = sceneFragmentShader(ctx, "animal");
     desc.bindings = {
         vk::VertexInputBindingDescription(0, sizeof(AnimalVertex), vk::VertexInputRate::eVertex),
     };

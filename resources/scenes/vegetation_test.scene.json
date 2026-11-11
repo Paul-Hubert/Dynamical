@@ -14,7 +14,7 @@
   "host": {
     "pre": [
       "Input", "UI", "Time", "PlayerControl", "VRControl", "DebugMenu",
-      "ChunkManager", "ChunkGenerator",
+      { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator",
       { "name": "VegetationLineup", "params": { "lods": "${lods}", "max_species": "${max_species}", "seed": "${veg_seed}", "categories": ["tree"] } },
       { "name": "VegetationScatter", "params": { "per_chunk": "${per_chunk}", "max_species": "${max_species}", "seed": "${veg_seed}", "categories": ["tree"] } },
       "BoxThrower", "RigidBody", "TerrainColliders", "Physics"

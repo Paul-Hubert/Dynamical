@@ -50,7 +50,7 @@
       "Time",
       "PlayerControl",
       "DebugMenu",
-      "ChunkManager",
+      { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager",
       "ChunkGenerator",
       {
         "name": "ModelWatcher",

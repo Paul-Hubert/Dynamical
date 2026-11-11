@@ -1,4 +1,5 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 // Grass without blade geometry. The pixel is on a shell at the top of the grass; its view ray is looked up
 // in rays baked against a tile of grass blades (logic/grass/grass_bake.h, mirrored on the CPU by lookupGrass) :
@@ -24,8 +25,6 @@ layout(location = 0) in vec3 v_position;
 layout(location = 1) in vec3 v_normal;
 layout(location = 2) in float v_height;     // of the grass here : the shell is that much above the ground
 layout(location = 3) in vec3 v_curve;       // how the ground bends : second derivatives of its height, xx, xz, zz
-
-layout(location = 0) out vec4 outColor;
 
 // The hit is never in front of the shell : keeps the early depth test
 layout(depth_greater) out float gl_FragDepth;
@@ -76,14 +75,8 @@ layout(set = 1, binding = 10) uniform sampler2D u_species;
 const float species_margin = 1.0;
 const float species_band = 0.45;
 
-layout(std140, set = 0, binding = 0) uniform View {
-    mat4 viewproj;
-    vec4 viewpos; // w : time
-    vec4 tree_shade; // x : strength, y : 1 / width of the map in metres, z : distance where it ends
-};
-
-// Shadows of the crowns of the plants on the ground, seen from above (renderer/tree_shade.h)
-layout(set = 0, binding = 1) uniform sampler2D u_tree_shade;
+// The view, the lights, the shade of the plants (treeShade), outColor
+#include "include/scene.glsl"
 
 const float pi = 3.14159265359;
 
@@ -166,32 +159,6 @@ const int max_layers = 4;
 const float layer_scales[max_layers] = float[](1.0, 1.37, 1.73, 0.55);
 const float warp_frequencies[max_layers] = float[](1.0, 1.37, 0.73, 1.61);
 
-const vec3 sun_direction = normalize(vec3(0.5, 1.0, 0.5));
-const vec3 sky_color = vec3(0.45, 0.6, 0.8);
-
-float shadeHash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float shadeNoise(vec2 p) {
-    vec2 cell = floor(p), f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(mix(shadeHash(cell), shadeHash(cell + vec2(1, 0)), f.x),
-               mix(shadeHash(cell + vec2(0, 1)), shadeHash(cell + vec2(1, 1)), f.x), f.y);
-}
-
-// How much of the sun the plants hide from a point `above` its ground : 0 in the open, tree_shade.x under
-// thick crowns. The map only knows how thick the crowns are : a noise lets flecks of sun through them
-float treeShade(vec3 position, float above) {
-    if(tree_shade.x <= 0.0) return 0.0;
-    float far = length(position - viewpos.xyz);
-    if(far >= tree_shade.z) return 0.0;
-    vec2 ground = position.xz - sun_direction.xz / sun_direction.y * above;
-    float depth = texture(u_tree_shade, ground * tree_shade.y).r * 4.0;
-    float flecks = mix(0.6 * shadeNoise(ground * 0.7) + 0.4 * shadeNoise(ground * 2.1 + 17.0), 0.5, smoothstep(25.0, 80.0, far));
-    float shade = 1.0 - exp(-depth * (0.2 + 1.6 * flecks));
-    return tree_shade.x * shade * (1.0 - smoothstep(0.75 * tree_shade.z, tree_shade.z, far));
-}
 
 // Mud, stones and sand over each chunk : 0.5 on the edge of a patch, more inside (renderer/terrain/soil_maps.h)
 layout(set = 0, binding = 2) uniform sampler2DArray u_soil;
@@ -774,12 +741,11 @@ void main() {
     }
     // Under the plants (the shell is close enough to the ground)
     float shade = treeShade(v_position, 0.0);
-    lit *= 1.0 - shade;
-    color *= (light * (1.0 - shade) * 0.7 + 0.3 * (1.0 - 0.35 * shade)) * occlusion;
-    color += vec3(0.9, 1.0, 0.7) * 0.12 * occlusion * lit * pow(max(dot(reflect(-sun_direction, normal), -view), 0.0), 24.0);
+    vec3 unlit = color * occlusion * (ambientLight(v_position, ground_normal, shade) + pointLights(v_position, normalize(ground_normal + normal), 0.5));
+    vec3 sunlit = color * light_color.rgb * (light * occlusion);
+    sunlit += vec3(0.9, 1.0, 0.7) * light_color.rgb * (0.17 * occlusion * lit * pow(max(dot(reflect(-sun_direction, normal), -view), 0.0), 24.0));
 
-    float fog = 1.0 - exp(-view_distance * 0.0006);
-    outColor = vec4(mix(color, sky_color, fog), 1.0);
+    writeLit(unlit, sunlit, shade, v_position, 1.0);
 
     // Depth of the hit. The smooth normal says roughly where the ground is : stay over the triangle
     // that is really under this pixel

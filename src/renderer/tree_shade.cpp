@@ -8,6 +8,7 @@
 
 #include "logic/components/render_settings.h"
 #include "logic/components/transform.h"
+#include "logic/sky/sky.h"
 #include "logic/vegetation/vegetation.h"
 
 using namespace dy;
@@ -18,6 +19,9 @@ TreeShade::TreeShade(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg),
     vk::SamplerCreateInfo info({}, vk::Filter::eLinear, vk::Filter::eLinear, vk::SamplerMipmapMode::eNearest,
         vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat);
     ctx.tree_shade_sampler = ctx.device->createSampler(info);
+
+    if(auto* sky = reg.ctx().find<Sky>()) light = skyLight(*sky).direction;
+    slope = glm::vec2(light.x, light.z) / std::max(light.y, min_height);
 
     reg.storage<Transform>();
     for(auto entity : reg.view<Plant>()) onPlant(reg, entity);
@@ -44,20 +48,45 @@ void TreeShade::onPlant(entt::registry& registry, entt::entity entity) {
     float strength = 0.9f * std::clamp((tall - 1.5f) / 4.f, 0.15f, 1.f);
     glm::vec2 root(transform->position.x, transform->position.z);
 
-    // The middle and the top of the crown, where the sun puts them on the ground
-    std::array<Disc, 2> discs;
-    discs[0] = { root - sun_slope * (0.5f * tall), 0.85f * crown, strength };
-    discs[1] = { root - sun_slope * (0.8f * tall), 0.6f * crown, strength };
-    for(auto& disc : discs) draw(disc, 1.f);
-    plants.emplace(entity, discs);
+    Crown shadow { root, tall, crown, strength };
+    for(auto& disc : discs(shadow)) draw(disc, 1.f);
+    plants.emplace(entity, shadow);
 
+}
+
+// The middle and the top of the crown, where the light puts them on the ground
+std::array<TreeShade::Disc, 2> TreeShade::discs(const Crown& crown) const {
+    return {
+        Disc { crown.root - slope * (0.5f * crown.tall), 0.85f * crown.radius, crown.strength },
+        Disc { crown.root - slope * (0.8f * crown.tall), 0.6f * crown.radius, crown.strength }
+    };
 }
 
 void TreeShade::onPlantDestroyed(entt::registry& registry, entt::entity entity) {
     auto it = plants.find(entity);
     if(it == plants.end()) return;
-    for(auto& disc : it->second) draw(disc, -1.f);
+    for(auto& disc : discs(it->second)) draw(disc, -1.f);
     plants.erase(it);
+}
+
+// Every shadow again once the light has moved enough to show
+void TreeShade::followLight() {
+
+    auto* sky = reg.ctx().find<Sky>();
+    if(!sky) return;
+    glm::vec3 now = skyLight(*sky).direction;
+    if(glm::dot(now, light) >= std::cos(glm::radians(follow))) return;
+
+    light = now;
+    slope = glm::vec2(light.x, light.z) / std::max(light.y, min_height);
+
+    std::fill(depth.begin(), depth.end(), 0.f);
+    std::fill(dirty.begin(), dirty.end(), (uint8_t) 1);
+    any_dirty = true;
+    for(auto& [entity, crown] : plants) {
+        for(auto& disc : discs(crown)) draw(disc, 1.f);
+    }
+
 }
 
 void TreeShade::draw(const Disc& disc, float sign) {
@@ -130,6 +159,8 @@ void TreeShade::update() {
             ++it;
         }
     }
+
+    followLight();
 
     if(any_dirty) upload();
 

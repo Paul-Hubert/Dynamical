@@ -24,7 +24,7 @@ TEST_CASE("T2.4 base system list after the PhysicsSys split (T1.5 updated)") {
     // PhysicsSys split into RigidBody, TerrainColliders, Physics (P2)
     CHECK(set.names(SystemSet::List::Pre) == std::vector<std::string> {
         "Input", "UI", "Time", "PlayerControl", "VRControl", "DebugMenu",
-        "ChunkManager", "ChunkGenerator", "BoxRing", "ModelLineup", "BoxThrower",
+        "Sky", "ChunkManager", "ChunkGenerator", "BoxRing", "ModelLineup", "BoxThrower",
         "RigidBody", "TerrainColliders", "Physics" });
     CHECK(set.names(SystemSet::List::Post) == std::vector<std::string> { "Terrain" });
 

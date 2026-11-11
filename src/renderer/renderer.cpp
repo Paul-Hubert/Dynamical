@@ -20,6 +20,7 @@
 #include "renderer/passes/vegetation_pass.h"
 #include "renderer/passes/animal_pass.h"
 #include "renderer/passes/ui_pass.h"
+#include "renderer/passes/sky_pass.h"
 
 #include "logic/components/frame_clock.h"
 #include "logic/components/render_settings.h"
@@ -40,12 +41,14 @@ per_frame(NUM_FRAMES) {
     reg.ctx().emplace<ModelManager>(reg);
     reg.ctx().emplace<RenderSettings>();
 
+    lights = std::make_unique<Lights>(ctx, reg);
     tree_shade = std::make_unique<TreeShade>(ctx, reg);
     soil_maps = std::make_unique<SoilMaps>(ctx, reg);
     classic = std::make_unique<ClassicRender>(ctx, reg);
     vr = std::make_unique<VRRender>(ctx, reg);
 
-    // Draw order as listed (base: opaque terrain, grass shells on top of it, models, then the desktop UI)
+    // Draw order as listed (base: opaque terrain, grass shells on top of it, models, then the desktop UI), over the sky
+    passes.push_back(std::make_unique<SkyPass>(ctx, reg));
     for(const std::string& name : desc.passes) {
         if(name == "terrain") passes.push_back(std::make_unique<TerrainPass>(ctx, reg));
         else if(name == "grass") passes.push_back(std::make_unique<GrassPass>(ctx, reg));
@@ -115,6 +118,7 @@ void Renderer::render() {
 
     ctx.transfer.check();
 
+    lights->update(frame_index, time);
     tree_shade->update();
     soil_maps->update();
     for(ScenePass* pass : pass_list) {
@@ -223,6 +227,7 @@ Renderer::~Renderer() {
     classic.reset();
     soil_maps.reset();
     tree_shade.reset();
+    lights.reset();
 
     for(auto& f : per_frame) {
         ctx.device->destroy(f.fence);

@@ -76,6 +76,7 @@ private:
     XrFrameState frame_state { XR_TYPE_FRAME_STATE };
     std::vector<XrView> views;
     std::vector<uint32_t> image_indices;
+    std::vector<glm::mat4> previous_view_projections;   // per eye
 
 };
 

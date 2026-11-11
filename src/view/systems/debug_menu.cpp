@@ -5,7 +5,10 @@
 #include "logic/components/camera.h"
 #include "view/components/input.h"
 #include "logic/components/render_settings.h"
+#include "logic/components/point_light.h"
 #include "logic/components/rigid_body.h"
+#include "logic/components/transform.h"
+#include "logic/sky/sky.h"
 #include "view/spawn.h"
 #include "logic/components/vr.h"
 #include "logic/settings/settings.h"
@@ -72,6 +75,29 @@ void DebugMenuSys::tick(double dt) {
             ImGui::SliderFloat("Shorter grass from", &soil.grass_margin, 0.f, 24.f, "%.0f m");
             ImGui::SliderFloat("Stones under the rock", &render.scree, 0.f, 1.f);
             ImGui::SliderFloat("Relief of the soil", &render.relief, 0.f, 3.f);
+        }
+
+        if(auto* sky = reg.ctx().find<Sky>()) {
+            if(ImGui::CollapsingHeader("Sky", ImGuiTreeNodeFlags_DefaultOpen)) {
+                int hours = (int) sky->time, minutes = (int) ((sky->time - (float) hours) * 60.f);
+                ImGui::Text("%02d:%02d, the %s is up", hours, minutes, skyLight(*sky).is_sun ? "sun" : "moon");
+                ImGui::SliderFloat("Time of the day", &sky->time, 0.f, 24.f, "%.2f h");
+                ImGui::SliderFloat("Length of a day", &sky->day_length, 0.f, 3600.f, "%.0f s (0 : stopped)");
+                ImGui::SliderFloat("Season", &sky->declination, -23.4f, 23.4f, "%.1f deg");
+                size_t torches = reg.view<PointLight>().size();
+                if(ImGui::Button("Torch here")) {
+                    auto torch = reg.create();
+                    reg.emplace<Transform>(torch, camera.position + camera.forward() * 1.5f);
+                    reg.emplace<PointLight>(torch);
+                }
+                ImGui::SameLine();
+                if(ImGui::Button("No torches")) {
+                    auto view = reg.view<PointLight>();
+                    reg.destroy(view.begin(), view.end());
+                }
+                ImGui::SameLine();
+                ImGui::Text("%zu torches", torches);
+            }
         }
 
         if(ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen)) {

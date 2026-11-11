@@ -18,7 +18,7 @@
   "host": {
     "pre": [
       "Input", "UI", "Time", "PlayerControl", "DebugMenu",
-      "ChunkManager", "ChunkGenerator",
+      { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator",
       { "name": "Forest", "params": { "definition": "${forest}", "seed": "${forest_seed}", "patch_size": "${patch_size}", "coverage": "${coverage}", "max_slope": "${max_slope}" } },
       { "name": "CameraWalk", "params": { "distance": "${distance}", "speed": "${speed}", "eye_height": "${eye_height}" } }
     ],

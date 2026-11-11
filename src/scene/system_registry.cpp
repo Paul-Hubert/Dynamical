@@ -12,6 +12,8 @@
 #include "logic/agents/sphere_roller.h"
 #include "logic/agents/walk_routes.h"
 #include "logic/components/model_ref.h"
+#include "logic/components/point_light.h"
+#include "logic/sky/sky.h"
 #include "logic/components/rigid_body.h"
 #include "logic/components/transform.h"
 #include "logic/systems/box_drop.h"
@@ -127,6 +129,23 @@ void registerSimComponents() {
         }
     });
 
+    registerComponent("PointLight", {
+        [](entt::registry& reg, entt::entity e, const nlohmann::json& j) {
+            PointLight l;
+            JsonFields f(j);
+            f.read("color", l.color);
+            f.read("intensity", l.intensity);
+            f.read("radius", l.radius);
+            f.finish();
+            if(l.radius <= 0.f) throw ComponentError("/radius", "must be positive");
+            reg.emplace_or_replace<PointLight>(e, l);
+        },
+        [](const entt::registry& reg, entt::entity e) {
+            auto& l = reg.get<PointLight>(e);
+            return nlohmann::json { { "color", toJson(l.color) }, { "intensity", l.intensity }, { "radius", l.radius } };
+        }
+    });
+
     registerComponent("ModelRef", {
         [](entt::registry& reg, entt::entity e, const nlohmann::json& j) {
             ModelRef m;
@@ -170,6 +189,7 @@ void dy::registerSimSystems() {
         SystemScope::World });
 
     registerSimComponents();
+    registerSky();
     registerSphereRoller();
     registerPursuit();
     registerHumanBot();

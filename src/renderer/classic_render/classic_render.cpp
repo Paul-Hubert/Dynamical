@@ -1,6 +1,7 @@
 #include "classic_render.h"
 
 #include "renderer/tree_shade.h"
+#include "renderer/lighting/lights.h"
 
 #include "util/log.h"
 
@@ -24,10 +25,7 @@ per_frame(NUM_FRAMES) {
 
     auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, (uint32_t)per_frame.size()));
 
-    auto sizes = std::vector {
-        vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, (uint32_t) per_frame.size()),
-        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, (uint32_t) per_frame.size() * 2),
-    };
+    auto sizes = ctx.viewPoolSizes((uint32_t) per_frame.size());
     descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo(vk::DescriptorPoolCreateFlags{}, (uint32_t) per_frame.size(), sizes));
 
     for (int i = 0; i < per_frame.size(); i++) {
@@ -48,13 +46,10 @@ per_frame(NUM_FRAMES) {
 
         auto bufInfo = vk::DescriptorBufferInfo(f.ubo, 0, sizeof(ViewUBO));
 
-        // The soil maps are one image for good (SoilMaps), the shade of the plants is set every frame
-        auto soilInfo = vk::DescriptorImageInfo(ctx.soil_sampler, ctx.soil_view, vk::ImageLayout::eShaderReadOnlyOptimal);
-
         ctx.device->updateDescriptorSets({
-            vk::WriteDescriptorSet(f.set, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &bufInfo, nullptr),
-            vk::WriteDescriptorSet(f.set, 2, 0, 1, vk::DescriptorType::eCombinedImageSampler, &soilInfo, nullptr, nullptr)
+            vk::WriteDescriptorSet(f.set, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &bufInfo, nullptr)
             }, {});
+        ctx.writeViewSet(f.set, (uint32_t) i, true);
 
         f.acquireSemaphore = ctx.device->createSemaphore(vk::SemaphoreCreateInfo());
 
@@ -148,12 +143,13 @@ void ClassicRender::updateView(uint32_t frame_index, float time) {
     ubo->view_projection = camera.getProjection(aspect) * camera.getView();
     ubo->position = glm::vec4(camera.position, time);
     ubo->tree_shade = treeShadeView(reg);
+    ubo->inverse_view_projection = glm::inverse(ubo->view_projection);
+    ubo->previous_view_projection = have_previous ? previous_view_projection : ubo->view_projection;
+    ubo->lighting = lightingView(reg, RenderTarget::Desktop);
+    previous_view_projection = ubo->view_projection;
+    have_previous = true;
 
-    // The map is replaced when plants come and go : the set of this frame is free to take the new one
-    auto image = vk::DescriptorImageInfo(ctx.tree_shade_sampler, ctx.tree_shade_view, vk::ImageLayout::eShaderReadOnlyOptimal);
-    ctx.device->updateDescriptorSets({
-        vk::WriteDescriptorSet(per_frame[frame_index].set, 1, 0, 1, vk::DescriptorType::eCombinedImageSampler, &image, nullptr, nullptr)
-        }, {});
+    ctx.writeViewSet(per_frame[frame_index].set, frame_index, false);
 
 }
 

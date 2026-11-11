@@ -1,6 +1,7 @@
 #include "vr_render.h"
 
 #include "renderer/tree_shade.h"
+#include "renderer/lighting/lights.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -38,10 +39,7 @@ per_frame(NUM_FRAMES) {
 
     auto cmds = ctx.device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, (uint32_t) per_frame.size()));
 
-    auto sizes = std::vector {
-        vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, (uint32_t) per_frame.size() * num_views),
-        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, (uint32_t) per_frame.size() * num_views * 2),
-    };
+    auto sizes = ctx.viewPoolSizes((uint32_t) per_frame.size() * num_views);
     descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, (uint32_t) per_frame.size() * num_views, sizes));
 
     for(size_t i = 0; i < per_frame.size(); i++) {
@@ -235,11 +233,13 @@ void VRRender::updateView(uint32_t frame_index, float time) {
         ubo->view_projection = projection_fov(views[v].fov, vr_near, vr_far) * glm::inverse(world_from_eye);
         ubo->position = glm::vec4(glm::vec3(world_from_eye[3]), time);
         ubo->tree_shade = treeShadeView(reg);
+        ubo->inverse_view_projection = glm::inverse(ubo->view_projection);
+        ubo->previous_view_projection = v < previous_view_projections.size() ? previous_view_projections[v] : ubo->view_projection;
+        ubo->lighting = lightingView(reg, RenderTarget::VR);
+        if(previous_view_projections.size() <= v) previous_view_projections.resize(v + 1);
+        previous_view_projections[v] = ubo->view_projection;
 
-        auto image = vk::DescriptorImageInfo(ctx.tree_shade_sampler, ctx.tree_shade_view, vk::ImageLayout::eShaderReadOnlyOptimal);
-        ctx.device->updateDescriptorSets({
-            vk::WriteDescriptorSet(per_frame[frame_index].eyes[v].set, 1, 0, 1, vk::DescriptorType::eCombinedImageSampler, &image, nullptr, nullptr)
-            }, {});
+        ctx.writeViewSet(per_frame[frame_index].eyes[v].set, frame_index, false);
     }
 
 }

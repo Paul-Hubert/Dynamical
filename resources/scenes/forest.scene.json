@@ -15,7 +15,7 @@
   "host": {
     "pre": [
       "Input", "UI", "Time", "PlayerControl", "VRControl", "DebugMenu",
-      "ChunkManager", "ChunkGenerator",
+      { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator",
       { "name": "Forest", "params": { "definition": "${forest}", "seed": "${forest_seed}", "patch_size": "${patch_size}", "coverage": "${coverage}", "max_slope": "${max_slope}" } },
       "BoxThrower", "RigidBody", "TerrainColliders", "Physics"
     ],

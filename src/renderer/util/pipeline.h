@@ -3,17 +3,19 @@
 
 #include "renderer/util/vk.h"
 
+#include <string>
 #include <vector>
 
 namespace dy {
 
 class Device;
+class Context;
 
 // Common state of every graphics pipeline in the engine : one subpass,
 // dynamic viewport and scissor, no multisampling.
 struct GraphicsPipelineDesc {
-    const char* vertex_shader = nullptr;
-    const char* fragment_shader = nullptr;
+    std::string vertex_shader;
+    std::string fragment_shader;
     const vk::SpecializationInfo* vertex_specialization = nullptr;
     const vk::SpecializationInfo* fragment_specialization = nullptr;
 
@@ -31,6 +33,10 @@ struct GraphicsPipelineDesc {
 };
 
 vk::ShaderModule loadShader(Device& device, const char* path);
+
+// The compiled fragment shader of a scene pass : resources/shaders/<name>.frag.glsl.spv, or its variant with
+// ray queries where the device has them (docs/lighting.md)
+std::string sceneFragmentShader(Context& ctx, const char* name);
 
 vk::Pipeline createGraphicsPipeline(Device& device, const GraphicsPipelineDesc& desc);
 

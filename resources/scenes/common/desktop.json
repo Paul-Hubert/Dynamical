@@ -1,3 +1,7 @@
 {
+  "variables": {
+    "time":       { "type": "float", "default": 10.3349, "description": "hours : time of the day the scene starts at (the Sky system)" },
+    "day_length": { "type": "float", "default": -1, "description": "seconds of play for a day, 0 stops the sun. -1 : 1440, and 0 in captures and probes" }
+  },
   "host": { "pre": ["Input", "UI", "PlayerControl", "DebugMenu"] }
 }

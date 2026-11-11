@@ -25,7 +25,7 @@
   "host": {
     "pre": [
       "Input", "UI", "Time", "PlayerControl", "VRControl", "DebugMenu",
-      "ChunkManager", "ChunkGenerator",
+      { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator",
       { "name": "AnimalWalkers", "params": { "species": "${species}", "path": "${path}", "radius": "${radius}", "speed": "${speed}", "gait": "${gait}",
           "procedural": "${procedural}", "gap": "${gap}", "follow": "${follow}",
           "style": { "stride": "${stride}", "step_height": "${step_height}", "clearance": "${clearance}", "soft_depth": "${soft_depth}",

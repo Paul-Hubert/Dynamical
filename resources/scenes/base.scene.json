@@ -8,7 +8,7 @@
   "host": {
     "pre": [
       "Input", "UI", "Time", "PlayerControl", "VRControl", "DebugMenu",
-      "ChunkManager", "ChunkGenerator", "BoxRing", "ModelLineup", "BoxThrower",
+      { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator", "BoxRing", "ModelLineup", "BoxThrower",
       "RigidBody", "TerrainColliders", "Physics"
     ],
     "post": ["Terrain"]

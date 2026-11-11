@@ -68,6 +68,9 @@ private:
 
     bool acquired = false;
 
+    glm::mat4 previous_view_projection = glm::mat4(1.f);
+    bool have_previous = false;
+
     VmaBuffer capture_buffer;
     bool capture_requested = false;
 

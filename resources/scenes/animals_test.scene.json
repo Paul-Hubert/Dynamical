@@ -14,7 +14,7 @@
   "host": {
     "pre": [
       "Input", "UI", "Time", "PlayerControl", "VRControl", "DebugMenu",
-      "ChunkManager", "ChunkGenerator",
+      { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator",
       { "name": "AnimalLineup", "params": { "clips": "${clips}", "per_row": "${per_row}", "seconds": "${seconds}", "yaw": "${yaw}" } },
       "AnimalAnimation"
     ],

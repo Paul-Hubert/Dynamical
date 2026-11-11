@@ -24,7 +24,7 @@
   "host": {
     "pre": [
       "Input", "UI", "Time", "PlayerControl", "DebugMenu",
-      "ChunkManager", "ChunkGenerator",
+      { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator",
       { "name": "Forest", "params": { "definition": "${forest}", "seed": "${forest_seed}" } },
       { "name": "Herds", "params": { "definition": "${herds}", "seed": "${herd_seed}", "cell": "${herd_cell}", "density": "${herd_density}", "radius": "${herd_radius}", "range": "${herd_range}", "graze": ["${graze_min}", "${graze_max}"] } },
       { "name": "HerdWatch", "params": { "kind": "${kind}", "distance": "${distance}", "height": "${height}", "orbit": "${orbit}" } },

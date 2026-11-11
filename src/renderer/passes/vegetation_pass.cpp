@@ -92,7 +92,7 @@ void VegetationPass::createPipeline(RenderTarget target, vk::RenderPass renderpa
 
     GraphicsPipelineDesc desc;
     desc.vertex_shader = "./resources/shaders/vegetation.vert.glsl.spv";
-    desc.fragment_shader = "./resources/shaders/vegetation.frag.glsl.spv";
+    desc.fragment_shader = sceneFragmentShader(ctx, "vegetation");
     desc.bindings = {
         vk::VertexInputBindingDescription(0, sizeof(VegetationVertex), vk::VertexInputRate::eVertex),
     };

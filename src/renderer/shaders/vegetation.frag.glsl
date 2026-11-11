@@ -1,4 +1,5 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 layout(location = 0) in vec3 v_position;
 layout(location = 1) in vec3 v_normal;
@@ -7,16 +8,8 @@ layout(location = 3) in vec2 v_uv;
 layout(location = 4) in vec2 v_shade;
 layout(location = 5) in float v_above;
 
-layout(location = 0) out vec4 outColor;
-
-layout(std140, set = 0, binding = 0) uniform View {
-    mat4 viewproj;
-    vec4 viewpos; // w : time
-    vec4 tree_shade; // x : strength, y : 1 / width of the map in metres, z : distance where it ends
-};
-
-// Shadows of the crowns of the plants on the ground, seen from above (renderer/tree_shade.h)
-layout(set = 0, binding = 1) uniform sampler2D u_tree_shade;
+// The view, the lights, the shade of the plants (treeShade), outColor
+#include "include/scene.glsl"
 
 // SpeedTree 8 maps
 layout(set = 1, binding = 0) uniform sampler2D u_color;         // rgb, a : opacity
@@ -30,36 +23,8 @@ layout(push_constant) uniform Plant {
     vec4 params; // x : alpha cutoff, y : billboard cards, z : normal map, w : subsurface
 };
 
-const vec3 sun_direction = normalize(vec3(0.5, 1.0, 0.5));
-const vec3 sun_color = vec3(1.0, 0.96, 0.88);
-const vec3 sky_color = vec3(0.45, 0.6, 0.8);
-// Ambient light from above and bounced from the ground
-const vec3 sky_light = vec3(0.5, 0.56, 0.66);
-const vec3 ground_light = vec3(0.3, 0.3, 0.24);
-
-float shadeHash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float shadeNoise(vec2 p) {
-    vec2 cell = floor(p), f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(mix(shadeHash(cell), shadeHash(cell + vec2(1, 0)), f.x),
-               mix(shadeHash(cell + vec2(0, 1)), shadeHash(cell + vec2(1, 1)), f.x), f.y);
-}
-
-// How much of the sun the plants hide from a point `above` its ground : 0 in the open, tree_shade.x under
-// thick crowns. The map only knows how thick the crowns are : a noise lets flecks of sun through them
-float treeShade(vec3 position, float above) {
-    if(tree_shade.x <= 0.0) return 0.0;
-    float far = length(position - viewpos.xyz);
-    if(far >= tree_shade.z) return 0.0;
-    vec2 ground = position.xz - sun_direction.xz / sun_direction.y * above;
-    float depth = texture(u_tree_shade, ground * tree_shade.y).r * 4.0;
-    float flecks = mix(0.6 * shadeNoise(ground * 0.7) + 0.4 * shadeNoise(ground * 2.1 + 17.0), 0.5, smoothstep(25.0, 80.0, far));
-    float shade = 1.0 - exp(-depth * (0.2 + 1.6 * flecks));
-    return tree_shade.x * shade * (1.0 - smoothstep(0.75 * tree_shade.z, tree_shade.z, far));
-}
+// SpeedTree's maps are dark : meant for more light than the ground gets
+const float exposure = 1.43;
 
 void main() {
 
@@ -95,27 +60,27 @@ void main() {
     // crown : a tall plant leaves it as it goes up (a small one has next to no shadow of its own)
     float own = clamp((tint.w - 1.5) / 4.0, 0.0, 1.0) * smoothstep(0.3, 0.75, v_above / max(tint.w, 0.01));
     float shade = treeShade(v_position, max(v_above, 0.0)) * (1.0 - own);
-    float sunlit = 1.0 - shade;
 
     // Without shadows inside the crown the baked occlusion also dims the sun there
-    float sun = max(n_dot_l, 0.0) * mix(1.0, occlusion, 0.5) * sunlit;
-    vec3 ambient = mix(ground_light, sky_light, normal.y * 0.5 + 0.5) * occlusion * (1.0 - 0.4 * shade);
-    vec3 lit = base.rgb * (sun_color * sun + ambient);
+    vec3 sun_color = light_color.rgb * exposure;
+    float sun = max(n_dot_l, 0.0) * mix(1.0, occlusion, 0.5);
+    vec3 ambient = ambientLight(v_position, normal, shade) * occlusion + pointLights(v_position, normal, 0.3);
+    vec3 unlit = base.rgb * ambient * exposure;
+    vec3 lit = base.rgb * sun_color * sun;
 
     // Sun seen through the leaves, stronger looking toward it
     if(params.w > 0.5) {
         vec3 through = texture(u_subsurface, v_uv).rgb;
         float back = max(-n_dot_l, 0.0);
         float toward = pow(max(dot(view, -sun_direction), 0.0), 3.0);
-        lit += through * sun_color * back * (0.4 + 0.6 * toward) * mix(1.0, occlusion, 0.5) * sunlit;
+        lit += through * sun_color * back * (0.4 + 0.6 * toward) * mix(1.0, occlusion, 0.5);
     }
 
     // Sheen of smooth leaves and bark
     vec3 halfway = normalize(sun_direction + view);
     float specular = pow(max(dot(normal, halfway), 0.0), mix(8.0, 96.0, extra.r)) * extra.r * step(0.0, n_dot_l);
-    lit += sun_color * specular * 0.25 * occlusion * sunlit;
+    lit += sun_color * specular * 0.25 * occlusion;
 
-    float fog = 1.0 - exp(-length(v_position - viewpos.xyz) * 0.0006);
-    outColor = vec4(mix(lit, sky_color, fog), 1.0);
+    writeLit(unlit, lit, shade, v_position, 1.0);
 
 }

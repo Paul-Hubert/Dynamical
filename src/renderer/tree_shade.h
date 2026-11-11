@@ -19,7 +19,7 @@ class Context;
 
 // The shade of the plants on the ground, without shadow maps : each Plant taller than a walker draws the
 // shadow of its crown as two soft discs on a map of the world seen from above, moved to where the sun
-// (sun_direction of the shaders) puts them on the ground. Binding 1 of the view set : the terrain, the grass
+// (the sun or the moon of the Sky, followed a degree at a time) puts them on the ground. Binding 1 of the view set : the terrain, the grass
 // and the plants read it (treeShade in their fragment shaders, with flecks of sun from a noise).
 //
 // One texel a metre, the map wraps around every `size` metres : the shaders stop reading it before a plant
@@ -29,7 +29,8 @@ public:
     static constexpr int size = 2048;
     static constexpr float max_depth = 4.f;         // optical depth of a white texel
     static constexpr float reach = 700.f;           // metres from the camera where the shaders stop reading the map
-    static constexpr glm::vec2 sun_slope = glm::vec2(0.5f, 0.5f);  // sun_direction.xz / sun_direction.y
+    static constexpr float min_height = 0.2f;       // of the light over the horizon (y of its direction) : lower, shadows are not longer
+    static constexpr float follow = 1.f;            // degrees the light moves before the shadows are drawn again
 
     TreeShade(Context& ctx, entt::registry& reg);
     ~TreeShade();
@@ -43,6 +44,12 @@ private:
         float radius = 0.f;
         float depth = 0.f;
     };
+    struct Crown {
+        glm::vec2 root = glm::vec2(0.f);
+        float tall = 0.f, radius = 0.f, strength = 0.f;
+    };
+    std::array<Disc, 2> discs(const Crown& crown) const;
+    void followLight();
 
     void onPlant(entt::registry& reg, entt::entity entity);
     void onPlantDestroyed(entt::registry& reg, entt::entity entity);
@@ -56,7 +63,9 @@ private:
     static constexpr int tile = 1 << tile_shift;
     static constexpr int tiles = size / tile;
 
-    std::unordered_map<entt::entity, std::array<Disc, 2>> plants;
+    std::unordered_map<entt::entity, Crown> plants;
+    glm::vec3 light = glm::vec3(0.f, 1.f, 0.f);  // the shadows are drawn for a light there
+    glm::vec2 slope = glm::vec2(0.f);           // where it puts the shadow of something a metre up
     std::vector<float> depth;           // optical depth of the crowns over each texel
     std::vector<uint8_t> texels;
     std::vector<uint8_t> dirty;         // tiles of `tile` texels to convert again

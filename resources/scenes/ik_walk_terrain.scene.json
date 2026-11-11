@@ -14,7 +14,7 @@
   },
   "renderer": { "passes": ["terrain", "model", "ui"], "vr": false },
   "host": {
-    "pre": [ "Input", "UI", "Time", "PlayerControl", "DebugMenu", "ChunkManager", "ChunkGenerator", "WorldStepper", { "name": "GaitView", "params": { "distance": "${view_distance}", "azimuth": "${view_side}", "camera": "${view_camera}" } } ],
+    "pre": [ "Input", "UI", "Time", "PlayerControl", "DebugMenu", { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator", "WorldStepper", { "name": "GaitView", "params": { "distance": "${view_distance}", "azimuth": "${view_side}", "camera": "${view_camera}" } } ],
     "post": [ { "name": "WorldView", "params": { "worlds": "all", "spacing": 0.0 } }, "Terrain" ]
   },
   "worlds": [ { "template": "ik_world", "count": 1,

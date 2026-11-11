@@ -1,5 +1,6 @@
 #include "pipeline.h"
 
+#include "renderer/context/context.h"
 #include "renderer/context/device.h"
 #include "util/util.h"
 
@@ -18,8 +19,8 @@ vk::ShaderModule dy::loadShader(Device& device, const char* path) {
 
 vk::Pipeline dy::createGraphicsPipeline(Device& device, const GraphicsPipelineDesc& desc) {
 
-    vk::ShaderModule vert = loadShader(device, desc.vertex_shader);
-    vk::ShaderModule frag = loadShader(device, desc.fragment_shader);
+    vk::ShaderModule vert = loadShader(device, desc.vertex_shader.c_str());
+    vk::ShaderModule frag = loadShader(device, desc.fragment_shader.c_str());
 
     auto stages = std::vector {
         vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, vert, "main", desc.vertex_specialization),
@@ -60,4 +61,8 @@ vk::Pipeline dy::createGraphicsPipeline(Device& device, const GraphicsPipelineDe
 
     return pipeline;
 
+}
+
+std::string dy::sceneFragmentShader(Context& ctx, const char* name) {
+    return std::string("./resources/shaders/") + name + ".frag.glsl.spv";
 }
