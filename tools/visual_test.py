@@ -38,7 +38,11 @@ def capture(args, out):
     out.mkdir(parents=True, exist_ok=True)
     for name in shot_names(args.script):
         (out / f"{name}.png").unlink(missing_ok=True)
-    code = run([args.exe, f"capture={pathlib.Path(args.script).resolve()}", f"capture_dir={out.resolve()}"])
+    cmd = [args.exe, f"capture={pathlib.Path(args.script).resolve()}", f"capture_dir={out.resolve()}"]
+    # Goldens are compared on any GPU: without the ray traced lighting, whose pictures depend on it (docs/lighting.md)
+    if not getattr(args, "rays", True):
+        cmd.append("ray_tracing=false")
+    code = run(cmd)
     if code != 0:
         sys.exit(f"capture failed with exit code {code}")
 
@@ -131,6 +135,7 @@ def main():
     g.add_argument("--out", required=True)
     g.add_argument("--golden-dir", default=str(pathlib.Path(__file__).resolve().parent.parent / "tests" / "golden" / "images"))
     g.add_argument("--expect-fail", action="store_true")
+    g.add_argument("--rays", action="store_true", help="with the ray traced lighting where the GPU has it")
 
     s = sub.add_parser("shots")
     s.add_argument("--exe", required=True)
@@ -143,6 +148,7 @@ def main():
     r.add_argument("--script", required=True)
     r.add_argument("--out", required=True)
     r.add_argument("--mae", type=float, default=0.1)
+    r.add_argument("--rays", action="store_true", help="with the ray traced lighting where the GPU has it")
 
     p = sub.add_parser("probe")
     p.add_argument("--exe", required=True)

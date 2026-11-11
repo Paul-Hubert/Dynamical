@@ -4,6 +4,7 @@
 #include "renderer/util/vk.h"
 #include "renderer/util/vmapp.h"
 
+#include <entt/entt.hpp>
 #include <glm/glm.hpp>
 
 #include <cstdint>
@@ -107,6 +108,23 @@ struct PlantVolumeSet {
         float voxel = 1.f;                  // metres a texel
     };
     std::vector<Volume> species;
+};
+
+// Context variable written by AnimalPass every frame : the animals that cast shadows this frame, their
+// positions skinned by the compute commands of the frame into `vertices`. RayScene builds a structure for
+// each, refits it while the animal stays, and lets it go when it is no longer listed
+struct RayAnimals {
+    struct Animal {
+        entt::entity entity;
+        vk::Buffer vertices;            // four floats a vertex
+        vk::DeviceSize first_vertex = 0;
+        uint32_t vertex_count = 0;
+        vk::Buffer indices;             // of the level that casts the shadow, relative to its first vertex
+        uint32_t index_count = 0;
+        glm::mat4 matrix = glm::mat4(1.f);
+        glm::vec3 color = glm::vec3(0.3f);
+    };
+    std::vector<Animal> animals;
 };
 
 // A plant that is its leaves in the rays (within the plant geometry range of the tiers, with a margin to leave)

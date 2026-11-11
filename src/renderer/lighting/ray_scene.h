@@ -72,8 +72,10 @@ private:
     static_assert(sizeof(GeometryEntry) == 56);
 
     // One build of this frame. false : the scratch memory of the frame is spent, try again the next one
+    // refit : `out` is built already (with eAllowUpdate), from the same number of triangles : it is fitted to
+    // where they are now
     bool queueBuild(Accel& out, vk::AccelerationStructureTypeKHR type, vk::BuildAccelerationStructureFlagsKHR flags,
-        std::vector<vk::AccelerationStructureGeometryKHR> geometries, std::vector<uint32_t> primitives);
+        std::vector<vk::AccelerationStructureGeometryKHR> geometries, std::vector<uint32_t> primitives, bool refit = false);
     void flushBuilds(vk::CommandBuffer command);
 
     void retire(Accel&& accel);
@@ -81,6 +83,7 @@ private:
 
     void updateChunks();
     void updateMeshes();
+    void updateAnimals();
     void gatherInstances();
     void buildTop(vk::CommandBuffer command);
 
@@ -130,6 +133,18 @@ private:
         bool built = false;
     };
     std::vector<MeshAccel> meshes;
+
+    // The animals that cast shadows (RayAnimals) : a structure each, refitted every frame to its pose and
+    // built again now and then
+    struct AnimalAccel {
+        Accel accel;
+        uint32_t vertex_count = 0, index_count = 0;
+        uint32_t geometry = 0;
+        glm::mat4 matrix = glm::mat4(1.f);
+        int age = 0;            // frames since it was built
+        bool listed = false;    // this frame
+    };
+    std::unordered_map<entt::entity, AnimalAccel> animals;
 
     // The unit box the plants far away are in the rays, and the entry of the table of each RayBox
     Accel box;

@@ -10,6 +10,7 @@
 
 #include "renderer/context/context.h"
 #include "renderer/context/num_frames.h"
+#include "renderer/lighting/ray_meshes.h"
 #include "renderer/util/pipeline.h"
 
 #include "logic/components/camera.h"
@@ -29,6 +30,17 @@ struct AnimalPC {
     glm::mat4 model;
     glm::vec4 tint;     // w : height of the animal
     glm::vec4 params;   // x : alpha cutoff, y : normal map, z : first joint in the buffer
+};
+
+// Push constants of animal_skin.rt.comp.glsl : buffers by their address
+struct SkinPC {
+    uint64_t vertices;
+    uint64_t joints;
+    uint64_t skinned;
+    uint32_t first_vertex;
+    uint32_t count;
+    uint32_t first_joint;
+    uint32_t first_out;
 };
 
 }
@@ -77,7 +89,8 @@ AnimalPass::AnimalPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
         allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
         allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
         f.joints = VmaBuffer(ctx.device, &allocInfo, vk::BufferCreateInfo({}, (vk::DeviceSize) max_joints * sizeof(glm::mat4),
-            vk::BufferUsageFlagBits::eStorageBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+            vk::BufferUsageFlagBits::eStorageBuffer | (ctx.device.ray.enabled() ? vk::BufferUsageFlagBits::eShaderDeviceAddress : vk::BufferUsageFlags()),
+            vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
         VmaAllocationInfo inf;
         vmaGetAllocationInfo(ctx.device, f.joints.allocation, &inf);
         f.pointer = static_cast<glm::mat4*>(inf.pMappedData);
@@ -90,6 +103,17 @@ AnimalPass::AnimalPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     auto layouts = std::vector { ctx.view_layout, materialLayout, jointLayout };
     auto pcRange = vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(AnimalPC));
     layout = ctx.device->createPipelineLayout(vk::PipelineLayoutCreateInfo({}, layouts, pcRange));
+
+    // With ray tracing : the compute shader that skins the animals that cast shadows
+    if(ctx.device.ray.enabled()) {
+        reg.ctx().emplace<RayAnimals>();
+        auto range = vk::PushConstantRange(vk::ShaderStageFlagBits::eCompute, 0, sizeof(SkinPC));
+        skin_layout = ctx.device->createPipelineLayout(vk::PipelineLayoutCreateInfo({}, {}, range));
+        vk::ShaderModule shader = loadShader(ctx.device, "./resources/shaders/animal_skin.rt.comp.glsl.spv");
+        skin_pipeline = ctx.device->createComputePipeline(nullptr, vk::ComputePipelineCreateInfo({},
+            vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, shader, "main"), skin_layout)).value;
+        ctx.device->destroy(shader);
+    }
 
 }
 
@@ -213,7 +237,32 @@ void AnimalPass::finishJob(Job& job) {
     s.radius = 0.75f * glm::length(s.def->max - s.def->min) + 0.1f;
 
     s.vertices = ctx.transfer.createBuffer(job.vertices.data(), vk::BufferCreateInfo({}, job.vertices.size() * sizeof(AnimalVertex),
-        vk::BufferUsageFlagBits::eVertexBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+        vk::BufferUsageFlagBits::eVertexBuffer | ctx.rayInputUsage(), vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+
+    // With ray tracing the animal casts a shadow : its second level (the first of those that have only one),
+    // its indices counted from the first vertex it uses
+    if(ctx.device.ray.enabled() && !s.def->lods.empty()) {
+        const AnimalLod& lod = s.def->lods[std::min<size_t>(1, s.def->lods.size() - 1)];
+        std::vector<uint32_t> indices;
+        uint32_t low = ~0u, high = 0;
+        for(auto& draw : lod.draws) {
+            for(uint32_t i = 0; i < draw.index_count && draw.first_index + i < job.indices.size(); i++) {
+                uint32_t index = job.indices[draw.first_index + i];
+                indices.push_back(index);
+                low = std::min(low, index);
+                high = std::max(high, index);
+            }
+        }
+        if(indices.size() >= 3) {
+            for(auto& index : indices) index -= low;
+            s.shadow_indices = ctx.transfer.createBuffer(indices.data(), vk::BufferCreateInfo({}, indices.size() * sizeof(uint32_t),
+                vk::BufferUsageFlagBits::eIndexBuffer | ctx.rayInputUsage(), vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+            s.shadow_first_vertex = low;
+            s.shadow_vertex_count = high - low + 1;
+            s.shadow_index_count = (uint32_t) (indices.size() / 3 * 3);
+            if(!s.def->materials.empty()) s.shadow_color = glm::vec3(s.def->materials[0].tint) * 0.3f;
+        }
+    }
     s.indices = ctx.transfer.createBuffer(job.indices.data(), vk::BufferCreateInfo({}, job.indices.size() * sizeof(uint32_t),
         vk::BufferUsageFlagBits::eIndexBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
 
@@ -315,6 +364,26 @@ void AnimalPass::update(uint32_t frame_index) {
     uint32_t joint_count = 0;
     bool unrequested = false, full = false;
 
+    // With ray tracing : how far from a viewer animals cast shadows, and how many may (the tiers of the targets)
+    struct Caster {
+        float distance;
+        entt::entity entity;
+        uint32_t species;
+        uint32_t first_joint;
+        glm::mat4 matrix;
+    };
+    std::vector<Caster> casters;
+    float shadow_range = 0.f;
+    size_t shadow_most = 0;
+    if(skin_pipeline && settings) {
+        for(uint32_t target = 0; target < NUM_RENDER_TARGETS; target++) {
+            if(!eyes[target].active) continue;
+            shadow_range = std::max(shadow_range, settings->lighting[target].traced_range * 1.2f);
+            shadow_most = std::max(shadow_most, (size_t) std::max(settings->lighting[target].animals, 0));
+        }
+        if(shadow_most == 0) shadow_range = 0.f;
+    }
+
     for(auto [entity, transform, animal, pose] : reg.view<const Transform, const Animal, const AnimalPose>().each()) {
 
         stats.animals++;
@@ -372,6 +441,81 @@ void AnimalPass::update(uint32_t frame_index) {
                 matrix = transform.matrix();
             }
             instances[target].push_back({ animal.species, (uint32_t) lod, first_joint, matrix });
+        }
+
+        // With ray tracing the animals near a viewer cast shadows, in its view or not
+        if(shadow_range > 0.f && s.shadow_indices) {
+            float nearest = 1e30f;
+            for(const Eye& eye : eyes) {
+                if(eye.active) nearest = std::min(nearest, glm::distance(eye.position, center));
+            }
+            if(nearest < shadow_range) {
+                if(first_joint == ~0u && joint_count + pose.skin.size() <= max_joints) {
+                    first_joint = joint_count;
+                    std::memcpy(joints + joint_count, pose.skin.data(), pose.skin.size() * sizeof(glm::mat4));
+                    joint_count += (uint32_t) pose.skin.size();
+                    matrix = transform.matrix();
+                }
+                if(first_joint != ~0u) casters.push_back({ nearest, entity, animal.species, first_joint, matrix });
+            }
+        }
+    }
+
+    // The nearest of them, as many as the tiers of the targets allow : skinned by the compute commands of
+    // the frame into one buffer, each its part, from which their acceleration structures are built
+    if(auto* traced = reg.ctx().find<RayAnimals>()) {
+        traced->animals.clear();
+
+        for(auto it = old_skinned.begin(); it != old_skinned.end();) {
+            if(++it->frames > (int) NUM_FRAMES + 2) it = old_skinned.erase(it);
+            else ++it;
+        }
+
+        std::sort(casters.begin(), casters.end(), [](const Caster& a, const Caster& b) { return a.distance < b.distance; });
+        if(casters.size() > shadow_most) casters.resize(shadow_most);
+
+        uint32_t vertices = 0;
+        for(auto& caster : casters) vertices += species[caster.species]->shadow_vertex_count;
+        if(vertices > skinned_capacity) {
+            if(skinned) old_skinned.push_back({ std::move(skinned), 0 });
+            skinned_capacity = std::max(vertices * 2, 1u << 16);
+            VmaAllocationCreateInfo alloc {};
+            alloc.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+            skinned = VmaBuffer(ctx.device, &alloc, vk::BufferCreateInfo({}, (vk::DeviceSize) skinned_capacity * 4 * sizeof(float),
+                vk::BufferUsageFlagBits::eStorageBuffer | ctx.rayInputUsage(), vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+        }
+
+        if(!casters.empty()) {
+            vk::CommandBuffer command = ctx.compute.getCommandBuffer();
+            command.bindPipeline(vk::PipelineBindPoint::eCompute, skin_pipeline);
+
+            SkinPC pc {};
+            pc.joints = ctx.device->getBufferAddress(vk::BufferDeviceAddressInfo(frames[frame_index].joints));
+            pc.skinned = ctx.device->getBufferAddress(vk::BufferDeviceAddressInfo(skinned));
+            uint32_t first_out = 0;
+            for(auto& caster : casters) {
+                const Species& s = *species[caster.species];
+                pc.vertices = ctx.device->getBufferAddress(vk::BufferDeviceAddressInfo(s.vertices->buffer));
+                pc.first_vertex = s.shadow_first_vertex;
+                pc.count = s.shadow_vertex_count;
+                pc.first_joint = caster.first_joint;
+                pc.first_out = first_out;
+                command.pushConstants(skin_layout, vk::ShaderStageFlagBits::eCompute, 0, sizeof(SkinPC), &pc);
+                command.dispatch((pc.count + 63) / 64, 1, 1);
+
+                RayAnimals::Animal animal;
+                animal.entity = caster.entity;
+                animal.vertices = skinned;
+                animal.first_vertex = first_out;
+                animal.vertex_count = s.shadow_vertex_count;
+                animal.indices = s.shadow_indices->buffer;
+                animal.index_count = s.shadow_index_count;
+                animal.matrix = caster.matrix;
+                animal.color = s.shadow_color;
+                traced->animals.push_back(animal);
+
+                first_out += s.shadow_vertex_count;
+            }
         }
     }
     if(unrequested) stats.species_loading++;
@@ -466,6 +610,12 @@ AnimalPass::~AnimalPass() {
     }
     for(auto& [image, view] : default_views) {
         ctx.device->destroy(view);
+    }
+    if(skin_pipeline) {
+        ctx.device->waitIdle();
+        ctx.device->destroy(skin_pipeline);
+        ctx.device->destroy(skin_layout);
+        reg.ctx().erase<RayAnimals>();
     }
     ctx.device->destroy(layout);
     ctx.device->destroy(sampler);

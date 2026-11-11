@@ -89,9 +89,9 @@ TEST_CASE("LIGHT.2 one light at a time : white at noon, orange and dim on the ho
     CHECK(glm::distance(night.direction, night.moon) < 1e-6f);
     CHECK(night.direction.y > 0.f);
     CHECK(luminance(night.color) > 0.f);
-    CHECK(luminance(night.color) < 0.15f * luminance(noon.color));
+    CHECK(luminance(night.color) < 0.2f * luminance(noon.color));
     CHECK(night.night == 1.f);
-    CHECK(luminance(night.zenith) < 0.05f * luminance(noon.zenith));
+    CHECK(luminance(night.zenith) < 0.08f * luminance(noon.zenith));
 
     // The light never jumps : through a whole day its colour and its direction change little in a minute,
     // except the direction where there is next to no light (the sun hands over to the moon)

@@ -57,6 +57,12 @@ private:
         float height = 1.f;
         glm::vec3 center = glm::vec3(0.f);  // of the sphere around the animal, model space
         float radius = 1.f;
+
+        // With ray tracing : the level that casts the shadow of the animal, its indices counted from its
+        // first vertex
+        std::shared_ptr<VmaBuffer> shadow_indices;
+        uint32_t shadow_first_vertex = 0, shadow_vertex_count = 0, shadow_index_count = 0;
+        glm::vec3 shadow_color = glm::vec3(0.3f);
     };
 
     // CPU side of a species, filled on a worker thread
@@ -118,6 +124,18 @@ private:
     std::vector<std::unique_ptr<Species>> species;      // by library index, null until requested
     std::vector<std::shared_ptr<Job>> jobs;
     std::vector<Frame> frames;
+
+    // With ray tracing, the animals near the viewers are skinned by a compute shader too, into one buffer
+    // the acceleration structures of the frame are built from (RayAnimals, animal_skin.rt.comp.glsl)
+    vk::PipelineLayout skin_layout;
+    vk::Pipeline skin_pipeline;
+    VmaBuffer skinned;
+    uint32_t skinned_capacity = 0;      // vertices
+    struct OldBuffer {
+        VmaBuffer buffer;
+        int frames = 0;
+    };
+    std::vector<OldBuffer> old_skinned;
 
     // What each target draws this frame, sorted by species and level
     std::array<std::vector<Instance>, NUM_RENDER_TARGETS> instances;

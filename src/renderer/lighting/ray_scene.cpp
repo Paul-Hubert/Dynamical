@@ -119,7 +119,7 @@ void RayScene::createTop(uint32_t capacity) {
 }
 
 bool RayScene::queueBuild(Accel& out, vk::AccelerationStructureTypeKHR type, vk::BuildAccelerationStructureFlagsKHR flags,
-    std::vector<vk::AccelerationStructureGeometryKHR> geometries, std::vector<uint32_t> primitives) {
+    std::vector<vk::AccelerationStructureGeometryKHR> geometries, std::vector<uint32_t> primitives, bool refit) {
 
     Device& device = ctx.device;
 
@@ -130,7 +130,7 @@ bool RayScene::queueBuild(Accel& out, vk::AccelerationStructureTypeKHR type, vk:
     auto sizes = device->getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, build->info, primitives);
 
     // The builds of a frame share one scratch buffer, each its part
-    vk::DeviceSize need = alignUp(sizes.buildScratchSize, device.ray.scratch_alignment);
+    vk::DeviceSize need = alignUp(refit ? sizes.updateScratchSize : sizes.buildScratchSize, device.ray.scratch_alignment);
     if(scratch_used + need > scratch_size) {
         if(scratch_used > 0) return false;
         // Larger than the whole buffer : a new one (the old one may still be used by the frames in flight)
@@ -143,12 +143,18 @@ bool RayScene::queueBuild(Accel& out, vk::AccelerationStructureTypeKHR type, vk:
         scratch_address = alignUp(device->getBufferAddress(vk::BufferDeviceAddressInfo(scratch)), device.ray.scratch_alignment);
     }
 
-    VmaAllocationCreateInfo alloc {};
-    alloc.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    out.buffer = VmaBuffer(device, &alloc, vk::BufferCreateInfo({}, sizes.accelerationStructureSize,
-        vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress, vk::SharingMode::eExclusive, 1, &device.g_i));
-    out.handle = device->createAccelerationStructureKHR(vk::AccelerationStructureCreateInfoKHR({}, out.buffer, 0, sizes.accelerationStructureSize, type));
-    out.address = device->getAccelerationStructureAddressKHR(vk::AccelerationStructureDeviceAddressInfoKHR(out.handle));
+    if(refit) {
+        build->info.mode = vk::BuildAccelerationStructureModeKHR::eUpdate;
+        build->info.srcAccelerationStructure = out.handle;
+    } else {
+        VmaAllocationCreateInfo alloc {};
+        alloc.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        out.buffer = VmaBuffer(device, &alloc, vk::BufferCreateInfo({}, sizes.accelerationStructureSize,
+            vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress, vk::SharingMode::eExclusive, 1, &device.g_i));
+        out.handle = device->createAccelerationStructureKHR(vk::AccelerationStructureCreateInfoKHR({}, out.buffer, 0, sizes.accelerationStructureSize, type));
+        out.address = device->getAccelerationStructureAddressKHR(vk::AccelerationStructureDeviceAddressInfoKHR(out.handle));
+        reg.ctx().get<LightingStats>().structure_bytes += sizes.accelerationStructureSize;
+    }
 
     build->info.dstAccelerationStructure = out.handle;
     build->info.scratchData.deviceAddress = scratch_address + scratch_used;
@@ -156,7 +162,6 @@ bool RayScene::queueBuild(Accel& out, vk::AccelerationStructureTypeKHR type, vk:
 
     for(uint32_t count : primitives) build->ranges.push_back(vk::AccelerationStructureBuildRangeInfoKHR(count, 0, 0, 0));
 
-    reg.ctx().get<LightingStats>().structure_bytes += sizes.accelerationStructureSize;
     builds.push_back(std::move(build));
     return true;
 
@@ -374,6 +379,74 @@ void RayScene::updateMeshes() {
 
 }
 
+// The animals that cast shadows this frame : their positions were skinned by the compute commands recorded
+// before these. A structure for each new one, a refit for the others (the same triangles, moved), and a
+// build again now and then : a structure refitted many times traces slowly
+void RayScene::updateAnimals() {
+
+    Device& device = ctx.device;
+    constexpr int rebuild_after = 240;
+
+    for(auto& [entity, animal] : animals) animal.listed = false;
+
+    if(auto* list = reg.ctx().find<RayAnimals>()) {
+        for(const auto& source : list->animals) {
+            if(source.index_count < 3 || source.vertex_count == 0) continue;
+
+            vk::DeviceAddress vertices = device->getBufferAddress(vk::BufferDeviceAddressInfo(source.vertices)) + source.first_vertex * 4 * sizeof(float);
+            vk::AccelerationStructureGeometryTrianglesDataKHR data(vk::Format::eR32G32B32Sfloat, vertices, 4 * sizeof(float),
+                source.vertex_count - 1, vk::IndexType::eUint32, device->getBufferAddress(vk::BufferDeviceAddressInfo(source.indices)), {});
+            vk::AccelerationStructureGeometryKHR geometry(vk::GeometryTypeKHR::eTriangles, data, vk::GeometryFlagBitsKHR::eOpaque);
+            const auto flags = vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate | vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastBuild;
+
+            auto it = animals.find(source.entity);
+            bool known = it != animals.end();
+            // Not all on the same frame
+            bool again = known && it->second.age > rebuild_after + (int) (entt::to_integral(source.entity) % 64);
+            if(known && !again && it->second.vertex_count == source.vertex_count && it->second.index_count == source.index_count) {
+                AnimalAccel& animal = it->second;
+                if(!queueBuild(animal.accel, vk::AccelerationStructureTypeKHR::eBottomLevel, flags, { geometry }, { source.index_count / 3 }, true)) continue;
+                animal.matrix = source.matrix;
+                animal.listed = true;
+                animal.age++;
+                continue;
+            }
+
+            Accel built;
+            if(!queueBuild(built, vk::AccelerationStructureTypeKHR::eBottomLevel, flags, { geometry }, { source.index_count / 3 })) continue;
+            if(!known) {
+                GeometryEntry entry;
+                entry.kind = (uint32_t) RayMesh::Kind::Solid;
+                entry.color = source.color;
+                AnimalAccel animal;
+                animal.geometry = chunkGeometry(entry);
+                it = animals.emplace(source.entity, std::move(animal)).first;
+            } else {
+                retire(std::move(it->second.accel));
+            }
+            AnimalAccel& animal = it->second;
+            animal.accel = std::move(built);
+            animal.vertex_count = source.vertex_count;
+            animal.index_count = source.index_count;
+            animal.matrix = source.matrix;
+            animal.listed = true;
+            animal.age = 0;
+        }
+    }
+
+    // Those that left the range, or the world
+    for(auto it = animals.begin(); it != animals.end();) {
+        if(it->second.listed) {
+            ++it;
+            continue;
+        }
+        retire(std::move(it->second.accel));
+        free_geometries.push_back({ it->second.geometry, 0 });
+        it = animals.erase(it);
+    }
+
+}
+
 void RayScene::addInstance(const glm::mat4& matrix, vk::DeviceAddress structure, uint32_t first_geometry, uint32_t mask) {
     vk::AccelerationStructureInstanceKHR instance;
     // Row major, three rows
@@ -473,6 +546,11 @@ void RayScene::gatherInstances() {
         for(auto entity : leaving) reg.remove<PlantInRays>(entity);
     }
 
+    // The animals near the viewers, as they stand this frame
+    for(auto& [entity, animal] : animals) {
+        if(animal.listed && animal.accel.handle) addInstance(animal.matrix, animal.accel.address, animal.geometry, Dynamic);
+    }
+
     // A mesh on its own for the rays of a bake : far under the world, seen through its own mask only
     if(auto* bake = reg.ctx().find<RayBake>()) {
         bake->placed = false;
@@ -566,6 +644,7 @@ void RayScene::update() {
 
     updateChunks();
     updateMeshes();
+    updateAnimals();
     flushBuilds(command);
     gatherInstances();
     buildTop(command);
@@ -580,6 +659,9 @@ RayScene::~RayScene() {
     for(auto& [entity, chunk] : chunks) ctx.device->destroyAccelerationStructureKHR(chunk.accel.handle);
     for(auto& mesh : meshes) {
         if(mesh.accel.handle) ctx.device->destroyAccelerationStructureKHR(mesh.accel.handle);
+    }
+    for(auto& [entity, animal] : animals) {
+        if(animal.accel.handle) ctx.device->destroyAccelerationStructureKHR(animal.accel.handle);
     }
     ctx.ray_geometries = nullptr;
     ctx.ray_textures = nullptr;

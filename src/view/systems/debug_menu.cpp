@@ -109,6 +109,12 @@ void DebugMenuSys::tick(double dt) {
                 if(lighting->bricks > 0) {
                     ImGui::Text("%u bricks, %u probes traced, %u never traced", lighting->bricks, lighting->probes_active, lighting->probes_pending);
                 }
+                ImGui::Text("%u plants as leaves in the rays, %u as boxes", lighting->plants_near, lighting->plants_far);
+                ImGui::SliderInt("Probe rays a frame", &render.probe_rays_per_frame, 0, 2000000);
+                ImGui::SliderInt("Rays a probe", &render.rays_per_probe, 16, 128);
+                ImGui::Checkbox("Far plants in the rays", &render.far_plants_in_rays);
+                ImGui::SameLine();
+                ImGui::Checkbox("Far plants from their volume", &render.far_plants_on_screen);
                 const char* const tiers[] = { "off", "low", "medium", "high" };
                 const char* const targets[] = { "Desktop", "VR" };
                 for(int target = 0; target < 2; target++) {

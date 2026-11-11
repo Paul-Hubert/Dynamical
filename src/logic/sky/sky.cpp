@@ -65,7 +65,7 @@ SkyLight dy::skyLight(const Sky& sky) {
     glm::vec3 sun_color = sun_white * glm::exp(-air * (airMass(sun_up) - 1.f)) * smooth(-0.035f, 0.03f, sun_up);
 
     // The moon lights once the sun is well under : the light goes through nothing between the two
-    const glm::vec3 moon_white(0.05f, 0.06f, 0.09f);
+    const glm::vec3 moon_white(0.09f, 0.11f, 0.16f);
     glm::vec3 moon_color = moon_white * smooth(-0.02f, 0.12f, moon_up) * (1.f - smooth(-0.14f, -0.035f, sun_up));
 
     light.is_sun = luminance(sun_color) >= luminance(moon_color);
@@ -76,8 +76,8 @@ SkyLight dy::skyLight(const Sky& sky) {
     float low = 1.f - smooth(0.f, 0.3f, sun_up);
     light.night = 1.f - day;
 
-    const glm::vec3 zenith_day(0.18f, 0.36f, 0.72f), zenith_night(0.004f, 0.007f, 0.016f);
-    const glm::vec3 horizon_day(0.45f, 0.6f, 0.8f), horizon_low(0.62f, 0.5f, 0.45f), horizon_night(0.012f, 0.017f, 0.03f);
+    const glm::vec3 zenith_day(0.18f, 0.36f, 0.72f), zenith_night(0.010f, 0.016f, 0.034f);
+    const glm::vec3 horizon_day(0.45f, 0.6f, 0.8f), horizon_low(0.62f, 0.5f, 0.45f), horizon_night(0.02f, 0.028f, 0.05f);
     light.zenith = glm::mix(zenith_night, zenith_day, day);
     light.horizon = glm::mix(horizon_night, glm::mix(horizon_day, horizon_low, low), day);
 

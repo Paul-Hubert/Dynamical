@@ -75,7 +75,9 @@ void TreeShade::followLight() {
     auto* sky = reg.ctx().find<Sky>();
     if(!sky) return;
     glm::vec3 now = skyLight(*sky).direction;
-    if(glm::dot(now, light) >= std::cos(glm::radians(follow))) return;
+    // With ray tracing the map is only what new probes start from : it follows the light from further behind
+    float behind = ctx.device.ray.enabled() ? 10.f * follow : follow;
+    if(glm::dot(now, light) >= std::cos(glm::radians(behind))) return;
 
     light = now;
     slope = glm::vec2(light.x, light.z) / std::max(light.y, min_height);
