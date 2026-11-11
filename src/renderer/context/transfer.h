@@ -21,8 +21,8 @@ public:
     vk::CommandBuffer getCommandBuffer();
     
     std::shared_ptr<VmaImage> createImage(const void* data, size_t real_size, vk::ImageCreateInfo info, vk::ImageLayout layout);
-    // Every mip level of a 2D image : data holds info.mipLevels levels one after the other, the largest first,
-    // level_sizes their sizes in bytes
+    // Every mip level of an image (2D, layers or 3D, block compressed or not) : data holds the levels one after
+    // the other, the largest first, level_sizes their sizes in bytes
     std::shared_ptr<VmaImage> createImageMips(const void* data, const std::vector<size_t>& level_sizes, vk::ImageCreateInfo info, vk::ImageLayout layout);
     std::shared_ptr<VmaBuffer> createBuffer(const void* data, vk::BufferCreateInfo info);
     

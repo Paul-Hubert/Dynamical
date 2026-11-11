@@ -4,8 +4,9 @@
 // in rays baked against a tile of grass blades (logic/grass/grass_bake.h, mirrored on the CPU by lookupGrass) :
 //  - u_oblique : rays going down at 45 degrees, for a position in the tile and an azimuth
 //  - u_top : rays going straight down
-// r is the height of the hit (0 ground, 1 top of the grass), g b its normal (octahedral, decodeNormal),
-// a a random value per blade (0.5 on the ground).
+// They hold the height of the hit (0 ground, 1 top of the grass), which every layer reads. Its normal
+// (octahedral, decodeNormal) and a random value per blade (0.5 on the ground) are in textures of their
+// own (u_*_normal, u_*_id), read once for the closest hit (logic/grass/grass_textures.h).
 //
 // Everything is done in root space : where on the ground the blade under a point is rooted. Wind and terrain
 // normal lean the blades, which shears that space around the ground : roots do not move. A baked ray is
@@ -51,6 +52,10 @@ layout(push_constant) uniform Args {
 layout(set = 1, binding = 0) uniform sampler3D u_oblique;
 layout(set = 1, binding = 1) uniform sampler2D u_top;
 layout(set = 1, binding = 2) uniform sampler2D u_noise;
+layout(set = 1, binding = 4) uniform sampler3D u_oblique_normal;
+layout(set = 1, binding = 5) uniform sampler3D u_oblique_id;
+layout(set = 1, binding = 6) uniform sampler2D u_top_normal;
+layout(set = 1, binding = 7) uniform sampler2D u_top_id;
 
 layout(std140, set = 0, binding = 0) uniform View {
     mat4 viewproj;
@@ -118,39 +123,50 @@ vec3 decodeNormal(vec2 encoded) {
 
 // One layer : the baked ray through the same point of the middle of the grass, from the same side.
 // hit : height of the hit on the view ray, baked : height read (how deep in the grass the blade was met),
-// texel : normal as stored and blade id, ahead : how far after the middle the blade is, in tiles.
+// ahead : how far after the middle the blade is, in tiles. azimuth, top_weight : where the heights were
+// read and how much of the top rays went in, for the normal and the blade (hitTexel).
 // dither : 0..1, fixed for the pixel
-void lookup(vec2 tile_middle, vec2 heading, float reach, float lod, float dither, out float hit, out float baked, out vec3 texel, out float ahead) {
+void lookup(vec2 tile_middle, vec2 heading, float reach, float lod, float dither, out float hit, out float baked, out float ahead, out float azimuth, out float top_weight) {
 
     // The sampler blends the two nearest baked azimuths, which shows a thin blade twice. Close up each
     // pixel takes one of the two instead, more often the nearer one : the same blend over neighbouring
     // pixels, one sharp view in each
-    float azimuth = atan(heading.y, heading.x) / (2.0 * pi);
+    azimuth = atan(heading.y, heading.x) / (2.0 * pi);
     float slices = float(textureSize(u_oblique, 0).z);
     float slice = azimuth * slices - 0.5;
     float one = (floor(slice) + (fract(slice) > dither ? 1.0 : 0.0) + 0.5) / slices;
     azimuth = mix(azimuth, one, azimuth_dither * (1.0 - smoothstep(0.5, 1.5, lod)));
 
-    vec4 oblique = textureLod(u_oblique, vec3(tile_middle, azimuth), lod);
+    float oblique = textureLod(u_oblique, vec3(tile_middle, azimuth), lod).r;
 
     // The baked ray met a blade (0.5 - r) tiles further than the middle. Blades are mostly vertical :
     // the view ray meets it at the same place, higher or lower. The baked hit itself at 45 degrees
-    hit = clamp(0.5 - (0.5 - oblique.r) / max(reach, 1e-3), 0.0, 1.0);
-    baked = oblique.r;
-    texel = oblique.gba;
-    ahead = 0.5 - oblique.r;
+    hit = clamp(0.5 - (0.5 - oblique) / max(reach, 1e-3), 0.0, 1.0);
+    baked = oblique;
+    ahead = 0.5 - oblique;
 
     // Between 45 degrees and the vertical : towards the rays from the top
+    top_weight = 0.0;
     if(reach < 1.0) {
         float steep = clamp((atan(1.0, reach) - pi / 4.0) / (pi / 4.0), 0.0, 1.0);
-        float top_weight = smoothstep(min(top_start, 0.999), 1.0, steep);
-        vec4 top = textureLod(u_top, tile_middle, lod);
-        hit = mix(hit, top.r, top_weight);
-        baked = mix(baked, top.r, top_weight);
-        texel = mix(texel, top.gba, top_weight);
+        top_weight = smoothstep(min(top_start, 0.999), 1.0, steep);
+        float top = textureLod(u_top, tile_middle, lod).r;
+        hit = mix(hit, top, top_weight);
+        baked = mix(baked, top, top_weight);
         ahead *= 1.0 - top_weight;
     }
 
+}
+
+// Normal as stored (xy) and blade id (z) of a hit : read where lookup read its height
+vec3 hitTexel(vec2 tile_middle, float azimuth, float top_weight, float lod) {
+    vec3 where = vec3(tile_middle, azimuth);
+    vec3 texel = vec3(textureLod(u_oblique_normal, where, lod).rg, textureLod(u_oblique_id, where, lod).r);
+    if(top_weight > 0.0) {
+        vec3 top = vec3(textureLod(u_top_normal, tile_middle, lod).rg, textureLod(u_top_id, tile_middle, lod).r);
+        texel = mix(texel, top, top_weight);
+    }
+    return texel;
 }
 
 // Part of the sun hidden at a point of a layer (tile space, at the part `height` of the layer), for
@@ -228,11 +244,12 @@ void main() {
     float hit_height = 0.0;         // over the ground
     float hit_part = 0.0;           // of its layer
     vec2 hit_point = vec2(0);       // of the blade that was met, in the tile of its layer
+    vec2 hit_middle = vec2(0);      // where the layer was looked up, and from which side
+    float hit_azimuth = 0.0;
+    float hit_top = 0.0;
     mat2 hit_turned = mat2(1.0);
     float hit_fall = 1.0;
     float baked = 0.0;
-    vec3 tile_normal = vec3(0, 1, 0);
-    float hit_id = 0.5;
     float hit_lod = 0.0;
     vec3 hit_noise = vec3(0);
     float hit_tile = tile_size;
@@ -286,16 +303,15 @@ void main() {
         // Interleaved gradient noise, another one for each layer
         float dither = fract(52.9829189 * fract(dot(gl_FragCoord.xy + 17.0 * float(i), vec2(0.06711056, 0.00583715))));
 
-        float layer_hit, layer_baked, layer_ahead;
-        vec3 layer_texel;
-        lookup(tile_middle, heading, reach, lod, dither, layer_hit, layer_baked, layer_texel, layer_ahead);
+        float layer_hit, layer_baked, layer_ahead, layer_azimuth, layer_top;
+        lookup(tile_middle, heading, reach, lod, dither, layer_hit, layer_baked, layer_ahead, layer_azimuth, layer_top);
 
         // The tangent is off by bend * (y - 0.5)² at the part y of the layer, nothing at the middle :
         // the ray is moved by that much for the depth just found, and looked up again
         if(dot(bend, bend) > 1e-8) {
             float off = layer_hit - 0.5;
             tile_middle -= turned * bend * (layer_height * off * off / tile);
-            lookup(tile_middle, heading, reach, lod, dither, layer_hit, layer_baked, layer_texel, layer_ahead);
+            lookup(tile_middle, heading, reach, lod, dither, layer_hit, layer_baked, layer_ahead, layer_azimuth, layer_top);
         }
 
         float layer_distance = (v_height - layer_hit * layer_height) / fall;
@@ -304,12 +320,12 @@ void main() {
             hit_height = layer_hit * layer_height;
             hit_part = layer_hit;
             hit_point = tile_middle + heading * layer_ahead;
+            hit_middle = tile_middle;
+            hit_azimuth = layer_azimuth;
+            hit_top = layer_top;
             hit_turned = turned;
             hit_fall = fall;
             baked = layer_baked;
-            vec3 layer_normal = decodeNormal(layer_texel.xy);
-            tile_normal = vec3(layer_normal.xz * turned, layer_normal.y).xzy;
-            hit_id = layer_texel.z;
             hit_lod = lod;
             hit_noise = noise;
             hit_tile = tile;
@@ -327,6 +343,16 @@ void main() {
     edge *= 1.0 - smoothstep(0.5, 2.0, hit_lod);
     if(baked < edge * silhouette) {
         discard;
+    }
+
+    // Normal and blade of the closest hit (every layer may be too short to be there)
+    vec3 tile_normal = vec3(0, 1, 0);
+    float hit_id = 0.5;
+    if(hit_distance < 1e30) {
+        vec3 texel = hitTexel(hit_middle, hit_azimuth, hit_top, hit_lod);
+        vec3 stored_normal = decodeNormal(texel.xy);
+        tile_normal = vec3(stored_normal.xz * hit_turned, stored_normal.y).xzy;
+        hit_id = texel.z;
     }
 
     // Between the blades : dark ground, kept over the terrain (which the flat ground of the tile only

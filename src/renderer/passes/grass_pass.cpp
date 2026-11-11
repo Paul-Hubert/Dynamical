@@ -8,6 +8,7 @@
 
 #include "logic/components/render_settings.h"
 #include "logic/grass/grass_bake.h"
+#include "logic/grass/grass_textures.h"
 
 #include "util/log.h"
 #include "util/tiled_noise.h"
@@ -71,6 +72,25 @@ GrassRaycast loadOrBake() {
 
 }
 
+// BC4 and BC5 textures, 3D ones too, that the sampler can filter
+bool blocksSupported(vk::PhysicalDevice physical) {
+
+    for(vk::Format format : {vk::Format::eBc4UnormBlock, vk::Format::eBc5UnormBlock}) {
+        auto features = physical.getFormatProperties(format).optimalTilingFeatures;
+        if(!(features & vk::FormatFeatureFlagBits::eSampledImageFilterLinear)) return false;
+        for(vk::ImageType type : {vk::ImageType::e2D, vk::ImageType::e3D}) {
+            try {
+                physical.getImageFormatProperties(format, type, vk::ImageTiling::eOptimal,
+                    vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, {});
+            } catch(const vk::SystemError&) {
+                return false;
+            }
+        }
+    }
+    return true;
+
+}
+
 }
 
 GrassPass::GrassPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
@@ -78,14 +98,18 @@ GrassPass::GrassPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     reg.ctx().get<RenderSettings>().grass_pass = true;
 
     auto poolSizes = std::vector {
-        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 3),
+        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 7),
     };
     descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, 1, poolSizes));
 
     auto bindings = std::vector {
         vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment),
         vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment),
-        vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
+        vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment),
+        vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment),
+        vk::DescriptorSetLayoutBinding(5, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment),
+        vk::DescriptorSetLayoutBinding(6, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment),
+        vk::DescriptorSetLayoutBinding(7, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment)
     };
     descLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, bindings));
     descSet = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &descLayout))[0];
@@ -97,28 +121,38 @@ GrassPass::GrassPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
         0.f, VK_FALSE, 1.f, VK_FALSE, vk::CompareOp::eNever, 0.f, VK_LOD_CLAMP_NONE
     ));
 
-    // Baked rays, with mips for the grass far away
+    // Baked rays, with mips for the grass far away. The heights, which every layer reads, apart from the
+    // normals and the blade ids, which only the closest hit reads; in blocks where the GPU has them
     {
         GrassRaycast raycast = loadOrBake();
         const uint32_t size = static_cast<uint32_t>(raycast.size), angles = static_cast<uint32_t>(raycast.angles);
+        const bool compressed = blocksSupported(ctx.device.physical);
+        const vk::Format one = compressed ? vk::Format::eBc4UnormBlock : vk::Format::eR8Unorm;
+        const vk::Format two = compressed ? vk::Format::eBc5UnormBlock : vk::Format::eR8G8Unorm;
 
-        int levels = max_mips;
-        std::vector<uint8_t> oblique = rgbaMipChain(raycast.oblique, raycast.size, raycast.size, raycast.angles, levels);
-        vk::ImageCreateInfo info({}, vk::ImageType::e3D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(size, size, angles), levels, 1,
-            vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-            vk::SharingMode::eExclusive, 1, &ctx.device.g_i, vk::ImageLayout::eUndefined);
-        obliqueImage = ctx.transfer.createImage(oblique.data(), oblique.size(), info, vk::ImageLayout::eShaderReadOnlyOptimal);
-        obliqueView = ctx.device->createImageView(vk::ImageViewCreateInfo({}, obliqueImage->image, vk::ImageViewType::e3D, vk::Format::eR8G8B8A8Unorm,
-            vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, levels, 0, 1)));
+        auto upload = [&](const GrassTexture& texture, vk::Format format, uint32_t depth, bool volume, Baked& out) {
+            const uint32_t levels = static_cast<uint32_t>(texture.level_sizes.size());
+            vk::ImageCreateInfo info({}, volume ? vk::ImageType::e3D : vk::ImageType::e2D, format, vk::Extent3D(size, size, depth), levels, 1,
+                vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+                vk::SharingMode::eExclusive, 1, &ctx.device.g_i, vk::ImageLayout::eUndefined);
+            out.image = ctx.transfer.createImageMips(texture.data.data(), texture.level_sizes, info, vk::ImageLayout::eShaderReadOnlyOptimal);
+            out.view = ctx.device->createImageView(vk::ImageViewCreateInfo({}, out.image->image, volume ? vk::ImageViewType::e3D : vk::ImageViewType::e2D, format,
+                vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, levels, 0, 1)));
+        };
 
-        levels = max_mips;
-        std::vector<uint8_t> top = rgbaMipChain(raycast.top, raycast.size, raycast.size, 1, levels);
-        info.imageType = vk::ImageType::e2D;
-        info.extent = vk::Extent3D(size, size, 1);
-        info.mipLevels = levels;
-        topImage = ctx.transfer.createImage(top.data(), top.size(), info, vk::ImageLayout::eShaderReadOnlyOptimal);
-        topView = ctx.device->createImageView(vk::ImageViewCreateInfo({}, topImage->image, vk::ImageViewType::e2D, vk::Format::eR8G8B8A8Unorm,
-            vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, levels, 0, 1)));
+        auto start = std::chrono::steady_clock::now();
+        GrassTextures oblique = makeGrassTextures(raycast.oblique, raycast.size, raycast.angles, max_mips, compressed);
+        GrassTextures top = makeGrassTextures(raycast.top, raycast.size, 1, max_mips, compressed);
+        std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start;
+        dy::log(dy::info) << "Grass rays : " << (oblique.bytes() + top.bytes()) / 1e6 << " MB" << (compressed ? " in blocks, made in " : ", made in ")
+            << elapsed.count() << " s\n";
+
+        upload(oblique.height, one, angles, true, baked[0]);
+        upload(top.height, one, 1, false, baked[1]);
+        upload(oblique.normal, two, angles, true, baked[2]);
+        upload(oblique.id, one, angles, true, baked[3]);
+        upload(top.normal, two, 1, false, baked[4]);
+        upload(top.id, one, 1, false, baked[5]);
     }
 
     // Tileable noise to break the repetition of the tiles
@@ -142,14 +176,17 @@ GrassPass::GrassPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
             vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)));
     }
 
-    auto obliqueInfo = vk::DescriptorImageInfo(sampler, obliqueView, vk::ImageLayout::eShaderReadOnlyOptimal);
-    auto topInfo = vk::DescriptorImageInfo(sampler, topView, vk::ImageLayout::eShaderReadOnlyOptimal);
+    // Bindings of grass.frag.glsl : the heights first, the normals and the ids after the noise
+    const uint32_t baked_bindings[6] = {0, 1, 4, 5, 6, 7};
+    std::array<vk::DescriptorImageInfo, 6> bakedInfos;
+    std::vector<vk::WriteDescriptorSet> writes;
+    for(size_t i = 0; i < baked.size(); i++) {
+        bakedInfos[i] = vk::DescriptorImageInfo(sampler, baked[i].view, vk::ImageLayout::eShaderReadOnlyOptimal);
+        writes.push_back(vk::WriteDescriptorSet(descSet, baked_bindings[i], 0, 1, vk::DescriptorType::eCombinedImageSampler, &bakedInfos[i], nullptr, nullptr));
+    }
     auto noiseInfo = vk::DescriptorImageInfo(sampler, noiseView, vk::ImageLayout::eShaderReadOnlyOptimal);
-    ctx.device->updateDescriptorSets({
-        vk::WriteDescriptorSet(descSet, 0, 0, 1, vk::DescriptorType::eCombinedImageSampler, &obliqueInfo, nullptr, nullptr),
-        vk::WriteDescriptorSet(descSet, 1, 0, 1, vk::DescriptorType::eCombinedImageSampler, &topInfo, nullptr, nullptr),
-        vk::WriteDescriptorSet(descSet, 2, 0, 1, vk::DescriptorType::eCombinedImageSampler, &noiseInfo, nullptr, nullptr)
-    }, {});
+    writes.push_back(vk::WriteDescriptorSet(descSet, 2, 0, 1, vk::DescriptorType::eCombinedImageSampler, &noiseInfo, nullptr, nullptr));
+    ctx.device->updateDescriptorSets(writes, {});
 
     auto layouts = std::vector { ctx.view_layout, descLayout };
     auto pcRange = vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(GrassPC));
@@ -210,8 +247,9 @@ GrassPass::~GrassPass() {
     }
     ctx.device->destroy(layout);
     ctx.device->destroy(noiseView);
-    ctx.device->destroy(topView);
-    ctx.device->destroy(obliqueView);
+    for(auto& texture : baked) {
+        ctx.device->destroy(texture.view);
+    }
     ctx.device->destroy(sampler);
     ctx.device->destroy(descLayout);
     ctx.device->destroy(descPool);

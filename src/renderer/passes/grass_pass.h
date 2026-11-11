@@ -6,6 +6,7 @@
 
 #include <entt/entt.hpp>
 
+#include <array>
 #include <memory>
 
 namespace dy {
@@ -34,11 +35,13 @@ private:
 
     vk::Sampler sampler;
 
-    // Rays at 45 degrees (3D : x, z of the tile and azimuth) and from the top (2D)
-    std::shared_ptr<VmaImage> obliqueImage;
-    vk::ImageView obliqueView;
-    std::shared_ptr<VmaImage> topImage;
-    vk::ImageView topView;
+    // Rays at 45 degrees (3D : x, z of the tile and azimuth) and from the top (2D), three textures each
+    // (logic/grass/grass_textures.h) : height of the hit, normal, id of the blade
+    struct Baked {
+        std::shared_ptr<VmaImage> image;
+        vk::ImageView view;
+    };
+    std::array<Baked, 6> baked;
 
     std::shared_ptr<VmaImage> noiseImage;
     vk::ImageView noiseView;

@@ -1,0 +1,13 @@
+{
+  "scene": "base",
+  "hide_ui": true,
+  "shots": [
+    { "frame": 600, "name": "warm_up", "camera": { "pos": [-23, 68.2, 24], "look_at": [-23, 66.5, 16] } },
+    { "frame": 900, "name": "grass_eye", "camera": { "pos": [-23, 68.2, 24], "look_at": [-23, 66.5, 16] } },
+    { "frame": 1200, "name": "grass_low", "camera": { "pos": [-20, 67.4, 21], "look_at": [-23, 66.8, 17] } },
+    { "frame": 1500, "name": "grass_45", "camera": { "pos": [-23, 68.6, 19.5], "look_at": [-23, 66.5, 17.6] } },
+    { "frame": 1800, "name": "grass_top", "camera": { "pos": [-23, 69.5, 17], "look_at": [-23, 66, 17.05] } },
+    { "frame": 2100, "name": "grass_far", "camera": { "pos": [-23, 69, 40], "look_at": [-23, 66.5, 16] } },
+    { "frame": 2400, "name": "grass_skim", "camera": { "pos": [-21.5, 67.05, 22], "look_at": [-23, 67.0, 17] } }
+  ]
+}

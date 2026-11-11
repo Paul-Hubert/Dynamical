@@ -8,7 +8,12 @@
 #include "renderer/context/num_frames.h"
 
 #include "logic/components/camera.h"
+#include "scene/run_args.h"
 #include "view/components/input.h"
+
+#include <algorithm>
+#include <iomanip>
+#include <sstream>
 
 using namespace dy;
 
@@ -56,11 +61,65 @@ per_frame(NUM_FRAMES) {
         semaphore = ctx.device->createSemaphore(vk::SemaphoreCreateInfo());
     }
 
+    auto* args = reg.ctx().find<RunArgs>();
+    if(args && args->gpu_times) {
+        uint32_t bits = ctx.device.physical.getQueueFamilyProperties()[ctx.device.g_i].timestampValidBits;
+        if(bits == 0) {
+            dy::log(dy::warning) << "gpu_times : the graphics queue has no timestamps\n";
+        } else {
+            times.mask = bits >= 64 ? ~0ull : (1ull << bits) - 1;
+            times.period = ctx.device.physical.getProperties().limits.timestampPeriod;
+            times.pool = ctx.device->createQueryPool(vk::QueryPoolCreateInfo({}, vk::QueryType::eTimestamp, (uint32_t) per_frame.size() * (max_timed_passes + 1)));
+            times.written.assign(per_frame.size(), 0);
+        }
+    }
+
+}
+
+void ClassicRender::readPassTimes(uint32_t frame_index) {
+
+    uint32_t count = times.written[frame_index];
+    if(count == 0) return;
+    times.written[frame_index] = 0;
+
+    uint64_t ticks[max_timed_passes + 1];
+    auto result = ctx.device->getQueryPoolResults(times.pool, frame_index * (max_timed_passes + 1), count + 1,
+        (count + 1) * sizeof(uint64_t), ticks, sizeof(uint64_t), vk::QueryResultFlagBits::e64);
+    if(result != vk::Result::eSuccess) return;
+
+    times.sums.resize(times.names.size(), 0.);
+    for(uint32_t i = 0; i < count; i++) {
+        times.sums[i] += (double) ((ticks[i + 1] - ticks[i]) & times.mask) * times.period * 1e-6;
+    }
+    if(++times.frames >= 300) logPassTimes();
+
+}
+
+void ClassicRender::logPassTimes() {
+
+    if(times.frames == 0) return;
+
+    std::ostringstream line;
+    line << std::fixed << std::setprecision(3);
+    double total = 0.;
+    for(size_t i = 0; i < times.sums.size(); i++) {
+        line << times.names[i] << " " << times.sums[i] / times.frames << ", ";
+        total += times.sums[i];
+    }
+    dy::log(dy::info) << "GPU ms over " << times.frames << " frames (" << ctx.swap.extent.width << " x " << ctx.swap.extent.height << ") : "
+        << line.str() << "all " << total / times.frames << "\n";
+
+    std::fill(times.sums.begin(), times.sums.end(), 0.);
+    times.frames = 0;
+
 }
 
 bool ClassicRender::prepare(uint32_t frame_index) {
 
     OPTICK_EVENT();
+
+    // The fence of this frame was waited for : what it timed last time is there
+    if(times.pool) readPassTimes(frame_index);
 
     acquired = false;
 
@@ -109,6 +168,10 @@ void ClassicRender::record(uint32_t frame_index, const std::vector<ScenePass*>& 
 
     vk::Extent2D extent = ctx.swap.extent;
 
+    const uint32_t first_query = frame_index * (max_timed_passes + 1);
+    uint32_t timed = 0;
+    if(times.pool) command.resetQueryPool(times.pool, first_query, max_timed_passes + 1);
+
     command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.frames[ctx.swap.current].framebuffer, vk::Rect2D({}, extent), clearValues), vk::SubpassContents::eInline);
 
     command.setViewport(0, vk::Viewport(0.f, 0.f, (float)extent.width, (float)extent.height, 0.f, 1.f));
@@ -116,11 +179,18 @@ void ClassicRender::record(uint32_t frame_index, const std::vector<ScenePass*>& 
 
     RenderView view { RenderTarget::Desktop, frame_index, 0, f.set, extent };
 
+    if(times.pool) command.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, times.pool, first_query);
+
     for(ScenePass* pass : passes) {
         if(pass->supports(RenderTarget::Desktop)) {
             pass->record(command, view);
+            if(times.pool && timed < max_timed_passes) {
+                command.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, times.pool, first_query + ++timed);
+                if(times.names.size() < timed) times.names.push_back(pass->name());
+            }
         }
     }
+    if(times.pool) times.written[frame_index] = timed;
 
     command.endRenderPass();
 
@@ -133,6 +203,9 @@ void ClassicRender::record(uint32_t frame_index, const std::vector<ScenePass*>& 
 bool ClassicRender::requestCapture() {
 
     if(!ctx.swap.readable || !acquired) return false;
+
+    // The camera of a shot is held since the shot before : these are the times of its view
+    if(times.pool) logPassTimes();
 
     vk::DeviceSize size = (vk::DeviceSize) ctx.swap.extent.width * ctx.swap.extent.height * 4;
     if(!capture_buffer || capture_buffer.size < size) {
@@ -212,6 +285,7 @@ ClassicRender::~ClassicRender() {
         ctx.device->destroy(semaphore);
     }
 
+    if(times.pool) ctx.device->destroy(times.pool);
     ctx.device->destroy(commandPool);
     ctx.device->destroy(descriptorPool);
 

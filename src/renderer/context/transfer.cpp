@@ -178,7 +178,7 @@ std::shared_ptr<VmaImage> Transfer::createImageMips(const void* data, const std:
     std::vector<vk::BufferImageCopy> regions;
     vk::DeviceSize offset = 0;
     for(uint32_t level = 0; level < info.mipLevels; level++) {
-        vk::Extent3D extent(std::max(info.extent.width >> level, 1u), std::max(info.extent.height >> level, 1u), 1);
+        vk::Extent3D extent(std::max(info.extent.width >> level, 1u), std::max(info.extent.height >> level, 1u), std::max(info.extent.depth >> level, 1u));
         regions.push_back(vk::BufferImageCopy(offset, 0, 0, vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, level, 0, info.arrayLayers), vk::Offset3D(0, 0, 0), extent));
         offset += level_sizes[level];
     }

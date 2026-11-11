@@ -53,7 +53,7 @@ Entry point is `src/main.cpp` → `Game::start()`. The game loop runs: `renderer
 
 ### Grass (`src/logic/grass/`, `passes/grass_pass.cpp`, docs/grass.md)
 - No blade geometry: `GrassPass` draws the chunks again as a shell at the top of the grass; `grass.frag.glsl` looks each view ray up in rays baked against a generated tile of blades repeated to infinity (`GrassTracer`)
-- Baked (`bakeGrass`, in `dynamical_sim`): a 3D texture of rays at 45° (x, z, azimuth) and a 2D texture of rays from the top; RGBA8 = hit height, octahedral normal, blade id. A 45° ray is stored where it crosses the **middle** of the grass; the view ray is looked up where it crosses the middle too
+- Baked (`bakeGrass`, in `dynamical_sim`): a 3D texture of rays at 45° (x, z, azimuth) and a 2D texture of rays from the top; RGBA8 = hit height, octahedral normal, blade id; on the GPU the heights are textures of their own, read for every layer, the normals and ids are read for the closest hit only, all in BC4 / BC5 blocks (`grass_textures.h`). A 45° ray is stored where it crosses the **middle** of the grass; the view ray is looked up where it crosses the middle too
 - Tile space is sheared around the ground by the lean of the blades (wind, terrain normal): roots do not move
 - Several layers (tall ones and an undergrowth) of the same tile at different sizes, heights and noise warps, closest hit wins; patches, blade colours, curved blades, blade shadows: one doc per feature in docs/grass/ (plan.md first)
 - `TerrainPass` darkens the terrain and pushes its depth back under the grass (`RenderSettings::grass_pass`): the grass hits may be a little under the real ground

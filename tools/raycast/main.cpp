@@ -4,15 +4,23 @@
 // to export the grass model and to compare the lookup with real ray tracing.
 //
 //   raycast [output.bin] [--size 256] [--angles 64] [--seed 7] [--obj tile.obj] [--preview preview.png]
+//           [--blocks] [--dither 0.5]
 //
 // --preview : orthographic views of the grass from 15 to 90 degrees of elevation, ray traced (left) and
 // rebuilt from the textures like the shader does (right), and the mean error of the hit height at each
 // elevation over rays from every side.
+// --blocks : the preview reads the rays back from the blocks the GPU gets (logic/grass/grass_textures.h),
+// and what each channel loses in them is printed.
+// --dither : azimuth_dither of the shader for the error of the preview, 0 blends the two nearest baked
+// azimuths, 1 takes one of them at random.
 // (build with -DDYNAMICAL_BUILD_TOOLS=ON)
 
 #include "logic/grass/grass_bake.h"
+#include "logic/grass/grass_textures.h"
 
 #include <stb_image_write.h>
+
+#include <algorithm>
 
 #include <chrono>
 #include <cmath>
@@ -36,7 +44,44 @@ glm::vec3 shade(float height, float depth_in_grass, glm::vec3 normal, glm::vec3 
     return color * light * occlusion;
 }
 
-bool preview(const GrassRaycast& data, const GrassModelParams& model, const std::string& path) {
+// Height of lookupGrass with the azimuth dither of the shader (grass.frag.glsl, lookup) : the rays are
+// read towards one of the two nearest baked azimuths, the nearer one more often. chance : 0..1
+float lookupHeight(const GrassRaycast& data, glm::vec2 q_top, glm::vec2 along, float reach, float dither, float chance) {
+    if(dither <= 0.f) return lookupGrass(data, q_top, along, reach, 0.f).height;
+
+    reach = std::clamp(reach, 1e-3f, grass_max_reach);
+    glm::vec2 q = q_top + along * (0.5f * reach);
+    float azimuth = std::atan2(along.y, along.x);
+    float slice = azimuth / (2.f * pi) * data.angles - 0.5f;
+    float one = (std::floor(slice) + (slice - std::floor(slice) > chance ? 1.f : 0.f) + 0.5f) / data.angles * 2.f * pi;
+    float baked = sampleGrassOblique(data, q, glm::mix(azimuth, one, dither)).r;
+    float height = std::clamp(0.5f - (0.5f - baked) / reach, 0.f, 1.f);
+    if(reach < 1.f) {
+        float steep = (std::atan2(1.f, reach) - pi / 4.f) / (pi / 4.f);
+        height = glm::mix(height, sampleGrassTop(data, q).r, steep * steep * (3.f - 2.f * steep));
+    }
+    return height;
+}
+
+// What the texels lose in blocks of 4 x 4
+void compareBlocks(const GrassRaycast& data, const GrassRaycast& blocks) {
+    const char* names[4] = {"height", "normal x", "normal z", "blade id"};
+    for(int c = 0; c < 4; c++) {
+        double sum = 0.;
+        size_t over = 0, texels = data.oblique.size() / 4;
+        int largest = 0;
+        for(size_t i = 0; i < texels; i++) {
+            int error = std::abs(int(data.oblique[i * 4 + c]) - int(blocks.oblique[i * 4 + c]));
+            sum += error;
+            over += error > 8;
+            largest = std::max(largest, error);
+        }
+        std::cout << "blocks, " << names[c] << " : mean error " << sum / texels << " / 255, " << 100. * over / texels
+            << " % of the texels over 8 / 255, largest " << largest << "\n";
+    }
+}
+
+bool preview(const GrassRaycast& data, const GrassModelParams& model, const std::string& path, float dither) {
 
     const std::vector<float> elevations = {15.f, 30.f, 45.f, 60.f, 75.f, 90.f};
     const int panel = 320;
@@ -99,7 +144,7 @@ bool preview(const GrassRaycast& data, const GrassModelParams& model, const std:
             tracer.trace(glm::vec3(entry.x, 1.f, entry.y), glm::vec3(heading.x * reach, -1.f, heading.y * reach), hit);
             truths[i] = 1.f - hit.t;
             mean += truths[i];
-            error += std::abs(lookupGrass(data, entry, heading, reach, 0.f).height - truths[i]);
+            error += std::abs(lookupHeight(data, entry, heading, reach, dither, random()) - truths[i]);
         }
         mean /= count;
         for(float truth : truths) constant += std::abs(truth - mean);
@@ -114,7 +159,7 @@ bool preview(const GrassRaycast& data, const GrassModelParams& model, const std:
 }
 
 int usage() {
-    std::cout << "Usage : raycast [output.bin] [--size 256] [--angles 64] [--seed 7] [--obj tile.obj] [--preview preview.png]\n";
+    std::cout << "Usage : raycast [output.bin] [--size 256] [--angles 64] [--seed 7] [--obj tile.obj] [--preview preview.png] [--blocks] [--dither 0.5]\n";
     return 1;
 }
 
@@ -124,6 +169,8 @@ int main(int argc, char** argv) {
 
     GrassBakeParams params;
     std::string output, obj, preview_path;
+    bool blocks = false;
+    float dither = 0.f;
 
     for(int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -133,6 +180,8 @@ int main(int argc, char** argv) {
         else if(arg == "--seed" && has_value) params.model.seed = uint32_t(std::atoi(argv[++i]));
         else if(arg == "--obj" && has_value) obj = argv[++i];
         else if(arg == "--preview" && has_value) preview_path = argv[++i];
+        else if(arg == "--dither" && has_value) dither = float(std::atof(argv[++i]));
+        else if(arg == "--blocks") blocks = true;
         else if(arg.rfind("--", 0) == 0 || !output.empty()) return usage();
         else output = arg;
     }
@@ -161,7 +210,13 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if(!preview_path.empty() && !preview(data, params.model, preview_path)) {
+    if(blocks) {
+        GrassRaycast read_back = compressedGrassRaycast(data);
+        compareBlocks(data, read_back);
+        data = std::move(read_back);
+    }
+
+    if(!preview_path.empty() && !preview(data, params.model, preview_path, dither)) {
         std::cerr << "Could not write " << preview_path << "\n";
         return 1;
     }
