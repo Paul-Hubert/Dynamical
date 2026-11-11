@@ -109,6 +109,9 @@ uint64_t grassBakeKey(const GrassBakeParams& params);
 
 // threads = 0 : one per core
 GrassRaycast bakeGrass(const GrassBakeParams& params = {}, unsigned threads = 0);
+// The same rays on any tile of triangles (params.model is not read) : the relief of the ground textures
+// (logic/terrain/ground_relief.h). cells : of the grid the triangles are sorted in, along x and z
+GrassRaycast bakeGrassModel(GrassModel model, const GrassBakeParams& params, uint64_t key, unsigned threads = 0, int cells = 48);
 
 bool saveGrassRaycast(const GrassRaycast& data, const std::string& path);
 bool loadGrassRaycast(GrassRaycast& data, const std::string& path);

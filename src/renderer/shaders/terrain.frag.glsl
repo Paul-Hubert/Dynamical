@@ -38,6 +38,7 @@ layout(push_constant) uniform Args {
     float under_grass;  // height of the grass that the grass pass draws over the flat ground, 0 without it
     float library;      // 0 : no ground textures (flat colours, the earth and the rock of u_color)
     float scree;        // stones at the foot of the rock
+    float relief[3];    // depth of the relief of the mud, the stones and the sand, in metres : 0 flat
 };
 
 layout(std140, set = 0, binding = 0) uniform View {
@@ -123,6 +124,94 @@ vec3 groundColor(int layer, vec2 at, vec2 dx, vec2 dy) {
     return mix(close, away, wide);
 }
 
+// The relief of the mud, the stones and the sand (logic/terrain/ground_relief.h) : their height maps were
+// built as geometry, and rays baked on it like on the grass (grass.frag.glsl, logic/grass/grass_bake.h).
+// u_relief : height of the hit of the oblique rays, a layer per azimuth of each elevation, the three
+// layers of the soil one after the other. u_relief_top : of the rays from the top, a layer each
+layout(set = 1, binding = 3) uniform sampler2DArray u_relief;
+layout(set = 1, binding = 4) uniform sampler2DArray u_relief_top;
+
+layout(constant_id = 0) const int relief_angles_0 = 48;
+layout(constant_id = 1) const int relief_angles_1 = 40;
+layout(constant_id = 2) const int relief_angles_2 = 32;
+layout(constant_id = 3) const int relief_angles_3 = 24;
+layout(constant_id = 4) const float relief_low_from = 1.0;
+layout(constant_id = 5) const float relief_low_to = 0.5;
+
+const float relief_pi = 3.14159265359;
+const float relief_max_reach = 3.0;     // grass_max_reach
+
+// Of the pixel, set in main
+vec3 r_view = vec3(0.0, -1.0, 0.0);
+vec3 r_normal = vec3(0.0, 1.0, 0.0);
+
+float reliefReach(int elevation) {
+    return elevation == 0 ? relief_max_reach : 1.0 / tan(float(elevation) * relief_pi / 8.0);
+}
+
+// Rays of one elevation through a point of the tile, the two azimuths around the heading blended
+float reliefRays(int layer, int elevation, vec2 point, vec2 heading, vec2 dx, vec2 dy) {
+    int count = elevation == 0 ? relief_angles_0 : elevation == 1 ? relief_angles_1 : elevation == 2 ? relief_angles_2 : relief_angles_3;
+    int first = elevation == 0 ? 0 : elevation == 1 ? relief_angles_0 : elevation == 2 ? relief_angles_0 + relief_angles_1
+        : relief_angles_0 + relief_angles_1 + relief_angles_2;
+    first += layer * (relief_angles_0 + relief_angles_1 + relief_angles_2 + relief_angles_3);
+    float slice = atan(heading.y, heading.x) / (2.0 * relief_pi) * float(count) - 0.5;
+    float lower = floor(slice);
+    vec2 layers = float(first) + mod(lower + vec2(0.0, 1.0), float(count));
+    return mix(textureGrad(u_relief, vec3(point, layers.x), dx, dy).r, textureGrad(u_relief, vec3(point, layers.y), dx, dy).r, slice - lower);
+}
+
+// Where the view ray meets the relief of a layer of the soil, as the point of the ground the textures
+// are read at : the plane that is drawn is the top of the relief, the ray goes on under it. The baked rays
+// through the point where it crosses the middle of the relief, of the two baked elevations around its
+// own, say how far before or after that point the stone is (lookup in grass.frag.glsl).
+// sunk : how deep under the plane the hit is, in metres
+vec2 reliefAt(int layer, vec2 ground, vec2 dx, vec2 dy, float fade, out float sunk) {
+
+    sunk = 0.0;
+    float depth = relief[layer] * fade;
+    float flat_speed = length(r_view.xz);
+    if(depth <= 1e-4 || flat_speed < 1e-4) {
+        return ground;
+    }
+
+    float tile = 1.0 / tiles[layer];
+    float sink = max(-dot(r_view, r_normal) / r_normal.y, 0.0);
+    // A ray that would cross more than relief_max_reach tiles is looked up as if it went down faster
+    float fall = max(max(sink, flat_speed * depth / (tile * relief_max_reach)), 1e-6);
+    vec2 along = r_view.xz / flat_speed;
+    float reach = max(flat_speed * depth / (fall * tile), 1e-3);
+    float flight = min(flat_speed * depth / (max(sink, 1e-6) * tile), 1e3);
+
+    vec2 middle = (ground + r_view.xz * (0.5 * depth / fall)) / tile;
+    vec2 tile_dx = dx / tile, tile_dy = dy / tile;
+
+    int lower = flight >= reliefReach(1) ? 0 : flight >= reliefReach(2) ? 1 : flight >= reliefReach(3) ? 2 : 3;
+    float from_reach = lower > 0 ? reliefReach(lower) : min(relief_max_reach / max(relief_low_from - relief_low_to, 1e-3), 1e3);
+    float to_reach = lower < 3 ? reliefReach(lower + 1) : 0.0;
+    float weight = clamp((from_reach - flight) / (from_reach - to_reach), 0.0, 1.0);
+
+    float rays = reliefRays(layer, lower, middle, along, tile_dx, tile_dy);
+    float ahead = (0.5 - rays) * reliefReach(lower);
+    float hit = clamp(0.5 - ahead / reach, 0.0, 1.0);
+    if(weight > 0.002) {
+        float next_ahead = 0.0, next_hit;
+        if(lower == 3) {
+            next_hit = textureGrad(u_relief_top, vec3(middle, float(layer)), tile_dx, tile_dy).r;
+        } else {
+            float next = reliefRays(layer, lower + 1, middle, along, tile_dx, tile_dy);
+            next_ahead = (0.5 - next) * reliefReach(lower + 1);
+            next_hit = clamp(0.5 - next_ahead / reach, 0.0, 1.0);
+        }
+        hit = mix(hit, next_hit, weight);
+        ahead = mix(ahead, next_ahead, weight);
+    }
+
+    sunk = (1.0 - hit) * depth;
+    return (middle + along * ahead) * tile;
+
+}
+
 // What shows at this pixel so far
 vec3 s_color;
 vec3 s_bump = vec3(0.0);    // added to the normal of the terrain
@@ -130,6 +219,7 @@ float s_occlusion = 1.0;
 float s_gloss = 0.0;
 float s_height = 0.5;
 float s_bare = 0.0;         // part that is one of the soil layers : no earth, no grass
+float s_sunk = 0.0;         // how deep under the plane the relief of the layer that shows was met, in metres
 
 // One layer of the soil over what is there. inside : how far in its patch the pixel is, 0 on the edge,
 // in the range of the soil maps. The edge is moved by `spread` of that range by the heights : by the
@@ -139,6 +229,12 @@ void soilLayer(int layer, float inside, float spread, float soft, float fills, v
 
     if(inside < -(0.7 * spread + soft)) return;
 
+    // The textures are read where the view ray meets the relief, not where it meets the plane. Not on
+    // the large tiles of far away
+    float sunk;
+    vec2 flat_ground = ground;
+    ground = reliefAt(layer, ground, dx, dy, 1.0 - wide, sunk);
+
     vec4 detail = groundDetail(layer, ground, dx, dy);
 
     float lift = mix(detail.b - 0.5, 0.5 - s_height + 0.4 * (detail.b - 0.5), fills);
@@ -147,7 +243,7 @@ void soilLayer(int layer, float inside, float spread, float soft, float fills, v
 
     // The tile repeats every few metres : lighter and darker over tens of metres
     vec3 albedo = groundColor(layer, ground, dx, dy);
-    albedo *= 0.84 + 0.32 * shadeNoise(ground * 0.11 + 13.0 * float(layer));
+    albedo *= 0.84 + 0.32 * shadeNoise(flat_ground * 0.11 + 13.0 * float(layer));
 
     vec2 slope = detail.rg * 2.0 - 1.0;
     s_color = mix(s_color, albedo, alpha);
@@ -157,6 +253,7 @@ void soilLayer(int layer, float inside, float spread, float soft, float fills, v
     s_gloss = mix(s_gloss, smoothness[layer] * mix(1.0, 1.0 - 0.6 * detail.b, fills), alpha);
     s_height = mix(s_height, detail.b, alpha);
     s_bare = max(s_bare, alpha);
+    s_sunk = mix(s_sunk, sunk, alpha);
 
 }
 
@@ -168,6 +265,8 @@ void main() {
     vec3 view = to_pixel / far;
     wide = smoothstep(40.0, 120.0, far);
     blur = max(far / 160.0, 1.0);
+    r_view = view;
+    r_normal = normal;
 
     // Derivatives are taken here : the layers are read in branches
     vec3 position_dx = dFdx(v_position), position_dy = dFdy(v_position);
@@ -271,13 +370,18 @@ void main() {
     // Under the grass (same slopes as grass.vert.glsl) : in its shade, and behind it. The grass pass
     // only knows the ground as a plane under each pixel, its hits can end up a little under the terrain :
     // the terrain steps back by the height of the grass and lets them through. None of that on the soil
+    // The relief is under the plane : what stands on the ground hides it by that much
     gl_FragDepth = gl_FragCoord.z;
+    if(s_sunk > 0.0) {
+        vec4 clip = viewproj * vec4(v_position + view * (s_sunk / max(-view.y, 0.05)), 1.0);
+        gl_FragDepth = clamp(max(clip.z / clip.w, gl_FragDepth), 0.0, 1.0);
+    }
     if(under_grass > 0.0) {
         float covered = smoothstep(0.76, 0.88, normal.y);
         color *= 1.0 - 0.8 * covered * grassy * (1.0 - 0.7 * s_bare);
         float behind = under_grass * covered * grass_tall * smoothstep(0.0, 0.15, grassy);
         vec4 clip = viewproj * vec4(v_position + view * behind, 1.0);
-        gl_FragDepth = clamp(max(clip.z / clip.w, gl_FragCoord.z), 0.0, 1.0);
+        gl_FragDepth = clamp(max(clip.z / clip.w, gl_FragDepth), 0.0, 1.0);
     }
 
     float fog = 1.0 - exp(-far * 0.0006);

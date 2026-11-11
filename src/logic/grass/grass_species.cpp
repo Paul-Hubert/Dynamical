@@ -57,7 +57,7 @@ std::vector<int8_t> bakeSpeciesNoise(uint32_t seed) {
                 for(int octave = 0; octave < grass_species::octaves; octave++) {
                     value += weight * perlin((x + 0.5f) / n * period, (y + 0.5f) / n * period, period, seed + uint32_t(c * 101 + octave * 7));
                     total += weight;
-                    weight *= 0.5f;
+                    weight *= 0.4f;
                     period *= 2;
                 }
                 // Octaves of Perlin noise seldom leave the middle half of their range : twice the contrast
@@ -73,30 +73,47 @@ GrassSpecies grassSpeciesAt(const std::vector<int8_t>& noise, const GrassSpecies
 
     GrassSpecies out;
     if(params.size <= 0.f) return out;
-    out.small = tallness < params.low;
+    // Thousandths, as the shader gets it
+    const float overlap = std::floor(std::clamp(params.overlap, 0.f, 1.f) * 1000.f) / 1000.f;
+
+    // How much the place is for the tall kinds, -1 to 1 over the band
+    const float band = std::max(grass_species::band * overlap, 1e-3f);
+    const float tall = std::clamp((tallness - params.low) / band, -1.f, 1.f);
 
     glm::vec2 at = world / (params.size * grass_species::periods);
     glm::vec4 read[3];
     for(int i = 0; i < 3; i++) read[i] = sample(noise, at * grass_species::scales[i] + grass_species::shifts[i]);
 
-    int primary = -1, secondary = -1;
-    float best = -1e9f, next = -1e9f;
+    int kind[3] = {-1, -1, -1}, under = -1;
+    float best[3] = {-1e9f, -1e9f, -1e9f}, best_small = -1e9f;
     for(int k = 0; k < grass_kinds; k++) {
         const GrassKindInfo& info = grassKindInfo(static_cast<GrassKind>(k));
-        if(info.small != out.small) continue;
-        float value = read[k / 4][k % 4] + info.abundance;
-        if(value > best) {
-            next = best;
-            secondary = primary;
-            best = value;
-            primary = k;
-        } else if(value > next) {
-            next = value;
-            secondary = k;
+        float value = read[k / 4][k % 4] + info.abundance + (info.small ? -tall : tall);
+        if(info.small && value > best_small) {
+            best_small = value;
+            under = k;
+        }
+        for(int rank = 0; rank < 3; rank++) {
+            if(value <= best[rank]) continue;
+            for(int moved = 2; moved > rank; moved--) {
+                best[moved] = best[moved - 1];
+                kind[moved] = kind[moved - 1];
+            }
+            best[rank] = value;
+            kind[rank] = k;
+            break;
         }
     }
-    out.primary = static_cast<GrassKind>(std::max(primary, 0));
-    out.secondary = static_cast<GrassKind>(secondary < 0 ? std::max(primary, 0) : secondary);
+    const float margin = grass_species::margin * overlap;
+    for(int rank = 1; rank < 3; rank++) {
+        if(kind[rank] < 0 || best[rank] <= best[0] - margin) kind[rank] = kind[0];
+    }
+    for(int rank = 0; rank < 3; rank++) out.kinds[rank] = static_cast<GrassKind>(kind[rank]);
+
+    // Small plants under the tall ones in the band only, and nothing under the small ones
+    if(grassKindInfo(out.kinds[0]).small) out.under = -2;
+    else if(tall >= 1.f || overlap <= 0.f) out.under = -1;
+    else out.under = under;
     return out;
 
 }

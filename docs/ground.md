@@ -117,3 +117,5 @@ Terrain, and the "Soil" header.
 Limits: the patches know nothing of the terrain (mud on a crest, sand anywhere) nor of the forests, and nothing
 reads them but the renderer: walkers and animals do not sink in the mud. Chunks one above the other bake the
 same map twice. The goldens of `base` were not recorded again. VR draws the same passes but was not looked at.
+
+The relief of the mud, the stones and the sand, looked up in baked rays: [ground-relief.md](ground-relief.md).

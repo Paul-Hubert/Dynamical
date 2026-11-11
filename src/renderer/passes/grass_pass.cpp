@@ -46,7 +46,7 @@ struct GrassPC {
     float wind_strength;
     float wind_speed;
     float top_start;
-    int32_t layers;
+    int32_t layers;             // and how much the patches of the species overlap, in thousandths, over the low byte
     float layer_spread;
     float layer_patch;
     float undergrowth;
@@ -406,7 +406,7 @@ void GrassPass::record(vk::CommandBuffer command, const RenderView& view) {
         std::max(params.patch_size, 1e-3f), params.patch_amount,
         params.noise_frequency, params.noise_amplitude,
         params.wind_strength, params.wind_speed,
-        params.top_start, std::clamp(params.layers, 1, 3),
+        params.top_start, std::clamp(params.layers, 1, 3) | (static_cast<int32_t>(std::clamp(params.species.overlap, 0.f, 1.f) * 1000.f) << 8),
         params.layer_spread, params.layer_patch, params.undergrowth,
         params.colour_variation, params.dryness, params.curve,
         params.shadow, params.canopy, params.silhouette, params.azimuth_dither,

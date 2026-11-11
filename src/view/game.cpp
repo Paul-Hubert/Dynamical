@@ -37,7 +37,7 @@ Game::Game(int argc, char** argv) {
 
     // Settings parses its own keys from the same arguments, anything else unknown is only a warning here
     static const char* settings_keys[] = { "window_width", "window_height", "fullscreen", "fps_max", "username",
-        "server_side", "client_side", "vr_mode", "view_distance", "grass_kind" };
+        "server_side", "client_side", "vr_mode", "view_distance", "grass_kind", "ground_relief" };
     auto parsed = parseRunArgs(argc, argv);
     for(auto& key : parsed.unknown) {
         if(std::find(std::begin(settings_keys), std::end(settings_keys), key) == std::end(settings_keys)) {

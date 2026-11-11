@@ -37,6 +37,8 @@ public:
 
     // One kind of grass tile everywhere (GrassKind : meadow, clover, dandelion...) instead of the patches of the species. Not saved
     std::string grass_kind;
+    // Times the depth of the relief of the soil (RenderSettings::relief) : 0 for the flat textures. Not saved
+    float ground_relief = 1.f;
 
     template <class Archive>
     void serialize(Archive& ar) {

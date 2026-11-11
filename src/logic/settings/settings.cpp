@@ -53,6 +53,7 @@ if(key == #T) T = value;
             ARGUMENT(vr_mode, std::atoi(value.c_str()))
             ARGUMENT(view_distance, std::atoi(value.c_str()))
             ARGUMENT(grass_kind, value)
+            ARGUMENT(ground_relief, float(std::atof(value.c_str())))
     }
 
 #undef ARGUMENT

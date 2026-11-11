@@ -7,7 +7,10 @@
 #include "renderer/util/texture.h"
 
 #include "logic/components/render_settings.h"
+#include "logic/settings/settings.h"
 #include "logic/terrain/chunk.h"
+#include "logic/terrain/ground_relief.h"
+#include "logic/grass/grass_textures.h"
 
 #include "util/log.h"
 #include "util/paths.h"
@@ -16,6 +19,7 @@
 #include <taskflow/taskflow.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <exception>
 #include <fstream>
 #include <mutex>
@@ -29,6 +33,11 @@ using namespace dy;
 constexpr int ground_layers = 5;
 const char* const ground_names[ground_layers] = { "mud", "stones", "sand", "rock", "earth" };
 
+// The first ones have a relief the view ray is looked up in (logic/terrain/ground_relief.h) : how deep
+// it is, in metres, from the top of the highest stone to the bottom of the texture
+constexpr int relief_layers = 3;
+const float relief_depths[relief_layers] = { 0.05f, 0.12f, 0.04f };
+
 // Their mean colours (sRGB), drawn flat when resources/ground is not there
 const uint8_t ground_flat[ground_layers][3] = { {78, 59, 39}, {113, 108, 96}, {166, 152, 133}, {108, 103, 93}, {107, 110, 71} };
 
@@ -40,6 +49,7 @@ struct TerrainPC {
     float under_grass;
     float library;
     float scree;
+    float relief[relief_layers];    // depth of the relief of mud, stones and sand, in metres : 0 none
 };
 
 std::vector<vk::VertexInputBindingDescription> dy::terrainVertexBindings() {
@@ -59,14 +69,16 @@ std::vector<vk::VertexInputAttributeDescription> dy::terrainVertexAttributes() {
 TerrainPass::TerrainPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
 
     auto poolSizes = std::vector {
-        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 3),
+        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 5),
     };
     descPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, 1, poolSizes));
 
     auto bindings = std::vector {
         vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment),
         vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment),
-        vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment)
+        vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment),
+        vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment),
+        vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment)
     };
     materialLayout = ctx.device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, bindings));
     materialSet = ctx.device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &materialLayout))[0];
@@ -101,10 +113,14 @@ TerrainPass::TerrainPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg)
     auto imageInfo = vk::DescriptorImageInfo(sampler, textureView, vk::ImageLayout::eShaderReadOnlyOptimal);
     auto colorInfo = vk::DescriptorImageInfo(groundSampler, groundColorView, vk::ImageLayout::eShaderReadOnlyOptimal);
     auto detailInfo = vk::DescriptorImageInfo(groundSampler, groundDetailView, vk::ImageLayout::eShaderReadOnlyOptimal);
+    auto reliefInfo = vk::DescriptorImageInfo(groundSampler, reliefView, vk::ImageLayout::eShaderReadOnlyOptimal);
+    auto reliefTopInfo = vk::DescriptorImageInfo(groundSampler, reliefTopView, vk::ImageLayout::eShaderReadOnlyOptimal);
     ctx.device->updateDescriptorSets({
         vk::WriteDescriptorSet(materialSet, 0, 0, 1, vk::DescriptorType::eCombinedImageSampler, &imageInfo, nullptr, nullptr),
         vk::WriteDescriptorSet(materialSet, 1, 0, 1, vk::DescriptorType::eCombinedImageSampler, &colorInfo, nullptr, nullptr),
-        vk::WriteDescriptorSet(materialSet, 2, 0, 1, vk::DescriptorType::eCombinedImageSampler, &detailInfo, nullptr, nullptr)
+        vk::WriteDescriptorSet(materialSet, 2, 0, 1, vk::DescriptorType::eCombinedImageSampler, &detailInfo, nullptr, nullptr),
+        vk::WriteDescriptorSet(materialSet, 3, 0, 1, vk::DescriptorType::eCombinedImageSampler, &reliefInfo, nullptr, nullptr),
+        vk::WriteDescriptorSet(materialSet, 4, 0, 1, vk::DescriptorType::eCombinedImageSampler, &reliefTopInfo, nullptr, nullptr)
     }, {});
 
     auto layouts = std::vector { ctx.view_layout, materialLayout };
@@ -164,6 +180,7 @@ void TerrainPass::loadGround() {
         groundColor = uploadTextureArray(ctx, colors, vk::Format::eR8G8B8A8Srgb);
         groundDetail = uploadTextureArray(ctx, details, vk::Format::eR8G8B8A8Unorm);
         groundLibrary = true;
+        loadRelief(&details);
 
     } catch(const std::exception& e) {
 
@@ -176,6 +193,7 @@ void TerrainPass::loadGround() {
         groundColor = uploadTextureArray(ctx, colors, vk::Format::eR8G8B8A8Srgb);
         groundDetail = uploadTextureArray(ctx, details, vk::Format::eR8G8B8A8Unorm);
         groundLibrary = false;
+        loadRelief(nullptr);
 
     }
 
@@ -184,6 +202,89 @@ void TerrainPass::loadGround() {
         vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, levels, 0, ground_layers)));
     groundDetailView = ctx.device->createImageView(vk::ImageViewCreateInfo({}, groundDetail->image, vk::ImageViewType::e2DArray, vk::Format::eR8G8B8A8Unorm,
         vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, levels, 0, ground_layers)));
+
+}
+
+// The rays of the relief of a ground texture, from its file next to the other resources of the run
+// directory, or baked and written there
+GrassRaycast loadOrBakeRelief(const char* name, const std::vector<uint8_t>& heights, int width, int height) {
+
+    GroundReliefParams params;
+    const std::string file = std::string("./resources/ground_relief_") + name + ".bin";
+    GrassRaycast data;
+    if(loadGrassRaycast(data, file) && data.key == groundReliefKey(heights.data(), width, height, params)) {
+        return data;
+    }
+
+    auto start = std::chrono::steady_clock::now();
+    data = bakeGroundRelief(heights.data(), width, height, params);
+    std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start;
+    dy::log(dy::info) << "Baked the relief of the " << name << " (" << data.size << " x " << data.size << " x " << data.slices() << ") in "
+        << elapsed.count() << " s\n";
+
+    if(!saveGrassRaycast(data, file)) {
+        dy::log(dy::warning) << "Could not write " << file << ", the relief will be baked again next time\n";
+    }
+    return data;
+
+}
+
+void TerrainPass::loadRelief(const std::vector<TexturePixels>* details) {
+
+    // Heights of the hits only : a layer per azimuth of each elevation, layer after layer of the soil
+    std::vector<GrassTexture> oblique(relief_layers), top(relief_layers);
+    uint32_t size = 1, slices = 1;
+    bool compressed = false;
+
+    if(details) {
+        auto features = ctx.device.physical.getFormatProperties(vk::Format::eBc4UnormBlock).optimalTilingFeatures;
+        compressed = (features & vk::FormatFeatureFlagBits::eSampledImageFilterLinear) == vk::FormatFeatureFlagBits::eSampledImageFilterLinear;
+        for(int layer = 0; layer < relief_layers; layer++) {
+            const TexturePixels& detail = (*details)[layer];
+            std::vector<uint8_t> heights(size_t(detail.width) * detail.height);
+            for(size_t i = 0; i < heights.size(); i++) heights[i] = detail.data[i * 4 + 2];
+            GrassRaycast raycast = loadOrBakeRelief(ground_names[layer], heights, detail.width, detail.height);
+            size = static_cast<uint32_t>(raycast.size);
+            slices = static_cast<uint32_t>(raycast.slices());
+            for(int e = 0; e < grass_elevations; e++) reliefLayout.angles[e] = raycast.angles[e];
+            reliefLayout.low_from = raycast.low_from;
+            reliefLayout.low_to = raycast.low_to;
+            oblique[layer] = makeGrassTextures(raycast.oblique, raycast.size, raycast.slices(), 7, compressed).height;
+            top[layer] = makeGrassTextures(raycast.top, raycast.size, 1, 7, compressed).height;
+        }
+        reliefBaked = true;
+    } else {
+        // Nothing to look up : a flat texel
+        for(int layer = 0; layer < relief_layers; layer++) {
+            oblique[layer] = GrassTexture { { 255 }, { 1 } };
+            top[layer] = GrassTexture { { 255 }, { 1 } };
+        }
+        reliefBaked = false;
+    }
+
+    auto upload = [&](const std::vector<GrassTexture>& textures, uint32_t layers_each, std::shared_ptr<VmaImage>& image, vk::ImageView& view) {
+        // The same level of every layer of the soil, one after the other
+        GrassTexture merged;
+        std::vector<size_t> offsets(textures.size(), 0);
+        for(size_t level = 0; level < textures[0].level_sizes.size(); level++) {
+            const size_t before = merged.data.size();
+            for(size_t k = 0; k < textures.size(); k++) {
+                merged.data.insert(merged.data.end(), textures[k].data.begin() + offsets[k], textures[k].data.begin() + offsets[k] + textures[k].level_sizes[level]);
+                offsets[k] += textures[k].level_sizes[level];
+            }
+            merged.level_sizes.push_back(merged.data.size() - before);
+        }
+        const vk::Format format = compressed ? vk::Format::eBc4UnormBlock : vk::Format::eR8Unorm;
+        const uint32_t levels = static_cast<uint32_t>(merged.level_sizes.size()), layers = layers_each * static_cast<uint32_t>(textures.size());
+        vk::ImageCreateInfo info({}, vk::ImageType::e2D, format, vk::Extent3D(size, size, 1), levels, layers,
+            vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+            vk::SharingMode::eExclusive, 1, &ctx.device.g_i, vk::ImageLayout::eUndefined);
+        image = ctx.transfer.createImageMips(merged.data.data(), merged.level_sizes, info, vk::ImageLayout::eShaderReadOnlyOptimal);
+        view = ctx.device->createImageView(vk::ImageViewCreateInfo({}, image->image, vk::ImageViewType::e2DArray, format,
+            vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, levels, 0, layers)));
+    };
+    upload(oblique, slices, relief, reliefView);
+    upload(top, 1, reliefTop, reliefTopView);
 
 }
 
@@ -196,6 +297,17 @@ void TerrainPass::createPipeline(RenderTarget target, vk::RenderPass renderpass)
     desc.attributes = terrainVertexAttributes();
     desc.layout = layout;
     desc.renderpass = renderpass;
+
+    // How the rays of the relief are laid out : azimuths of each elevation (constant_id 0 to 3), heights
+    // of the lowest rays (4 and 5)
+    vk::SpecializationMapEntry entries[6];
+    for(uint32_t e = 0; e < 4; e++) {
+        entries[e] = vk::SpecializationMapEntry(e, offsetof(ReliefLayout, angles) + e * sizeof(int32_t), sizeof(int32_t));
+    }
+    entries[4] = vk::SpecializationMapEntry(4, offsetof(ReliefLayout, low_from), sizeof(float));
+    entries[5] = vk::SpecializationMapEntry(5, offsetof(ReliefLayout, low_to), sizeof(float));
+    auto specialization = vk::SpecializationInfo(6, entries, sizeof(ReliefLayout), &reliefLayout);
+    desc.fragment_specialization = &specialization;
 
     pipelines[index(target)] = createGraphicsPipeline(ctx.device, desc);
 
@@ -224,6 +336,11 @@ void TerrainPass::record(vk::CommandBuffer command, const RenderView& view) {
     pc.under_grass = settings && settings->grass && settings->grass_pass ? settings->grass_params.height : 0.f;
     pc.library = groundLibrary ? 1.f : 0.f;
     pc.scree = settings ? settings->scree : 1.f;
+    auto* run = creg.ctx().find<Settings>();
+    const float relief_scale = (settings ? settings->relief : 1.f) * (run ? run->ground_relief : 1.f);
+    for(int layer = 0; layer < relief_layers; layer++) {
+        pc.relief[layer] = reliefBaked ? relief_depths[layer] * relief_scale : 0.f;
+    }
     command.pushConstants(layout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(TerrainPC), &pc);
 
     for(auto [entity, position, gpu] : creg.view<const ChunkC, const ChunkGPU, const ChunkReady>().each()) {
@@ -246,6 +363,8 @@ TerrainPass::~TerrainPass() {
     }
     ctx.device->destroy(layout);
     ctx.device->destroy(groundSampler);
+    ctx.device->destroy(reliefTopView);
+    ctx.device->destroy(reliefView);
     ctx.device->destroy(groundDetailView);
     ctx.device->destroy(groundColorView);
     ctx.device->destroy(sampler);

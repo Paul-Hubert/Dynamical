@@ -23,6 +23,7 @@ struct RenderSettings {
     bool soil = true;
     SoilParams soil_params;
     float scree = 1.f;          // stones at the foot of the rock, where the ground gets steep : 0 none
+    float relief = 1.f;         // depth of the relief of the mud, the stones and the sand, looked up in baked rays : 0 flat
 
     // Plants of the vegetation library (VegetationPass)
     struct Vegetation {

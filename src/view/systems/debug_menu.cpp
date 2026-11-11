@@ -71,6 +71,7 @@ void DebugMenuSys::tick(double dt) {
             ImGui::SliderFloat("Soil edge width", &soil.edge_width, 4.f, 24.f, "%.0f m");
             ImGui::SliderFloat("Shorter grass from", &soil.grass_margin, 0.f, 24.f, "%.0f m");
             ImGui::SliderFloat("Stones under the rock", &render.scree, 0.f, 1.f);
+            ImGui::SliderFloat("Relief of the soil", &render.relief, 0.f, 3.f);
         }
 
         if(ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -114,6 +115,7 @@ void DebugMenuSys::tick(double dt) {
             ImGui::SliderFloat("Baked colour", &grass.baked_colour, 0.f, 1.f);
             ImGui::SliderFloat("Species patch size", &grass.species.size, 0.f, 120.f, "%.0f m");
             ImGui::SliderFloat("Small plants under", &grass.species.low, 0.f, 1.f);
+            ImGui::SliderFloat("Species overlap", &grass.species.overlap, 0.f, 1.f);
             ImGui::SliderFloat("Shadow", &grass.shadow, 0.f, 1.f);
             ImGui::SliderFloat("Canopy", &grass.canopy, 0.f, 1.f);
             ImGui::SliderFloat("See through on crests", &grass.silhouette, 0.f, 3.f);

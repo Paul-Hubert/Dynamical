@@ -269,6 +269,10 @@ uint64_t grassBakeKey(const GrassBakeParams& params) {
 }
 
 GrassRaycast bakeGrass(const GrassBakeParams& params, unsigned threads) {
+    return bakeGrassModel(generateGrassTile(params.model), params, grassBakeKey(params), threads);
+}
+
+GrassRaycast bakeGrassModel(GrassModel model, const GrassBakeParams& params, uint64_t key, unsigned threads, int cells) {
 
     const int size = std::max(params.size, 1);
 
@@ -277,14 +281,14 @@ GrassRaycast bakeGrass(const GrassBakeParams& params, unsigned threads) {
     for(int e = 0; e < grass_elevations; e++) out.angles[e] = std::max(params.angles[e], 1);
     out.low_from = std::clamp(params.low_from, 0.f, 1.f);
     out.low_to = std::clamp(params.low_to, 0.f, out.low_from);
-    out.key = grassBakeKey(params);
+    out.key = key;
     const int slices = out.slices();
     out.oblique.resize(size_t(slices) * size * size * 4);
     out.top.resize(size_t(size) * size * 4);
     out.oblique_colour.resize(out.oblique.size(), 255);
     out.top_colour.resize(out.top.size(), 255);
 
-    GrassTracer tracer(generateGrassTile(params.model));
+    GrassTracer tracer(std::move(model), cells);
 
     // Slice `slices` is the top down one. A ray is at its start at t = 0, over its texel at t = 0.5 and
     // at its end at t = 1 : from the top of the grass to the ground, but for the lowest rays

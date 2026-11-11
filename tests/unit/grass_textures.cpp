@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "logic/grass/grass_height.h"
+#include "logic/grass/grass_species.h"
 #include "logic/grass/grass_textures.h"
 
 using namespace dy;
@@ -245,6 +247,75 @@ TEST_CASE("GRASS.12 the colour map holds what each ray met : green by the height
     for(size_t i = 0; i < data.oblique_colour.size(); i++) error += std::abs(int(data.oblique_colour[i]) - int(read_back.oblique_colour[i]));
     INFO("colour moved by " << error / (data.oblique_colour.size() * 0.75) << " / 255 in blocks");
     CHECK(error / (data.oblique_colour.size() * 0.75) < 6.);
+
+}
+
+TEST_CASE("GRASS.13 every kind has its patches, they overlap, the small plants are where the grass is short") {
+
+    std::vector<int8_t> noise = bakeSpeciesNoise();
+    REQUIRE(noise.size() == size_t(grass_species::size) * grass_species::size * 4);
+    CHECK(noise == bakeSpeciesNoise());
+
+    // It repeats : the first and the last columns are neighbours, a step of the noise apart
+    int jump = 0;
+    for(int y = 0; y < grass_species::size; y++) {
+        jump = std::max(jump, std::abs(int(noise[size_t(y) * grass_species::size * 4]) - int(noise[(size_t(y) * grass_species::size + grass_species::size - 1) * 4])));
+    }
+    CHECK(jump < 40);
+
+    GrassSpeciesParams params, apart;
+    apart.overlap = 0.f;
+    GrassHeightField heights;
+    int seen[grass_kinds] = {}, changes = 0, places = 0, mixed = 0, both = 0;
+    GrassKind before = GrassKind::Meadow;
+    for(int z = 0; z < 300; z++) {
+        for(int x = 0; x < 300; x++) {
+            glm::vec2 world(x * 3.f - 450.f, z * 3.f - 450.f);
+            float tallness = heights.sample(world.x, world.y);
+            GrassSpecies here = grassSpeciesAt(noise, params, world, tallness);
+            const bool small = grassKindInfo(here.kinds[0]).small;
+            const float band = grass_species::band * params.overlap;
+            // Away from the band of heights where both grow : small plants in the short grass only
+            if(std::abs(tallness - params.low) >= band) {
+                REQUIRE(small == (tallness < params.low));
+                REQUIRE(here.under < 0);
+                REQUIRE(grassKindInfo(here.kinds[1]).small == small);
+            }
+            REQUIRE((here.under == -2) == small);
+            if(here.under >= 0) REQUIRE(grassKindInfo(static_cast<GrassKind>(here.under)).small);
+            mixed += here.kinds[1] != here.kinds[0];
+            both += here.under >= 0 || grassKindInfo(here.kinds[1]).small != small;
+            // Without overlap : one kind at a place, small plants on one side of a line
+            GrassSpecies alone = grassSpeciesAt(noise, apart, world, tallness);
+            REQUIRE(alone.kinds[1] == alone.kinds[0]);
+            REQUIRE(alone.kinds[2] == alone.kinds[0]);
+            if(std::abs(tallness - apart.low) > 0.002f) {
+                REQUIRE(grassKindInfo(alone.kinds[0]).small == (tallness < apart.low));
+                REQUIRE(alone.under == (tallness < apart.low ? -2 : -1));
+            }
+            seen[int(here.kinds[0])]++;
+            changes += x > 0 && here.kinds[0] != before;
+            before = here.kinds[0];
+            places++;
+        }
+    }
+    // Each kind takes some of the land, in patches : neighbours 3 m apart are mostly of the same kind
+    for(int k = 0; k < grass_kinds; k++) {
+        CAPTURE(grassKindInfo(static_cast<GrassKind>(k)).name);
+        CHECK(seen[k] > places / 200);
+    }
+    CHECK(changes < places / 4);
+
+    // The patches overlap : two kinds together over a good part of the land, not everywhere, and small
+    // plants with tall ones somewhere
+    INFO(mixed << " places of " << places << " with two kinds, " << both << " with small and tall plants");
+    CHECK(mixed > places / 5);
+    CHECK(mixed < places * 9 / 10);
+    CHECK(both > places / 100);
+
+    // No patches : the meadow
+    params.size = 0.f;
+    CHECK(grassSpeciesAt(noise, params, glm::vec2(12.f, 7.f), 0.f).kinds[0] == GrassKind::Meadow);
 
 }
 
