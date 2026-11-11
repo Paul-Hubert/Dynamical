@@ -43,6 +43,9 @@ void TerrainSys::init() {
     // Created now so the render passes can read them from worker threads without creating them
     reg.storage<ChunkGPU>();
     reg.storage<ChunkReady>();
+    reg.storage<ChunkTriangles>();
+
+    ray_tracing = device.ray.enabled();
 
     vk::DeviceSize alignment = std::max<vk::DeviceSize>(device.physical.getProperties().limits.minStorageBufferOffsetAlignment, 16);
 
@@ -52,8 +55,19 @@ void TerrainSys::init() {
         VmaAllocationCreateInfo info {};
         info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
         indirect = VmaBuffer(device, &info, vk::BufferCreateInfo({}, max_slots * indirect_stride,
-            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eTransferDst,
+            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eTransferSrc,
             vk::SharingMode::eExclusive, 1, &device.g_i));
+    }
+
+    if(ray_tracing) {
+        VmaAllocationCreateInfo info {};
+        info.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
+        info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        readback = VmaBuffer(device, &info, vk::BufferCreateInfo({}, max_slots * sizeof(vk::DrawIndirectCommand),
+            vk::BufferUsageFlagBits::eTransferDst, vk::SharingMode::eExclusive, 1, &device.g_i));
+        VmaAllocationInfo inf;
+        vmaGetAllocationInfo(device, readback.allocation, &inf);
+        readback_pointer = static_cast<const vk::DrawIndirectCommand*>(inf.pMappedData);
     }
 
     // Density staging : a ring of max_per_frame chunks per compute command buffer
@@ -169,8 +183,11 @@ uint32_t TerrainSys::allocateSlot() {
 
     VmaAllocationCreateInfo info {};
     info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    // The acceleration structure of the chunk is built from its vertices as they are (RayScene)
+    vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eVertexBuffer;
+    if(ray_tracing) usage |= vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
     slot->vertices = VmaBuffer(device, &info, vk::BufferCreateInfo({}, (vk::DeviceSize) max_triangles * 3 * sizeof(TerrainVertex),
-        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eVertexBuffer, vk::SharingMode::eExclusive, 1, &device.g_i));
+        usage, vk::SharingMode::eExclusive, 1, &device.g_i));
 
     slot->set = device->allocateDescriptorSets(vk::DescriptorSetAllocateInfo(descPool, 1, &chunkLayout))[0];
 
@@ -205,6 +222,22 @@ void TerrainSys::tick(double dt) {
             it = pending_frees.erase(it);
         } else {
             ++it;
+        }
+    }
+
+    // The frame that counted these meshes is done (its fence was waited for) : how many triangles they have
+    if(!pending_counts.empty()) {
+        vmaInvalidateAllocation(ctx.device, readback.allocation, 0, VK_WHOLE_SIZE);
+        for(auto it = pending_counts.begin(); it != pending_counts.end();) {
+            if(frame_counter - it->frame < NUM_FRAMES) {
+                ++it;
+                continue;
+            }
+            auto* gpu = reg.valid(it->entity) ? reg.try_get<ChunkGPU>(it->entity) : nullptr;
+            if(gpu && gpu->slot == it->slot) {
+                reg.emplace_or_replace<ChunkTriangles>(it->entity, readback_pointer[it->slot].vertexCount / 3, it->slot);
+            }
+            it = pending_counts.erase(it);
         }
     }
 
@@ -302,12 +335,27 @@ void TerrainSys::tick(double dt) {
         command.dispatch(1, 1, 1);
     }
 
+    if(ray_tracing) {
+        command.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eTransfer, {},
+            vk::MemoryBarrier(vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eTransferRead), {}, {});
+        for(auto& build : builds) {
+            command.copyBuffer(indirect.buffer, readback.buffer, vk::BufferCopy(build.slot * indirect_stride,
+                build.slot * sizeof(vk::DrawIndirectCommand), sizeof(vk::DrawIndirectCommand)));
+            pending_counts.push_back({ build.entity, build.slot, frame_counter });
+        }
+        // What comes next in this command buffer (the acceleration structures) reads the vertices
+        command.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader | vk::PipelineStageFlagBits::eTransfer,
+            vk::PipelineStageFlagBits::eAllCommands, {},
+            vk::MemoryBarrier(vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eMemoryRead), {}, {});
+    }
+
     // Graphics waits on the compute submission of this frame, the meshes can be drawn right away
     for(auto& build : builds) {
         if(auto* gpu = reg.try_get<ChunkGPU>(build.entity)) {
             pending_frees.push_back({gpu->slot, frame_counter});
         }
         reg.emplace_or_replace<ChunkGPU>(build.entity, build.slot);
+        reg.remove<ChunkTriangles>(build.entity);
         reg.emplace_or_replace<ChunkReady>(build.entity);
         reg.remove<ChunkMeshPending>(build.entity);
     }
@@ -323,6 +371,7 @@ TerrainSys::~TerrainSys() {
 
     reg.clear<ChunkGPU>();
     reg.clear<ChunkReady>();
+    reg.clear<ChunkTriangles>();
     reg.ctx().erase<TerrainBuffers>();
 
     slots.clear();

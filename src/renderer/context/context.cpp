@@ -13,24 +13,40 @@ Context::Context(entt::registry& reg) : vr(*this, reg), win(*this, reg), instanc
     // Needs the device : session, reference space and per-eye swapchains
     vr.init();
 
+    // The compute shaders of the lighting read the same set
+    auto stages = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute;
     auto bindings = std::vector{
-        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1,
-                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment),
-        vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment),
-        vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eCombinedImageSampler, 1,
-                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment),
-        vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eUniformBuffer, 1,
-                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
+        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, stages),
+        vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eCombinedImageSampler, 1, stages),
+        vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eCombinedImageSampler, 1, stages),
+        vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eUniformBuffer, 1, stages)
     };
-    view_layout = device->createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo({}, bindings));
+    if(device.ray.enabled()) {
+        bindings.push_back(vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eAccelerationStructureKHR, 1, stages));
+        bindings.push_back(vk::DescriptorSetLayoutBinding(5, vk::DescriptorType::eStorageBuffer, 1, stages));
+        bindings.push_back(vk::DescriptorSetLayoutBinding(6, vk::DescriptorType::eCombinedImageSampler, max_ray_textures, stages));
+    }
+    // The textures of the rays come as the species load : most of that array is not there
+    std::vector<vk::DescriptorBindingFlags> flags(bindings.size());
+    if(device.ray.enabled()) flags[6] = vk::DescriptorBindingFlagBits::ePartiallyBound;
+    vk::DescriptorSetLayoutBindingFlagsCreateInfo binding_flags(flags);
+    vk::DescriptorSetLayoutCreateInfo layout_info({}, bindings);
+    if(device.ray.enabled()) layout_info.pNext = &binding_flags;
+    view_layout = device->createDescriptorSetLayout(layout_info);
 
 }
 
 std::vector<vk::DescriptorPoolSize> Context::viewPoolSizes(uint32_t sets) const {
-    return {
+    std::vector<vk::DescriptorPoolSize> sizes {
         vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, sets * 2),
         vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, sets * 2),
     };
+    if(device.ray.enabled()) {
+        sizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, sets));
+        sizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, sets));
+        sizes[1].descriptorCount += sets * max_ray_textures;
+    }
+    return sizes;
 }
 
 void Context::writeViewSet(vk::DescriptorSet set, uint32_t frame, bool first) {
@@ -47,6 +63,27 @@ void Context::writeViewSet(vk::DescriptorSet set, uint32_t frame, bool first) {
     if(first) {
         writes.push_back(vk::WriteDescriptorSet(set, 2, 0, 1, vk::DescriptorType::eCombinedImageSampler, &soil, nullptr, nullptr));
         writes.push_back(vk::WriteDescriptorSet(set, 3, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &lights, nullptr));
+    }
+
+    // What the rays see : the structure is built again every frame, and replaced when it grows
+    vk::WriteDescriptorSetAccelerationStructureKHR scene(1, &tlas);
+    if(device.ray.enabled() && tlas) {
+        vk::WriteDescriptorSet write(set, 4, 0, 1, vk::DescriptorType::eAccelerationStructureKHR);
+        write.pNext = &scene;
+        writes.push_back(write);
+    }
+    auto geometries = vk::DescriptorBufferInfo(ray_geometries, 0, VK_WHOLE_SIZE);
+    if(device.ray.enabled() && ray_geometries) {
+        writes.push_back(vk::WriteDescriptorSet(set, 5, 0, 1, vk::DescriptorType::eStorageBuffer, nullptr, &geometries, nullptr));
+    }
+    if(device.ray.enabled() && ray_textures) {
+        size_t& written = ray_textures_written[(VkDescriptorSet) set];
+        size_t count = std::min<size_t>(ray_textures->size(), max_ray_textures);
+        if(written < count) {
+            writes.push_back(vk::WriteDescriptorSet(set, 6, (uint32_t) written, (uint32_t) (count - written),
+                vk::DescriptorType::eCombinedImageSampler, ray_textures->data() + written, nullptr, nullptr));
+            written = count;
+        }
     }
 
     device->updateDescriptorSets(writes, {});

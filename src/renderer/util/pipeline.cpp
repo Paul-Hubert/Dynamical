@@ -44,7 +44,8 @@ vk::Pipeline dy::createGraphicsPipeline(Device& device, const GraphicsPipelineDe
         vk::BlendFactor::eSrcAlpha, vk::BlendFactor::eOneMinusSrcAlpha, vk::BlendOp::eAdd,
         vk::BlendFactor::eOne, vk::BlendFactor::eOneMinusSrcAlpha, vk::BlendOp::eAdd,
         vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
-    auto colorBlending = vk::PipelineColorBlendStateCreateInfo({}, VK_FALSE, vk::LogicOp::eCopy, 1, &blendAttachment);
+    std::vector<vk::PipelineColorBlendAttachmentState> blendAttachments(desc.color_attachments, blendAttachment);
+    auto colorBlending = vk::PipelineColorBlendStateCreateInfo({}, VK_FALSE, vk::LogicOp::eCopy, blendAttachments);
 
     auto depthStencil = vk::PipelineDepthStencilStateCreateInfo({}, desc.depth_test, desc.depth_write, vk::CompareOp::eLessOrEqual);
 
@@ -64,5 +65,5 @@ vk::Pipeline dy::createGraphicsPipeline(Device& device, const GraphicsPipelineDe
 }
 
 std::string dy::sceneFragmentShader(Context& ctx, const char* name) {
-    return std::string("./resources/shaders/") + name + ".frag.glsl.spv";
+    return std::string("./resources/shaders/") + name + (ctx.device.ray.enabled() ? ".frag.glsl.rt.spv" : ".frag.glsl.spv");
 }

@@ -20,6 +20,7 @@
 #include "logic/terrain/terrain_generator.h"
 #include "logic/terrain/chunk.h"
 #include "logic/animals/animal.h"
+#include "logic/components/lighting_stats.h"
 #include "logic/vegetation/vegetation.h"
 #include "scene/run_args.h"
 #include "util/log.h"
@@ -223,6 +224,12 @@ bool dy::animalsReady(const entt::registry& reg) {
     return !stats || stats->species_loading == 0;
 }
 
+// The lighting has nothing left to build (true without ray tracing)
+bool dy::lightingReady(const entt::registry& reg) {
+    auto* stats = reg.ctx().find<LightingStats>();
+    return !stats || stats->settled();
+}
+
 bool Capture::due(uint64_t frame) {
 
     if(done() || failed() || frame < shots[next].frame) return false;
@@ -232,7 +239,7 @@ bool Capture::due(uint64_t frame) {
         return false;
     }
 
-    if(terrainReady(reg)) {
+    if(terrainReady(reg) && lightingReady(reg)) {
         if(frame > shots[next].frame) {
             dy::log(dy::warning) << "Capture " << shots[next].name << " : terrain ready at frame " << frame << " instead of " << shots[next].frame << "\n";
             // A sequence keeps its pace : the frames after a late one are as late

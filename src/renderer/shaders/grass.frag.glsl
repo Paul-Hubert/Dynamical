@@ -745,7 +745,7 @@ void main() {
     vec3 sunlit = color * light_color.rgb * (light * occlusion);
     sunlit += vec3(0.9, 1.0, 0.7) * light_color.rgb * (0.17 * occlusion * lit * pow(max(dot(reflect(-sun_direction, normal), -view), 0.0), 24.0));
 
-    writeLit(unlit, sunlit, shade, v_position, 1.0);
+    writeLit(unlit, sunlit, shade, v_position, liftAlpha(0.3 + terminatorLift(dFdx(v_position), dFdy(v_position), ground_normal, 4.0)));
 
     // Depth of the hit. The smooth normal says roughly where the ground is : stay over the triangle
     // that is really under this pixel

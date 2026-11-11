@@ -42,6 +42,7 @@ per_frame(NUM_FRAMES) {
     reg.ctx().emplace<RenderSettings>();
 
     lights = std::make_unique<Lights>(ctx, reg);
+    if(ctx.device.ray.enabled()) ray_scene = std::make_unique<RayScene>(ctx, reg);
     tree_shade = std::make_unique<TreeShade>(ctx, reg);
     soil_maps = std::make_unique<SoilMaps>(ctx, reg);
     classic = std::make_unique<ClassicRender>(ctx, reg);
@@ -62,10 +63,10 @@ per_frame(NUM_FRAMES) {
     for(auto& pass : passes) {
         pass_list.push_back(pass.get());
         if(pass->supports(RenderTarget::Desktop)) {
-            pass->createPipeline(RenderTarget::Desktop, classic->getRenderpass());
+            pass->createPipeline(RenderTarget::Desktop, pass->overlay() ? classic->getFinalRenderpass() : classic->getRenderpass());
         }
         if(vr->enabled() && pass->supports(RenderTarget::VR)) {
-            pass->createPipeline(RenderTarget::VR, vr->getRenderpass());
+            pass->createPipeline(RenderTarget::VR, pass->overlay() ? vr->getFinalRenderpass() : vr->getRenderpass());
         }
     }
 
@@ -124,6 +125,9 @@ void Renderer::render() {
     for(ScenePass* pass : pass_list) {
         pass->update(frame_index);
     }
+
+    // What the rays of this frame see : built in its compute commands
+    if(ray_scene) ray_scene->update();
 
 
     // Transfer -> compute -> graphics, each stage waiting on the previous one if it had work
@@ -227,6 +231,7 @@ Renderer::~Renderer() {
     classic.reset();
     soil_maps.reset();
     tree_shade.reset();
+    ray_scene.reset();
     lights.reset();
 
     for(auto& f : per_frame) {

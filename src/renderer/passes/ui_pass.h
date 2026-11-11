@@ -22,6 +22,7 @@ public:
 
     const char* name() const override { return "UI"; }
     bool supports(RenderTarget target) const override { return target == RenderTarget::Desktop; }
+    bool overlay() const override { return true; }
     void createPipeline(RenderTarget target, vk::RenderPass renderpass) override;
     void update(uint32_t frame_index) override;
     void record(vk::CommandBuffer command, const RenderView& view) override;

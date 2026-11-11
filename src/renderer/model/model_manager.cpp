@@ -51,9 +51,9 @@ entt::entity ModelManager::add(const std::string& key, const MeshData& mesh) {
     }
 
     model.vertices = ctx.transfer.createBuffer(vertices.data(), vk::BufferCreateInfo({}, vertices.size() * sizeof(ModelVertex),
-        vk::BufferUsageFlagBits::eVertexBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+        vk::BufferUsageFlagBits::eVertexBuffer | ctx.rayInputUsage(), vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
     model.indices = ctx.transfer.createBuffer(mesh.indices.data(), vk::BufferCreateInfo({}, mesh.indices.size() * sizeof(uint32_t),
-        vk::BufferUsageFlagBits::eIndexBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+        vk::BufferUsageFlagBits::eIndexBuffer | ctx.rayInputUsage(), vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
     model.materials.push_back(ModelC::Material());
     model.parts.push_back({ 0, (uint32_t) mesh.indices.size(), 0 });
 

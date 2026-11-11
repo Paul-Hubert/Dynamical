@@ -37,6 +37,10 @@ public:
 
     virtual bool supports(RenderTarget target) const { return true; }
 
+    // Drawn over the finished picture, in the render pass of the image the target shows (the UI). The others
+    // are the scene : with ray tracing they draw in the pass of SunVisibility, which has two colour attachments
+    virtual bool overlay() const { return false; }
+
     // Called once per render target. Pipelines differ between targets since the color formats do.
     virtual void createPipeline(RenderTarget target, vk::RenderPass renderpass) = 0;
 

@@ -7,6 +7,7 @@ layout(std140, set = 0, binding = 0) uniform View {
     vec4 tree_shade;    // x : strength, y : 1 / width of the map in metres, z : distance where it ends
     mat4 inv_viewproj;
     mat4 prev_viewproj; // of the same eye, a frame before
+    vec4 prev_viewpos;  // xyz : where the eye was then
     vec4 view_lighting; // x : traced range in metres, y : sun rays a pixel, z : shadowed torches a pixel
 };
 

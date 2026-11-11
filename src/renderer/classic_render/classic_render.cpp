@@ -73,6 +73,10 @@ per_frame(NUM_FRAMES) {
         }
     }
 
+    if(ctx.device.ray.enabled()) {
+        lit = std::make_unique<SunVisibility>(ctx, reg, RenderTarget::Desktop, std::vector<vk::Extent2D> { ctx.swap.extent }, renderpass);
+    }
+
 }
 
 void ClassicRender::readPassTimes(uint32_t frame_index) {
@@ -145,9 +149,13 @@ void ClassicRender::updateView(uint32_t frame_index, float time) {
     ubo->tree_shade = treeShadeView(reg);
     ubo->inverse_view_projection = glm::inverse(ubo->view_projection);
     ubo->previous_view_projection = have_previous ? previous_view_projection : ubo->view_projection;
+    ubo->previous_position = have_previous ? glm::vec4(previous_position, 0.f) : ubo->position;
+    previous_position = camera.position;
     ubo->lighting = lightingView(reg, RenderTarget::Desktop);
     previous_view_projection = ubo->view_projection;
     have_previous = true;
+
+    if(lit) lit->beginFrame();
 
     ctx.writeViewSet(per_frame[frame_index].set, frame_index, false);
 
@@ -172,24 +180,48 @@ void ClassicRender::record(uint32_t frame_index, const std::vector<ScenePass*>& 
     uint32_t timed = 0;
     if(times.pool) command.resetQueryPool(times.pool, first_query, max_timed_passes + 1);
 
+    RenderView view { RenderTarget::Desktop, frame_index, 0, f.set, extent };
+
+    if(times.pool) command.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, times.pool, first_query);
+
+    auto stamp = [&](const char* name) {
+        if(times.pool && timed < max_timed_passes) {
+            command.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, times.pool, first_query + ++timed);
+            if(times.names.size() < timed) times.names.push_back(name);
+        }
+    };
+    auto draw = [&](bool overlay) {
+        for(ScenePass* pass : passes) {
+            if(pass->supports(RenderTarget::Desktop) && pass->overlay() == overlay) {
+                pass->record(command, view);
+                stamp(pass->name());
+            }
+        }
+    };
+
+    // With ray tracing the scene is drawn apart, the sun's light on its own, and brought together in the
+    // image of the window with how much of the sun each pixel sees
+    if(lit) {
+        lit->beginScene(command, 0);
+        draw(false);
+        lit->endScene(command);
+        lit->trace(command, 0, f.set);
+        stamp("Sun rays");
+    }
+
     command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.frames[ctx.swap.current].framebuffer, vk::Rect2D({}, extent), clearValues), vk::SubpassContents::eInline);
 
     command.setViewport(0, vk::Viewport(0.f, 0.f, (float)extent.width, (float)extent.height, 0.f, 1.f));
     command.setScissor(0, vk::Rect2D(vk::Offset2D(), extent));
 
-    RenderView view { RenderTarget::Desktop, frame_index, 0, f.set, extent };
-
-    if(times.pool) command.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, times.pool, first_query);
-
-    for(ScenePass* pass : passes) {
-        if(pass->supports(RenderTarget::Desktop)) {
-            pass->record(command, view);
-            if(times.pool && timed < max_timed_passes) {
-                command.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, times.pool, first_query + ++timed);
-                if(times.names.size() < timed) times.names.push_back(pass->name());
-            }
-        }
+    if(lit) {
+        lit->composite(command, 0, f.set);
+        stamp("Composite");
+    } else {
+        draw(false);
     }
+    draw(true);
+
     if(times.pool) times.written[frame_index] = timed;
 
     command.endRenderPass();

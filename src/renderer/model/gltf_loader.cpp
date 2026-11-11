@@ -277,9 +277,9 @@ ModelC dy::loadGLTF(entt::registry& reg, const std::string& path) {
     }
 
     model.vertices = ctx.transfer.createBuffer(vertices.data(), vk::BufferCreateInfo({}, vertices.size() * sizeof(ModelVertex),
-        vk::BufferUsageFlagBits::eVertexBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+        vk::BufferUsageFlagBits::eVertexBuffer | ctx.rayInputUsage(), vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
     model.indices = ctx.transfer.createBuffer(indices.data(), vk::BufferCreateInfo({}, indices.size() * sizeof(uint32_t),
-        vk::BufferUsageFlagBits::eIndexBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+        vk::BufferUsageFlagBits::eIndexBuffer | ctx.rayInputUsage(), vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
 
     dy::log(dy::info) << "Loaded " << path << " : " << vertices.size() << " vertices, " << indices.size() / 3 << " triangles\n";
 

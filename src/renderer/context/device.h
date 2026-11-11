@@ -3,6 +3,7 @@
 
 #include "renderer/util/vk.h"
 #include "vk_mem_alloc.h"
+#include "ray_context.h"
 #include <mutex>
 
 #include <entt/entt.hpp>
@@ -39,6 +40,8 @@ public :
     uint32_t g_i = 0, c_i = 0, t_i = 0;
 
     bool sampler_anisotropy = false;    // enabled when the GPU has it
+
+    RayContext ray;                     // acceleration structures and ray queries, where the GPU has them
 
     
     vk::PhysicalDevice physical;

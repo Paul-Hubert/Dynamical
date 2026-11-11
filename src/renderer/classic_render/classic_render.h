@@ -9,6 +9,9 @@
 
 #include "renderer/scene_pass.h"
 #include "renderer/view_ubo.h"
+#include "renderer/lighting/sun_visibility.h"
+
+#include <memory>
 
 #include <vector>
 
@@ -22,7 +25,11 @@ public:
     ClassicRender(Context& ctx, entt::registry& reg);
     ~ClassicRender();
 
+    // The pass the scene passes draw in, and the one of the image the target shows (the same without ray tracing)
     vk::RenderPass getRenderpass() {
+        return lit ? lit->scenePass() : renderpass.renderpass;
+    }
+    vk::RenderPass getFinalRenderpass() {
         return renderpass;
     }
 
@@ -51,6 +58,9 @@ private:
 
     ClRenderpass renderpass;
 
+    // With ray tracing : the images the scene is drawn in, and the sun's visibility
+    std::unique_ptr<SunVisibility> lit;
+
     vk::CommandPool commandPool;
     vk::DescriptorPool descriptorPool;
 
@@ -69,6 +79,7 @@ private:
     bool acquired = false;
 
     glm::mat4 previous_view_projection = glm::mat4(1.f);
+    glm::vec3 previous_position = glm::vec3(0.f);
     bool have_previous = false;
 
     VmaBuffer capture_buffer;

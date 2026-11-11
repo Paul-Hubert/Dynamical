@@ -33,6 +33,9 @@ struct RunArgs {
     // 300 frames. The window presents without waiting for the monitor
     bool gpu_times = false;
 
+    // dynamical: false draws without the ray traced lighting on a GPU that has it (docs/lighting.md)
+    bool ray_tracing = true;
+
     // Probes
     std::string probe;                      // csv file
     std::string probe_entities = "RigidBody";

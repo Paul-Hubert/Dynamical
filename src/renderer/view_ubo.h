@@ -15,6 +15,7 @@ struct ViewUBO {
                           // z : distance from the camera where it ends
     glm::mat4 inverse_view_projection;
     glm::mat4 previous_view_projection; // of the same eye, a frame before
+    glm::vec4 previous_position; // xyz : where the eye was then
     glm::vec4 lighting; // the tier of the target (RenderSettings::Lighting) : x : traced range in metres, y : sun rays a pixel,
                         // z : shadowed torches a pixel
 

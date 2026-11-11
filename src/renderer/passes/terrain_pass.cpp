@@ -293,6 +293,7 @@ void TerrainPass::createPipeline(RenderTarget target, vk::RenderPass renderpass)
     GraphicsPipelineDesc desc;
     desc.vertex_shader = "./resources/shaders/terrain.vert.glsl.spv";
     desc.fragment_shader = sceneFragmentShader(ctx, "terrain");
+    desc.color_attachments = ctx.sceneAttachments();
     desc.bindings = terrainVertexBindings();
     desc.attributes = terrainVertexAttributes();
     desc.layout = layout;

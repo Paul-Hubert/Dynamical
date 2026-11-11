@@ -60,13 +60,17 @@ per_frame(NUM_FRAMES) {
             eye.pointer = static_cast<ViewUBO*> (inf.pMappedData);
 
             auto bufInfo = vk::DescriptorBufferInfo(eye.ubo, 0, sizeof(ViewUBO));
-            auto soilInfo = vk::DescriptorImageInfo(ctx.soil_sampler, ctx.soil_view, vk::ImageLayout::eShaderReadOnlyOptimal);
-
             ctx.device->updateDescriptorSets({
-                vk::WriteDescriptorSet(eye.set, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &bufInfo, nullptr),
-                vk::WriteDescriptorSet(eye.set, 2, 0, 1, vk::DescriptorType::eCombinedImageSampler, &soilInfo, nullptr, nullptr)
+                vk::WriteDescriptorSet(eye.set, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &bufInfo, nullptr)
                 }, {});
+            ctx.writeViewSet(eye.set, (uint32_t) i, true);
         }
+    }
+
+    if(ctx.device.ray.enabled()) {
+        std::vector<vk::Extent2D> extents;
+        for(auto& swapchain : ctx.vr.swapchains) extents.push_back(vk::Extent2D(swapchain.width, swapchain.height));
+        lit = std::make_unique<SunVisibility>(ctx, reg, RenderTarget::VR, extents, renderpass);
     }
 
 }
@@ -227,6 +231,8 @@ void VRRender::updateView(uint32_t frame_index, float time) {
 
     glm::mat4 world_from_stage = reg.ctx().get<VRRig>().transform();
 
+    if(lit) lit->beginFrame();
+
     for(uint32_t v = 0; v < ctx.vr.num_views; v++) {
         glm::mat4 world_from_eye = world_from_stage * pose_matrix(views[v].pose);
         auto* ubo = per_frame[frame_index].eyes[v].pointer;
@@ -235,6 +241,9 @@ void VRRender::updateView(uint32_t frame_index, float time) {
         ubo->tree_shade = treeShadeView(reg);
         ubo->inverse_view_projection = glm::inverse(ubo->view_projection);
         ubo->previous_view_projection = v < previous_view_projections.size() ? previous_view_projections[v] : ubo->view_projection;
+        ubo->previous_position = v < previous_positions.size() ? glm::vec4(previous_positions[v], 0.f) : ubo->position;
+        if(previous_positions.size() <= v) previous_positions.resize(v + 1);
+        previous_positions[v] = glm::vec3(world_from_eye[3]);
         ubo->lighting = lightingView(reg, RenderTarget::VR);
         if(previous_view_projections.size() <= v) previous_view_projections.resize(v + 1);
         previous_view_projections[v] = ubo->view_projection;
@@ -261,18 +270,35 @@ void VRRender::record(uint32_t frame_index, const std::vector<ScenePass*>& passe
                 vk::ClearValue(vk::ClearColorValue(std::array<float, 4> { 0.45f, 0.6f, 0.8f, 1.0f })),
                 vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0)) };
 
+        RenderView view { RenderTarget::VR, frame_index, v, f.eyes[v].set, extent };
+
+        auto draw = [&](bool overlay) {
+            for(ScenePass* pass : passes) {
+                if(pass->supports(RenderTarget::VR) && pass->overlay() == overlay) {
+                    pass->record(command, view);
+                }
+            }
+        };
+
+        // As the desktop target : with ray tracing the scene apart, then the sun's visibility of this eye
+        if(lit) {
+            lit->beginScene(command, v);
+            draw(false);
+            lit->endScene(command);
+            lit->trace(command, v, f.eyes[v].set);
+        }
+
         command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.views[v].framebuffers[image_indices[v]], vk::Rect2D({}, extent), clearValues), vk::SubpassContents::eInline);
 
         command.setViewport(0, vk::Viewport(0.f, 0.f, (float) extent.width, (float) extent.height, 0.f, 1.f));
         command.setScissor(0, vk::Rect2D(vk::Offset2D(), extent));
 
-        RenderView view { RenderTarget::VR, frame_index, v, f.eyes[v].set, extent };
-
-        for(ScenePass* pass : passes) {
-            if(pass->supports(RenderTarget::VR)) {
-                pass->record(command, view);
-            }
+        if(lit) {
+            lit->composite(command, v, f.eyes[v].set);
+        } else {
+            draw(false);
         }
+        draw(true);
 
         command.endRenderPass();
     }

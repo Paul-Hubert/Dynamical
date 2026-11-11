@@ -15,6 +15,7 @@ void SkyPass::createPipeline(RenderTarget target, vk::RenderPass renderpass) {
     GraphicsPipelineDesc desc;
     desc.vertex_shader = "./resources/shaders/sky.vert.glsl.spv";
     desc.fragment_shader = sceneFragmentShader(ctx, "sky");
+    desc.color_attachments = ctx.sceneAttachments();
     desc.layout = layout;
     desc.renderpass = renderpass;
     desc.cull = vk::CullModeFlagBits::eNone;

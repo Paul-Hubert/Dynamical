@@ -107,6 +107,7 @@ private:
         std::shared_ptr<VmaImage> image;
         vk::ImageView view;
         bool cutout = false;
+        glm::vec3 mean = glm::vec3(0.4f);   // colour of the whole texture, linear
     };
     std::unordered_map<std::string, Texture> textures;
     std::unordered_map<VmaImage*, vk::ImageView> default_views;

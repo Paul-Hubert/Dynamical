@@ -28,6 +28,13 @@ public:
 };
 struct ChunkReady {}; // the mesh was computed in a submitted compute batch, drawable
 
+// How many triangles the mesh of the chunk has : only the GPU knows when it is drawn, read back a few
+// frames later where something needs it on the CPU (the acceleration structures of the lighting)
+struct ChunkTriangles {
+    uint32_t count = 0;
+    uint32_t slot = 0;      // of the mesh that was counted
+};
+
 // Context variable read by the terrain and grass passes
 struct TerrainBuffers {
     vk::Buffer indirect;
@@ -83,6 +90,18 @@ private:
         uint64_t frame;
     };
     std::vector<PendingFree> pending_frees;
+
+    // With ray tracing : the indirect commands of the meshes of a frame are copied here, a slot each,
+    // and read once that frame is done
+    VmaBuffer readback;
+    const vk::DrawIndirectCommand* readback_pointer = nullptr;
+    struct PendingCount {
+        entt::entity entity;
+        uint32_t slot;
+        uint64_t frame;
+    };
+    std::vector<PendingCount> pending_counts;
+    bool ray_tracing = false;
     uint64_t frame_counter = 0;
 };
 

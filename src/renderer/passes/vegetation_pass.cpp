@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "renderer/context/context.h"
+#include "renderer/lighting/ray_meshes.h"
 #include "renderer/util/pipeline.h"
 
 #include "logic/components/camera.h"
@@ -20,6 +21,9 @@ using namespace dy;
 
 constexpr uint32_t max_materials = 1024;
 constexpr size_t max_jobs = 6;
+
+// Part of the light a leaf lets through, in the rays of the lighting : its brightest colour channel
+constexpr float leaf_translucency = 0.45f;
 
 namespace {
 
@@ -51,6 +55,7 @@ VegetationPass::VegetationPass(Context& ctx, entt::registry& reg) : ctx(ctx), re
     reg.storage<Transform>();
     reg.ctx().emplace<VegetationStats>();
     species.resize(vegetationLibrary(reg).species.size());
+    if(reg.ctx().find<RayMeshes>()) reg.ctx().emplace<RayPlantMeshes>().mesh.assign(species.size(), -1);
 
     auto poolSizes = std::vector {
         vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, max_materials * 4),
@@ -93,6 +98,7 @@ void VegetationPass::createPipeline(RenderTarget target, vk::RenderPass renderpa
     GraphicsPipelineDesc desc;
     desc.vertex_shader = "./resources/shaders/vegetation.vert.glsl.spv";
     desc.fragment_shader = sceneFragmentShader(ctx, "vegetation");
+    desc.color_attachments = ctx.sceneAttachments();
     desc.bindings = {
         vk::VertexInputBindingDescription(0, sizeof(VegetationVertex), vk::VertexInputRate::eVertex),
     };
@@ -196,6 +202,11 @@ void VegetationPass::finishJob(Job& job) {
             vk::Format format = texture.srgb ? vk::Format::eR8G8B8A8Srgb : vk::Format::eR8G8B8A8Unorm;
             t.image = uploadTexture(ctx, texture.pixels, format);
             t.cutout = texture.pixels.cutout;
+            // The smallest level is the mean colour of what is not cut out : what the rays that bounce read
+            if(texture.srgb && texture.pixels.data.size() >= 4) {
+                const uint8_t* last = texture.pixels.data.data() + texture.pixels.data.size() - 4;
+                t.mean = glm::pow(glm::vec3(last[0], last[1], last[2]) / 255.f, glm::vec3(2.2f));
+            }
             t.view = ctx.device->createImageView(vk::ImageViewCreateInfo({}, t.image->image, vk::ImageViewType::e2D, format,
                 vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, (uint32_t) texture.pixels.level_sizes.size(), 0, 1)));
         }
@@ -210,9 +221,9 @@ void VegetationPass::finishJob(Job& job) {
     s.radius = glm::length(glm::vec3(reach.x, std::max(s.def.max.y - s.height * 0.5f, s.height * 0.5f - s.def.min.y), reach.z));
 
     s.vertices = ctx.transfer.createBuffer(job.vertices.data(), vk::BufferCreateInfo({}, job.vertices.size() * sizeof(VegetationVertex),
-        vk::BufferUsageFlagBits::eVertexBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+        vk::BufferUsageFlagBits::eVertexBuffer | ctx.rayInputUsage(), vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
     s.indices = ctx.transfer.createBuffer(job.indices.data(), vk::BufferCreateInfo({}, job.indices.size() * sizeof(uint32_t),
-        vk::BufferUsageFlagBits::eIndexBuffer, vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
+        vk::BufferUsageFlagBits::eIndexBuffer | ctx.rayInputUsage(), vk::SharingMode::eExclusive, 1, &ctx.device.g_i));
 
     for(auto& def : s.def.materials) {
         Material material;
@@ -244,6 +255,40 @@ void VegetationPass::finishJob(Job& job) {
         ctx.device->updateDescriptorSets(writes, {});
 
         s.materials.push_back(material);
+    }
+
+    // With ray tracing the most detailed level goes to the rays : bark stops the light, leaves let it
+    // through where their texture is, tinted (docs/lighting.md)
+    if(auto* ray_meshes = reg.ctx().find<RayMeshes>(); ray_meshes && !s.def.lods.empty() && !s.def.lods[0].billboard) {
+        const VegetationLod& lod = s.def.lods[0];
+        RayMesh mesh;
+        mesh.kind = RayMesh::Kind::Plant;
+        mesh.vertices = s.vertices;
+        mesh.indices = s.indices;
+        mesh.vertex_stride = sizeof(VegetationVertex);
+        mesh.first_vertex = lod.first_vertex;
+        mesh.vertex_count = lod.vertex_count;
+        for(auto& draw : lod.draws) {
+            const VegetationMaterial& def = s.def.materials[draw.material];
+            RayMesh::Part part;
+            part.first_index = draw.first_index;
+            part.index_count = draw.index_count;
+            auto color = textures.find(def.color);
+            bool textured = color != textures.end() && color->second.image;
+            glm::vec3 mean = (textured ? color->second.mean : glm::vec3(0.4f)) * glm::vec3(def.tint);
+            part.color = mean;
+            if(textured && color->second.cutout) {
+                part.texture = ray_meshes->texture(color->second.view, atlas_sampler);
+                part.opaque = part.texture < 0;
+                part.alpha_cutoff = s.def.alpha_cutoff;
+                // What a leaf lets through has its colour, a little greyer
+                part.transmission = glm::mix(mean, glm::vec3(glm::dot(mean, glm::vec3(0.3f, 0.6f, 0.1f))), 0.25f) * leaf_translucency / std::max(std::max(mean.r, mean.g), std::max(mean.b, 0.05f));
+            }
+            mesh.parts.push_back(part);
+        }
+        auto& plant_meshes = reg.ctx().get<RayPlantMeshes>();
+        if(plant_meshes.mesh.size() < species.size()) plant_meshes.mesh.resize(species.size(), -1);
+        plant_meshes.mesh[job.species] = (int32_t) ray_meshes->add(std::move(mesh));
     }
 
     s.state = Species::State::Ready;

@@ -16,6 +16,7 @@
 
 #include <array>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 namespace dy {
@@ -44,6 +45,24 @@ public:
     vk::Sampler soil_sampler;
     std::array<vk::Buffer, NUM_FRAMES> lights_buffers {};
 
+    // With ray tracing (device.ray.enabled()) the set goes on : what the rays see (RayScene, binding 4)
+    vk::AccelerationStructureKHR tlas;
+    // What a shader knows of a hit (the geometry table of RayScene, binding 5) and the textures the rays
+    // test the leaves against (RayMeshes, binding 6 : only ever added)
+    vk::Buffer ray_geometries;
+    const std::vector<vk::DescriptorImageInfo>* ray_textures = nullptr;
+    static constexpr uint32_t max_ray_textures = 512;
+
+    // Usage a vertex or an index buffer needs to be traced, nothing without ray tracing
+    vk::BufferUsageFlags rayInputUsage() {
+        if(!device.ray.enabled()) return {};
+        return vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
+    }
+
+    // Colour attachments of the render pass the scene passes draw in : the swapchain image, or with ray
+    // tracing the colour and the light of the sun apart (SunVisibility)
+    uint32_t sceneAttachments() { return device.ray.enabled() ? 2 : 1; }
+
     // Sizes of a descriptor pool that holds `sets` sets of view_layout
     std::vector<vk::DescriptorPoolSize> viewPoolSizes(uint32_t sets) const;
 
@@ -52,6 +71,10 @@ public:
     void writeViewSet(vk::DescriptorSet set, uint32_t frame_index, bool first);
 
     uint32_t frame_index = 0;
+
+private:
+    // Textures of the rays each set already has
+    std::unordered_map<VkDescriptorSet, size_t> ray_textures_written;
 
 };
 

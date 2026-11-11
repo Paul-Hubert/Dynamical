@@ -31,8 +31,9 @@ Instance::Instance(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     layers.push_back("VK_LAYER_KHRONOS_validation");
 #endif
 
-    // Vulkan 1.1 for subgroup operations in the marching cubes shader
-    uint32_t version = VK_API_VERSION_1_1;
+    // Vulkan 1.1 for subgroup operations in the marching cubes shader, 1.2 for the rays of the lighting
+    // where the loader has it (RayContext)
+    uint32_t version = vk::enumerateInstanceVersion() >= VK_API_VERSION_1_2 ? VK_API_VERSION_1_2 : VK_API_VERSION_1_1;
 
     // OpenXR decides part of the instance extensions and the api version
     std::vector<std::string> xr_extensions;
@@ -50,6 +51,7 @@ Instance::Instance(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     
     extensions = checkExtensions(extensions, vk::enumerateInstanceExtensionProperties());
 
+    api_version = version;
     vk::ApplicationInfo appInfo("Dynamical", VK_MAKE_VERSION(1, 0, 0), "Dynamical", VK_MAKE_VERSION(1, 0, 0), version);
 
 

@@ -30,6 +30,7 @@ struct GraphicsPipelineDesc {
     bool depth_test = true;
     bool depth_write = true;
     bool alpha_blend = false;
+    uint32_t color_attachments = 1;     // of the subpass, all blended the same way
 };
 
 vk::ShaderModule loadShader(Device& device, const char* path);

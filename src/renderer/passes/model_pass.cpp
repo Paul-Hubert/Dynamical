@@ -1,6 +1,7 @@
 #include "model_pass.h"
 
 #include "renderer/context/context.h"
+#include "renderer/lighting/ray_meshes.h"
 #include "renderer/model/model.h"
 #include "renderer/util/pipeline.h"
 #include "renderer/util/texture.h"
@@ -52,6 +53,7 @@ void ModelPass::createPipeline(RenderTarget target, vk::RenderPass renderpass) {
     GraphicsPipelineDesc desc;
     desc.vertex_shader = "./resources/shaders/model.vert.glsl.spv";
     desc.fragment_shader = sceneFragmentShader(ctx, "model");
+    desc.color_attachments = ctx.sceneAttachments();
     desc.bindings = {
         vk::VertexInputBindingDescription(0, sizeof(ModelVertex), vk::VertexInputRate::eVertex),
     };
@@ -91,11 +93,31 @@ vk::DescriptorSet ModelPass::makeMaterialSet(const std::shared_ptr<VmaImage>& im
 void ModelPass::update(uint32_t frame_index) {
 
     // Descriptor sets of newly loaded models, on the main thread before the parallel recording
+    auto* ray_meshes = reg.ctx().find<RayMeshes>();
+
     for(auto [entity, model] : reg.view<ModelC>().each()) {
         for(auto& material : model.materials) {
             if(!material.set) {
                 material.set = makeMaterialSet(material.image);
             }
+        }
+
+        // With ray tracing the model casts shadows : its mesh, to the rays
+        if(ray_meshes && model.ray_mesh < 0 && model.vertices && model.indices) {
+            RayMesh mesh;
+            mesh.kind = RayMesh::Kind::Solid;
+            mesh.vertices = model.vertices;
+            mesh.indices = model.indices;
+            mesh.vertex_stride = sizeof(ModelVertex);
+            mesh.vertex_count = (uint32_t) (model.vertices->size / sizeof(ModelVertex));
+            for(auto& part : model.parts) {
+                RayMesh::Part traced;
+                traced.first_index = part.first_index;
+                traced.index_count = part.index_count;
+                traced.color = glm::vec3(model.materials[part.material].base_color);
+                mesh.parts.push_back(traced);
+            }
+            model.ray_mesh = (int32_t) ray_meshes->add(std::move(mesh));
         }
     }
 

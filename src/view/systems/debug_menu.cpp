@@ -5,6 +5,7 @@
 #include "logic/components/camera.h"
 #include "view/components/input.h"
 #include "logic/components/render_settings.h"
+#include "logic/components/lighting_stats.h"
 #include "logic/components/point_light.h"
 #include "logic/components/rigid_body.h"
 #include "logic/components/transform.h"
@@ -97,6 +98,25 @@ void DebugMenuSys::tick(double dt) {
                 }
                 ImGui::SameLine();
                 ImGui::Text("%zu torches", torches);
+            }
+        }
+
+        // Ray traced lighting : what each target pays for (docs/lighting.md)
+        if(auto* lighting = reg.ctx().find<LightingStats>()) {
+            if(ImGui::CollapsingHeader("Lighting", ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::Text("%u chunks in the rays (%u waiting), %u instances, %.1f MB", lighting->chunks_lit, lighting->chunks_pending,
+                    lighting->instances, (double) lighting->structure_bytes / (1024. * 1024.));
+                if(lighting->bricks > 0) {
+                    ImGui::Text("%u bricks, %u probes traced, %u never traced", lighting->bricks, lighting->probes_active, lighting->probes_pending);
+                }
+                const char* const tiers[] = { "off", "low", "medium", "high" };
+                const char* const targets[] = { "Desktop", "VR" };
+                for(int target = 0; target < 2; target++) {
+                    int tier = (int) render.lighting[target].tier;
+                    if(ImGui::Combo(targets[target], &tier, tiers, 4)) {
+                        render.lighting[target] = RenderSettings::Lighting::of((RenderSettings::LightingTier) tier);
+                    }
+                }
             }
         }
 

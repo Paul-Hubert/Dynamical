@@ -17,6 +17,7 @@ public:
     operator vk::Instance() { return instance; }
     operator VkInstance() { return static_cast<VkInstance>(instance); }
     bool supportsPresent(VkPhysicalDevice device, int i);
+    uint32_t api_version = VK_API_VERSION_1_1;  // the instance was created for
 #ifndef NDEBUG
     VkDebugUtilsMessengerEXT messenger;
     static bool debugOutput;

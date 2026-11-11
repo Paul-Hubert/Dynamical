@@ -13,6 +13,9 @@
 
 #include "renderer/scene_pass.h"
 #include "renderer/view_ubo.h"
+#include "renderer/lighting/sun_visibility.h"
+
+#include <memory>
 
 namespace dy {
 
@@ -27,7 +30,11 @@ public:
 
     bool enabled() const;
 
+    // The pass the scene passes draw in, and the one of the image the target shows (the same without ray tracing)
     vk::RenderPass getRenderpass() {
+        return lit ? lit->scenePass() : renderpass.renderpass;
+    }
+    vk::RenderPass getFinalRenderpass() {
         return renderpass;
     }
 
@@ -54,6 +61,9 @@ private:
     Context& ctx;
 
     VRRenderpass renderpass;
+
+    // With ray tracing : the images the scene is drawn in, and the sun's visibility
+    std::unique_ptr<SunVisibility> lit;
     std::unique_ptr<VRActions> actions;
 
     vk::CommandPool commandPool;
@@ -77,6 +87,7 @@ private:
     std::vector<XrView> views;
     std::vector<uint32_t> image_indices;
     std::vector<glm::mat4> previous_view_projections;   // per eye
+    std::vector<glm::vec3> previous_positions;
 
 };
 

@@ -39,6 +39,8 @@ bool terrainReady(const entt::registry& reg);
 bool vegetationReady(const entt::registry& reg);
 // No animal of the library is still loading (true without animals)
 bool animalsReady(const entt::registry& reg);
+// The ray traced lighting has built what it sees (true without it)
+bool lightingReady(const entt::registry& reg);
 
 class Capture {
 public:

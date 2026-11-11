@@ -13,6 +13,7 @@
 
 #include "renderer/util/vk_util.h"
 #include "logic/settings/settings.h"
+#include "scene/run_args.h"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
@@ -91,6 +92,13 @@ Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
         }
     }
 
+    // The rays of the lighting, where the GPU has them
+    {
+        auto* args = reg.ctx().find<RunArgs>();
+        ray.detect(physical, ctx.instance.api_version, !args || args->ray_tracing);
+        for(const char* extension : ray.extensions()) extensions.push_back(extension);
+    }
+
     extensions = checkExtensions(extensions, physical.enumerateDeviceExtensionProperties());
     
     // Prepare queue choice data : GRAPHICS / COMPUTE / TRANSFER
@@ -163,7 +171,13 @@ Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
 
     // Create Device
 
-    logical = physical.createDevice(vk::DeviceCreateInfo({}, countF, pqinfo.data(), 0, nullptr, (uint32_t) extensions.size(), extensions.data(), &requiredFeatures));
+    if(ray.enabled()) {
+        vk::DeviceCreateInfo info({}, countF, pqinfo.data(), 0, nullptr, (uint32_t) extensions.size(), extensions.data(), nullptr);
+        info.pNext = ray.features(requiredFeatures);
+        logical = physical.createDevice(info);
+    } else {
+        logical = physical.createDevice(vk::DeviceCreateInfo({}, countF, pqinfo.data(), 0, nullptr, (uint32_t) extensions.size(), extensions.data(), &requiredFeatures));
+    }
     
     VULKAN_HPP_DEFAULT_DISPATCHER.init(logical);
     
@@ -196,6 +210,11 @@ Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     allocatorInfo.physicalDevice = physical;
     allocatorInfo.device = logical;
     allocatorInfo.instance = ctx.instance;
+    if(ray.enabled()) {
+        // Buffers the acceleration structures are built from are known by their address
+        allocatorInfo.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+        allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_2;
+    }
     vmaCreateAllocator(&allocatorInfo, &allocator);
     
 }

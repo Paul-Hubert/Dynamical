@@ -353,6 +353,6 @@ void main() {
         gl_FragDepth = clamp(max(clip.z / clip.w, gl_FragDepth), 0.0, 1.0);
     }
 
-    writeLit(unlit, sunlit, shade, v_position, 1.0);
+    writeLit(unlit, sunlit, shade, v_position, liftAlpha(terminatorLift(position_dx, position_dy, normal, 4.0)));
 
 }

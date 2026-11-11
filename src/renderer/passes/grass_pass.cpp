@@ -337,6 +337,7 @@ void GrassPass::createPipeline(RenderTarget target, vk::RenderPass renderpass) {
     GraphicsPipelineDesc desc;
     desc.vertex_shader = "./resources/shaders/grass.vert.glsl.spv";
     desc.fragment_shader = sceneFragmentShader(ctx, "grass");
+    desc.color_attachments = ctx.sceneAttachments();
     desc.bindings = terrainVertexBindings();
     desc.attributes = terrainVertexAttributes();
     desc.layout = layout;

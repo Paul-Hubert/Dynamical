@@ -41,6 +41,8 @@ public:
     glm::vec3 min = glm::vec3(0.f);
     glm::vec3 max = glm::vec3(0.f);
 
+    int32_t ray_mesh = -1;      // in RayMeshes, with ray tracing : given by ModelPass
+
 };
 
 }
