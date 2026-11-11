@@ -48,7 +48,7 @@ Actuator of the `sphere_roll` agent (one dynamic sphere per world, steered by a 
 | [AgentIO](../components/AgentIO.md) | world | readwrite | init | `configure(behavior, 16, 3)`; reset clears outputs |
 | [WorldRng](../components/WorldRng.md) | world | readwrite | init | reset draws |
 | [WorldInfo](../components/WorldInfo.md) | world | read | init | `find`; `index` |
-| [std::shared_ptr&lt;TerrainColliders&gt;](../components/std--shared_ptr-TerrainColliders.md) | world | readwrite | init | `find`; `surfaceHeight`, `overhangAmplitude`, `require` |
+| [std::shared_ptr&lt;TerrainColliders&gt;](../components/shared_ptr-TerrainColliders.md) | world | readwrite | init | `find`; `surfaceHeight`, `overhangAmplitude`, `require` |
 | [WorldClock](../components/WorldClock.md) | world | read | init | `tick * dt` for `require` |
 | [PhysicsWorld](../components/PhysicsWorld.md) | world | readwrite | init | `groundBelow`; `SetPositionRotationAndVelocity` if created |
 | [PhysicsPose](../components/PhysicsPose.md) | world | write | init | `try_get`; set to the spawn pose |
@@ -61,7 +61,7 @@ Actuator of the `sphere_roll` agent (one dynamic sphere per world, steered by a 
 | [Transform](../components/Transform.md) | world | readwrite | tick | reset on pending reset |
 | [WorldRng](../components/WorldRng.md) | world | readwrite | tick | reset on pending reset |
 | [WorldInfo](../components/WorldInfo.md) | world | read | tick | reset on pending reset |
-| [std::shared_ptr&lt;TerrainColliders&gt;](../components/std--shared_ptr-TerrainColliders.md) | world | readwrite | tick | reset on pending reset |
+| [std::shared_ptr&lt;TerrainColliders&gt;](../components/shared_ptr-TerrainColliders.md) | world | readwrite | tick | reset on pending reset |
 | [PhysicsPose](../components/PhysicsPose.md) | world | write | tick | reset on pending reset |
 | [Parked](../components/Parked.md) | world | write | tick | reset on pending reset |
 

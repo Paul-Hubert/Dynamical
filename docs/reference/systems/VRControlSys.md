@@ -35,7 +35,7 @@ VR player controls: left thumbstick locomotion of the play area ([`VRRig`](../co
 |---|---|---|---|---|
 | [`VRHands`](../components/VRHands.md) | host | write +create | preinit | `emplace<VRHands>()` |
 | [`VRRig`](../components/VRRig.md) | host | write | init | `position.y` |
-| [`TerrainGenerator`](../components/TerrainGenerator.md) (`std::shared_ptr<TerrainGenerator>`) | host | read | init | `find`, `surfaceHeight(0, 0)` |
+| [`TerrainGenerator`](../components/shared_ptr-TerrainGenerator.md) (`std::shared_ptr<TerrainGenerator>`) | host | read | init | `find`, `surfaceHeight(0, 0)` |
 | [`VRInput`](../components/VRInput.md) | host | read | init | `find`, `enabled` |
 | [`ModelManager`](../components/ModelManager.md) | host | read | init | `load(box.gltf)` |
 | [`VRHands`](../components/VRHands.md) | host | readwrite | init | stores the hand entities |
@@ -44,7 +44,7 @@ VR player controls: left thumbstick locomotion of the play area ([`VRRig`](../co
 | [`RigidBody`](../components/RigidBody.md) | host | write +create | init | kinematic hand boxes |
 | [`VRInput`](../components/VRInput.md) | host | read | tick | session state, head, sticks, trigger, poses, velocity |
 | [`VRRig`](../components/VRRig.md) | host | readwrite | tick | `stick_locomotion`, `transform()`, `position`, `yaw` |
-| [`TerrainGenerator`](../components/TerrainGenerator.md) (`std::shared_ptr<TerrainGenerator>`) | host | read | tick | `surfaceHeight` under the rig |
+| [`TerrainGenerator`](../components/shared_ptr-TerrainGenerator.md) (`std::shared_ptr<TerrainGenerator>`) | host | read | tick | `surfaceHeight` under the rig |
 | [`VRHands`](../components/VRHands.md) | host | read | tick | hand entities |
 | [`Transform`](../components/Transform.md) | host | write | tick | hand poses; also `+create` for thrown boxes (spawnBox) |
 | [`ModelManager`](../components/ModelManager.md) | host | read | tick | spawnBox |

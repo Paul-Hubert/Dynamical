@@ -30,7 +30,7 @@ Fills the densities of the chunks created by [ChunkManagerSys](ChunkManagerSys.m
 ## Components and context variables touched
 | Component / context var | Registry | Access | Where (phase) | Details |
 |---|---|---|---|---|
-| [std::shared_ptr&lt;TerrainGenerator&gt;](../components/std--shared_ptr-TerrainGenerator.md) | host | write (emplace_ctx) | preinit | new generator, seed 1337 |
+| [std::shared_ptr&lt;TerrainGenerator&gt;](../components/shared_ptr-TerrainGenerator.md) | host | write (emplace_ctx) | preinit | new generator, seed 1337 |
 | [RunArgs](../components/RunArgs.md) | host | read | tick | `find`; `deterministic()` |
 | [Camera](../components/Camera.md) | host | read | tick | `find`; `position` for priority |
 | [ChunkC](../components/ChunkC.md) | host | read | tick | `center()`, `pos` |
@@ -40,7 +40,7 @@ Fills the densities of the chunks created by [ChunkManagerSys](ChunkManagerSys.m
 | [ChunkVolume](../components/ChunkVolume.md) | host | write +create | tick | collect, surface chunks |
 | [ChunkMeshPending](../components/ChunkMeshPending.md) | host | write +create | tick | collect, surface chunks |
 | [ChunkEmpty](../components/ChunkEmpty.md) | host | write +create | tick | collect, chunks without surface |
-| [tf::Executor](../components/tf--Executor.md) | host | readwrite | tick | `get`; `silent_async` per job |
+| [tf::Executor](../components/tf-Executor.md) | host | readwrite | tick | `get`; `silent_async` per job |
 
 The component-doc file names for `std::shared_ptr<TerrainGenerator>` and `tf::Executor` above are guesses at the merge script's naming.
 

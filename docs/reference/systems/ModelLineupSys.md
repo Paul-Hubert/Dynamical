@@ -27,7 +27,7 @@ Demo content of the `base` scene: at init, loads every glTF file directly in `re
 | Component / context var | Registry | Access | Where (phase) | Details |
 |---|---|---|---|---|
 | [`ModelManager`](../components/ModelManager.md) | host | read | init | `load()` per file |
-| [`TerrainGenerator`](../components/TerrainGenerator.md) (`std::shared_ptr<TerrainGenerator>`) | host | read | init | `surfaceHeight(x, 15)` |
+| [`TerrainGenerator`](../components/shared_ptr-TerrainGenerator.md) (`std::shared_ptr<TerrainGenerator>`) | host | read | init | `surfaceHeight(x, 15)` |
 | [`ModelC`](../components/ModelC.md) | host | read | init | `min`, `max` of the model entity |
 | [`Transform`](../components/Transform.md) | host | write +create | init | new entity |
 | [`ModelRenderable`](../components/ModelRenderable.md) | host | write +create | init | new entity |

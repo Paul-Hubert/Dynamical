@@ -31,11 +31,11 @@ The free-flying desktop camera. Emplaces the [`Camera`](../components/Camera.md)
 |---|---|---|---|---|
 | [`Camera`](../components/Camera.md) | host | write +create | preinit | `emplace<Camera>()` |
 | [`Camera`](../components/Camera.md) | host | write | init | spawn position and pitch |
-| [`TerrainGenerator`](../components/TerrainGenerator.md) (`std::shared_ptr<TerrainGenerator>`) | host | read | init | `find`, `surfaceHeight(0, 60)` |
+| [`TerrainGenerator`](../components/shared_ptr-TerrainGenerator.md) (`std::shared_ptr<TerrainGenerator>`) | host | read | init | `find`, `surfaceHeight(0, 60)` |
 | [`Camera`](../components/Camera.md) | host | readwrite | tick | `yaw`, `pitch`, `position`, `sprinting` |
 | [`Input`](../components/Input.md) | host | readwrite | tick | reads `rightDown`, `mouseDelta`, `mouseWheel`, movement bits; clears `on[VR_RIG]` |
 | [`VRRig`](../components/VRRig.md) | host | write | tick | `position`, `yaw` on VR_RIG |
-| [`TerrainGenerator`](../components/TerrainGenerator.md) (`std::shared_ptr<TerrainGenerator>`) | host | read | tick | `surfaceHeight` under the camera on VR_RIG |
+| [`TerrainGenerator`](../components/shared_ptr-TerrainGenerator.md) (`std::shared_ptr<TerrainGenerator>`) | host | read | tick | `surfaceHeight` under the camera on VR_RIG |
 
 ## Side effects
 - `SDL_SetRelativeMouseMode` every tick (grabs/hides the cursor while the right button is held).

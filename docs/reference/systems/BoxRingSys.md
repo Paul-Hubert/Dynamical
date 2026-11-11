@@ -21,7 +21,7 @@ Demo content of the `base` scene: at init, drops a ring of 12 dynamic boxes onto
 ## Components and context variables touched
 | Component / context var | Registry | Access | Where (phase) | Details |
 |---|---|---|---|---|
-| [`TerrainGenerator`](../components/TerrainGenerator.md) (`std::shared_ptr<TerrainGenerator>`) | host | read | init | `surfaceHeight(x, z)` |
+| [`TerrainGenerator`](../components/shared_ptr-TerrainGenerator.md) (`std::shared_ptr<TerrainGenerator>`) | host | read | init | `surfaceHeight(x, z)` |
 | [`ModelManager`](../components/ModelManager.md) | host | read | init | spawnBox loads `box.gltf` |
 | [`Transform`](../components/Transform.md) | host | write +create | init | spawnBox, then rotation |
 | [`ModelRenderable`](../components/ModelRenderable.md) | host | write +create | init | spawnBox |

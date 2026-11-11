@@ -44,7 +44,7 @@ Sensor and episode bookkeeping of the `sphere_roll` agent, run on the last tick 
 | [Transform](../components/Transform.md) | world | readwrite | tick | `position`; reset writes it on RESET |
 | [PhysicsWorld](../components/PhysicsWorld.md) | world | readwrite | tick | velocities, 3 `groundBelow` casts; reset teleports on RESET |
 | [WorldInfo](../components/WorldInfo.md) | world | read | tick | reset on RESET |
-| [std::shared_ptr&lt;TerrainColliders&gt;](../components/std--shared_ptr-TerrainColliders.md) | world | readwrite | tick | reset on RESET (`require`) |
+| [std::shared_ptr&lt;TerrainColliders&gt;](../components/shared_ptr-TerrainColliders.md) | world | readwrite | tick | reset on RESET (`require`) |
 | [WorldClock](../components/WorldClock.md) | world | read | tick | reset on RESET (with TerrainColliders) |
 | [PhysicsPose](../components/PhysicsPose.md) | world | write | tick | reset on RESET |
 

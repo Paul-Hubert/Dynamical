@@ -79,3 +79,7 @@ Entry point is `src/main.cpp` → `Game::start()`. The game loop runs: `renderer
 - Optick profiler integration (`OPTICK_EVENT` macros) — currently disabled in main
 - `ThreadSafe<T>` wrapper in `src/util/util.h` for mutex-guarded shared state
 - Taskflow executor (context variable) for chunk generation and parallel command recording
+
+## Reference Docs
+
+`docs/reference/` documents every system, component (with per-system read/write access and side effects) and source folder. When changing a system's behavior or component access, update its `systems/<Name>.md` and `data/<area>.json` entry, then run `python3 tools/gen_reference_docs.py` (and `--check`). See `docs/reference/README.md`.

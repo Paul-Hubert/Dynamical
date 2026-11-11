@@ -26,7 +26,7 @@ None (the chunk systems are in [`src/logic/systems/`](src-logic-systems.md)).
 - [ChunkMeshPending](../components/ChunkMeshPending.md)
 - [ChunkDestroying](../components/ChunkDestroying.md)
 - [ChunkMap](../components/ChunkMap.md)
-- [std::shared_ptr&lt;TerrainGenerator&gt;](../components/std--shared_ptr-TerrainGenerator.md)
+- [std::shared_ptr&lt;TerrainGenerator&gt;](../components/shared_ptr-TerrainGenerator.md)
 
 ## Subfolders
 None.
