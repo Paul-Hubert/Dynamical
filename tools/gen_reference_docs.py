@@ -25,7 +25,8 @@ ACCESS_ORDER = {"write": 0, "readwrite": 1, "read": 2}
 
 def slug(name: str) -> str:
     """File name of a component or system doc: C++ qualifiers and template brackets become dashes."""
-    s = re.sub(r"[^A-Za-z0-9_]+", "-", name).strip("-")
+    s = re.sub(r"\bstd::", "", name)
+    s = re.sub(r"[^A-Za-z0-9_]+", "-", s).strip("-")
     return s or "unnamed"
 
 
