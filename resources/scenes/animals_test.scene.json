@@ -1,0 +1,23 @@
+{
+  "format_version": 1,
+  "name": "animals_test",
+  "include": ["common/desktop.json"],
+  "variables": {
+    "clips":   { "type": "string", "default": "all", "description": "all (every clip in turn), a kind (walk, idle, run, eat, rest), a clip name, or none (the bind pose)" },
+    "per_row": { "type": "int",    "default": 10 },
+    "seconds": { "type": "float",  "default": 4,  "description": "how long a looping clip is held" },
+    "yaw":     { "type": "float",  "default": 180, "description": "degrees : 180 faces the spawn camera" }
+  },
+
+  "renderer": { "passes": ["terrain", "animals", "model", "ui"], "vr": true },
+
+  "host": {
+    "pre": [
+      "Input", "UI", "Time", "PlayerControl", "VRControl", "DebugMenu",
+      "ChunkManager", "ChunkGenerator",
+      { "name": "AnimalLineup", "params": { "clips": "${clips}", "per_row": "${per_row}", "seconds": "${seconds}", "yaw": "${yaw}" } },
+      "AnimalAnimation"
+    ],
+    "post": ["Terrain"]
+  }
+}

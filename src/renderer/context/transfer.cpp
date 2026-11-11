@@ -250,6 +250,39 @@ std::shared_ptr<VmaBuffer> Transfer::createBuffer(const void* data, vk::BufferCr
 
 }
 
+void Transfer::updateImage(const void* data, size_t size, vk::Image image, vk::ImageSubresourceLayers layers, vk::Offset3D offset, vk::Extent3D extent, vk::ImageLayout layout) {
+
+    VmaAllocationCreateInfo ainfo{};
+    ainfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    ainfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    auto binfo = vk::BufferCreateInfo({}, size, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, 1, &ctx.device.t_i);
+
+    current.stagingBuffers.push_back(VmaBuffer(ctx.device, &ainfo, binfo));
+    auto& stage = current.stagingBuffers.back();
+
+    VmaAllocationInfo inf;
+    vmaGetAllocationInfo(ctx.device, stage.allocation, &inf);
+
+    memcpy(inf.pMappedData, data, size);
+
+    auto range = vk::ImageSubresourceRange(layers.aspectMask, layers.mipLevel, 1, layers.baseArrayLayer, layers.layerCount);
+
+    current.command.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eTransfer, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ImageMemoryBarrier(
+        vk::AccessFlagBits::eShaderRead, vk::AccessFlagBits::eTransferWrite, layout, vk::ImageLayout::eTransferDstOptimal,
+        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image, range
+    ));
+
+    current.command.copyBufferToImage(stage, image, vk::ImageLayout::eTransferDstOptimal, vk::BufferImageCopy(0, 0, 0, layers, offset, extent));
+
+    current.command.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eAllCommands, vk::DependencyFlagBits::eByRegion, {}, {}, vk::ImageMemoryBarrier(
+        vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eShaderRead, vk::ImageLayout::eTransferDstOptimal, layout,
+        VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, image, range
+    ));
+
+    empty = false;
+
+}
+
 vk::CommandBuffer Transfer::getCommandBuffer() {
     empty = false;
     return current.command;

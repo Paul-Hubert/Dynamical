@@ -40,7 +40,7 @@ per_frame(NUM_FRAMES) {
 
     auto sizes = std::vector {
         vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, (uint32_t) per_frame.size() * num_views),
-        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, (uint32_t) per_frame.size() * num_views),
+        vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, (uint32_t) per_frame.size() * num_views * 2),
     };
     descriptorPool = ctx.device->createDescriptorPool(vk::DescriptorPoolCreateInfo({}, (uint32_t) per_frame.size() * num_views, sizes));
 
@@ -62,9 +62,11 @@ per_frame(NUM_FRAMES) {
             eye.pointer = static_cast<ViewUBO*> (inf.pMappedData);
 
             auto bufInfo = vk::DescriptorBufferInfo(eye.ubo, 0, sizeof(ViewUBO));
+            auto soilInfo = vk::DescriptorImageInfo(ctx.soil_sampler, ctx.soil_view, vk::ImageLayout::eShaderReadOnlyOptimal);
 
             ctx.device->updateDescriptorSets({
-                vk::WriteDescriptorSet(eye.set, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &bufInfo, nullptr)
+                vk::WriteDescriptorSet(eye.set, 0, 0, 1, vk::DescriptorType::eUniformBuffer, nullptr, &bufInfo, nullptr),
+                vk::WriteDescriptorSet(eye.set, 2, 0, 1, vk::DescriptorType::eCombinedImageSampler, &soilInfo, nullptr, nullptr)
                 }, {});
         }
     }

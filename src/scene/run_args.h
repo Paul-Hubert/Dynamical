@@ -29,6 +29,10 @@ struct RunArgs {
     bool window_hidden = false;
     bool exit_after_capture = true;
 
+    // dynamical: time each scene pass takes on the GPU (desktop target), logged at every capture and every
+    // 300 frames. The window presents without waiting for the monitor
+    bool gpu_times = false;
+
     // Probes
     std::string probe;                      // csv file
     std::string probe_entities = "RigidBody";

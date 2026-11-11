@@ -14,8 +14,12 @@
 #include <SDL.h>
 #include <imgui/imgui.h>
 
+#include "logic/agents/ground_field.h"
 #include "logic/components/camera.h"
+#include "logic/terrain/marching_cubes.h"
+#include "logic/terrain/terrain_generator.h"
 #include "logic/terrain/chunk.h"
+#include "logic/animals/animal.h"
 #include "logic/vegetation/vegetation.h"
 #include "scene/run_args.h"
 #include "util/log.h"
@@ -53,6 +57,7 @@ Capture::Capture(entt::registry& reg, const RunArgs& args) : reg(reg), directory
                 if(c.contains("offset")) shot.offset = vec3(c["offset"]);
                 if(c.contains("yaw")) shot.yaw = c["yaw"].get<float>();
                 if(c.contains("pitch")) shot.pitch = c["pitch"].get<float>();
+                if(c.contains("above")) shot.above = c["above"].get<float>();
             }
             if(!shots.empty() && shot.frame <= shots.back().frame) {
                 error = "capture script " + args.capture + ": shot frames must increase (" + shot.name + ")";
@@ -182,6 +187,16 @@ void Capture::beginFrame(uint64_t frame) {
     if(!shot.pos && !shot.offset && !shot.look_at && !shot.yaw && !shot.pitch) return;
 
     camera.position = shot.pos.value_or(spawn_position) + shot.offset.value_or(glm::vec3(0.f));
+    if(shot.above) {
+        // The ground the renderer draws : the same densities, meshed the same way
+        if(!ground) {
+            auto* generator = reg.ctx().find<std::shared_ptr<TerrainGenerator>>();
+            ground = std::make_shared<TerrainField>(generator ? *generator : std::make_shared<TerrainGenerator>(), std::make_shared<MarchingCubes>());
+        }
+        if(auto hit = ground->top(camera.position.x, camera.position.z)) {
+            camera.position.y = hit->point.y + *shot.above;
+        }
+    }
     camera.yaw = shot.yaw.value_or(spawn_yaw);
     camera.pitch = shot.pitch.value_or(spawn_pitch);
     if(shot.look_at) {
@@ -203,11 +218,16 @@ bool dy::vegetationReady(const entt::registry& reg) {
     return !stats || stats->species_loading == 0;
 }
 
+bool dy::animalsReady(const entt::registry& reg) {
+    auto* stats = reg.ctx().find<AnimalStats>();
+    return !stats || stats->species_loading == 0;
+}
+
 bool Capture::due(uint64_t frame) {
 
     if(done() || failed() || frame < shots[next].frame) return false;
 
-    if(!vegetationReady(reg)) {
+    if(!vegetationReady(reg) || !animalsReady(reg)) {
         waiting_from = frame + 1;
         return false;
     }

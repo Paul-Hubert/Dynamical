@@ -11,6 +11,7 @@
 
 #include "component_registry.h"
 #include "system_registry.h"
+#include "util/paths.h"
 
 using namespace dy;
 namespace fs = std::filesystem;
@@ -321,6 +322,9 @@ private:
         auto it = referenced.find(file);
         if(it == referenced.end()) {
             fs::path full = options.resources / file;
+            // The generated libraries (animal bodies) are read from the source tree when they are not with the scenes
+            if(!fs::exists(full) && fs::exists(file)) full = file;
+            if(!fs::exists(full)) full = libraryResourceFile(file);
             if(!fs::exists(full)) throw SceneError(display, path, "referenced file not found: " + file);
             it = referenced.emplace(file, readJson(full, file)).first;
         }

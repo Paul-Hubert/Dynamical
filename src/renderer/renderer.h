@@ -8,6 +8,7 @@
 #include "vr_render/vr_render.h"
 #include "scene_pass.h"
 #include "tree_shade.h"
+#include "terrain/soil_maps.h"
 #include "scene/scene_def.h"
 
 #include <chrono>
@@ -43,6 +44,7 @@ private:
     Context ctx;
 
     std::unique_ptr<TreeShade> tree_shade;
+    std::unique_ptr<SoilMaps> soil_maps;
     std::unique_ptr<ClassicRender> classic;
     std::unique_ptr<VRRender> vr;
 

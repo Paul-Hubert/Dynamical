@@ -2,6 +2,8 @@
 
 **Goal.** A field of one height reads as a carpet. Patches of taller and shorter grass, down to clearings, are what breaks the tiling between 5 and 30 m.
 
+> The field patches now come from a height map baked per chunk instead of the noise texture, and `patch_size` only sizes the layer patches: [11-height-map.md](11-height-map.md).
+
 ## Design
 
 Two scales, both by changing heights (a blade cannot be removed from the texture: what is behind it is not baked).

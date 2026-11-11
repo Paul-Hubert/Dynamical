@@ -10,6 +10,9 @@
 #include "logic/components/vr.h"
 #include "logic/settings/settings.h"
 #include "logic/terrain/chunk.h"
+#include "logic/animals/animal.h"
+#include "logic/animals/gait.h"
+#include "logic/animals/herd.h"
 #include "logic/vegetation/vegetation.h"
 
 #include "renderer/terrain/terrain_sys.h"
@@ -50,6 +53,24 @@ void DebugMenuSys::tick(double dt) {
             ImGui::Checkbox("Grass", &render.grass);
             ImGui::SameLine();
             ImGui::Checkbox("Models", &render.models);
+            ImGui::SameLine();
+            ImGui::Checkbox("Soil", &render.soil);
+        }
+
+        // The soil map of each chunk : baked again when these change
+        if(ImGui::CollapsingHeader("Soil##settings")) {
+            auto& soil = render.soil_params;
+            ImGui::SliderFloat("Mud cover", &soil.mud.cover, 0.f, 0.5f);
+            ImGui::SliderFloat("Mud wavelength", &soil.mud.wavelength, 16.f, 400.f, "%.0f m", ImGuiSliderFlags_Logarithmic);
+            ImGui::SliderFloat("Stones cover", &soil.stones.cover, 0.f, 0.5f);
+            ImGui::SliderFloat("Stones wavelength", &soil.stones.wavelength, 16.f, 400.f, "%.0f m", ImGuiSliderFlags_Logarithmic);
+            ImGui::SliderFloat("Sand cover", &soil.sand.cover, 0.f, 0.5f);
+            ImGui::SliderFloat("Sand wavelength", &soil.sand.wavelength, 16.f, 400.f, "%.0f m", ImGuiSliderFlags_Logarithmic);
+            ImGui::SliderInt("Soil octaves", &soil.octaves, 1, 5);
+            ImGui::SliderFloat("Soil gain", &soil.gain, 0.f, 1.f);
+            ImGui::SliderFloat("Soil edge width", &soil.edge_width, 4.f, 24.f, "%.0f m");
+            ImGui::SliderFloat("Shorter grass from", &soil.grass_margin, 0.f, 24.f, "%.0f m");
+            ImGui::SliderFloat("Stones under the rock", &render.scree, 0.f, 1.f);
         }
 
         if(ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -67,15 +88,21 @@ void DebugMenuSys::tick(double dt) {
             }
         }
 
-        if(ImGui::CollapsingHeader("Grass")) {
+        // Its own id : with the one of the Grass checkbox above, a click never opened it
+        if(ImGui::CollapsingHeader("Grass##settings")) {
             auto& grass = render.grass_params;
             ImGui::SliderFloat("Tile size", &grass.tile_size, 0.1f, 4.f);
             ImGui::SliderFloat("Height", &grass.height, 0.01f, 3.f);
             ImGui::SliderInt("Layers", &grass.layers, 1, 3);
             ImGui::SliderFloat("Layer spread", &grass.layer_spread, 0.f, 1.f);
             ImGui::SliderFloat("Undergrowth", &grass.undergrowth, 0.f, 1.f);
-            ImGui::SliderFloat("Patch size", &grass.patch_size, 4.f, 60.f);
-            ImGui::SliderFloat("Patch amount", &grass.patch_amount, 0.f, 0.9f);
+            // The height map of each chunk : baked again when these change
+            ImGui::SliderFloat("Height map wavelength", &grass.height_map.wavelength, 16.f, 400.f, "%.0f m", ImGuiSliderFlags_Logarithmic);
+            ImGui::SliderInt("Height map octaves", &grass.height_map.octaves, 1, 6);
+            ImGui::SliderFloat("Height map gain", &grass.height_map.gain, 0.f, 1.f);
+            ImGui::SliderFloat("Height map contrast", &grass.height_map.contrast, 0.f, 4.f);
+            ImGui::SliderFloat("Height map amount", &grass.patch_amount, 0.f, 0.9f);
+            ImGui::SliderFloat("Layer patch size", &grass.patch_size, 4.f, 60.f);
             ImGui::SliderFloat("Layer patches", &grass.layer_patch, 0.f, 1.f);
             ImGui::SliderFloat3("Base normal", &grass.base_normal[0], -1.f, 1.f);
             ImGui::SliderFloat("Follow terrain", &grass.follow_terrain, 0.f, 1.f);
@@ -84,9 +111,12 @@ void DebugMenuSys::tick(double dt) {
             ImGui::SliderFloat("Curve", &grass.curve, 0.f, 1.f);
             ImGui::SliderFloat("Colour variation", &grass.colour_variation, 0.f, 1.f);
             ImGui::SliderFloat("Dryness", &grass.dryness, 0.f, 1.f);
+            ImGui::SliderFloat("Baked colour", &grass.baked_colour, 0.f, 1.f);
+            ImGui::SliderFloat("Species patch size", &grass.species.size, 0.f, 120.f, "%.0f m");
+            ImGui::SliderFloat("Small plants under", &grass.species.low, 0.f, 1.f);
             ImGui::SliderFloat("Shadow", &grass.shadow, 0.f, 1.f);
             ImGui::SliderFloat("Canopy", &grass.canopy, 0.f, 1.f);
-            ImGui::SliderFloat("Silhouette", &grass.silhouette, 0.f, 1.f);
+            ImGui::SliderFloat("See through on crests", &grass.silhouette, 0.f, 3.f);
             ImGui::SliderFloat("Azimuth dither", &grass.azimuth_dither, 0.f, 1.f);
             ImGui::SliderFloat("Top blend start", &grass.top_start, 0.f, 0.95f);
             ImGui::SliderFloat("Noise frequency", &grass.noise_frequency, 0.001f, 1.f, "%.5g", ImGuiSliderFlags_Logarithmic);
@@ -108,6 +138,38 @@ void DebugMenuSys::tick(double dt) {
                 ImGui::SliderFloat("Shade under the plants", &render.tree_shade, 0.f, 1.f);
                 ImGui::SliderFloat("LOD bias", &params.lod_bias, 0.25f, 16.f, "%.2f", ImGuiSliderFlags_Logarithmic);
                 ImGui::SliderInt("Force LOD (-1 : by distance)", &params.force_lod, -1, 5);
+            }
+        }
+
+        if(auto* animals = reg.ctx().find<AnimalStats>()) {
+            if(ImGui::CollapsingHeader("Animals", ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::Text("%u animals, %u drawn, %u triangles, %u joints", animals->animals, animals->drawn, animals->triangles, animals->joints);
+                ImGui::Text("%u species loaded, %u loading", animals->species_loaded, animals->species_loading);
+                if(auto* herds = reg.ctx().find<HerdStats>()) {
+                    ImGui::Text("%u herds, %u on their way, %u animals walking", herds->herds, herds->travelling, herds->moving);
+                }
+                ImGui::Checkbox("Animals", &render.animals);
+                // The procedural walk : one style for every animal that walks
+                if(!reg.ctx().find<GaitStyleOverride>()) reg.ctx().emplace<GaitStyleOverride>();
+                auto& gait = reg.ctx().get<GaitStyleOverride>();
+                ImGui::SameLine();
+                ImGui::Checkbox("One walk for all", &gait.on);
+                if(gait.on) {
+                    GaitStyle& style = gait.style;
+                    ImGui::SliderFloat("Planted feet", &style.ik, 0.f, 1.f);
+                    ImGui::SliderFloat("Stride", &style.stride, 0.5f, 1.6f);
+                    ImGui::SliderFloat("Step height", &style.step_height, 0.5f, 3.f);
+                    ImGui::SliderFloat("Clearance (m)", &style.clearance, 0.f, 0.5f);
+                    ImGui::SliderFloat("Soft ground (m)", &style.soft_depth, 0.f, 0.5f);
+                    ImGui::SliderFloat("Straight up out of it", &style.exit_vertical, 0.f, 1.f);
+                    ImGui::SliderFloat("Straight down into it", &style.entry_vertical, 0.f, 1.f);
+                    ImGui::SliderFloat("Body sinks with it", &style.body_sink, 0.f, 1.f);
+                    ImGui::SliderFloat("Crouch (m)", &style.crouch, 0.f, 0.4f);
+                    ImGui::SliderFloat("Feet apart (m)", &style.spread, -0.1f, 0.3f);
+                    ImGui::SliderFloat("Bend with the path", &style.bend, 0.f, 2.f);
+                    ImGui::SliderFloat("Head into the turn", &style.head_lead, 0.f, 2.f);
+                    ImGui::SliderFloat("Lean into the turn", &style.bank, 0.f, 1.5f);
+                }
             }
         }
 

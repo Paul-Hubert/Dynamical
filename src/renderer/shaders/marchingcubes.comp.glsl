@@ -35,7 +35,7 @@ const uint trinum[256] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 2, 1, 2, 
 layout(set = 0, binding = 0) uniform isamplerBuffer triTable;
 
 layout(std430, set = 1, binding = 0) writeonly buffer Vertices {
-    vec4 vertices[]; // two vec4 per vertex : (position, normal.x), (normal.yz, uv)
+    vec4 vertices[]; // two vec4 per vertex : (position, normal.x), (normal.y, curve), the normal octahedral (TerrainVertex)
 };
 
 layout(std430, set = 1, binding = 1) buffer IndirectDraw {
@@ -64,6 +64,44 @@ float values(int x, int y, int z) {
 
 float values(ivec3 p) {
     return values(p.x, p.y, p.z);
+}
+
+// Octahedral : a unit vector in two values in -1..1 (decoded by terrain.vert.glsl and grass.vert.glsl)
+vec2 encodeNormal(vec3 n) {
+    n /= abs(n.x) + abs(n.y) + abs(n.z);
+    vec2 e = n.xz;
+    if(n.y < 0.0) {
+        e = (1.0 - abs(e.yx)) * vec2(e.x >= 0.0 ? 1.0 : -1.0, e.y >= 0.0 ? 1.0 : -1.0);
+    }
+    return e;
+}
+
+// How the ground bends at a sample : second derivatives of its height (xx, xz, zz), per metre.
+// groundCurve of logic/terrain/ground_curve.h
+vec3 groundCurve(ivec3 p) {
+    float center = values(p);
+    float h = 1.0 / float(size), hh = h * h;
+    vec3 first = vec3(
+        values(p.x + 1, p.y, p.z) - values(p.x - 1, p.y, p.z),
+        values(p.x, p.y + 1, p.z) - values(p.x, p.y - 1, p.z),
+        values(p.x, p.y, p.z + 1) - values(p.x, p.y, p.z - 1)) * (0.5 * h);
+    if(first.y * first.y < 0.09 * dot(first, first) || first.y == 0.0) {
+        return vec3(0.0);
+    }
+
+    float xx = (values(p.x + 1, p.y, p.z) - 2.0 * center + values(p.x - 1, p.y, p.z)) * hh;
+    float yy = (values(p.x, p.y + 1, p.z) - 2.0 * center + values(p.x, p.y - 1, p.z)) * hh;
+    float zz = (values(p.x, p.y, p.z + 1) - 2.0 * center + values(p.x, p.y, p.z - 1)) * hh;
+    float xy = (values(p.x + 1, p.y + 1, p.z) - values(p.x + 1, p.y - 1, p.z) - values(p.x - 1, p.y + 1, p.z) + values(p.x - 1, p.y - 1, p.z)) * (0.25 * hh);
+    float yz = (values(p.x, p.y + 1, p.z + 1) - values(p.x, p.y + 1, p.z - 1) - values(p.x, p.y - 1, p.z + 1) + values(p.x, p.y - 1, p.z - 1)) * (0.25 * hh);
+    float xz = (values(p.x + 1, p.y, p.z + 1) - values(p.x + 1, p.y, p.z - 1) - values(p.x - 1, p.y, p.z + 1) + values(p.x - 1, p.y, p.z - 1)) * (0.25 * hh);
+
+    float sx = -first.x / first.y, sz = -first.z / first.y;
+    vec3 curve = vec3(
+        -(xx + 2.0 * xy * sx + yy * sx * sx) / first.y,
+        -(xz + xy * sz + yz * sx + yy * sx * sz) / first.y,
+        -(zz + 2.0 * yz * sz + yy * sz * sz) / first.y);
+    return clamp(curve, vec3(-1.0), vec3(1.0));
 }
 
 void main() {
@@ -128,12 +166,13 @@ void main() {
             values(a2.x, a2.y - 1, a2.z) - values(a2.x, a2.y + 1, a2.z),
             values(a2.x, a2.y, a2.z - 1) - values(a2.x, a2.y, a2.z + 1)
         );
-        vec3 normal = normalize(mix(norm1, norm2, t));
+        vec2 normal = encodeNormal(normalize(mix(norm1, norm2, t)));
 
-        vec2 uv = vertex.xz / 32.;
+        // How the ground bends there : where it falls away, the grass has the air behind it (grass.frag.glsl)
+        vec3 curve = mix(groundCurve(a1), groundCurve(a2), t);
 
         vertices[vertex_index * 2] = vec4(vertex, normal.x);
-        vertices[vertex_index * 2 + 1] = vec4(normal.yz, uv);
+        vertices[vertex_index * 2 + 1] = vec4(normal.y, curve);
     }
 
 }

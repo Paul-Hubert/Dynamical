@@ -158,7 +158,7 @@ void registerComponent(std::string name, ComponentInfo);
 | `TrackActions` | plays a `PoseTrack` kinematically (`MoveKinematic` or teleport) | world | lib | every | P5 |
 | `RigChecks` | limits, bone lengths, velocities, ground (geometric) | world | lib | every | P5 |
 | `GroundPlane`, `GroundTerrain` | the world's `GroundField` ([ik-gait.md](ik-gait.md)) | world | lib | preinit | after P13 |
-| `GaitBase`, `GaitFootIK`, `GaitBalance`, `GaitChecks` | the kinematic walk: base animation, foot targets, pelvis placement, measurements | world | lib | every | after P13 |
+| `GaitBase`, `GaitFootIK`, `GaitHandIK`, `GaitBalance`, `GaitChecks` | the kinematic walk: base animation, foot targets, hand targets on steep ground (`GaitParams::scramble`), pelvis placement, measurements | world | lib | every | after P13 |
 | `Fabrik`, `RigPoseApply` | solve every `IKTarget` into `RigPose`; `RigPose` onto the kinematic bodies | world | lib | every | after P13 |
 | `GaitView` | follow camera, panel and markers of the `ik_walk` scenes | host | `dynamical` | pre | after P13 |
 | `WorldTerrain` | marching cubes colliders of a world, around its `RigidBody` bodies and its ragdoll (`TerrainUsers`) | world | lib | every | sphere roller, terrain walker |
@@ -168,6 +168,10 @@ void registerComponent(std::string name, ComponentInfo);
 | `TrainerActions`, `Policy`, `HeuristicActions` | actions from the bridge / ONNX (through `PolicyHandle`) / random or zero → `HeldDrive` | world | lib | act | P8, P11, P8 |
 | `Disturbances`, `Task`, `Stats`, `Termination` | push/pull; target and speed; stats; kill and truncation | world | lib | every | P8 |
 | `Observation`, `Rewards`, `Episode` | observation stack; window rewards; outbox and reset | world | lib | observe | P8 |
+| `AnimalFactory`, `AnimalDrive`, `AnimalSync`, `AnimalTask`, `AnimalTermination`, `AnimalSoftGround` | the animals ([reports/animal-agents.md](reports/animal-agents.md)): ragdoll of a generated body, drives, states, the walk command, the fall test, the soft layer | world | lib | init / act / every | animal agents |
+| `AnimalRewards`, `AnimalObservation`, `AnimalEpisode` | the animals: window reward, observation stack, done and reset | world | lib | observe | animal agents |
+| `AnimalGaitPlayer`, `AnimalChecks` | the procedural walk on the kinematic body (demonstrations) and what a recording is checked for | world | lib | every | animal agents |
+| `AnimalAgentView` | the skinned mesh on the ragdoll, a follow camera, a panel | host | `dynamical` | pre | animal agents |
 
 ## Prefabs
 
@@ -235,10 +239,14 @@ entities, so `ScenePass::record` keeps its single-registry, read-only rule.
 | `walker_view` | `dynamical` | `humanbot_world` with `Policy`; `ModelWatcher`; variables `run`, `policy`, `replay` | P11 |
 | `walker_eval` | `dynamical_train` | `humanbot_world` with `Policy`; variables `policy`, `episodes` | P11 |
 | `devita_train` / `devita_view` | as walker | H173 body, DeVita params, slope ground | P13 |
-| `ik_walk_slope` / `ik_walk_terrain` | `dynamical` | `common/ik_world.json`: the kinematic walk on a tilted plane or on the marching cubes terrain, with `GaitView` ([ik-gait.md](ik-gait.md)) | after P13 |
+| `ik_walk_slope` / `ik_walk_terrain` | `dynamical` | `common/ik_world.json`: the kinematic walk on a tilted plane or on the marching cubes terrain, with `GaitView` ([ik-gait.md](ik-gait.md)). `var.scramble=true`: trunk down and palms on steep ground; `var.view_camera=false` leaves the camera to a capture script | after P13 |
 | `ik_check` / `ik_check_terrain` | tests (`ScenarioRunner`) | The same worlds, headless | after P13 |
 | `walker_terrain_train` | `dynamical_train` | `common/humanbot_terrain_world.json`: the walker on the marching cubes terrain (`WorldTerrain`, `GroundTerrain`), episodes placed by `WalkRoutes` ([reports/terrain-walker.md](reports/terrain-walker.md)) | terrain walker |
 | `walker_terrain_eval` / `walker_terrain_view` | `dynamical_train` / `dynamical` | The same world with `Policy`; eval writes the stretches between target draws (`var.legs`), the view follows the walker over the terrain | terrain walker |
 | `walker_demo_gait` / `walker_demo_terrain` | `dynamical_train` | `common/ik_demo_world.json`: the kinematic walk recorded as GAIL demonstrations, on a plane or on the terrain (`GaitRoutes`, `mode=record-demo`) | terrain walker |
+| `animal_train` / `animal_eval` / `animal_stand` | `dynamical_train` | `common/animal_world.json`: one animal of the library per world (`var.body`: a generated body file), the walker's trainer slot or `Policy`; `animal_stand` holds the standing pose ([reports/animal-agents.md](reports/animal-agents.md)) | animal agents |
+| `animal_view` / `animal_demo_view` | `dynamical` | The same world with `Policy` and `AnimalAgentView`; the kinematic walk of the demonstrations | animal agents |
+| `animal_demo` | `dynamical_train` | `common/animal_demo_world.json`: the procedural walk played on the body, recorded by `mode=record-demo`, checked (`var.checks`) | animal agents |
+| `animal_terrain_train` / `_eval` / `_view`, `animal_demo_terrain` | as above | The same on the marching cubes terrain (`WorldTerrain`, `GroundTerrain`, `WalkRoutes`) | animal agents |
 
 Capture scripts live in `tests/capture/<name>.capture.json` ([phases.md](phases.md#capture-facility-p0)).

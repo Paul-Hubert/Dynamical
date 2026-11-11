@@ -9,11 +9,12 @@
     "start_z":      { "type": "float", "default": 120.0, "description": "from (0, 120) at heading 90 the slopes stay under 18 degrees for 30 m" },
     "heading":      { "type": "float", "default": 90.0 },
     "view_distance": { "type": "float", "default": 3.4 },
-    "view_side":    { "type": "float", "default": 75.0 }
+    "view_side":    { "type": "float", "default": 75.0 },
+    "view_camera":   { "type": "bool",  "default": true, "description": "false: the camera stays where the capture script or the player puts it" }
   },
   "renderer": { "passes": ["terrain", "model", "ui"], "vr": false },
   "host": {
-    "pre": [ "Input", "UI", "Time", "PlayerControl", "DebugMenu", "ChunkManager", "ChunkGenerator", "WorldStepper", { "name": "GaitView", "params": { "distance": "${view_distance}", "azimuth": "${view_side}" } } ],
+    "pre": [ "Input", "UI", "Time", "PlayerControl", "DebugMenu", "ChunkManager", "ChunkGenerator", "WorldStepper", { "name": "GaitView", "params": { "distance": "${view_distance}", "azimuth": "${view_side}", "camera": "${view_camera}" } } ],
     "post": [ { "name": "WorldView", "params": { "worlds": "all", "spacing": 0.0 } }, "Terrain" ]
   },
   "worlds": [ { "template": "ik_world", "count": 1,

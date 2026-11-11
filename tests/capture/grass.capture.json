@@ -8,6 +8,7 @@
     { "frame": 720, "name": "grass_45_later", "camera": { "pos": [-23, 68.6, 19.5], "look_at": [-23, 66.5, 17.6] } },
     { "frame": 740, "name": "grass_top", "camera": { "pos": [-23, 69.5, 17], "look_at": [-23, 66, 17.05] } },
     { "frame": 760, "name": "grass_far", "camera": { "pos": [-23, 69, 40], "look_at": [-23, 66.5, 16] } },
-    { "frame": 780, "name": "grass_skim", "camera": { "pos": [-21.5, 67.05, 22], "look_at": [-23, 67.0, 17] } }
+    { "frame": 780, "name": "grass_skim", "camera": { "pos": [-21.5, 67.05, 22], "look_at": [-23, 67.0, 17] } },
+    { "frame": 800, "name": "grass_crest", "camera": { "pos": [-23, 69.5, 9], "look_at": [-23, 69.3, -5] } }
   ]
 }

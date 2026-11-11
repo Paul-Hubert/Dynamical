@@ -25,6 +25,10 @@ public:
     // level_sizes their sizes in bytes
     std::shared_ptr<VmaImage> createImageMips(const void* data, const std::vector<size_t>& level_sizes, vk::ImageCreateInfo info, vk::ImageLayout layout);
     std::shared_ptr<VmaBuffer> createBuffer(const void* data, vk::BufferCreateInfo info);
+
+    // Replaces a part of one mip level of an image that is in `layout`, and stays in it. data is tightly
+    // packed, layer after layer. Nothing drawn by a frame in flight may read that part
+    void updateImage(const void* data, size_t size, vk::Image image, vk::ImageSubresourceLayers layers, vk::Offset3D offset, vk::Extent3D extent, vk::ImageLayout layout);
     
     void check();
 

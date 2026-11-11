@@ -35,6 +35,9 @@ public:
     static constexpr int default_view_distance = 768;
     int view_distance = default_view_distance;
 
+    // One kind of grass tile everywhere (GrassKind : meadow, clover, dandelion...) instead of the patches of the species. Not saved
+    std::string grass_kind;
+
     template <class Archive>
     void serialize(Archive& ar) {
         ar(

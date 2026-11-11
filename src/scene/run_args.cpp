@@ -67,6 +67,7 @@ RunArgsResult dy::parseRunArgs(const std::vector<std::string>& args) {
         else if(key == "fixed_frame_dt") ok = parseDouble(value, a.fixed_frame_dt) && a.fixed_frame_dt >= 0.;
         else if(key == "window_hidden") ok = parseBool(value, a.window_hidden);
         else if(key == "exit_after_capture") ok = parseBool(value, a.exit_after_capture);
+        else if(key == "gpu_times") ok = parseBool(value, a.gpu_times);
         else if(key == "probe") a.probe = value;
         else if(key == "probe_entities") a.probe_entities = value;
         else if(key == "probe_every") ok = parseInt(value, a.probe_every) && a.probe_every > 0;

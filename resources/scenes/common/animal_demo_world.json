@@ -1,0 +1,118 @@
+{
+  "variables": {
+    "body": {
+      "type": "string",
+      "default": "animals/bodies/deer_red.body.json",
+      "description": "a generated body file (tools/animal_body), under resources/"
+    },
+    "params": {
+      "type": "string",
+      "default": "agents/params/animal.params.json"
+    },
+    "ranges": {
+      "type": "string",
+      "default": "agents/ranges/walk_basic.json",
+      "description": "GaitRanges: the styles, speeds and turns of the recorded walks"
+    },
+    "gait": {
+      "type": "string",
+      "default": "walk",
+      "description": "walk, trot or run: the clip the procedural walk is made from"
+    },
+    "draw": {
+      "type": "bool",
+      "default": false
+    },
+    "speed": {
+      "type": "float",
+      "default": 0.0,
+      "description": "> 0: this speed straight ahead, in speeds of the clip, instead of the drawn commands"
+    },
+    "soft_depth": {
+      "type": "float",
+      "default": -1.0,
+      "description": ">= 0: this depth of soft ground, in heights of the animal, instead of the ranges' draw"
+    },
+    "warmup": {
+      "type": "float",
+      "default": 2.0,
+      "description": "seconds walked before a walk is recorded (plus up to a cycle, drawn per walk)"
+    },
+    "episode_decisions": {
+      "type": "int",
+      "default": 300,
+      "description": "recorded decisions per walk"
+    },
+    "pitch": {
+      "type": "float",
+      "default": 0.0,
+      "description": "degrees of the ground plane"
+    },
+    "roll": {
+      "type": "float",
+      "default": 0.0
+    },
+    "heading": {
+      "type": "float",
+      "default": -1.0,
+      "description": ">= 0: every walk starts with this heading, degrees (0 looks down -z, uphill for a positive pitch); else drawn"
+    }
+  },
+  "templates": {
+    "animal_demo_world": {
+      "physics": {
+        "threads": 1,
+        "max_bodies": 128,
+        "max_body_pairs": 2048,
+        "max_contacts": 2048,
+        "temp_bytes": 8388608,
+        "allow_sleeping": false,
+        "friction_combine": "max",
+        "restitution_combine": "min"
+      },
+      "clock": {
+        "physics_hz": 60,
+        "control_hz": 30
+      },
+      "fixed": [
+        "RigidBody",
+        {
+          "name": "GroundPlane",
+          "params": {
+            "pitch": "${pitch}",
+            "roll": "${roll}"
+          }
+        },
+        "AnimalFactory",
+        "AnimalGaitPlayer",
+        "PhysicsStep",
+        "AnimalSync",
+        "AnimalChecks",
+        "AnimalRewards@observe",
+        "AnimalObservation@observe",
+        "AnimalEpisode@observe"
+      ],
+      "entities": [
+        {
+          "prefab": "ground_flat"
+        },
+        {
+          "AnimalSpawn": {
+            "body": "${body}",
+            "params": "${params}",
+            "ranges": "${ranges}",
+            "gait": "${gait}",
+            "motion": "kinematic",
+            "recording": true,
+            "draw": "${draw}",
+            "speed": "${speed}",
+            "soft_depth": "${soft_depth}",
+            "warmup": "${warmup}",
+            "recording_decisions": "${episode_decisions}",
+            "heading": "${heading}"
+          }
+        }
+      ]
+    }
+  }
+}

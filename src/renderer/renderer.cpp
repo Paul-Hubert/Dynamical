@@ -18,6 +18,7 @@
 #include "renderer/passes/grass_pass.h"
 #include "renderer/passes/model_pass.h"
 #include "renderer/passes/vegetation_pass.h"
+#include "renderer/passes/animal_pass.h"
 #include "renderer/passes/ui_pass.h"
 
 #include "logic/components/frame_clock.h"
@@ -40,6 +41,7 @@ per_frame(NUM_FRAMES) {
     reg.ctx().emplace<RenderSettings>();
 
     tree_shade = std::make_unique<TreeShade>(ctx, reg);
+    soil_maps = std::make_unique<SoilMaps>(ctx, reg);
     classic = std::make_unique<ClassicRender>(ctx, reg);
     vr = std::make_unique<VRRender>(ctx, reg);
 
@@ -48,6 +50,7 @@ per_frame(NUM_FRAMES) {
         if(name == "terrain") passes.push_back(std::make_unique<TerrainPass>(ctx, reg));
         else if(name == "grass") passes.push_back(std::make_unique<GrassPass>(ctx, reg));
         else if(name == "vegetation") passes.push_back(std::make_unique<VegetationPass>(ctx, reg));
+        else if(name == "animals") passes.push_back(std::make_unique<AnimalPass>(ctx, reg));
         else if(name == "model") passes.push_back(std::make_unique<ModelPass>(ctx, reg));
         else if(name == "ui") passes.push_back(std::make_unique<UIPass>(ctx, reg));
         else dy::log(dy::error) << "Renderer : unknown pass " << name << "\n";
@@ -113,6 +116,7 @@ void Renderer::render() {
     ctx.transfer.check();
 
     tree_shade->update();
+    soil_maps->update();
     for(ScenePass* pass : pass_list) {
         pass->update(frame_index);
     }
@@ -217,6 +221,7 @@ Renderer::~Renderer() {
     pass_list.clear();
     vr.reset();
     classic.reset();
+    soil_maps.reset();
     tree_shade.reset();
 
     for(auto& f : per_frame) {

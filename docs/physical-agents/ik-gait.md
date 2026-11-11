@@ -10,7 +10,7 @@ as imitation data.
 ```
 dynamical scene=ik_walk_slope   var.pitch=12 var.roll=8      # tilted test plane, sliders for everything
 dynamical scene=ik_walk_terrain                              # marching cubes terrain, seed 1337
-dynamical_tests --test-case="IK*,GAIT*"                      # 19 tests, 6 s
+dynamical_tests --test-case="IK*,GAIT*"                      # 22 tests, 25 s
 ```
 
 ![level](reports/figures/ik_level_double_support.png)
@@ -26,6 +26,7 @@ World fixed lane, 60 Hz, in this order (`resources/scenes/common/ik_world.json`)
 | `GroundPlane` or `GroundTerrain` | `ground_field.*` | Makes the world's `GroundField` (preinit) |
 | `GaitBase` | `gait.*` | Follows the command, advances the stride's phase and the reference point, writes pelvis, trunk, head and arms into `RigPose` |
 | `GaitFootIK` | `gait.*` | Plans footprints on the ground, moves each foot through heel strike, flat stance, toe-off and swing, and **creates and updates the legs' `IKChain` and `IKTarget`** |
+| `GaitHandIK` | `gait.*` | With `GaitParams::scramble`: finds holds for the hands on steep ground, lays the palms flat on them, and **creates and updates the arms' `IKChain` and `IKTarget`** ([Scrambling](#scrambling)) |
 | `GaitBalance` | `gait.*` | Places the pelvis: height from the legs' reach, horizontal position so that the centre of mass of the solved pose is on its target. Publishes `BalanceState` |
 | `Fabrik` | `ik.*` | Solves every chain that has enabled targets, in one batch, and writes joint angles into `RigPose`. Knows nothing of gaits or ground |
 | `RigPoseApply` | `ik.*` | Forward kinematics, then `MoveKinematic` on the HumanBot's bodies |
@@ -202,6 +203,52 @@ across the path the walk stays inside the limits, but for a degree at two of the
 Beyond, the limits are passed by what the ground asks: 4° at 35° uphill, 26° at 50°, 39° on the terrain's
 62° faces, anything on a wall. With `yield_limits` off the limits always hold and the foot misses its
 print instead (GAIT.10).
+
+## Scrambling
+
+An option, off by default: `GaitParams::scramble` (scene variable `scramble`, a checkbox in the Gait panel).
+The steeper the ground, the lower the trunk; a hand that comes within reach of the ground lays its palm
+flat on it. With the option off, or on ground under 20°, the walk is bit for bit what it was (GAIT.13).
+
+![Scrambling up 50°](reports/figures/ik_scramble.png)
+
+| What | How | Where |
+|---|---|---|
+| How low | `low` goes from 0 at 20° of slope to 1 at 50° (`scramble_from`, `scramble_full`), filtered over 0.3 s | `GaitBase` |
+| Trunk | Tilts toward the slope until the shoulders are 0.3 m from the ground (`scramble_shoulder`), found by bisection on the pose; no further than 29° past lying along the slope. The two spine joints bend 24° each, the pelvis tips for the rest. The free arms hang as gravity has them | `GaitBase` |
+| Body up the slope | When all that tilt leaves the shoulders too far, the centre of mass target moves up the slope, 0.45 m at most (`scramble_forward`): the hands will take weight. The hips also come down 15 % of the legs' reach | `GaitBase` |
+| Hips and knees | The hips stay as far from each ankle as the knee folds (0.35 m), lifted at 0.3 m/s at most and no higher than the legs reached in the last step | `GaitBalance` |
+| Holds | A hand looks at 18 places ahead and beside its shoulder and takes the furthest ahead where its palm lies flat within 86 % of the arm; the fingers turn (inward mostly) to where the arm is the least outside its limits | `GaitHandIK` |
+| Palm | The hand box's widest face, fitted on the ground as a sole is (`fitFootprint`): flat, on the ground's highest points | `GaitHandIK` |
+| Hand cycle | Swinging, reaching (0.3 s, 5 cm off the ground), planted on a print fixed in the world, letting go. It moves on when it is 12 cm behind its shoulder or its arm is 20° outside its limits, one hand at a time, after 0.4 s at least | `GaitHandIK` |
+| Elbow | Points where the arm is the least outside its limits, among 12 directions around the shoulder to wrist line, near where it pointed | `GaitHandIK` |
+| Torso for reach | The trunk turns about the bottom of the spine, 20° at most, until the shoulders are within reach of the hands' targets; that lean goes in 0.4 s once no hand asks for it. A palm still out of reach lets go at once | `GaitBalance` |
+| Torso for balance | The centre of mass target moves 10 % of the way to each planted palm (`hand_support`); the arms are solved with the legs when the pelvis is placed; the support outline takes in the palms | `GaitBalance` |
+
+`GaitHandIK` posts two more `IKChain` (shoulder, elbow, wrist) and `IKTarget`; `Fabrik` solves them with
+the legs, nothing in it changed. Lane order: `GaitBase`, `GaitFootIK`, `GaitHandIK`, `GaitBalance`, `Fabrik`.
+
+**Measured** (GAIT.12 on planes for 20 s, GAIT.14 on the terrain's origin for 40 s; commanded 1.36 m/s, the
+slope leaves 0.31 to 0.35 m/s):
+
+| Ground | Palms planted | Palm to ground | Palm slip | Hips over the feet | Feet slip |
+|---|---|---|---|---|---|
+| 50° straight up | both, 52 % of the time, 51 holds | 0.01 mm | 0.02 mm | 0.59 m (0.80 upright) | 0.84 mm |
+| 55° straight up | both, 53 % | 0.01 mm | 0.02 mm | 0.64 m (0.75) | 0.86 mm |
+| 45° across | the uphill one, 53 % | 0.00 mm | 0.02 mm | 0.72 m (0.82) | 0.02 mm |
+| 45° straight down | both, 68 %, behind the walker | 0.01 mm | 0.02 mm | 0.68 m (0.71) | 0.02 mm |
+| Terrain, origin, heading 250 | the uphill one, 39 % | on the ground's edges (17 mm gaps) | 0.02 mm | 0.61 m | 0.35 mm |
+
+**What it does not do well:**
+- **Straight up, the hands reach the ground from about 45°.** Under that the trunk bends but the shoulders stay
+  too far (0.5 m at 45° with the body 0.45 m up the slope), and the hands swing.
+- **Joints go far outside their limits.** Wrists: a flat palm under a shoulder asks 90° of extension or more,
+  the body file allows 67° to 80° (planted arms are 20° to 60° outside on average). Legs: on 50° and more an
+  ankle goes up to 127° outside, hips 30° to 60°; the walk without scrambling is already 59° outside there.
+- **The hips move fast at some moments** (up to 30 mm in a tick, 57 mm going down 55°): they follow the legs'
+  reach as they do without scrambling, and the ground is steep.
+- The centre of mass is ahead of the feet before the hands are down: balance counts on them.
+- Overhangs, and ground the hands could reach behind a ridge, are not seen: holds are looked for straight down.
 
 ## Decisions taken on the way
 

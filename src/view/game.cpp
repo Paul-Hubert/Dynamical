@@ -37,7 +37,7 @@ Game::Game(int argc, char** argv) {
 
     // Settings parses its own keys from the same arguments, anything else unknown is only a warning here
     static const char* settings_keys[] = { "window_width", "window_height", "fullscreen", "fps_max", "username",
-        "server_side", "client_side", "vr_mode", "view_distance" };
+        "server_side", "client_side", "vr_mode", "view_distance", "grass_kind" };
     auto parsed = parseRunArgs(argc, argv);
     for(auto& key : parsed.unknown) {
         if(std::find(std::begin(settings_keys), std::end(settings_keys), key) == std::end(settings_keys)) {
@@ -49,11 +49,14 @@ Game::Game(int argc, char** argv) {
     }
     reg.ctx().emplace<RunArgs>(parsed.args);
 
-    // Captures and probes: a 960 x 540 window, no headset. Not saved to the config file
+    // Captures and probes: a 960 x 540 window, no headset. Not saved to the config file.
+    // With gpu_times the window keeps the size that was asked for: the passes are timed at that size
     if(parsed.args.deterministic()) {
         auto& settings = reg.ctx().get<Settings>();
-        settings.window_width = 960;
-        settings.window_height = 540;
+        if(!parsed.args.gpu_times) {
+            settings.window_width = 960;
+            settings.window_height = 540;
+        }
         settings.fullscreen = false;
         settings.vr_mode = 0;
     }

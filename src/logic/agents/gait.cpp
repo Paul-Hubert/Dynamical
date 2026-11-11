@@ -199,6 +199,60 @@ FootGeometry dy::footGeometry(const RigModel& model, bool right) {
 
 }
 
+HandGeometry dy::handGeometry(const RigModel& model, bool right) {
+
+    const BodyDef& def = *model.body;
+    HandGeometry g;
+    g.shoulder = model.jointIndex(right ? "RightArm" : "LeftArm");
+    g.elbow = model.jointIndex(right ? "RightForeArm" : "LeftForeArm");
+    g.wrist = model.jointIndex(right ? "RightHand" : "LeftHand");
+    if(g.shoulder < 0 || g.elbow < 0 || g.wrist < 0) throw AssetError("gait: the body has no Arm, ForeArm and Hand joints");
+
+    FootGeometry& palm = g.palm;
+    palm.segment = def.joints[g.wrist].child;
+    palm.side = right ? 1.f : -1.f;
+    palm.hip = g.shoulder;
+    palm.knee = g.elbow;
+    palm.ankle = g.wrist;
+    const SegmentDef& seg = def.segments[palm.segment];
+    const ShapeDef* box = nullptr;
+    for(const ShapeDef& s : seg.shapes) {
+        if(s.type == ShapeDef::Type::Box) { box = &s; break; }
+    }
+    if(!box) throw AssetError("gait: the hand " + seg.name + " has no box");
+
+    glm::quat world = seg.rest_rotation * box->rotation;
+    glm::vec3 axes[3] = { world * glm::vec3(1.f, 0.f, 0.f), world * glm::vec3(0.f, 1.f, 0.f), world * glm::vec3(0.f, 0.f, 1.f) };
+    float half[3] = { box->half_extents.x, box->half_extents.y, box->half_extents.z };
+    // The palm is one of the box's two widest faces, the fingers run along its longest side, away from the wrist
+    int t = 0, l = 0;
+    for(int i = 1; i < 3; i++) {
+        if(half[i] < half[t]) t = i;
+        if(half[i] > half[l]) l = i;
+    }
+    if(l == t) l = (t + 1) % 3;
+    int w = 3 - t - l;
+    const glm::vec3 shoulder = def.joints[g.shoulder].anchor, elbow = def.joints[g.elbow].anchor, wrist = def.joints[g.wrist].anchor;
+    const glm::vec3 centre = seg.rest_position + seg.rest_rotation * box->center;
+    glm::vec3 fingers = axes[l] * (glm::dot(axes[l], centre - wrist) >= 0.f ? 1.f : -1.f);
+    // At the rest pose the arms hang, palms toward the thighs and a little backward
+    glm::vec3 facing = axes[t] * (glm::dot(axes[t], glm::vec3(-palm.side, 0.f, 0.5f)) >= 0.f ? 1.f : -1.f);
+    glm::quat frame = soleFrame(fingers, -facing);
+    palm.sole_rotation = glm::normalize(glm::inverse(seg.rest_rotation) * frame);
+    palm.sole_centre = glm::inverse(seg.rest_rotation) * (centre + facing * half[t] - seg.rest_position);
+    palm.half_width = half[w];
+    palm.half_length = half[l];
+
+    g.reach = glm::length(elbow - shoulder) + glm::length(wrist - elbow);
+    // The elbow flexes about its twist axis, to the side most of its range is on: it points the other way
+    const JointLimit& limit = model.body_limits[g.elbow];
+    glm::vec3 hinge = model.rest_frame[g.elbow] * glm::vec3(1.f, 0.f, 0.f);
+    glm::vec3 flex = glm::cross(hinge, wrist - elbow) * (limit.twist_max >= -limit.twist_min ? 1.f : -1.f);
+    g.pole_rest = glm::length(flex) > 1e-6f ? -glm::normalize(flex) : glm::vec3(palm.side, 0.f, 0.f);
+    return g;
+
+}
+
 Footprint dy::fitFootprint(const GroundField& ground, const FootGeometry& foot, glm::vec2 centre, float yaw, float from_y, float max_tilt) {
 
     Footprint p;
@@ -284,6 +338,12 @@ void GaitBaseSys::tick(double h) {
         glm::vec3 hip = def.joints[left.hip].anchor, knee = def.joints[left.knee].anchor, ankle = def.joints[left.ankle].anchor;
         state.leg_length = hip.y - sole_y;
         state.reach = params.leg_extension * (glm::length(knee - hip) + glm::length(ankle - knee));
+        // The hip is no nearer to the ankle than the knee folds
+        {
+            const float thigh = glm::length(knee - hip), shank = glm::length(ankle - knee);
+            const float flexion = std::max(model.limits[left.knee].twist_max, 0.3f);
+            state.fold = std::sqrt(thigh * thigh + shank * shank + 2.f * thigh * shank * std::cos(flexion));
+        }
         state.pivot = 0.5f * (model.anchor_parent[state.foot[0].geometry.hip] + model.anchor_parent[state.foot[1].geometry.hip]);
         state.heading = g.command->heading;
         state.speed = 0.f;
@@ -362,6 +422,21 @@ void GaitBaseSys::tick(double h) {
     float lean = params.lean * std::min(state.speed / params.reference_speed, 1.5f) + params.lean_slope_gain * state.slope_pitch;
     state.lean += blend * (lean - state.lean);
 
+    // Scrambling: the steeper the ground, the lower the trunk
+    {
+        const float along = std::tan(state.slope_pitch), across = std::tan(state.slope_roll);
+        const float steep = std::hypot(along, across), slope = std::atan(steep);
+        const float low = params.scramble ? smooth((slope - params.scramble_from) / std::max(params.scramble_full - params.scramble_from, 1e-3f)) : 0.f;
+        state.low += blend * (low - state.low);
+        if(!params.scramble && state.low < 1e-4f) {
+            state.low = 0.f;
+            state.tilt = glm::vec2(0.f);
+            state.forward = 0.f;
+        }
+        state.uphill = steep > 1e-4f ? (dir * along + right * across) / steep : glm::vec3(0.f);
+    }
+    const bool lowered = state.low > 0.f;
+
     // Pelvis: level to gravity, turning and listing with the stride
     const float phi = 2.f * pi * state.phase;
     const float side = std::sin(2.f * pi * (state.phase - 0.5f * state.stance_share + 0.25f));     // +1 in the middle of the left stance
@@ -369,7 +444,6 @@ void GaitBaseSys::tick(double h) {
     const float gait_yaw = -params.pelvis_yaw * amplitude * std::cos(phi);
     const float gait_roll = -params.pelvis_list * amplitude * side;
     const glm::quat gait = yawQuat(gait_yaw) * rollQuat(gait_roll);
-    pose.root_rotation = glm::normalize(yawQuat(state.heading) * gait * def.segments[def.pelvis].rest_rotation);
 
     // The centre of mass sways toward the stance foot as an inverted pendulum between the two feet does
     float sway = 0.5f * params.step_width * (1.f - 1.f / std::cosh(0.5f * state.omega * step_time)) * std::min(state.speed / 0.4f, 1.f);
@@ -377,28 +451,100 @@ void GaitBaseSys::tick(double h) {
     const float ankle_height = state.leg_length - state.reach / params.leg_extension;
     // Highest in mid stance, lowest in the middle of each double support
     const float bob = params.bob * amplitude * amplitude * 0.5f * (1.f + std::cos(4.f * pi * (state.phase - 0.5f * (state.stance_share - 0.5f))));
-    state.hip_centre = state.centre + right * state.sway + up * (params.hip_height * state.reach + ankle_height - bob);
-    pose.root_position = state.hip_centre - pose.root_rotation * state.pivot;
+    // ... and lower as the walker scrambles
+    const float drop = lowered ? params.scramble_crouch * state.low * state.reach : 0.f;
+    state.hip_centre = state.centre + right * state.sway + up * (params.hip_height * state.reach + ankle_height - bob - drop);
     state.com_target = glm::vec2(state.centre.x + right.x * state.sway, state.centre.z + right.z * state.sway);
+    if(lowered) {
+        // The body moves up the slope, less so across the heading, where it would spread the legs
+        const glm::vec3 moved = dir * glm::dot(state.uphill, dir) + right * (0.7f * glm::dot(state.uphill, right));
+        state.com_target += glm::vec2(moved.x, moved.z) * (state.forward * state.low);
+    }
 
-    // Trunk: leans, undoes the pelvis' list and turns the shoulders against it; the head keeps a level gaze
-    auto set = [&](const char* name, glm::quat delta) {
+    auto set = [&](RigPose& p, const char* name, glm::quat delta) {
         int j = model.jointIndex(name);
-        if(j >= 0) pose.joint[j] = model.clamp(j, model.fromRestDelta(j, delta));
+        if(j >= 0) p.joint[j] = model.clamp(j, model.fromRestDelta(j, delta));
     };
-    const glm::quat spine = yawQuat(-0.5f * gait_yaw * (1.f + params.counter_rotation)) * rollQuat(-0.5f * gait_roll) * pitchQuat(-0.5f * state.lean);
-    set("Spine", spine);
-    set("Spine2", spine);
-    set("Head", glm::inverse(gait * spine * spine));
+    // The pelvis and the trunk. The trunk leans, undoes the pelvis' list and turns the shoulders against it; the head
+    // keeps a level gaze. Scrambling, they tilt toward the slope by `tilt` (radians along the heading and to the
+    // right): the spine bends as far as it may and the pelvis tips for the rest
+    auto trunk = [&](RigPose& p, glm::vec2 tilt) {
+        glm::quat spine = yawQuat(-0.5f * gait_yaw * (1.f + params.counter_rotation)) * rollQuat(-0.5f * gait_roll) * pitchQuat(-0.5f * state.lean);
+        glm::quat pelvis(1.f, 0.f, 0.f, 0.f);
+        if(lowered) {
+            const float angle = glm::length(tilt);
+            const float bend = std::min(angle, 2.f * params.scramble_spine);
+            const glm::vec2 toward = angle > 1e-6f ? tilt / angle : glm::vec2(1.f, 0.f);
+            pelvis = glm::angleAxis(angle - bend, glm::vec3(-toward.x, 0.f, -toward.y));
+            // The walk's lean gives way to the tilt
+            const glm::vec2 both = glm::vec2((1.f - state.low) * state.lean, 0.f) + toward * bend;
+            const float a = glm::length(both);
+            const glm::quat lean = a > 1e-6f ? glm::angleAxis(0.5f * a, glm::vec3(-both.x, 0.f, -both.y) / a) : glm::quat(1.f, 0.f, 0.f, 0.f);
+            spine = yawQuat(-0.5f * gait_yaw * (1.f + params.counter_rotation)) * rollQuat(-0.5f * gait_roll) * lean;
+            p.root_rotation = glm::normalize(yawQuat(state.heading) * gait * pelvis * def.segments[def.pelvis].rest_rotation);
+        } else {
+            p.root_rotation = glm::normalize(yawQuat(state.heading) * gait * def.segments[def.pelvis].rest_rotation);
+        }
+        p.root_position = state.hip_centre - p.root_rotation * state.pivot;
+        set(p, "Spine", spine);
+        set(p, "Spine2", spine);
+        set(p, "Head", glm::inverse(lowered ? gait * pelvis * spine * spine : gait * spine * spine));
+    };
 
-    // Arms against the legs
+    if(lowered) {
+        // The trunk tilts toward the slope until the shoulders are within an arm of the ground, the hips where
+        // GaitBalance had them on the last tick
+        glm::vec2 wanted(0.f);
+        const int left = model.jointIndex("LeftArm"), right_arm = model.jointIndex("RightArm");
+        if(glm::length(state.uphill) > 0.5f && left >= 0 && right_arm >= 0) {
+            const glm::vec2 toward(glm::dot(state.uphill, dir), glm::dot(state.uphill, right));
+            const glm::vec3 moved = balance && balance->valid ? balance->offset : glm::vec3(0.f);
+            auto gap = [&](float angle) {
+                RigPose p = pose;
+                trunk(p, toward * angle);
+                p.root_position += moved;
+                SegmentPoses at;
+                model.forward(p, at);
+                glm::vec3 chest = 0.5f * (model.anchor(at, left) + model.anchor(at, right_arm));
+                auto hit = ground.below(chest + up * 1.5f, 8.f);
+                return hit ? (chest.y - hit->point.y) * hit->normal.y : 1e3f;
+            };
+            // No further than a little past lying along the slope
+            const float slope = std::atan(std::hypot(std::tan(state.slope_pitch), std::tan(state.slope_roll)));
+            const float most = std::clamp(0.5f * pi - slope + params.scramble_past, 0.f, params.scramble_lean);
+            float lo = 0.f, hi = most;
+            const float upright = gap(lo), tilted = gap(hi);
+            if(upright > params.scramble_shoulder) {
+                if(tilted < params.scramble_shoulder) {
+                    for(int pass = 0; pass < 10; pass++) {
+                        float mid = 0.5f * (lo + hi);
+                        (gap(mid) > params.scramble_shoulder ? lo : hi) = mid;
+                    }
+                    hi = 0.5f * (lo + hi);
+                }
+                wanted = toward * (hi * state.low);
+            }
+            // Still too far with all that tilt: the body moves up the slope, and comes back when there is tilt to spare
+            const float short_of = tilted - params.scramble_shoulder + 0.03f;
+            state.forward = std::clamp(state.forward + (dt / 0.4f) * short_of / std::max(std::sin(slope), 0.3f), 0.f, params.scramble_forward);
+            state.shoulder_gap = gap(glm::length(state.tilt));
+        }
+        state.tilt += blend * (wanted - state.tilt);
+    }
+    trunk(pose, state.tilt);
+
+    // Arms against the legs. Under a tilted trunk they hang as gravity has them
+    glm::quat hang(1.f, 0.f, 0.f, 0.f);
+    if(lowered && glm::length(state.tilt) > 1e-6f) {
+        hang = glm::angleAxis(-glm::length(state.tilt), glm::normalize(glm::vec3(-state.tilt.x, 0.f, -state.tilt.y)));
+    }
     const float swing = params.arm_swing * amplitude * std::cos(phi);
     for(int i = 0; i < 2; i++) {
         float angle = params.arm_bias * amplitude + (i == 0 ? -swing : swing);
         float forward = amplitude > 1e-3f ? 0.5f + 0.5f * (i == 0 ? -1.f : 1.f) * std::cos(phi) : 0.f;
-        set(i == 0 ? "LeftArm" : "RightArm", pitchQuat(angle));
-        set(i == 0 ? "LeftForeArm" : "RightForeArm", pitchQuat(params.elbow * amplitude + params.elbow_swing * amplitude * forward));
-        set(i == 0 ? "LeftHand" : "RightHand", glm::quat(1.f, 0.f, 0.f, 0.f));
+        set(pose, i == 0 ? "LeftArm" : "RightArm", lowered ? hang * pitchQuat(angle) : pitchQuat(angle));
+        set(pose, i == 0 ? "LeftForeArm" : "RightForeArm", pitchQuat(params.elbow * amplitude + params.elbow_swing * amplitude * forward));
+        set(pose, i == 0 ? "LeftHand" : "RightHand", glm::quat(1.f, 0.f, 0.f, 0.f));
     }
 
 }
@@ -591,6 +737,11 @@ void GaitFootIKSys::tick(double h) {
                 placeStance(f);
             }
             f.extra = std::max(extra, 0.f);
+            // However the ankle asks, a heel never rises past its toes
+            if(f.pitch < -(params.max_heel_rise + 0.7f)) {
+                f.pitch = -(params.max_heel_rise + 0.7f);
+                placeStance(f);
+            }
         } else {
             const float sw = (phase - share) / (1.f - share);
             if(!f.planned || sw < params.replan_until) {
@@ -636,7 +787,7 @@ void GaitFootIKSys::tick(double h) {
                         footPose(geo, f.next, f.strike, f.strike >= 0.f ? +1 : -1, position, rotation);
                         float over = flexionOverAt(then_pose, geo, position, rotation);
                         if(std::abs(over) < 1e-4f) break;
-                        f.strike -= over;
+                        f.strike = std::max(f.strike - over, -params.max_heel_rise);
                     }
                 }
 
@@ -704,6 +855,278 @@ void GaitFootIKSys::tick(double h) {
 
 }
 
+// GaitHandIK
+
+void GaitHandIKSys::tick(double h) {
+
+    OPTICK_EVENT();
+
+    GaitRig g = gaitRig(reg);
+    if(g.entity == entt::null || !g.state->started) return;
+    const RigModel& model = *g.rig->model;
+    const GaitParams& params = *g.params;
+    GaitState& state = *g.state;
+    if(!params.scramble && !state.hands_ready) return;
+    GroundField& ground = groundField(reg);
+    const float dt = (float) h;
+    const glm::vec3 dir = state.direction(), right = state.right();
+
+    if(!state.hands_ready) {
+        for(int i = 0; i < 2; i++) {
+            HandState& hand = state.hand[i];
+            hand.geometry = handGeometry(model, i == 1);
+            const HandGeometry& geo = hand.geometry;
+            hand.chain = reg.create();
+            auto& chain = reg.emplace<IKChain>(hand.chain);
+            chain.rig = g.entity;
+            chain.name = i == 0 ? "left arm" : "right arm";
+            chain.joints = { geo.shoulder, geo.elbow, geo.wrist };
+            chain.pole_rest = geo.pole_rest;
+            hand.target = reg.create();
+            auto& target = reg.emplace<IKTarget>(hand.target);
+            target.chain = hand.chain;
+            target.owner = "GaitHandIK";
+            target.enabled = false;
+        }
+        state.hands_ready = true;
+    }
+
+    // The trunk where GaitBase put it, the hips moved as GaitBalance moved them on the last tick, the arms swinging
+    const auto* balance = reg.try_get<BalanceState>(g.entity);
+    RigPose trial = *g.pose;
+    if(balance && balance->valid) trial.root_position += balance->offset;
+    SegmentPoses poses;
+    model.forward(trial, poses);
+
+    // Where the elbow of an arm points, its hand at this pose: around the line from the shoulder to the wrist, where the
+    // arm is the least outside its limits, near where a bent elbow rests (out and back) and where it pointed (`last`)
+    // Returns the angle outside the limits there, radians
+    auto elbowPole = [&](const HandGeometry& geo, glm::vec3 shoulder, glm::vec3 position, glm::quat rotation, glm::vec3 last, glm::vec3& pole) {
+        const glm::vec3 wrist = position + rotation * model.anchor_child[geo.wrist];
+        glm::vec3 axis = wrist - shoulder;
+        axis = glm::length(axis) > 1e-6f ? glm::normalize(axis) : -up;
+        glm::vec3 relaxed = right * (0.8f * geo.palm.side) - 0.4f * dir - 0.2f * up;
+        relaxed -= axis * glm::dot(relaxed, axis);
+        if(glm::length(relaxed) < 1e-4f) relaxed = glm::cross(axis, dir);
+        relaxed = glm::normalize(relaxed);
+        const glm::vec3 turned = glm::cross(axis, relaxed);
+        const std::vector<int> joints { geo.shoulder, geo.elbow, geo.wrist };
+        float least = 1e9f, over = 0.f;
+        for(int k = 0; k < 12; k++) {
+            const float angle = 2.f * pi * k / 12.f;
+            glm::vec3 candidate = relaxed * std::cos(angle) + turned * std::sin(angle);
+            RigPose free = trial;
+            solveChain(model, free, joints, geo.pole_rest, IKGoal { wrist, rotation, true, candidate }, false, false);
+            float excess = 0.f;
+            for(int j : joints) excess = std::max(excess, RigModel::excess(model.limits[j], free.joint[j]));
+            float cost = excess + 0.1f * (1.f - glm::dot(candidate, relaxed));
+            if(glm::length(last) > 0.5f) cost += 0.2f * (1.f - glm::dot(candidate, last));
+            if(cost < least) {
+                least = cost;
+                over = excess;
+                pole = candidate;
+            }
+        }
+        return over;
+    };
+
+    // A hold for a hand: where its palm lies flat on the ground within the arm's reach, the furthest ahead of the
+    // shoulder (the walker comes to it, then leaves it behind), or the nearest to a relaxed arm when it stands
+    // `over`: the angle the arm is outside its limits there
+    float hold_over = 0.f;
+    auto findHold = [&](const HandGeometry& geo, glm::vec3 shoulder, float least_ahead, Footprint& out) {
+        const float reach = params.hand_plant_reach * geo.reach;
+        const float palm = glm::length(geo.palm.sole_centre - model.anchor_child[geo.wrist]);
+        const float from_y = shoulder.y + 0.6f;
+        // Fingers ahead, and up the slope as the trunk comes down
+        const glm::vec3 fingers = dir + state.uphill * (0.8f * state.low);
+        const float yaw = std::atan2(-fingers.x, -fingers.z);
+        bool found = false;
+        float best = -1e9f;
+        glm::vec2 where(0.f);
+        for(float a : { 0.54f, 0.42f, 0.3f, 0.18f, 0.06f, -0.06f }) {
+            if(a < least_ahead) continue;
+            for(float b : { 0.06f, 0.18f, 0.3f }) {
+                const float score = (state.moving ? a : -std::abs(a - 0.18f)) - 0.3f * b;
+                if(score <= best) continue;
+                glm::vec3 at = shoulder + dir * a + right * (geo.palm.side * b);
+                auto hit = ground.below(glm::vec3(at.x, from_y, at.z), 3.f);
+                if(!hit || glm::length(hit->point - shoulder) > reach + palm + 0.05f) continue;
+                Footprint print = fitFootprint(ground, geo.palm, glm::vec2(at.x, at.z), yaw, from_y, params.hand_max_tilt);
+                glm::vec3 position;
+                glm::quat rotation;
+                footPose(geo.palm, print, 0.f, 0, position, rotation);
+                const float d = glm::length(position + rotation * model.anchor_child[geo.wrist] - shoulder);
+                if(d > reach || d < 0.3f * geo.reach) continue;
+                // The palm faces the ground from the shoulder's side of it
+                if(glm::dot(shoulder - print.centre, print.rotation * up) < 0.08f) continue;
+                best = score;
+                out = print;
+                where = glm::vec2(at.x, at.z);
+                found = true;
+            }
+        }
+        if(!found) return false;
+        // The fingers turn, inward mostly, to where the arm is the least outside its limits
+        glm::vec3 position, pole;
+        glm::quat rotation;
+        footPose(geo.palm, out, 0.f, 0, position, rotation);
+        float least = elbowPole(geo, shoulder, position, rotation, glm::vec3(0.f), pole);
+        for(float turn : { 0.5f, 1.f, 1.5f, -0.5f }) {
+            if(least < 0.02f) break;
+            Footprint print = fitFootprint(ground, geo.palm, where, yaw + geo.palm.side * turn, from_y, params.hand_max_tilt);
+            footPose(geo.palm, print, 0.f, 0, position, rotation);
+            const float d = glm::length(position + rotation * model.anchor_child[geo.wrist] - shoulder);
+            if(d > reach || d < 0.3f * geo.reach) continue;
+            float over = elbowPole(geo, shoulder, position, rotation, glm::vec3(0.f), pole);
+            if(over < least - 0.02f) {
+                least = over;
+                out = print;
+            }
+        }
+        hold_over = least;
+        return true;
+    };
+
+    for(int i = 0; i < 2; i++) {
+        HandState& hand = state.hand[i];
+        const HandGeometry& geo = hand.geometry;
+        const HandState& other = state.hand[1 - i];
+        const glm::vec3 shoulder = model.anchor(poses, geo.shoulder);
+        const glm::vec3 free_position = poses.position[geo.palm.segment];
+        const glm::quat free_rotation = poses.rotation[geo.palm.segment];
+        hand.planted_now = false;
+        hand.wait = std::max(hand.wait - dt, 0.f);
+
+        auto leave = [&](const Footprint& print) {
+            if(hand.contact == HandContact::Free) {
+                hand.from_position = free_position;
+                hand.from_rotation = free_rotation;
+            } else {
+                hand.from_position = hand.position;
+                hand.from_rotation = hand.rotation;
+            }
+            hand.next = print;
+            hand.t = 0.f;
+            hand.contact = HandContact::Reaching;
+        };
+
+        Footprint print;
+        if(hand.contact == HandContact::Free || hand.contact == HandContact::Releasing) {
+            if(params.scramble && hand.wait <= 0.f && findHold(geo, shoulder, -1.f, print)) leave(print);
+        } else if(hand.contact == HandContact::Planted) {
+            glm::vec3 position;
+            glm::quat rotation;
+            footPose(geo.palm, hand.current, 0.f, 0, position, rotation);
+            const glm::vec3 wrist = position + rotation * model.anchor_child[geo.wrist];
+            // Out of reach, the trunk's lean counted (GaitBalance, on the last tick)
+            const bool out = !params.scramble || hand.deficit > 5e-3f || glm::length(wrist - shoulder) > geo.reach + 0.3f;
+            hand.held += dt;
+            if(out) {
+                // A hold that did not last was at the edge of the arm's reach: the hand waits before it tries again
+                if(hand.held < 0.25f) hand.wait = 0.6f;
+                if(params.scramble && hand.wait <= 0.f && findHold(geo, shoulder, -1.f, print)) {
+                    leave(print);
+                } else {
+                    hand.from_position = position;
+                    hand.from_rotation = rotation;
+                    hand.t = 0.f;
+                    hand.contact = HandContact::Releasing;
+                }
+            } else if(state.moving && other.contact != HandContact::Reaching && hand.held > params.hand_hold) {
+                // Behind its shoulder, or its arm well outside its limits, after it held for a while: it moves on to a hold
+                // ahead, one hand at a time
+                // ... where the arm is clearly better off
+                glm::vec3 pole;
+                const float over = elbowPole(geo, shoulder, position, rotation, hand.pole, pole);
+                const bool behind = glm::dot(wrist - shoulder, dir) < -params.hand_behind;
+                if((behind || over > params.hand_over) && findHold(geo, shoulder, 0.15f, print) && (behind || hold_over < over - 0.2f)) leave(print);
+            }
+        }
+
+        if(hand.contact == HandContact::Reaching) {
+            // The hold went out of reach while the hand was on its way: another one, or none
+            glm::vec3 position;
+            glm::quat rotation;
+            footPose(geo.palm, hand.next, 0.f, 0, position, rotation);
+            // ... (it must come down with some reach to spare, or it would let go at once)
+            if(glm::length(position + rotation * model.anchor_child[geo.wrist] - shoulder) > 0.5f * (params.hand_plant_reach + params.hand_reach) * geo.reach) {
+                if(params.scramble && findHold(geo, shoulder, -1.f, print)) {
+                    leave(print);
+                } else {
+                    hand.from_position = hand.position;
+                    hand.from_rotation = hand.rotation;
+                    hand.current = hand.next;
+                    hand.t = 0.f;
+                    hand.wait = 0.6f;
+                    hand.contact = HandContact::Releasing;
+                }
+            }
+        }
+
+        if(hand.contact == HandContact::Reaching) {
+            hand.t = std::min(hand.t + dt / std::max(params.hand_time, 1e-3f), 1.f);
+            glm::vec3 position;
+            glm::quat rotation;
+            footPose(geo.palm, hand.next, 0.f, 0, position, rotation);
+            const float e = smooth(hand.t);
+            hand.position = glm::mix(hand.from_position, position, e) + (hand.next.rotation * up) * (params.hand_lift * std::sin(pi * hand.t));
+            hand.rotation = glm::normalize(glm::slerp(hand.from_rotation, rotation, e));
+            if(hand.t >= 1.f) {
+                hand.position = position;
+                hand.rotation = rotation;
+                hand.current = hand.next;
+                hand.contact = HandContact::Planted;
+                hand.planted_now = true;
+                hand.deficit = 0.f;
+                hand.held = 0.f;
+            }
+        } else if(hand.contact == HandContact::Planted) {
+            footPose(geo.palm, hand.current, 0.f, 0, hand.position, hand.rotation);
+        } else if(hand.contact == HandContact::Releasing) {
+            hand.t = std::min(hand.t + dt / std::max(params.hand_time, 1e-3f), 1.f);
+            const float e = smooth(hand.t);
+            hand.position = glm::mix(hand.from_position, free_position, e) + (hand.current.rotation * up) * (params.hand_lift * std::sin(pi * hand.t));
+            hand.rotation = glm::normalize(glm::slerp(hand.from_rotation, free_rotation, e));
+            if(hand.t >= 1.f) hand.contact = HandContact::Free;
+        }
+        if(hand.contact == HandContact::Free) {
+            hand.position = free_position;
+            hand.rotation = free_rotation;
+            hand.deficit = 0.f;
+        }
+        hand.grip = approach(hand.grip, hand.contact == HandContact::Planted ? 1.f : 0.f, dt / 0.25f);
+
+        auto& chain = reg.get<IKChain>(hand.chain);
+        chain.yield = params.yield_limits;
+        auto& target = reg.get<IKTarget>(hand.target);
+        target.enabled = hand.contact != HandContact::Free;
+        if(!target.enabled) {
+            hand.pole = glm::vec3(0.f);
+            continue;
+        }
+
+        // Where the elbow points, turning there no faster than an arm does
+        const glm::vec3 wrist = hand.position + hand.rotation * model.anchor_child[geo.wrist];
+        glm::vec3 best(0.f);
+        elbowPole(geo, shoulder, hand.position, hand.rotation, hand.pole, best);
+        if(glm::length(hand.pole) > 0.5f) {
+            glm::vec3 axis = wrist - shoulder;
+            axis = glm::length(axis) > 1e-6f ? glm::normalize(axis) : -up;
+            glm::vec3 pole = glm::mix(hand.pole, best, dt / (0.12f + dt));
+            pole -= axis * glm::dot(pole, axis);
+            hand.pole = glm::length(pole) > 1e-3f ? glm::normalize(pole) : best;
+        } else {
+            hand.pole = best;
+        }
+
+        target.position = wrist;
+        target.rotation = hand.rotation;
+        target.pole = hand.pole;
+    }
+
+}
+
 // GaitBalance
 
 void GaitBalanceSys::tick(double h) {
@@ -719,6 +1142,50 @@ void GaitBalanceSys::tick(double h) {
     GroundField& ground = groundField(reg);
     auto& balance = reg.get_or_emplace<BalanceState>(g.entity);
     const float dt = (float) h;
+    const BodyDef& def = *model.body;
+
+    // The hands that hold or reach: their arms are solved with the legs, and the trunk leans as far as they need
+    struct Arm {
+        HandState* hand;
+        const IKChain* chain;
+        IKGoal goal;
+    };
+    Arm arms[2];
+    int arm_count = 0;
+    const int spine_joint[2] = { model.jointIndex("Spine"), model.jointIndex("Spine2") };
+    glm::quat spine_base[2] = { glm::quat(1.f, 0.f, 0.f, 0.f), glm::quat(1.f, 0.f, 0.f, 0.f) };
+    glm::vec3 trunk_lean(0.f);
+    glm::vec2 com_target = state.com_target;
+    bool trunk = false;
+    if(state.hands_ready && spine_joint[0] >= 0 && spine_joint[1] >= 0) {
+        for(HandState& hand : state.hand) {
+            if(hand.grip > 0.f) com_target += params.hand_support * hand.grip * (glm::vec2(hand.current.centre.x, hand.current.centre.z) - state.com_target);
+            const auto& target = reg.get<IKTarget>(hand.target);
+            if(!target.enabled) {
+                hand.deficit = 0.f;
+                continue;
+            }
+            arms[arm_count++] = Arm { &hand, &reg.get<IKChain>(hand.chain), IKGoal { target.position, target.rotation, target.use_rotation, target.pole } };
+        }
+        for(int k = 0; k < 2; k++) spine_base[k] = pose.joint[spine_joint[k]];
+        // What the trunk leaned for the hands goes when no hand asks for it
+        trunk_lean = state.trunk_reach * std::exp(-dt / std::max(params.trunk_return, 1e-3f));
+        if(glm::length(trunk_lean) < 1e-5f) trunk_lean = glm::vec3(0.f);
+        trunk = arm_count > 0 || trunk_lean != glm::vec3(0.f);
+    }
+    // The spine as GaitBase left it, turned by a world rotation vector, half on each of its joints
+    auto leanTrunk = [&](RigPose& p, glm::vec3 lean) {
+        for(int k = 0; k < 2; k++) p.joint[spine_joint[k]] = spine_base[k];
+        const float angle = glm::length(lean);
+        if(angle < 1e-6f) return;
+        const glm::quat half = glm::angleAxis(0.5f * angle, lean / angle);
+        SegmentPoses at;
+        for(int k = 0; k < 2; k++) {
+            model.forward(p, at);
+            const JointDef& joint = def.joints[spine_joint[k]];
+            p.joint[spine_joint[k]] = model.clamp(spine_joint[k], model.jointRotation(spine_joint[k], at.rotation[joint.parent], glm::normalize(half * at.rotation[joint.child])));
+        }
+    };
 
     const IKChain* chains[2];
     IKGoal goals[2];
@@ -739,7 +1206,15 @@ void GaitBalanceSys::tick(double h) {
         balance.deficit = 0.f;
     }
     balance.bias += (balance.wanted - balance.bias) * (dt / (params.crouch_time + dt));
-    float limit = nominal;
+    // Scrambling brings the hips down, but no nearer to an ankle than the knee folds: they are lifted for that, no
+    // faster than hips move (a knee folds past its stop for a moment instead) and no higher than the legs reached
+    // through the last step
+    const bool folding = state.low > 0.f || balance.lift > 0.f;
+    if(folding && (state.foot[0].landed || state.foot[1].landed || !state.moving)) {
+        balance.lift_room = balance.lift_room_step;
+        balance.lift_room_step = 10.f;
+    }
+    float limit = nominal, lift_now = 0.f, room_now = 10.f;
     auto height = [&](glm::vec3 hip) {
         float y = nominal + 1.f;
         for(int i = 0; i < 2; i++) {
@@ -749,7 +1224,21 @@ void GaitBalanceSys::tick(double h) {
             y = std::min(y, goals[i].position.y - hip_offset[i].y + (rest > 0.f ? std::sqrt(rest) : 0.f));
         }
         limit = y;
-        return std::min(y, nominal - balance.bias);
+        y = std::min(y, nominal - balance.bias);
+        if(folding) {
+            float least = -1e9f;
+            for(int i = 0; i < 2; i++) {
+                glm::vec3 joint = hip + hip_offset[i];
+                float dx = joint.x - goals[i].position.x, dz = joint.z - goals[i].position.z;
+                float rest = state.fold * state.fold - dx * dx - dz * dz;
+                if(rest > 0.f) least = std::max(least, goals[i].position.y - hip_offset[i].y + std::sqrt(rest));
+            }
+            lift_now = state.low > 0.f ? std::max(std::min(least, limit) - y, 0.f) : 0.f;
+            room_now = std::max(limit - y, 0.f);
+            // Reach comes first
+            y = std::min(y + balance.lift, limit);
+        }
+        return y;
     };
 
     glm::vec3 hip = state.hip_centre;
@@ -760,11 +1249,38 @@ void GaitBalanceSys::tick(double h) {
     for(int k = 0; k < std::max(params.balance_iterations, 1); k++) {
         hip.y = height(hip);
         pose.root_position = hip - pose.root_rotation * state.pivot;
+        if(trunk) {
+            // The shoulders come within reach of the hands' targets: the trunk turns about the bottom of the spine
+            leanTrunk(pose, trunk_lean);
+            for(int pass = 0; pass < 6 && arm_count > 0; pass++) {
+                model.forward(pose, poses);
+                glm::vec3 shift(0.f);
+                int lacking = 0;
+                for(int a = 0; a < arm_count; a++) {
+                    const HandGeometry& geo = arms[a].hand->geometry;
+                    glm::vec3 d = arms[a].goal.position - model.anchor(poses, geo.shoulder);
+                    const float l = glm::length(d), over = l - params.hand_reach * geo.reach;
+                    if(over > 0.f) {
+                        shift += d * (over / l);
+                        lacking++;
+                    }
+                }
+                if(lacking == 0) break;
+                const glm::vec3 chest = 0.5f * (model.anchor(poses, state.hand[0].geometry.shoulder) + model.anchor(poses, state.hand[1].geometry.shoulder));
+                const glm::vec3 lever = chest - model.anchor(poses, spine_joint[0]);
+                // Each pass covers most of what is lacking: a sum over the hands, so that a second hand starting to lack changes nothing at once
+                trunk_lean += glm::cross(lever, 0.6f * shift) / std::max(glm::dot(lever, lever), 1e-4f);
+                const float angle = glm::length(trunk_lean);
+                if(angle > params.trunk_reach) trunk_lean *= params.trunk_reach / angle;
+                leanTrunk(pose, trunk_lean);
+            }
+        }
         solved = pose;
         for(int i = 0; i < 2; i++) solveChain(model, solved, chains[i]->joints, chains[i]->pole_rest, goals[i], chains[i]->limits, chains[i]->yield);
+        for(int a = 0; a < arm_count; a++) solveChain(model, solved, arms[a].chain->joints, arms[a].chain->pole_rest, arms[a].goal, arms[a].chain->limits, arms[a].chain->yield);
         model.forward(solved, poses);
         com = model.centerOfMass(poses);
-        glm::vec2 error(state.com_target.x - com.x, state.com_target.y - com.z);
+        glm::vec2 error(com_target.x - com.x, com_target.y - com.z);
         balance.error = glm::length(error);
         balance.iterations = k + 1;
         if(balance.error < params.balance_tolerance || k + 1 >= params.balance_iterations) break;
@@ -773,6 +1289,26 @@ void GaitBalanceSys::tick(double h) {
     }
     balance.crouch = nominal - hip.y;
     balance.offset = hip - state.hip_centre;
+    if(folding) {
+        balance.lift_room_step = std::min(balance.lift_room_step, room_now);
+        balance.lift = approach(balance.lift, std::min(lift_now, balance.lift_room), 0.3f * dt);
+    }
+    if(trunk) {
+        state.trunk_reach = trunk_lean;
+        for(int a = 0; a < arm_count; a++) {
+            const HandGeometry& geo = arms[a].hand->geometry;
+            HandState& hand = *arms[a].hand;
+            hand.deficit = std::max(glm::length(arms[a].goal.position - model.anchor(poses, geo.shoulder)) - params.hand_reach * geo.reach, 0.f);
+            // Out of reach whatever the trunk does: the palm lets go now
+            if(hand.contact == HandContact::Planted && hand.deficit > 5e-3f) {
+                hand.from_position = hand.position;
+                hand.from_rotation = hand.rotation;
+                hand.t = 0.f;
+                if(hand.held < 0.25f) hand.wait = 0.6f;
+                hand.contact = HandContact::Releasing;
+            }
+        }
+    }
     balance.deficit = std::max(balance.deficit, nominal - limit);
     balance.wanted = std::max(balance.wanted, balance.deficit);
 
@@ -798,6 +1334,15 @@ void GaitBalanceSys::tick(double h) {
             points.emplace_back(p.x, p.z);
             if(!f.stance && f.planned) {
                 p = soleCorner(f.geometry, f.next, c);
+                points.emplace_back(p.x, p.z);
+            }
+        }
+    }
+    if(state.hands_ready) {
+        for(const HandState& hand : state.hand) {
+            if(hand.contact != HandContact::Planted) continue;
+            for(int c = 0; c < 4; c++) {
+                glm::vec3 p = soleCorner(hand.geometry.palm, hand.current, c);
                 points.emplace_back(p.x, p.z);
             }
         }
@@ -903,8 +1448,52 @@ void GaitChecksSys::tick(double h) {
     }
     if(balance && balance->captured) report.capture_error = balance->capture_error;
 
+    // Hands
+    const bool settled = state.time >= report.settle;
+    report.hand_contact_error = report.hand_penetration = report.hand_slip = report.hand_ik_position = report.hand_ik_rotation = 0.f;
+    if(state.hands_ready) {
+        for(int i = 0; i < 2; i++) {
+            const HandState& hand = state.hand[i];
+            const FootGeometry& palm = hand.geometry.palm;
+            const bool planted = hand.contact == HandContact::Planted;
+            for(int c = 0; c < 4; c++) {
+                glm::vec3 corner = palm.corner(c, s.position[palm.segment], s.rotation[palm.segment]);
+                if(!planted) {
+                    report.hand_is_planted[i][c] = false;
+                    continue;
+                }
+                if(auto hit = ground.below(glm::vec3(corner.x, corner.y + 1.f, corner.z), 4.f)) {
+                    float distance = (corner.y - hit->point.y) * hit->normal.y;
+                    report.hand_penetration = std::max(report.hand_penetration, -distance);
+                    report.hand_contact_error = std::max(report.hand_contact_error, std::abs(distance));
+                }
+                if(!report.hand_is_planted[i][c] || hand.planted_now) {
+                    report.hand_planted[i][c] = corner;
+                    report.hand_is_planted[i][c] = true;
+                }
+                report.hand_slip = std::max(report.hand_slip, glm::length(corner - report.hand_planted[i][c]));
+            }
+            const auto& chain = reg.get<IKChain>(hand.chain);
+            if(planted) {
+                report.hand_ik_position = std::max(report.hand_ik_position, chain.position_error);
+                report.hand_ik_rotation = std::max(report.hand_ik_rotation, chain.rotation_error);
+                if(settled) report.hand_ticks[i]++;
+            }
+            if(settled && hand.planted_now) report.hand_holds[i]++;
+            if(settled && chain.solved) report.max_arm_limit = std::max(report.max_arm_limit, chain.limit_excess);
+        }
+        if(state.ground_version != ground.version) report.hand_is_planted = {};
+    }
+
     report.ticks++;
     if(state.time < report.settle) return;
+    report.max_hand_contact_error = std::max(report.max_hand_contact_error, report.hand_contact_error);
+    report.max_hand_penetration = std::max(report.max_hand_penetration, report.hand_penetration);
+    report.max_hand_slip = std::max(report.max_hand_slip, report.hand_slip);
+    report.max_hand_ik_position = std::max(report.max_hand_ik_position, report.hand_ik_position);
+    report.max_hand_ik_rotation = std::max(report.max_hand_ik_rotation, report.hand_ik_rotation);
+    report.max_low = std::max(report.max_low, state.low);
+    if(balance && balance->valid) report.min_hip_height = std::min(report.min_hip_height, state.hip_centre.y + balance->offset.y - state.centre.y);
     if(report.settle_time < 0. && balance) {
         report.settle_time = state.time;
         report.settle_com = balance->com;
@@ -961,6 +1550,7 @@ void dy::registerGait() {
             JsonFields f(j);
             float strike = glm::degrees(p.strike_angle), toe = glm::degrees(p.toe_angle);
             float roll = glm::degrees(p.ankle_roll_extra), yaw = glm::degrees(p.ankle_yaw_extra);
+            float from = glm::degrees(p.scramble_from), full = glm::degrees(p.scramble_full), lean = glm::degrees(p.scramble_lean), trunk = glm::degrees(p.trunk_reach);
             f.read("step_factor", p.step_factor);
             f.read("step_exponent", p.step_exponent);
             f.read("max_stride_time", p.max_stride_time);
@@ -982,7 +1572,20 @@ void dy::registerGait() {
             f.read("step_rise", p.step_rise);
             f.read("ankle_roll_extra", roll);
             f.read("ankle_yaw_extra", yaw);
+            f.read("scramble", p.scramble);
+            f.read("scramble_from", from);
+            f.read("scramble_full", full);
+            f.read("scramble_crouch", p.scramble_crouch);
+            f.read("scramble_lean", lean);
+            f.read("scramble_shoulder", p.scramble_shoulder);
+            f.read("hand_time", p.hand_time);
+            f.read("hand_support", p.hand_support);
+            f.read("trunk_reach", trunk);
             f.finish();
+            p.scramble_from = glm::radians(from);
+            p.scramble_full = glm::radians(full);
+            p.scramble_lean = glm::radians(lean);
+            p.trunk_reach = glm::radians(trunk);
             p.strike_angle = glm::radians(strike);
             p.toe_angle = glm::radians(toe);
             p.ankle_roll_extra = glm::radians(roll);
@@ -996,12 +1599,16 @@ void dy::registerGait() {
                 { "toe_angle", glm::degrees(p.toe_angle) }, { "swing_lift", p.swing_lift }, { "swing_clearance", p.swing_clearance },
                 { "leg_extension", p.leg_extension }, { "hip_height", p.hip_height }, { "lean_slope_gain", p.lean_slope_gain },
                 { "acceleration", p.acceleration }, { "turn_rate", p.turn_rate }, { "slope_slowdown", p.slope_slowdown }, { "slope_speed_floor", p.slope_speed_floor }, { "step_rise", p.step_rise }, { "knee_out", p.knee_out }, { "yield_limits", p.yield_limits },
-                { "ankle_roll_extra", glm::degrees(p.ankle_roll_extra) }, { "ankle_yaw_extra", glm::degrees(p.ankle_yaw_extra) } };
+                { "ankle_roll_extra", glm::degrees(p.ankle_roll_extra) }, { "ankle_yaw_extra", glm::degrees(p.ankle_yaw_extra) },
+                { "scramble", p.scramble }, { "scramble_from", glm::degrees(p.scramble_from) }, { "scramble_full", glm::degrees(p.scramble_full) },
+                { "scramble_crouch", p.scramble_crouch }, { "scramble_lean", glm::degrees(p.scramble_lean) }, { "scramble_shoulder", p.scramble_shoulder },
+                { "hand_time", p.hand_time }, { "hand_support", p.hand_support }, { "trunk_reach", glm::degrees(p.trunk_reach) } };
         }
     });
 
     registerSystem("GaitBase", systemInfo<GaitBaseSys>(SystemScope::World));
     registerSystem("GaitFootIK", systemInfo<GaitFootIKSys>(SystemScope::World));
+    registerSystem("GaitHandIK", systemInfo<GaitHandIKSys>(SystemScope::World));
     registerSystem("GaitBalance", systemInfo<GaitBalanceSys>(SystemScope::World));
     registerSystem("GaitChecks", systemInfo<GaitChecksSys>(SystemScope::World));
 

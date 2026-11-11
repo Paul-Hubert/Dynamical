@@ -205,6 +205,35 @@ std::shared_ptr<VmaImage> dy::uploadTexture(Context& ctx, const TexturePixels& p
 
 }
 
+std::shared_ptr<VmaImage> dy::uploadTextureArray(Context& ctx, const std::vector<TexturePixels>& layers, vk::Format format) {
+
+    const TexturePixels& first = layers.at(0);
+    for(const TexturePixels& layer : layers) {
+        if(layer.width != first.width || layer.height != first.height || layer.level_sizes != first.level_sizes) {
+            throw std::runtime_error("Texture array layers must have the same size");
+        }
+    }
+
+    // Level after level, each one layer after layer
+    std::vector<uint8_t> data;
+    std::vector<size_t> level_sizes;
+    size_t offset = 0;
+    for(size_t size : first.level_sizes) {
+        for(const TexturePixels& layer : layers) {
+            data.insert(data.end(), layer.data.begin() + offset, layer.data.begin() + offset + size);
+        }
+        level_sizes.push_back(size * layers.size());
+        offset += size;
+    }
+
+    vk::ImageCreateInfo info({}, vk::ImageType::e2D, format, vk::Extent3D(first.width, first.height, 1), (uint32_t) level_sizes.size(), (uint32_t) layers.size(),
+        vk::SampleCountFlagBits::e1, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+        vk::SharingMode::eExclusive, 1, &ctx.device.g_i, vk::ImageLayout::eUndefined);
+
+    return ctx.transfer.createImageMips(data.data(), level_sizes, info, vk::ImageLayout::eShaderReadOnlyOptimal);
+
+}
+
 std::shared_ptr<VmaImage> dy::makeSolidTexture(Context& ctx, uint32_t rgba) {
 
     vk::ImageCreateInfo info({}, vk::ImageType::e2D, vk::Format::eR8G8B8A8Unorm, vk::Extent3D(1, 1, 1), 1, 1, vk::SampleCountFlagBits::e1,

@@ -12,7 +12,7 @@ What did not go as planned:
 
 - Step 3 needed the terrain pass to step back and darken under the grass ([03-patches.md](03-patches.md)).
 - Step 7 takes three fetches, not one ([07-sun-shadows.md](07-sun-shadows.md)).
-- Step 9 only works within a few metres ([09-silhouette.md](09-silhouette.md)).
+- Step 9 only works within a few metres ([09-silhouette.md](09-silhouette.md)); replaced by [13-see-through.md](13-see-through.md).
 - Step 10: one azimuth per pixel is too grainy at full strength, the default is half ([10-sharper-blades.md](10-sharper-blades.md)).
 - Not checked: motion (wind, sliding), VR, frame time. The lookup went from 3 to 5 texture fetches per pixel to about 16 to 22 (3 layers, shadow and canopy).
 
@@ -28,6 +28,14 @@ What did not go as planned:
 | 8 | [08-canopy-occlusion.md](08-canopy-occlusion.md) | Darker under the canopy, from the top rays (idea 12) | no | 1 |
 | 9 | [09-silhouette.md](09-silhouette.md) | Blade tips instead of a smooth line on the crests (idea 13) | no | 0 |
 | 10 | [10-sharper-blades.md](10-sharper-blades.md) | 256 texels per tile, one azimuth per pixel instead of two blended (idea 14) | yes | 0 |
+
+Added after the ten: [11-height-map.md](11-height-map.md), the height of the grass from octaves of Perlin noise baked in a 2D map per chunk (replaces the field patches of step 3; no re-bake of the rays, no extra fetch per pixel).
+
+Tiles of other plants to bake the rays on (clover, ryegrass, dandelion...): [13-plants.md](13-plants.md), one kind at a time in the engine (`grass_kind=`). Their colours: [14-colour-map.md](14-colour-map.md), a colour map baked next to the rays.
+
+And [12-elevations.md](12-elevations.md): oblique rays at four elevations instead of 45° alone, each with its own azimuths, in a 2D array filtered 16 times anisotropic (re-bake; 1 to 4 fetches per lookup instead of 1).
+
+And [13-see-through.md](13-see-through.md): where the ground falls away under the ray (from the second derivatives of the terrain density, a value per terrain vertex), what is deeper than the ray ever gets is not drawn and the air behind shows between the blades (replaces step 9; no re-bake, no fetch).
 
 ## What the steps share
 

@@ -1,0 +1,7 @@
+{
+  "description": "Soft ground on every walk, 3 to 12 % of the height of the animal deep; the style of the clip otherwise",
+  "stride": 1.0, "step_height": 1.0, "clearance": 0.0, "soft_depth": [0.03, 0.12], "sink_time": [0.06, 0.2], "exit_vertical": [0.5, 1.0],
+  "entry_vertical": [0.2, 0.8], "exit_part": [0.2, 0.4], "body_sink": [0.5, 0.9], "crouch": 0.0, "spread": 0.0, "bend": 1.0, "max_bend": 40.0,
+  "head_lead": 0.6, "bank": 0.5, "turn_step": 1.0, "ik": 1.0,
+  "speed": [0.8, 1.2], "radius": [4.0, 12.0], "straight": 0.4, "soft": 1.0, "scale": [1.0, 1.0], "segment": [2.0, 5.0]
+}

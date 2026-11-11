@@ -1,0 +1,26 @@
+{
+  "scene": "ik_walk_slope",
+  "vars": {
+    "pitch": "50",
+    "scramble": "true"
+  },
+  "hide_ui": true,
+  "shots": [
+    {
+      "frame": 420,
+      "name": "ik_scramble_a"
+    },
+    {
+      "frame": 450,
+      "name": "ik_scramble_b"
+    },
+    {
+      "frame": 480,
+      "name": "ik_scramble_c"
+    },
+    {
+      "frame": 510,
+      "name": "ik_scramble_d"
+    }
+  ]
+}

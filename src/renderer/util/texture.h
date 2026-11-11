@@ -37,6 +37,9 @@ TexturePixels decodeTextureMips(const std::string& path, bool srgb, float alpha_
 // Uploads through the transfer queue (main thread)
 std::shared_ptr<VmaImage> uploadTexture(Context& ctx, const TexturePixels& pixels, vk::Format format);
 
+// The same for the layers of a 2D array : images of the same size, with their mip chains
+std::shared_ptr<VmaImage> uploadTextureArray(Context& ctx, const std::vector<TexturePixels>& layers, vk::Format format);
+
 }
 
 #endif

@@ -57,7 +57,7 @@ int TrainHost::run() {
     if(mode == "null") return null();
     if(mode == "train") return agents();
     if(mode == "record-demo") return recordDemo();
-    if(mode == "eval") return eval();
+    if(mode == "eval") return animalWorlds() ? evalAnimals() : eval();
 
     dy::log(dy::error) << "mode=" << mode << " is not available yet\n";
     return 1;
@@ -124,6 +124,10 @@ int TrainHost::recordDemo() {
     auto& world = runner.world(0);
     auto& io = world.reg.ctx().get<AgentIO>();
     int period = (int) world.reg.ctx().get<WorldClock>().decision_period;
+    if(std::string problem = animalDemoProblem(); !problem.empty()) {
+        dy::log(dy::error) << "mode=record-demo: " << problem << "\n";
+        return 1;
+    }
 
     mlagents::co::DemonstrationMetaProto meta;
     meta.set_api_version(1);
@@ -142,6 +146,7 @@ int TrainHost::recordDemo() {
             if(stopRequested()) return 1;
             // A gait demo's warm-up between two routes belongs to no episode
             if(!io.recordable) continue;
+            recordAnimalReplay();
             mlagents::co::AgentInfoActionPairProto pair;
             auto* info = pair.mutable_agent_info();
             info->set_reward(0.f);
@@ -208,6 +213,7 @@ int TrainHost::recordDemo() {
         out.write(records.data(), records.size());
     }
     dy::log(dy::info) << "Demo " << out_path << ": " << steps << " decisions, " << episodes << " episodes\n";
+    writeAnimalChecks();
     return 0;
 
 }

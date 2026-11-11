@@ -31,11 +31,13 @@ public:
     Compute compute;
     Swapchain swap;
 
-    // Set 0 of every scene pipeline : the ViewUBO of the desktop camera or of one VR eye
-    // and the shade of the plants (TreeShade, which owns both)
+    // Set 0 of every scene pipeline : the ViewUBO of the desktop camera or of one VR eye,
+    // the shade of the plants (TreeShade, which owns both) and the soil maps of the chunks (SoilMaps, likewise)
     vk::DescriptorSetLayout view_layout;
     vk::ImageView tree_shade_view;
     vk::Sampler tree_shade_sampler;
+    vk::ImageView soil_view;
+    vk::Sampler soil_sampler;
 
     uint32_t frame_index = 0;
 

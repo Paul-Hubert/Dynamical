@@ -30,6 +30,7 @@ struct ShapeDef {
     glm::quat rotation = glm::quat(1.f, 0.f, 0.f, 0.f);  // in the segment's frame; a capsule's axis is its local Y
     float radius = 0.f, half_height = 0.f;          // capsule: of the cylinder part; sphere: radius
     glm::vec3 half_extents = glm::vec3(0.f);        // box
+    float convex_radius = -1.f;                     // box: how round its edges are; < 0: the least of 5 cm and its half extents (the human walker)
 };
 
 struct SegmentDef {
@@ -124,7 +125,7 @@ struct AgentParams {
     float push_chance = 0.001f, push_force = 5.f, pull_chance = 0.001f, pull_force = 1.f;
 
     float root_reward = 0.34f, head_spring_reward = 0.f, head_damper_reward = 0.f, life_reward = 0.f, dying_reward = 0.f;
-    float win_reward = 0.f, death_penalty = -10.f, reward_factor = 1.f, collision_penalty = 0.f;
+    float win_reward = 0.f, death_penalty = 0.f, reward_factor = 1.f, collision_penalty = 0.f;
     float dying_height_factor = 0.7f;
     int max_dying_frames = 0;
     bool die_on_fall = true, reset_on_alive = true;

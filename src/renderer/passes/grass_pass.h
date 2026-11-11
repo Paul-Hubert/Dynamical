@@ -2,15 +2,20 @@
 #define DY_GRASS_PASS_H
 
 #include "renderer/scene_pass.h"
+#include "renderer/terrain/chunk_layers.h"
 #include "renderer/util/vmapp.h"
 
 #include <entt/entt.hpp>
 
+#include <array>
+#include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace dy {
 
 class Context;
+class GrassHeightField;
 
 // Grass without blade geometry : the terrain chunks are drawn again as a shell at the top of the grass,
 // and each pixel looks its view ray up in rays baked against a grass model (logic/grass/grass_bake.h)
@@ -21,6 +26,7 @@ public:
 
     const char* name() const override { return "Grass"; }
     void createPipeline(RenderTarget target, vk::RenderPass renderpass) override;
+    void update(uint32_t frame_index) override;
     void record(vk::CommandBuffer command, const RenderView& view) override;
 
 private:
@@ -33,15 +39,41 @@ private:
     vk::PipelineLayout layout;
 
     vk::Sampler sampler;
+    vk::Sampler raySampler;     // trilinear and anisotropic, for the baked rays
 
-    // Rays at 45 degrees (3D : x, z of the tile and azimuth) and from the top (2D)
-    std::shared_ptr<VmaImage> obliqueImage;
-    vk::ImageView obliqueView;
-    std::shared_ptr<VmaImage> topImage;
-    vk::ImageView topView;
+    // Oblique rays (x, z of the tile, and a layer for each azimuth of each elevation : GPUs do not filter
+    // 3D images anisotropically, the shader blends the layers) and rays from the top (2D), four textures
+    // each (logic/grass/grass_textures.h) : height of the hit, normal, id of the blade, colour
+    struct Baked {
+        std::shared_ptr<VmaImage> image;
+        vk::ImageView view;
+    };
+    std::array<Baked, 8> baked;
+    // Specialization constants of grass.frag.glsl : how the layers are laid out
+    struct RayLayout {
+        int32_t angles[4] = {};         // azimuths of each elevation
+        float low_from = 1.f, low_to = 0.5f;    // of the lowest rays (GrassRaycast)
+        float tiles[10] = {}, heights[10] = {}; // metres each kind of tile was modelled at (GrassModel)
+        float abundance[10] = {};               // GrassKindInfo
+        int32_t small_mask = 0;                 // a bit per kind : small plants
+        int32_t forced_kind = -1;               // grass_kind=... : that kind everywhere
+    } rayLayout;
 
     std::shared_ptr<VmaImage> noiseImage;
     vk::ImageView noiseView;
+
+    // Noises the kinds of plants are chosen by (logic/grass/grass_species.h)
+    std::shared_ptr<VmaImage> speciesImage;
+    vk::ImageView speciesView;
+
+    // Height of the grass over each chunk (logic/grass/grass_height.h) : one layer of a 2D array per
+    // chunk, baked when the chunk gets its mesh and again when the parameters change
+    std::unique_ptr<GrassHeightField> heightField;
+    vk::Sampler heightSampler;
+    std::shared_ptr<VmaImage> heightImage;
+    vk::ImageView heightView;
+
+    ChunkLayers heightLayers;               // which layer each chunk has
 };
 
 }

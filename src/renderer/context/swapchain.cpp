@@ -4,6 +4,8 @@
 #include "loader.inl"
 #include "num_frames.h"
 
+#include "scene/run_args.h"
+
 #include <SDL_vulkan.h>
 #include <iostream>
 #include <time.h>
@@ -28,9 +30,12 @@ Swapchain::Swapchain(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     vkGetPhysicalDeviceSurfacePresentModesKHR(static_cast<VkPhysicalDevice> (ctx.device), ctx.win.surface, &num, reinterpret_cast<VkPresentModeKHR*> (presentModes.data()));
     
     vk::SurfaceFormatKHR surfaceformat = chooseSwapSurfaceFormat(formats, vk::Format::eB8G8R8A8Srgb, vk::ColorSpaceKHR::eSrgbNonlinear);
-    // With a headset, the desktop window must not throttle the loop to the monitor refresh rate
-    presentMode = chooseSwapPresentMode(presentModes, ctx.vr.enabled() ? vk::PresentModeKHR::eMailbox : vk::PresentModeKHR::eFifo);
-    if(ctx.vr.enabled() && presentMode == vk::PresentModeKHR::eFifo) {
+    // With a headset, or when the passes are timed (gpu_times), the desktop window must not throttle the
+    // loop to the monitor refresh rate
+    auto* args = reg.ctx().find<RunArgs>();
+    bool unthrottled = ctx.vr.enabled() || (args && args->gpu_times);
+    presentMode = chooseSwapPresentMode(presentModes, unthrottled ? vk::PresentModeKHR::eMailbox : vk::PresentModeKHR::eFifo);
+    if(unthrottled && presentMode == vk::PresentModeKHR::eFifo) {
         presentMode = chooseSwapPresentMode(presentModes, vk::PresentModeKHR::eImmediate);
     }
     extent = chooseSwapExtent(capabilities);

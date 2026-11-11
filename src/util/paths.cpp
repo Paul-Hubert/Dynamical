@@ -6,6 +6,22 @@
 
 #include <vector>
 
+std::filesystem::path dy::libraryResourceFile(const std::filesystem::path& relative) {
+    std::error_code ec;
+    if(relative.is_absolute()) return relative;
+    auto local = std::filesystem::path("resources") / relative;
+    if(std::filesystem::exists(local, ec)) return local;
+    // A path given from the working directory (a file frozen with a run)
+    if(std::filesystem::is_regular_file(relative, ec)) return relative;
+    auto beside = executableDirectory() / "resources" / relative;
+    if(std::filesystem::exists(beside, ec)) return beside;
+#ifdef DY_SOURCE_RESOURCES
+    return std::filesystem::path(DY_SOURCE_RESOURCES) / relative;
+#else
+    return beside;
+#endif
+}
+
 std::filesystem::path dy::executableDirectory() {
 #ifdef _WIN32
     std::vector<wchar_t> buffer(MAX_PATH);

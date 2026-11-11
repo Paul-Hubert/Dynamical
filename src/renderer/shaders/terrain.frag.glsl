@@ -1,19 +1,43 @@
 #version 450
 
+// The ground. Seen from above : earth (under the grass of the grass pass), and patches of mud, stones and
+// sand where the soil map of the chunk says so (logic/terrain/soil.h). Steep faces : rock, laid on the two
+// vertical planes. Stones again at the foot of the rock, where the ground gets steep.
+// Layers are not faded into each other : each has a height (ground_import.py), and where two meet the
+// higher one shows. Stones come out of the earth and of the sand by their tops, mud fills the hollows of
+// what it covers, the ledges of the rock keep the earth (docs/ground.md)
+
 layout(location = 0) in vec3 v_position;
 layout(location = 1) in vec3 v_normal;
-layout(location = 2) in vec2 v_uv;
 
 layout(location = 0) out vec4 outColor;
 
-// Layer 0 : grass, layer 1 : rock
+// Without the ground textures. Layer 0 : earth under the grass, layer 1 : rock
 layout(set = 1, binding = 0) uniform sampler2DArray u_color;
+
+// Ground textures, a layer each : mud, stones, sand (as the channels of the soil maps), rock, earth.
+// u_ground_color : albedo. u_ground_detail : rg normal (x and z of the world when u is along x and
+// v along z, 0.5 flat), b height, a occlusion
+layout(set = 1, binding = 1) uniform sampler2DArray u_ground_color;
+layout(set = 1, binding = 2) uniform sampler2DArray u_ground_detail;
+
+const int layer_mud = 0;
+const int layer_stones = 1;
+const int layer_sand = 2;
+const int layer_rock = 3;
+const int layer_earth = 4;
+const int ground_layers = 5;
 
 // Only pushed back, under the grass : keeps the early depth test
 layout(depth_greater) out float gl_FragDepth;
 
 layout(push_constant) uniform Args {
+    vec4 chunk;         // of each draw. xy : origin on the ground, z : layer of its soil map (< 0 : none), w : texels per metre
+    float tiles[ground_layers];         // tiles per metre
+    float smoothness[ground_layers];
     float under_grass;  // height of the grass that the grass pass draws over the flat ground, 0 without it
+    float library;      // 0 : no ground textures (flat colours, the earth and the rock of u_color)
+    float scree;        // stones at the foot of the rock
 };
 
 layout(std140, set = 0, binding = 0) uniform View {
@@ -24,6 +48,10 @@ layout(std140, set = 0, binding = 0) uniform View {
 
 // Shadows of the crowns of the plants on the ground, seen from above (renderer/tree_shade.h)
 layout(set = 0, binding = 1) uniform sampler2D u_tree_shade;
+
+// Mud (r), stones (g) and sand (b) over each chunk, a layer each : 0.5 on the edge of a patch, more
+// inside. a : how tall the grass is next to them (renderer/terrain/soil_maps.h). Texel (i, j) is on the vertices i, j cubes from the origin of the chunk
+layout(set = 0, binding = 2) uniform sampler2DArray u_soil;
 
 const vec3 sun_direction = normalize(vec3(0.5, 1.0, 0.5));
 const vec3 sky_color = vec3(0.45, 0.6, 0.8);
@@ -52,41 +80,207 @@ float treeShade(vec3 position, float above) {
     return tree_shade.x * shade * (1.0 - smoothstep(0.75 * tree_shade.z, tree_shade.z, far));
 }
 
+// The soil maps have a texel every 4 m : a patch would have straight edges. The maps are read a few
+// metres off (never more than their border of one texel), further over tens of metres and less over one,
+// and the edges wind. The same in grass.frag.glsl
+const float soil_border = 1.0;
+vec2 soilWarp(vec2 ground) {
+    vec2 large = vec2(shadeNoise(ground * 0.13 + 3.1), shadeNoise(ground * 0.13 + 61.7)) - 0.5;
+    vec2 middle = vec2(shadeNoise(ground * 0.47 + 17.0), shadeNoise(ground * 0.47 + 93.2)) - 0.5;
+    vec2 small = vec2(shadeNoise(ground * 1.9 + 5.0), shadeNoise(ground * 1.9 + 37.9)) - 0.5;
+    return 4.4 * large + 2.2 * middle + 0.7 * small;
+}
+
+// Mud, stones and sand at a point of the ground of this chunk, from its soil map. a : height of the grass
+vec4 soilAt(vec2 ground, float layer, float texels_per_metre) {
+    vec2 texel = (ground - chunk.xy) * texels_per_metre + soil_border + 0.5;
+    return textureLod(u_soil, vec3(texel / vec2(textureSize(u_soil, 0).xy), layer), 0.0);
+}
+
+// A tile of a few metres seen from far shows its repeats as a grid : the textures are read on tiles
+// 1 / wide_scale times larger there (wide : 0 up close, 1 far), and blurred further still
+const float wide_scale = 1.0 / 3.1;
+float wide = 0.0;
+float blur = 1.0;
+
+// Normal, height and occlusion of a ground texture at a point of the plane it is laid on (metres).
+// dx, dy : the pixel on that plane (the layers are read in branches)
+vec4 groundDetail(int layer, vec2 at, vec2 dx, vec2 dy) {
+    float tile = tiles[layer];
+    vec4 close = vec4(0.0), away = vec4(0.0);
+    if(wide < 1.0) close = textureGrad(u_ground_detail, vec3(at * tile, float(layer)), dx * tile, dy * tile);
+    tile *= wide_scale;
+    if(wide > 0.0) away = textureGrad(u_ground_detail, vec3(at * tile + 0.37, float(layer)), dx * (tile * blur), dy * (tile * blur));
+    return mix(close, away, wide);
+}
+
+vec3 groundColor(int layer, vec2 at, vec2 dx, vec2 dy) {
+    float tile = tiles[layer];
+    vec3 close = vec3(0.0), away = vec3(0.0);
+    if(wide < 1.0) close = textureGrad(u_ground_color, vec3(at * tile, float(layer)), dx * tile, dy * tile).rgb;
+    tile *= wide_scale;
+    if(wide > 0.0) away = textureGrad(u_ground_color, vec3(at * tile + 0.37, float(layer)), dx * (tile * blur), dy * (tile * blur)).rgb;
+    return mix(close, away, wide);
+}
+
+// What shows at this pixel so far
+vec3 s_color;
+vec3 s_bump = vec3(0.0);    // added to the normal of the terrain
+float s_occlusion = 1.0;
+float s_gloss = 0.0;
+float s_height = 0.5;
+float s_bare = 0.0;         // part that is one of the soil layers : no earth, no grass
+
+// One layer of the soil over what is there. inside : how far in its patch the pixel is, 0 on the edge,
+// in the range of the soil maps. The edge is moved by `spread` of that range by the heights : by the
+// layer's own (fills 0, it comes out by its tops) or by the one of what it covers (fills 1, it lies in
+// the hollows). soft : width of the edge itself
+void soilLayer(int layer, float inside, float spread, float soft, float fills, vec2 ground, vec2 dx, vec2 dy) {
+
+    if(inside < -(0.7 * spread + soft)) return;
+
+    vec4 detail = groundDetail(layer, ground, dx, dy);
+
+    float lift = mix(detail.b - 0.5, 0.5 - s_height + 0.4 * (detail.b - 0.5), fills);
+    float alpha = smoothstep(-soft, soft, inside + spread * lift);
+    if(alpha <= 0.0) return;
+
+    // The tile repeats every few metres : lighter and darker over tens of metres
+    vec3 albedo = groundColor(layer, ground, dx, dy);
+    albedo *= 0.84 + 0.32 * shadeNoise(ground * 0.11 + 13.0 * float(layer));
+
+    vec2 slope = detail.rg * 2.0 - 1.0;
+    s_color = mix(s_color, albedo, alpha);
+    s_bump = mix(s_bump, vec3(slope.x, 0.0, slope.y), alpha);
+    s_occlusion = mix(s_occlusion, detail.a, alpha);
+    // What lies in the hollows is wet : water stands in its own
+    s_gloss = mix(s_gloss, smoothness[layer] * mix(1.0, 1.0 - 0.6 * detail.b, fills), alpha);
+    s_height = mix(s_height, detail.b, alpha);
+    s_bare = max(s_bare, alpha);
+
+}
+
 void main() {
 
     vec3 normal = normalize(v_normal);
+    vec3 to_pixel = v_position - viewpos.xyz;
+    float far = length(to_pixel);
+    vec3 view = to_pixel / far;
+    wide = smoothstep(40.0, 120.0, far);
+    blur = max(far / 160.0, 1.0);
 
-    // Triplanar rock on the sides, grass on top
-    vec4 rock_color = max(mix(
-            texture(u_color, vec3(v_position.yx / 3., 1)),
-            texture(u_color, vec3(v_position.yz / 3., 1)),
-            (normal.x * normal.x) / (normal.x * normal.x + normal.z * normal.z + 0.0001)
-        ), 0);
+    // Derivatives are taken here : the layers are read in branches
+    vec3 position_dx = dFdx(v_position), position_dy = dFdy(v_position);
+    vec2 ground = v_position.xz;
+    vec2 ground_dx = position_dx.xz, ground_dy = position_dy.xz;
 
-    outColor = mix(
-        rock_color,
-        texture(u_color, vec3(v_position.xz / 3., 0)),
-        clamp(normal.y * normal.y * normal.y, 0, 1)
-    );
+    // The earth : under the grass, and what shows where the grass gets thin
+    if(library > 0.5) {
+        vec4 detail = groundDetail(layer_earth, ground, ground_dx, ground_dy);
+        vec2 slope = detail.rg * 2.0 - 1.0;
+        s_color = groundColor(layer_earth, ground, ground_dx, ground_dy) * (0.84 + 0.32 * shadeNoise(ground * 0.11 + 57.0));
+        s_bump = vec3(slope.x, 0.0, slope.y);
+        s_occlusion = detail.a;
+        s_gloss = smoothness[layer_earth];
+        s_height = detail.b;
+    } else {
+        s_color = textureGrad(u_color, vec3(ground / 3., 0), ground_dx / 3., ground_dy / 3.).rgb;
+    }
+
+    // The patches of the soil map, and how much grass there is next to them (grass.vert.glsl,
+    // grass.frag.glsl) : shorter towards a patch, blade by blade over its edge
+    vec3 inside = vec3(-1.0);
+    float grassy = 1.0, grass_tall = 1.0;
+    if(chunk.z >= 0.0) {
+        vec3 soil = soilAt(ground + soilWarp(ground), chunk.z, chunk.w).rgb;
+        inside = soil - 0.5;
+        grassy = 1.0 - smoothstep(0.4, 0.6, max(soil.r, max(soil.g, soil.b)));
+        // The shell of the grass has its height from the map on its vertices
+        grass_tall = soilAt(ground, chunk.z, chunk.w).a;
+    }
+
+    // Stones fallen from the rock : where the ground gets steep, before the faces, here and there
+    float foot = smoothstep(0.6, 0.7, normal.y) * (1.0 - smoothstep(0.78, 0.88, normal.y));
+    foot *= scree * smoothstep(0.45, 0.7, 0.7 * shadeNoise(ground * 0.045 + 41.0) + 0.3 * shadeNoise(ground * 0.17 + 7.0));
+    inside.g = max(inside.g, mix(-0.4, 0.16, foot) + 0.2 * (shadeNoise(ground * 1.3 + 23.0) - 0.5));
+
+    // Sand at the bottom, stones on it, mud in the hollows of both
+    float soft = 0.012 + 0.0006 * far;
+    soilLayer(layer_sand, inside.b, 0.1, 3.0 * soft, 0.0, ground, ground_dx, ground_dy);
+    soilLayer(layer_stones, inside.g, 0.24, soft, 0.0, ground, ground_dx, ground_dy);
+    soilLayer(layer_mud, inside.r, 0.2, soft, 1.0, ground, ground_dx, ground_dy);
+
+    // Rock on the steep faces : each of the two vertical planes where the face looks its way, the one
+    // whose rock is higher where they meet, instead of both seen through each other
+    float level = smoothstep(0.55, 0.8, normal.y);
+    if(level < 0.999) {
+
+        float facing_x = normal.x * normal.x / (normal.x * normal.x + normal.z * normal.z + 0.0001);
+        vec3 rock, rock_bump = vec3(0.0);
+        float rock_height = 0.5, rock_occlusion = 1.0;
+
+        if(library > 0.5) {
+            // u along the face, v down
+            vec2 at_x = vec2(v_position.z, -v_position.y), at_z = vec2(v_position.x, -v_position.y);
+            vec2 dx_x = vec2(position_dx.z, -position_dx.y), dy_x = vec2(position_dy.z, -position_dy.y);
+            vec2 dx_z = vec2(position_dx.x, -position_dx.y), dy_z = vec2(position_dy.x, -position_dy.y);
+
+            vec4 detail_x = groundDetail(layer_rock, at_x, dx_x, dy_x);
+            vec4 detail_z = groundDetail(layer_rock, at_z, dx_z, dy_z);
+            float plane = smoothstep(-0.1, 0.1, facing_x - 0.5 + 0.35 * (detail_x.b - detail_z.b));
+
+            rock = vec3(0.0);
+            if(plane < 1.0) rock += (1.0 - plane) * groundColor(layer_rock, at_z, dx_z, dy_z);
+            if(plane > 0.0) rock += plane * groundColor(layer_rock, at_x, dx_x, dy_x);
+            rock *= 0.84 + 0.32 * shadeNoise(v_position.xz * 0.07 + v_position.y * 0.13 + 71.0);
+            vec2 slope_x = detail_x.rg * 2.0 - 1.0, slope_z = detail_z.rg * 2.0 - 1.0;
+            rock_bump = mix(vec3(slope_z.x, -slope_z.y, 0.0), vec3(0.0, -slope_x.y, slope_x.x), plane);
+            rock_height = mix(detail_z.b, detail_x.b, plane);
+            rock_occlusion = mix(detail_z.a, detail_x.a, plane);
+        } else {
+            rock = max(mix(
+                    textureGrad(u_color, vec3(v_position.yx / 3., 1), position_dx.yx / 3., position_dy.yx / 3.),
+                    textureGrad(u_color, vec3(v_position.yz / 3., 1), position_dx.yz / 3., position_dy.yz / 3.),
+                    facing_x
+                ), 0).rgb;
+        }
+
+        // The ground stays on what is level enough, and first in the hollows of the rock
+        float kept = smoothstep(-0.08, 0.08, level - 0.5 + 0.3 * (s_height - rock_height));
+        s_color = mix(rock, s_color, kept);
+        s_bump = mix(rock_bump, s_bump, kept);
+        s_occlusion = mix(rock_occlusion, s_occlusion, kept);
+        s_gloss = mix(smoothness[layer_rock], s_gloss, kept);
+        s_bare *= kept;
+
+    }
+
+    // The relief of the textures
+    vec3 lit_normal = normalize(normal + 1.2 * s_bump);
 
     // Under the plants : little sun, and less of the sky
     float shade = treeShade(v_position, 0.0);
-    float light = max(dot(normal, sun_direction), 0.0) * (1.0 - shade);
-    outColor.rgb = outColor.rgb * (light * 0.7 + 0.3 * (1.0 - 0.35 * shade));
+    float light = max(dot(lit_normal, sun_direction), 0.0) * (1.0 - shade);
+    vec3 color = s_color * (light * 0.7 * mix(1.0, s_occlusion, 0.5) + 0.3 * (1.0 - 0.35 * shade) * s_occlusion);
+
+    // Wet mud shines, stones a little
+    vec3 half_way = normalize(sun_direction - view);
+    float shine = 0.4 * s_gloss * s_gloss * pow(max(dot(lit_normal, half_way), 0.0), 8.0 + 120.0 * s_gloss);
+    color += vec3(1.0, 0.97, 0.9) * shine * smoothstep(0.0, 0.15, dot(normal, sun_direction)) * (1.0 - shade);
 
     // Under the grass (same slopes as grass.vert.glsl) : in its shade, and behind it. The grass pass
     // only knows the ground as a plane under each pixel, its hits can end up a little under the terrain :
-    // the terrain steps back by the height of the grass and lets them through
+    // the terrain steps back by the height of the grass and lets them through. None of that on the soil
     gl_FragDepth = gl_FragCoord.z;
     if(under_grass > 0.0) {
         float covered = smoothstep(0.76, 0.88, normal.y);
-        outColor.rgb *= 1.0 - 0.8 * covered;
-        vec4 clip = viewproj * vec4(v_position + normalize(v_position - viewpos.xyz) * (under_grass * covered), 1.0);
+        color *= 1.0 - 0.8 * covered * grassy * (1.0 - 0.7 * s_bare);
+        float behind = under_grass * covered * grass_tall * smoothstep(0.0, 0.15, grassy);
+        vec4 clip = viewproj * vec4(v_position + view * behind, 1.0);
         gl_FragDepth = clamp(max(clip.z / clip.w, gl_FragCoord.z), 0.0, 1.0);
     }
 
-    float fog = 1.0 - exp(-length(v_position - viewpos.xyz) * 0.0006);
-    outColor.rgb = mix(outColor.rgb, sky_color, fog);
-    outColor.a = 1.0;
+    float fog = 1.0 - exp(-far * 0.0006);
+    outColor = vec4(mix(color, sky_color, fog), 1.0);
 
 }

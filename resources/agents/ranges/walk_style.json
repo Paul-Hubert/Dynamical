@@ -1,0 +1,7 @@
+{
+  "description": "Hard level ground, every style parameter wide, tighter turns",
+  "stride": [0.8, 1.25], "step_height": [0.8, 1.6], "clearance": [0.0, 0.08], "soft_depth": 0.0, "sink_time": 0.12, "exit_vertical": 0.8,
+  "entry_vertical": 0.5, "exit_part": 0.3, "body_sink": 0.7, "crouch": [0.0, 0.04], "spread": [-0.01, 0.03], "bend": [0.6, 1.2], "max_bend": 40.0,
+  "head_lead": [0.2, 1.0], "bank": [0.2, 0.8], "turn_step": 1.0, "ik": 1.0,
+  "speed": [0.7, 1.3], "radius": [2.0, 10.0], "straight": 0.3, "soft": 0.0, "scale": [1.0, 1.0], "segment": [2.0, 5.0]
+}

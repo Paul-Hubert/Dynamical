@@ -1,0 +1,29 @@
+{
+  "variables": {
+    "body":   { "type": "string", "default": "animals/bodies/deer_red.body.json", "description": "a generated body file (tools/animal_body), under resources/" },
+    "params": { "type": "string", "default": "agents/params/animal.params.json" },
+    "ranges": { "type": "string", "default": "agents/ranges/walk_basic.json", "description": "GaitRanges: the commands of the task" },
+    "draw":   { "type": "bool",   "default": false },
+    "view":   { "type": "bool",   "default": false },
+    "view_truncate": { "type": "bool", "default": false },
+    "speed":  { "type": "float",  "default": 0.0, "description": "> 0: this speed straight ahead, in speeds of the walk clip, instead of the drawn commands" },
+    "soft_depth": { "type": "float", "default": -1.0, "description": ">= 0: this depth of soft ground, in heights of the animal, instead of the ranges' draw" }
+  },
+  "templates": {
+    "animal_world": {
+      "physics": { "threads": 1, "max_bodies": 128, "max_body_pairs": 2048, "max_contacts": 2048, "temp_bytes": 8388608,
+                   "allow_sleeping": false, "friction_combine": "max", "restitution_combine": "min",
+                   "substeps": "${body}#substeps", "velocity_steps": "${body}#velocity_steps", "position_steps": "${body}#position_steps", "penetration_slop": "${body}#penetration_slop", "speculative_distance": "${body}#speculative_distance" },
+      "clock": { "physics_hz": 60, "control_hz": 30 },
+      "fixed": [
+        "RigidBody", "AnimalFactory", "TrainerActions@act", "AnimalDrive@act", "AnimalSoftGround", "PhysicsStep", "AnimalSync",
+        "AnimalTask", "AnimalTermination", "AnimalRewards@observe", "AnimalObservation@observe", "AnimalEpisode@observe"
+      ],
+      "entities": [
+        { "prefab": "ground_flat" },
+        { "AnimalSpawn": { "body": "${body}", "params": "${params}", "ranges": "${ranges}", "draw": "${draw}", "view": "${view}",
+                           "view_truncate": "${view_truncate}", "speed": "${speed}", "soft_depth": "${soft_depth}" } }
+      ]
+    }
+  }
+}

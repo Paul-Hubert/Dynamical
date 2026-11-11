@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -12,6 +13,7 @@
 namespace dy {
 
 struct RunArgs;
+class GroundField;
 
 // Runs a capture script (capture=<script.json>): moves the desktop camera to each shot and writes the frame
 // to <capture_dir>/<name>.png. A shot waits until the terrain is generated and meshed and the plants are loaded.
@@ -20,6 +22,8 @@ struct RunArgs;
 //                                 "camera": { "pos": [x, y, z], "look_at": [x, y, z] } } ] }
 // camera (optional, else the spawn camera): pos with look_at or yaw / pitch (radians), or offset from the spawn
 // camera position. The camera of a shot is held from the frame after the previous shot.
+// "above": h puts the camera h over the ground under its pos, whatever the y of pos (a camera that follows the
+// ground : one shot per frame makes a path, tools/grass_video.py).
 //
 // "sequence": { "start": 120, "count": 600, "every": 2, "name": "frame" }: frames for a video, after the shots,
 // written as <name>_00000.png ... without moving the camera (a scene system may drive it). When a frame has to wait
@@ -33,6 +37,8 @@ struct RunArgs;
 bool terrainReady(const entt::registry& reg);
 // No species of the vegetation library is still loading (true without vegetation)
 bool vegetationReady(const entt::registry& reg);
+// No animal of the library is still loading (true without animals)
+bool animalsReady(const entt::registry& reg);
 
 class Capture {
 public:
@@ -73,6 +79,7 @@ private:
         std::string name;
         std::optional<glm::vec3> pos, look_at, offset;
         std::optional<float> yaw, pitch;
+        std::optional<float> above;
         bool sequence = false;
     };
 
@@ -83,6 +90,8 @@ private:
     size_t next = 0;
     uint64_t waiting_from = 0;  // the wait for the terrain is counted from this frame
     bool hide_ui = false;       // "hide_ui": true, the ImGui windows are drawn transparent (videos of what they would cover)
+
+    std::shared_ptr<GroundField> ground;    // for the cameras "above" the ground, made with the first one
 
     bool have_spawn = false;
     glm::vec3 spawn_position;

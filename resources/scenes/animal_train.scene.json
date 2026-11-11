@@ -1,0 +1,19 @@
+{
+  "format_version": 1,
+  "name": "animal_train",
+  "include": [
+    "common/animal_world.json"
+  ],
+  "variables": {
+    "num_worlds": {
+      "type": "int",
+      "default": 25
+    }
+  },
+  "worlds": [
+    {
+      "template": "animal_world",
+      "count": "${num_worlds}"
+    }
+  ]
+}

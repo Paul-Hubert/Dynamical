@@ -1,0 +1,19 @@
+{
+  "format_version": 1,
+  "name": "animal_stand",
+  "include": [
+    "common/animal_world.json"
+  ],
+  "variables": {
+    "view": {
+      "type": "bool",
+      "default": true
+    }
+  },
+  "worlds": [
+    {
+      "template": "animal_world",
+      "count": 1
+    }
+  ]
+}

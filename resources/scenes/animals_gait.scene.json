@@ -1,0 +1,37 @@
+{
+  "format_version": 1,
+  "name": "animals_gait",
+  "include": ["common/desktop.json"],
+  "variables": {
+    "species":       { "type": "string", "default": "", "description": "ids separated by commas; empty : a few animals on four legs and on two" },
+    "path":          { "type": "string", "default": "eight", "description": "circle, eight, weave or straight" },
+    "radius":        { "type": "float",  "default": 2.5, "description": "of the turns, in lengths of the animal" },
+    "speed":         { "type": "float",  "default": 1,   "description": "times the speed of the clip" },
+    "gait":          { "type": "string", "default": "walk", "description": "walk, trot or run : the clip the walk is made from" },
+    "gap":           { "type": "float",  "default": 3,   "description": "metres between the paths of two animals" },
+    "follow":        { "type": "int",    "default": -1,  "description": "n : the camera goes round the n-th animal" },
+    "procedural":    { "type": "bool",   "default": true, "description": "false : the clip as it is, feet sliding through the turns" },
+    "stride":        { "type": "float",  "default": 1,   "description": "length of the steps against the clip's" },
+    "step_height":   { "type": "float",  "default": 1,   "description": "how high the feet are lifted against the clip" },
+    "clearance":     { "type": "float",  "default": 0,   "description": "metres the feet are lifted over the ground at least" },
+    "soft_depth":    { "type": "float",  "default": 0,   "description": "metres the feet sink in the ground" },
+    "exit_vertical": { "type": "float",  "default": 0.8, "description": "0 : the feet leave soft ground along their swing, 1 : straight up first" },
+    "bend":          { "type": "float",  "default": 1,   "description": "how much the body follows the curve of its path" },
+    "bank":          { "type": "float",  "default": 0.5, "description": "lean into the turns" }
+  },
+
+  "renderer": { "passes": ["terrain", "animals", "model", "ui"], "vr": true },
+
+  "host": {
+    "pre": [
+      "Input", "UI", "Time", "PlayerControl", "VRControl", "DebugMenu",
+      "ChunkManager", "ChunkGenerator",
+      { "name": "AnimalWalkers", "params": { "species": "${species}", "path": "${path}", "radius": "${radius}", "speed": "${speed}", "gait": "${gait}",
+          "procedural": "${procedural}", "gap": "${gap}", "follow": "${follow}",
+          "style": { "stride": "${stride}", "step_height": "${step_height}", "clearance": "${clearance}", "soft_depth": "${soft_depth}",
+                     "exit_vertical": "${exit_vertical}", "bend": "${bend}", "bank": "${bank}" } } },
+      "AnimalAnimation", "AnimalGait"
+    ],
+    "post": ["Terrain"]
+  }
+}

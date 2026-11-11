@@ -1,0 +1,88 @@
+{
+  "format_version": 1,
+  "name": "animal_view",
+  "include": [
+    "common/desktop.json",
+    "common/animal_world.json"
+  ],
+  "variables": {
+    "draw": {
+      "type": "bool",
+      "default": false,
+      "description": "the shapes of the ragdoll too"
+    },
+    "view": {
+      "type": "bool",
+      "default": true
+    },
+    "num_worlds": {
+      "type": "int",
+      "default": 1
+    },
+    "view_distance": {
+      "type": "float",
+      "default": 1.5,
+      "description": "from the camera to the animal, in sizes of the animal"
+    },
+    "view_side": {
+      "type": "float",
+      "default": 70.0,
+      "description": "degrees the camera is swung from behind the commanded heading"
+    },
+    "model": {
+      "type": "string",
+      "default": "",
+      "description": "an .onnx policy of the species; empty: zero actions, the standing pose held"
+    }
+  },
+  "renderer": {
+    "passes": [
+      "animals",
+      "model",
+      "ui"
+    ],
+    "vr": false
+  },
+  "host": {
+    "pre": [
+      "Input",
+      "UI",
+      "PlayerControl",
+      "DebugMenu",
+      {
+        "name": "ModelWatcher",
+        "params": {
+          "model": "${model}"
+        }
+      },
+      "WorldStepper",
+      {
+        "name": "AnimalAgentView",
+        "params": {
+          "distance": "${view_distance}",
+          "azimuth": "${view_side}"
+        }
+      }
+    ],
+    "post": [
+      {
+        "name": "WorldView",
+        "params": {
+          "worlds": "all",
+          "spacing": 0.0
+        }
+      }
+    ]
+  },
+  "worlds": [
+    {
+      "template": "animal_world",
+      "count": "${num_worlds}",
+      "systems": {
+        "replace": {
+          "TrainerActions@act": "Policy@act"
+        }
+      }
+    }
+  ]
+}

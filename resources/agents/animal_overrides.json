@@ -1,0 +1,8 @@
+{
+  "description": "What the animal library does not hold, for the body generator (tools/animal_body, docs/physical-agents/reports/animal-agents.md). defaults applies to every species, species/<id> over it. Keys are those of AnimalBodyOptions: density (kg/m3), mass (kg), max_bodies, max_leg_bodies, merge_loss, limit_margin, limit_margin_part, stiffness, appendage_stiffness, damping_time, torque_angle, friction, stand",
+  "defaults": {
+    "density": 1000.0
+  },
+  "species": {
+  }
+}

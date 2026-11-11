@@ -71,6 +71,21 @@ private:
     VmaBuffer capture_buffer;
     bool capture_requested = false;
 
+    // gpu_times=true : a timestamp before the first scene pass and after each one, read back once the
+    // frame is done. Means are logged at every capture and every 300 frames
+    static constexpr uint32_t max_timed_passes = 15;
+    struct PassTimes {
+        vk::QueryPool pool;                 // max_timed_passes + 1 queries per frame
+        double period = 0.;                 // nanoseconds per tick
+        uint64_t mask = ~0ull;              // valid bits of a timestamp
+        std::vector<uint32_t> written;      // per frame : passes timed in its command buffer
+        std::vector<const char*> names;
+        std::vector<double> sums;           // milliseconds, per pass
+        uint32_t frames = 0;
+    } times;
+    void readPassTimes(uint32_t frame_index);
+    void logPassTimes();
+
 };
 
 }

@@ -1,0 +1,33 @@
+{
+  "format_version": 1,
+  "name": "animal_demo",
+  "include": [
+    "common/animal_demo_world.json"
+  ],
+  "variables": {
+    "decisions": {
+      "type": "int",
+      "default": 9000
+    },
+    "out": {
+      "type": "string",
+      "default": ""
+    },
+    "checks": {
+      "type": "string",
+      "default": "",
+      "description": "a json file: what the recording was checked for (limits, jumps, flips, ground, speed)"
+    },
+    "replay": {
+      "type": "string",
+      "default": "",
+      "description": "a prefix: the segments at every recorded decision, as <prefix>.replay.json and .bin"
+    }
+  },
+  "worlds": [
+    {
+      "template": "animal_demo_world",
+      "count": 1
+    }
+  ]
+}

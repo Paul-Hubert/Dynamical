@@ -25,6 +25,7 @@
 #include "physics/physics_sys.h"
 #include "physics/physics_world.h"
 #include "physics/terrain_colliders.h"
+#include "ragdoll.h"
 #include "scene/component_registry.h"
 #include "scene/system_registry.h"
 #include "scene/world.h"
@@ -38,125 +39,24 @@ namespace {
 
 constexpr float pi = 3.14159265358979f;
 
-JPH::Mat44 inertiaMatrix(glm::vec3 principal, glm::quat rotation, float scale) {
-    JPH::Mat44 r = JPH::Mat44::sRotation(toJolt(rotation));
-    JPH::Mat44 d = JPH::Mat44::sScale(toJolt(principal * scale));
-    d.SetColumn4(3, JPH::Vec4(0, 0, 0, 1));
-    JPH::Mat44 m = r * d * r.Transposed3x3();
-    m.SetColumn4(3, JPH::Vec4(0, 0, 0, 1));
-    return m;
-}
-
-JPH::Ref<JPH::Shape> makeShape(const ShapeDef& s) {
-    JPH::Ref<JPH::Shape> shape;
-    switch(s.type) {
-    case ShapeDef::Type::Capsule: shape = new JPH::CapsuleShape(s.half_height, s.radius); break;
-    case ShapeDef::Type::Sphere: shape = new JPH::SphereShape(s.radius); break;
-    case ShapeDef::Type::Box: shape = new JPH::BoxShape(toJolt(s.half_extents), std::min({ 0.05f, s.half_extents.x, s.half_extents.y, s.half_extents.z })); break;
-    }
-    return shape;
-}
-
-// The segment's shape in its body frame, its centre of mass where the body file says
-JPH::Ref<JPH::Shape> segmentShape(const SegmentDef& seg) {
-
-    JPH::Ref<JPH::Shape> inner;
-    if(seg.shapes.size() == 1) {
-        const ShapeDef& s = seg.shapes[0];
-        inner = new JPH::RotatedTranslatedShape(toJolt(s.center), toJolt(s.rotation), makeShape(s));
-    } else {
-        JPH::StaticCompoundShapeSettings compound;
-        for(const ShapeDef& s : seg.shapes) compound.AddShape(toJolt(s.center), toJolt(s.rotation), makeShape(s));
-        auto result = compound.Create();
-        if(result.HasError()) throw AssetError("segment " + seg.name + ": " + result.GetError().c_str());
-        inner = result.Get();
-    }
-    JPH::Vec3 offset = toJolt(seg.center_of_mass) - inner->GetCenterOfMass();
-    return new JPH::OffsetCenterOfMassShape(inner, offset);
-
-}
-
 void buildRagdoll(entt::registry& reg, HumanBot& bot) {
 
     auto& world = physicsWorld(reg);
-    auto& bodies = world.bodies();
     const BodyDef& def = *bot.body;
     auto& params = bot.params;
     bot.built_mass = params.total_mass;
-    const float mass_scale = params.total_mass / def.total_mass;
 
-    JPH::Ref<JPH::GroupFilterTable> filter = new JPH::GroupFilterTable((JPH::uint) def.segments.size());
-    for(JPH::uint i = 0; i < def.segments.size(); i++) {
-        for(JPH::uint j = i + 1; j < def.segments.size(); j++) filter->DisableCollision(i, j);
-    }
-
-    bot.bodies.resize(def.segments.size());
-    for(size_t i = 0; i < def.segments.size(); i++) {
-        const SegmentDef& seg = def.segments[i];
-        JPH::BodyCreationSettings settings(segmentShape(seg), JPH::RVec3(toJolt(seg.rest_position)), toJolt(seg.rest_rotation),
-            bot.kinematic ? JPH::EMotionType::Kinematic : JPH::EMotionType::Dynamic, PhysicsLayers::agent_layer);
-        settings.mOverrideMassProperties = JPH::EOverrideMassProperties::MassAndInertiaProvided;
-        settings.mMassPropertiesOverride.mMass = params.total_mass * seg.percentage / 100.f;
-        settings.mMassPropertiesOverride.mInertia = inertiaMatrix(seg.inertia, seg.inertia_rotation, mass_scale);
-        settings.mFriction = def.friction;
-        settings.mRestitution = def.restitution;
-        settings.mLinearDamping = def.linear_damping;
-        settings.mAngularDamping = def.angular_damping;
-        settings.mMaxAngularVelocity = params.max_angular_velocity;
-        settings.mMotionQuality = JPH::EMotionQuality::Discrete;
-        settings.mAllowSleeping = false;
-        settings.mCollideKinematicVsNonDynamic = bot.kinematic;
-        // The marching cubes mesh has no thickness and edges: a fast limb is cast along its motion instead of
-        // stepping through the surface (with discrete steps a foot of the flat policy ended 0.5 m under it), and a
-        // sole that crosses an edge between two triangles does not catch on it. The flat ground keeps discrete steps
-        if(!bot.kinematic && reg.ctx().contains<std::shared_ptr<TerrainColliders>>()) {
-            settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
-            settings.mEnhancedInternalEdgeRemoval = true;
-        }
-        settings.mCollisionGroup = JPH::CollisionGroup(filter, 0, (JPH::CollisionGroup::SubGroupID) i);
-        bot.bodies[i] = bodies.CreateAndAddBody(settings, JPH::EActivation::Activate);
-    }
-
-    bot.constraints.clear();
-    bot.frame1.resize(def.joints.size());
-    bot.frame2.resize(def.joints.size());
-
-    for(size_t j = 0; j < def.joints.size(); j++) {
-        const JointDef& joint = def.joints[j];
-        const SegmentDef& parent = def.segments[joint.parent];
-        const SegmentDef& child = def.segments[joint.child];
-
-        // Constraint frame at the rest pose: X twist, Y plane, Z normal
-        glm::vec3 x = glm::normalize(joint.twist_axis), y = glm::normalize(joint.plane_axis - x * glm::dot(joint.plane_axis, x));
-        glm::vec3 z = glm::cross(x, y);
-        glm::quat constraint = glm::quat_cast(glm::mat3(x, y, z));
-        bot.frame1[j] = glm::normalize(glm::inverse(parent.rest_rotation) * constraint);
-        bot.frame2[j] = glm::normalize(glm::inverse(child.rest_rotation) * constraint);
-        if(bot.kinematic) continue;
-
-        JPH::SwingTwistConstraintSettings settings;
-        settings.mSpace = JPH::EConstraintSpace::WorldSpace;
-        settings.mPosition1 = settings.mPosition2 = JPH::RVec3(toJolt(joint.anchor));
-        settings.mTwistAxis1 = settings.mTwistAxis2 = toJolt(x);
-        settings.mPlaneAxis1 = settings.mPlaneAxis2 = toJolt(y);
-        settings.mSwingType = JPH::ESwingType::Cone;
-        settings.mPlaneHalfConeAngle = joint.swing_y;
-        settings.mNormalHalfConeAngle = joint.swing_z;
-        settings.mTwistMinAngle = joint.twist_min;
-        settings.mTwistMaxAngle = joint.twist_max;
-        // Constraints are made at the rest pose: bodies are still there
-        JPH::Ref<JPH::Constraint> c = bodies.CreateConstraint(&settings, bot.bodies[joint.parent], bot.bodies[joint.child]);
-        auto* swing = static_cast<JPH::SwingTwistConstraint*>(c.GetPtr());
-        for(auto* motor : { &swing->GetSwingMotorSettings(), &swing->GetTwistMotorSettings() }) {
-            motor->mSpringSettings.mMode = JPH::ESpringMode::StiffnessAndDamping;
-            motor->mSpringSettings.mStiffness = 0.f;
-            motor->mSpringSettings.mDamping = 0.f;
-        }
-        swing->SetSwingMotorState(JPH::EMotorState::PositionAndVelocity);
-        swing->SetTwistMotorState(JPH::EMotorState::PositionAndVelocity);
-        world.system().AddConstraint(c);
-        bot.constraints.emplace_back(swing);
-    }
+    RagdollBuild build;
+    build.total_mass = params.total_mass;
+    build.max_angular_velocity = params.max_angular_velocity;
+    build.kinematic = bot.kinematic;
+    build.cast = reg.ctx().contains<std::shared_ptr<TerrainColliders>>();
+    RagdollParts parts;
+    buildRagdollParts(world, def, build, parts);
+    bot.bodies = std::move(parts.bodies);
+    bot.constraints = std::move(parts.constraints);
+    bot.frame1 = std::move(parts.frame1);
+    bot.frame2 = std::move(parts.frame2);
 
     bot.est0 = def.est0();
     for(int j = 0; j < (int) def.joints.size(); j++) {
@@ -446,7 +346,7 @@ void dy::resetHumanBot(entt::registry& reg) {
                 if(!body.Succeeded()) continue;
                 JPH::MassProperties mp;
                 mp.mMass = bot.params.total_mass * def.segments[i].percentage / 100.f;
-                mp.mInertia = inertiaMatrix(def.segments[i].inertia, def.segments[i].inertia_rotation, mass_scale);
+                mp.mInertia = ragdollInertia(def.segments[i].inertia, def.segments[i].inertia_rotation, mass_scale);
                 body.GetBody().GetMotionProperties()->SetMassProperties(JPH::EAllowedDOFs::All, mp);
             }
             bot.built_mass = bot.params.total_mass;
@@ -902,7 +802,6 @@ void RewardsSys::tick(double h) {
     }
 
     if(bot.killed) {
-        reward += p.death_penalty;
         stat("Death/Death Frames", (float) bot.tick, histogram);
         stat("Death/Total Death Reward", p.death_penalty);
     } else if(bot.truncated) {
@@ -957,6 +856,10 @@ void RewardsSys::tick(double h) {
     }
     bot.books.window_pos = bot.books.window_neg = 0.f;
     bot.books.window_torque_variation = 0.f;
+
+    // Death takes the whole reward of the step, the energy reward too: a fall costs what would have followed it,
+    // nothing more (death_penalty, 0 by default, comes on top)
+    if(bot.killed) reward = p.death_penalty;
 
     io.reward = reward * p.reward_factor;
     bot.cumulative_reward += io.reward;

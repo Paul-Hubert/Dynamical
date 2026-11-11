@@ -18,7 +18,7 @@ namespace dy {
 class GroundField;
 
 // The kinematic walk (docs/physical-agents/ik-gait.md): a procedural gait on any ground, legs by inverse kinematics.
-// Fixed lane order: GaitBase, GaitFootIK, GaitBalance, Fabrik, RigPoseApply, PhysicsStep, BodySync, GaitChecks.
+// Fixed lane order: GaitBase, GaitFootIK, GaitHandIK, GaitBalance, Fabrik, RigPoseApply, PhysicsStep, BodySync, GaitChecks.
 // Every component here sits on the rig entity (the one with HumanBotSpawn)
 
 // What the walker is asked to do
@@ -76,6 +76,27 @@ struct GaitParams {
     int balance_iterations = 8;
     float balance_tolerance = 3e-4f;
     float velocity_smoothing = 0.08f;           // seconds, the centre of mass velocity filter
+    // Scrambling (GaitHandIK in the lane): the steeper the ground, the lower the trunk, and a hand that comes within
+    // reach of the ground lays its palm flat on it
+    bool scramble = false;
+    float scramble_from = 0.35f, scramble_full = 0.87f; // radians of slope (20 and 50 degrees) between which the trunk comes down
+    float scramble_crouch = 0.15f;              // the hips come down by this share of the legs' reach on the steepest ground,
+    float scramble_shoulder = 0.3f;             // ... and the trunk tilts toward the slope until the shoulders are this far from the ground, m,
+    float scramble_lean = 1.5f;                 // ... by this much at most, radians,
+    float scramble_past = 0.5f;                 // ... and no further than this past lying along the slope, radians.
+    float scramble_forward = 0.45f;             // Then the centre of mass target moves up the slope, by this at most, m: the hands will take weight
+    float scramble_spine = 0.42f;               // radians each of the two spine joints bends for that tilt; the pelvis tips for the rest
+    float hand_plant_reach = 0.86f;             // a hand takes a hold no further from its shoulder than this share of the arm,
+    float hand_reach = 0.97f;                   // ... and keeps it until the arm is stretched to this share
+    float hand_behind = 0.12f;                  // m behind its shoulder from where a hand moves on to a hold ahead, if there is one,
+    float hand_over = 0.35f;                    // ... or radians its arm is outside its limits,
+    float hand_hold = 0.4f;                     // ... once it has held for this long, seconds
+    float hand_time = 0.3f;                     // seconds a hand takes to reach a hold, or to go back to its swing
+    float hand_lift = 0.05f;                    // m off the ground on its way
+    float hand_max_tilt = 1.48f;                // radians: steeper ground than this (85 degrees) is held at this tilt
+    float trunk_reach = 0.35f;                  // radians the trunk leans further so that a planted hand stays within reach
+    float trunk_return = 0.4f;                  // seconds for that lean to go once no hand asks for it
+    float hand_support = 0.1f;                  // the centre of mass target moves this share of the way to each planted palm
 };
 
 // A planted sole: the centre of its bottom face and its frame (x right, y the ground normal, -z toward the toes)
@@ -125,6 +146,38 @@ struct FootState {
     glm::vec3 pole = glm::vec3(0.f, 0.f, -1.f);
 };
 
+// A hand of the body file: its box, seen as a palm (a sole whose toes are the fingers: FootGeometry's sole_*,
+// half_width and half_length)
+struct HandGeometry {
+    FootGeometry palm;                          // segment: the hand; side; the palm frame has y from the palm into the hand
+    int shoulder = -1, elbow = -1, wrist = -1;  // joints
+    float reach = 0.48f;                        // shoulder to wrist, the arm straight
+    glm::vec3 pole_rest = glm::vec3(1.f, 0.f, 0.f);     // where the elbow points at the rest pose
+};
+
+enum class HandContact : uint8_t { Free, Reaching, Planted, Releasing };
+
+struct HandState {
+    HandGeometry geometry;
+    entt::entity chain = entt::null, target = entt::null;
+
+    HandContact contact = HandContact::Free;
+    Footprint current;                          // the palm print it holds, or held last
+    Footprint next;                             // the one it reaches for
+    glm::vec3 from_position = glm::vec3(0.f);   // the hand segment when it left for next
+    glm::quat from_rotation = glm::quat(1.f, 0.f, 0.f, 0.f);
+    float t = 0.f;                              // share of the way to next, or back to the swing
+    float grip = 0.f;                           // 0 swinging, 1 planted
+    bool planted_now = false;                   // the palm came down on this tick
+    float held = 0.f;                           // seconds it has held its print
+    float wait = 0.f;                           // seconds before it looks for a hold again (the last one did not last)
+    float deficit = 0.f;                        // m its target was out of the arm's reach on the last tick, the trunk's help counted
+
+    glm::vec3 position = glm::vec3(0.f);        // the hand segment this tick
+    glm::quat rotation = glm::quat(1.f, 0.f, 0.f, 0.f);
+    glm::vec3 pole = glm::vec3(0.f);            // where the elbow points
+};
+
 struct GaitState {
     bool started = false, feet_ready = false;
     double time = 0.;
@@ -137,6 +190,7 @@ struct GaitState {
 
     // This tick's gait laws
     float leg_length = 0.96f, reach = 0.84f;    // hip to sole; the longest hip to ankle distance
+    float fold = 0.36f;                         // the shortest hip to ankle distance (scrambling)
     float step_length = 0.f, stride_time = 1.f, stance_share = 0.62f, amplitude = 0.f;
     float omega = 3.1f;                         // sqrt(g / height of the centre of mass)
     float capture_offset = 0.f;                 // the heel lands this far behind the extrapolated centre of mass
@@ -149,6 +203,16 @@ struct GaitState {
     glm::vec2 com_target = glm::vec2(0.f);      // x, z
 
     std::array<FootState, 2> foot;              // left, right
+
+    // Scrambling
+    bool hands_ready = false;
+    std::array<HandState, 2> hand;              // left, right
+    float low = 0.f;                            // 0 upright, 1 as low as the steepest ground brings the trunk
+    glm::vec2 tilt = glm::vec2(0.f);            // radians the pelvis and the trunk tilt toward the slope, along the heading and to the right
+    float forward = 0.f;                        // m the centre of mass target is moved up the slope, at low = 1
+    float shoulder_gap = 0.f;                   // m from the shoulders to the ground, as GaitBase last saw them
+    glm::vec3 uphill = glm::vec3(0.f);          // horizontal unit vector up the slope under the walker (zero on level ground)
+    glm::vec3 trunk_reach = glm::vec3(0.f);     // the trunk's lean for the hands, a world rotation vector
 
     float footPhase(int i) const { float p = phase + (i ? 0.5f : 0.f); return p - std::floor(p); }
     glm::vec3 direction() const { return glm::vec3(-std::sin(heading), 0.f, -std::cos(heading)); }
@@ -167,8 +231,10 @@ struct BalanceState {
     float crouch = 0.f;                         // m the hips sit under their nominal height
     float bias = 0.f;                           // m of that held through the stride, so the hips move smoothly
     float deficit = 0.f, wanted = 0.f;          // the most reach this step lacked so far; what bias is settling to
+    float lift = 0.f;                           // m the hips are held up so that the knees do not fold past their stop (scrambling)
+    float lift_room = 10.f, lift_room_step = 10.f;  // the least the legs' reach left over the hips in the last step, and in this one so far
     glm::vec3 offset = glm::vec3(0.f);          // where the hips ended, from where GaitBase put them
-    std::vector<glm::vec2> support;             // convex hull of the soles' last and next prints, x z
+    std::vector<glm::vec2> support;             // convex hull of the soles' last and next prints and of the planted palms, x z
     float outside = 0.f;                        // m the centre of mass is outside it
     float lateral_margin = 0.f;                 // m from the extrapolated centre of mass to the stance foot's outer edge
     bool captured = false;                      // a heel struck on this tick
@@ -202,6 +268,18 @@ struct GaitReport {
     std::array<std::array<bool, 4>, 2> is_planted {};
     glm::vec3 settle_com = glm::vec3(0.f);
     double settle_time = -1.;
+    // Hands (scrambling)
+    float hand_contact_error = 0.f, max_hand_contact_error = 0.f;   // m between a planted palm point and the ground
+    float hand_penetration = 0.f, max_hand_penetration = 0.f;       // m a planted palm point is under the ground
+    float hand_slip = 0.f, max_hand_slip = 0.f;                     // m a planted palm point moved since it was planted
+    float hand_ik_position = 0.f, max_hand_ik_position = 0.f;       // m and radians, the residual of the arms of planted hands
+    float hand_ik_rotation = 0.f, max_hand_ik_rotation = 0.f;
+    float max_arm_limit = 0.f;                                      // radians the arms' limits took away, or gave
+    std::array<int, 2> hand_ticks {}, hand_holds {};                // ticks each palm was planted, holds it took, since settle
+    float max_low = 0.f;
+    float min_hip_height = 10.f;                                    // m of the hips over the walker's reference point
+    std::array<std::array<glm::vec3, 4>, 2> hand_planted {};
+    std::array<std::array<bool, 4>, 2> hand_is_planted {};
 };
 
 // The gait's clock and base animation: follows the command, advances the phase and the reference point, and writes
@@ -222,7 +300,17 @@ public:
     void tick(double h) override;
 };
 
-// Places the pelvis: as high as the legs reach, and where the centre of mass of the solved pose sits on its target
+// Scrambling (GaitParams::scramble): a hand within reach of the ground takes a hold on it, palm flat, keeps it while
+// the arm reaches, then moves on to the next. Creates and updates the arms' IKChain and IKTarget
+class GaitHandIKSys : public System {
+public:
+    GaitHandIKSys(entt::registry& reg) : System(reg) {}
+    const char* name() override { return "GaitHandIK"; }
+    void tick(double h) override;
+};
+
+// Places the pelvis: as high as the legs reach, and where the centre of mass of the solved pose sits on its target.
+// Leans the trunk as far as the planted hands need
 class GaitBalanceSys : public System {
 public:
     GaitBalanceSys(entt::registry& reg) : System(reg) {}
@@ -240,6 +328,8 @@ public:
 
 // The sole of a foot segment of the body
 FootGeometry footGeometry(const RigModel& model, bool right);
+// The palm and the arm of a hand of the body
+HandGeometry handGeometry(const RigModel& model, bool right);
 // A sole of this geometry on the ground around (x, z), its toes toward `yaw`
 // (no steeper than max_tilt, radians from level)
 Footprint fitFootprint(const GroundField& ground, const FootGeometry& foot, glm::vec2 centre, float yaw, float from_y, float max_tilt = 1.31f);

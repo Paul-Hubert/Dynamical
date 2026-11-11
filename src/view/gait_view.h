@@ -14,7 +14,7 @@ namespace dy {
 // Host system of the ik_walk scenes (docs/physical-agents/ik-gait.md): a camera that follows one world's kinematic
 // walker from where the ground does not hide its feet (the asked side first, then the other side, higher, behind), a panel to command it (speed, heading, the test plane's tilt) and read its checks, and markers: the
 // test plane with a metre grid, the soles' prints (orange on the heel edge, green flat, blue on the toe edge, grey
-// where the swing foot will land), the legs' IK targets, the centre of mass over its ground point (red), the
+// where the swing foot will land), the palms' prints when the walker scrambles, the legs' and arms' IK targets, the centre of mass over its ground point (red), the
 // extrapolated centre of mass (magenta) and the outline of the prints it must stay between. After WorldStepper.
 // params: { "world": 0, "distance": 3.4, "height": 1.3, "azimuth": 75 (degrees from behind the walker), "camera": true,
 //           "markers": true, "panel": true }

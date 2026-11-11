@@ -43,6 +43,15 @@ private:
     // mode=eval: the scene's Policy worlds for var.episodes episodes, deterministic, a summary JSON at var.out
     int eval();
 
+    // The animals (animal_host.cpp): is this a scene of AnimalBot worlds, the checks of a recording as JSON
+    // (var.checks), the eval of a policy on them
+    bool animalWorlds();
+    std::string animalDemoProblem();
+    void recordAnimalReplay();
+    std::vector<float> animal_replay;
+    void writeAnimalChecks();
+    int evalAnimals();
+
     // The handshake, then RESET / STEP / QUIT against the environment `connected` makes from the trainer's seed
     int serve(const std::function<std::unique_ptr<TrainerEnvironment>(int64_t seed)>& connected);
 

@@ -17,6 +17,7 @@
 #include "view/camera_walk.h"
 #include "view/walker_view.h"
 #include "view/gait_view.h"
+#include "view/animal_view.h"
 
 using namespace dy;
 
@@ -43,6 +44,7 @@ void dy::registerViewSystems() {
         return std::make_unique<RollerPlayerSys>(reg, params, RollerPlayerSys::Player::VR); }, SystemScope::Host, true });
     registerSystem("DesktopRoller", { [](entt::registry& reg, const nlohmann::json& params) {
         return std::make_unique<RollerPlayerSys>(reg, params, RollerPlayerSys::Player::Desktop); }, SystemScope::Host, true });
+    registerSystem("AnimalAgentView", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<AnimalAgentViewSys>(reg, params); }, SystemScope::Host, true });
     registerSystem("WalkerView", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<WalkerViewSys>(reg, params); }, SystemScope::Host, true });
     registerSystem("GaitView", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<GaitViewSys>(reg, params); }, SystemScope::Host, true });
     registerSystem("WorldView", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<WorldViewSys>(reg, params); },

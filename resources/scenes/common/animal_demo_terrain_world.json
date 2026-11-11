@@ -1,0 +1,127 @@
+{
+  "variables": {
+    "body": {
+      "type": "string",
+      "default": "animals/bodies/deer_red.body.json",
+      "description": "a generated body file (tools/animal_body), under resources/"
+    },
+    "params": {
+      "type": "string",
+      "default": "agents/params/animal.params.json"
+    },
+    "ranges": {
+      "type": "string",
+      "default": "agents/ranges/walk_basic.json",
+      "description": "GaitRanges: the styles, speeds and turns of the recorded walks"
+    },
+    "gait": {
+      "type": "string",
+      "default": "walk",
+      "description": "walk, trot or run: the clip the procedural walk is made from"
+    },
+    "draw": {
+      "type": "bool",
+      "default": false
+    },
+    "speed": {
+      "type": "float",
+      "default": 0.0,
+      "description": "> 0: this speed straight ahead, in speeds of the clip, instead of the drawn commands"
+    },
+    "warmup": {
+      "type": "float",
+      "default": 2.0,
+      "description": "seconds walked before a walk is recorded (plus up to a cycle, drawn per walk)"
+    },
+    "episode_decisions": {
+      "type": "int",
+      "default": 300,
+      "description": "recorded decisions per walk"
+    },
+    "terrain_seed": {
+      "type": "int",
+      "default": 1337
+    },
+    "spawn_radius": {
+      "type": "float",
+      "default": 1000.0
+    },
+    "route_up": {
+      "type": "float",
+      "default": 15.0,
+      "description": "degrees: the steepest climb along a path the animal is sent on (the red deer's walk holds its limits to 20 on a plane, tools/animal_slope_band.py)"
+    },
+    "route_down": {
+      "type": "float",
+      "default": 15.0,
+      "description": "degrees: the steepest descent along it"
+    },
+    "route_across": {
+      "type": "float",
+      "default": 12.0,
+      "description": "degrees: the steepest slope across it"
+    },
+    "route_length": {
+      "type": "float",
+      "default": 12.0
+    }
+  },
+  "templates": {
+    "animal_demo_terrain_world": {
+      "physics": {
+        "threads": 1,
+        "max_bodies": 128,
+        "max_body_pairs": 2048,
+        "max_contacts": 2048,
+        "temp_bytes": 8388608,
+        "allow_sleeping": false,
+        "friction_combine": "max",
+        "restitution_combine": "min"
+      },
+      "clock": {
+        "physics_hz": 60,
+        "control_hz": 30
+      },
+      "fixed": [
+        "RigidBody",
+        {
+          "name": "GroundTerrain",
+          "params": {
+            "seed": "${terrain_seed}"
+          }
+        },
+        "AnimalFactory",
+        "AnimalGaitPlayer",
+        "PhysicsStep",
+        "AnimalSync",
+        "AnimalChecks",
+        "AnimalRewards@observe",
+        "AnimalObservation@observe",
+        "AnimalEpisode@observe"
+      ],
+      "entities": [
+        {
+          "AnimalSpawn": {
+            "body": "${body}",
+            "params": "${params}",
+            "ranges": "${ranges}",
+            "gait": "${gait}",
+            "motion": "kinematic",
+            "recording": true,
+            "draw": "${draw}",
+            "speed": "${speed}",
+            "warmup": "${warmup}",
+            "recording_decisions": "${episode_decisions}"
+          },
+          "WalkRoutes": {
+            "up": "${route_up}",
+            "down": "${route_down}",
+            "across": "${route_across}",
+            "length": "${route_length}",
+            "spawn_radius": "${spawn_radius}"
+          }
+        }
+      ]
+    }
+  }
+}

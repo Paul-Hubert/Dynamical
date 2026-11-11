@@ -8,7 +8,8 @@
     "start_x": { "type": "float",  "default": 0.0 },
     "start_z": { "type": "float",  "default": 0.0 },
     "pitch":   { "type": "float",  "default": 0.0, "description": "degrees of the ground plane; positive rises toward -z (uphill at heading 0)" },
-    "roll":    { "type": "float",  "default": 0.0, "description": "degrees of the ground plane; positive rises toward +x (the right side at heading 0)" }
+    "roll":    { "type": "float",  "default": 0.0, "description": "degrees of the ground plane; positive rises toward +x (the right side at heading 0)" },
+    "scramble": { "type": "bool",  "default": false, "description": "on steep ground the trunk comes down and the hands take hold of the ground within their reach" }
   },
   "templates": {
     "ik_world": {
@@ -16,11 +17,12 @@
                    "allow_sleeping": false, "friction_combine": "max", "restitution_combine": "min" },
       "clock": { "physics_hz": 60, "control_hz": 30 },
       "fixed": [ "RigidBody", "AgentFactory", { "name": "GroundPlane", "params": { "pitch": "${pitch}", "roll": "${roll}" } },
-                 "GaitBase", "GaitFootIK", "GaitBalance", "Fabrik", "RigPoseApply", "PhysicsStep", "BodySync", "GaitChecks",
+                 "GaitBase", "GaitFootIK", "GaitHandIK", "GaitBalance", "Fabrik", "RigPoseApply", "PhysicsStep", "BodySync", "GaitChecks",
                  "Observation@observe" ],
       "entities": [
         { "HumanBotSpawn": { "body": "${body}", "params": "${params}", "motion": "kinematic", "recording": true, "draw": "${draw}" },
-          "GaitCommand": { "speed": "${speed}", "heading": "${heading}", "start": ["${start_x}", "${start_z}"] } }
+          "GaitCommand": { "speed": "${speed}", "heading": "${heading}", "start": ["${start_x}", "${start_z}"] },
+          "GaitParams": { "scramble": "${scramble}" } }
       ]
     }
   }

@@ -191,6 +191,21 @@ void GaitViewSys::tick(double dt) {
             }
         }
 
+        if(state.hands_ready) {
+            // Palm prints: green held, grey reached for; the arms' IK targets
+            for(const HandState& hand : state.hand) {
+                const FootGeometry& g = hand.geometry.palm;
+                glm::vec3 size(2.f * g.half_width, 0.004f, 2.f * g.half_length);
+                if(hand.contact == HandContact::Planted) {
+                    place(Shape::Box, hand.current.centre + hand.current.rotation * glm::vec3(0.f, 0.003f, 0.f), hand.current.rotation, size, glm::vec4(0.2f, 0.85f, 0.3f, 1.f));
+                } else if(hand.contact == HandContact::Reaching) {
+                    place(Shape::Box, hand.next.centre + hand.next.rotation * glm::vec3(0.f, 0.003f, 0.f), hand.next.rotation, size, glm::vec4(0.75f, 0.75f, 0.75f, 1.f));
+                }
+                auto* target = w.try_get<IKTarget>(hand.target);
+                if(target && target->enabled) place(Shape::Sphere, target->position, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(0.04f), glm::vec4(1.f, 0.9f, 0.1f, 1.f));
+            }
+        }
+
         if(balance && balance->valid) {
             glm::vec3 below(balance->com.x, balance->ground + 0.006f, balance->com.z);
             place(Shape::Sphere, balance->com, glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(0.07f), glm::vec4(0.95f, 0.15f, 0.15f, 1.f));
@@ -215,8 +230,8 @@ void GaitViewSys::tick(double dt) {
     if(ImGui::SliderFloat("heading (deg)", &heading, -180.f, 180.f, "%.0f")) command.heading = heading / deg;
     if(plane) {
         float pitch = plane->pitch(), roll = plane->roll();
-        bool changed = ImGui::SliderFloat("plane pitch (deg)", &pitch, -30.f, 30.f, "%.0f");
-        changed |= ImGui::SliderFloat("plane roll (deg)", &roll, -30.f, 30.f, "%.0f");
+        bool changed = ImGui::SliderFloat("plane pitch (deg)", &pitch, -70.f, 70.f, "%.0f");
+        changed |= ImGui::SliderFloat("plane roll (deg)", &roll, -70.f, 70.f, "%.0f");
         if(changed) plane->setTilt(pitch, roll);
     }
     ImGui::Checkbox("follow camera", &camera);
@@ -234,6 +249,11 @@ void GaitViewSys::tick(double dt) {
         ImGui::Text("left %s (sole %.0f deg), right %s (sole %.0f deg)", contactName(state.foot[0].contact), state.foot[0].pitch * deg,
             contactName(state.foot[1].contact), state.foot[1].pitch * deg);
     }
+    if(state.hands_ready) {
+        auto handName = [](HandContact c) { return c == HandContact::Planted ? "palm down" : c == HandContact::Reaching ? "reaching" : c == HandContact::Releasing ? "letting go" : "swinging"; };
+        ImGui::Text("trunk %.0f %% down, tilted %.0f deg; left hand %s, right hand %s", state.low * 100.f, glm::length(state.tilt) * deg,
+            handName(state.hand[0].contact), handName(state.hand[1].contact));
+    }
     if(balance && balance->valid) {
         ImGui::Text("hips %.0f mm under nominal", balance->crouch * 1e3f);
         ImGui::Text("centre of mass off target %.1f mm (%d passes)", balance->error * 1e3f, balance->iterations);
@@ -250,6 +270,10 @@ void GaitViewSys::tick(double dt) {
         ImGui::Text("limits took or gave %.1f / %.1f deg", report->ik_limit * deg, report->max_ik_limit * deg);
         ImGui::Text("past the body file's limits %.1f / %.1f deg", report->body_limit_excess * deg, report->max_body_limit_excess * deg);
         ImGui::Text("steps %d", report->steps);
+        if(state.hands_ready) {
+            ImGui::Text("palm to ground %.1f / %.1f mm, slip %.1f / %.1f mm", report->hand_contact_error * 1e3f, report->max_hand_contact_error * 1e3f,
+                report->hand_slip * 1e3f, report->max_hand_slip * 1e3f);
+        }
     }
     if(params) {
         ImGui::Separator();
@@ -260,6 +284,15 @@ void GaitViewSys::tick(double dt) {
         ImGui::SliderFloat("slope slowdown", &params->slope_slowdown, 0.f, 3.5f, "%.1f");
         ImGui::SliderFloat("lean per slope", &params->lean_slope_gain, 0.f, 1.f, "%.2f");
         ImGui::Checkbox("joint limits give way to a planted foot", &params->yield_limits);
+        ImGui::Checkbox("scramble: trunk down and palms on steep ground", &params->scramble);
+        if(params->scramble) {
+            float from = params->scramble_from * deg, full = params->scramble_full * deg;
+            if(ImGui::SliderFloat("trunk comes down from (deg)", &from, 0.f, 60.f, "%.0f")) params->scramble_from = from / deg;
+            if(ImGui::SliderFloat("... all the way at (deg)", &full, 5.f, 80.f, "%.0f")) params->scramble_full = std::max(full, from + 1.f) / deg;
+            ImGui::SliderFloat("crouch (share of the legs)", &params->scramble_crouch, 0.f, 0.6f, "%.2f");
+            ImGui::SliderFloat("shoulders to the ground (m)", &params->scramble_shoulder, 0.15f, 0.6f, "%.2f");
+            ImGui::SliderFloat("weight on a palm", &params->hand_support, 0.f, 0.3f, "%.2f");
+        }
     }
     ImGui::End();
 

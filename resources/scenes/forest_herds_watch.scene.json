@@ -1,0 +1,35 @@
+{
+  "format_version": 1,
+  "name": "forest_herds_watch",
+  "include": ["common/desktop.json"],
+  "variables": {
+    "forest":      { "type": "string", "default": "forest/tautavel.forest.json", "description": "stands, layers and species (docs/forest.md)" },
+    "forest_seed": { "type": "int",    "default": 1,   "description": "places the forests and their plants" },
+    "herds":       { "type": "string", "default": "herds/tautavel.herds.json", "description": "kinds of herds and their animals (docs/animals.md)" },
+    "herd_seed":   { "type": "int",    "default": 1,   "description": "places the herds" },
+    "herd_cell":   { "type": "float",  "default": 170, "description": "metres : one herd at most per cell of this size" },
+    "herd_density": { "type": "float", "default": 0.75, "description": "part of the cells that have a herd" },
+    "herd_radius": { "type": "float",  "default": 420, "description": "metres : herds this close to the camera exist" },
+    "herd_range":  { "type": "float",  "default": 140, "description": "metres : how far from its home a herd goes" },
+    "graze_min":   { "type": "float",  "default": 6,   "description": "seconds a herd stays in a place, at least" },
+    "graze_max":   { "type": "float",  "default": 14 },
+    "kind":        { "type": "string", "default": "",  "description": "the kind of herd the camera looks for first (red deer, reindeer, bison, ...)" },
+    "distance":    { "type": "float",  "default": 9,   "description": "metres from the herd" },
+    "height":      { "type": "float",  "default": 2.6, "description": "metres above the ground" },
+    "orbit":       { "type": "float",  "default": 5,   "description": "degrees a second around the herd" }
+  },
+
+  "renderer": { "passes": ["terrain", "grass", "vegetation", "animals", "model", "ui"], "vr": false },
+
+  "host": {
+    "pre": [
+      "Input", "UI", "Time", "PlayerControl", "DebugMenu",
+      "ChunkManager", "ChunkGenerator",
+      { "name": "Forest", "params": { "definition": "${forest}", "seed": "${forest_seed}" } },
+      { "name": "Herds", "params": { "definition": "${herds}", "seed": "${herd_seed}", "cell": "${herd_cell}", "density": "${herd_density}", "radius": "${herd_radius}", "range": "${herd_range}", "graze": ["${graze_min}", "${graze_max}"] } },
+      { "name": "HerdWatch", "params": { "kind": "${kind}", "distance": "${distance}", "height": "${height}", "orbit": "${orbit}" } },
+      "AnimalAnimation", "AnimalGait"
+    ],
+    "post": ["Terrain"]
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "format_version": 1,
+  "name": "animal_eval",
+  "include": [
+    "common/animal_world.json"
+  ],
+  "variables": {
+    "view": {
+      "type": "bool",
+      "default": true
+    },
+    "view_truncate": {
+      "type": "bool",
+      "default": true
+    },
+    "num_worlds": {
+      "type": "int",
+      "default": 16
+    },
+    "model": {
+      "type": "string",
+      "default": ""
+    },
+    "episodes": {
+      "type": "int",
+      "default": 100
+    },
+    "out": {
+      "type": "string",
+      "default": ""
+    },
+    "stochastic": {
+      "type": "int",
+      "default": 0
+    },
+    "replay": {
+      "type": "string",
+      "default": "",
+      "description": "a prefix: the segments of world 0 at every decision, as <prefix>.replay.json and .bin"
+    },
+    "replay_seconds": {
+      "type": "float",
+      "default": 30.0
+    }
+  },
+  "worlds": [
+    {
+      "template": "animal_world",
+      "count": "${num_worlds}",
+      "systems": {
+        "replace": {
+          "TrainerActions@act": "Policy@act"
+        }
+      }
+    }
+  ]
+}

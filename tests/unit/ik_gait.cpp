@@ -80,6 +80,17 @@ std::string describe(const GaitReport& r) {
     return text;
 }
 
+std::string describeHands(const GaitReport& r) {
+    char text[480];
+    std::snprintf(text, sizeof(text),
+        "low %.2f, hips down to %.2f m | palms planted %d and %d of %d ticks (%d and %d holds) | palm to ground %.2f mm, under %.2f mm, slip %.2f mm | "
+        "arm ik %.2f mm %.2f deg, arm limits took or gave %.1f deg",
+        r.max_low, r.min_hip_height, r.hand_ticks[0], r.hand_ticks[1], r.ticks, r.hand_holds[0], r.hand_holds[1],
+        r.max_hand_contact_error * 1e3f, r.max_hand_penetration * 1e3f, r.max_hand_slip * 1e3f, r.max_hand_ik_position * 1e3f, r.max_hand_ik_rotation * deg,
+        r.max_arm_limit * deg);
+    return text;
+}
+
 // The thresholds of docs/physical-agents/ik-gait.md
 // over_limits: degrees a planted foot may take its leg past the joint limits (they give way, GaitParams::yield_limits)
 void checkWalk(const GaitReport& r, float speed, float over_limits = 0.1f) {
@@ -541,6 +552,101 @@ TEST_CASE("GAIT.10 with limits that hold, steep ground costs the foot its print,
     CHECK(r.yielded == 0);
     CHECK(r.max_limit_excess * deg < 0.1f);
     CHECK(r.max_ik_rotation * deg > 1.f);
+}
+
+
+TEST_CASE("GAIT.12 scrambling: on steep ground the trunk comes down and the palms lie flat on the ground") {
+    if(!haveBody()) return;
+    // The plane's pitch and the heading: straight up, steeper, across (the slope rises on the walker's right), down
+    struct Case { float pitch, heading; int uphill_hand; };
+    for(Case c : { Case { 50.f, 0.f, -1 }, Case { 55.f, 0.f, -1 }, Case { 45.f, 90.f, 1 }, Case { 45.f, 180.f, -1 } }) {
+        CAPTURE(c.pitch);
+        CAPTURE(c.heading);
+        Vars vars { { "pitch", std::to_string(c.pitch) }, { "heading", std::to_string(c.heading) } };
+        Walk plain = walk("ik_check", vars, 20.);
+        vars.push_back({ "scramble", "true" });
+        Walk w = walk("ik_check", vars, 20.);
+        const GaitReport& r = w.report;
+        MESSAGE("pitch ", c.pitch, " heading ", c.heading, ": ", describeHands(r), " (upright: hips ", plain.report.min_hip_height, " m) | ", describe(r));
+        CHECK(std::isfinite(w.balance.com.x + w.balance.com.y + w.balance.com.z));
+        CHECK(r.max_low > 0.5f);
+        CHECK(r.min_hip_height < plain.report.min_hip_height - 0.02f);
+        // Palms on the ground: for a good part of the walk, flat, and where they were put
+        const int settled = r.ticks - 120;
+        if(c.uphill_hand < 0) {
+            CHECK(r.hand_ticks[0] > settled / 4);
+            CHECK(r.hand_ticks[1] > settled / 4);
+        } else {
+            CHECK(r.hand_ticks[c.uphill_hand] > settled / 4);
+        }
+        CHECK(r.hand_holds[0] + r.hand_holds[1] >= 2);
+        CHECK(r.max_hand_contact_error < 5e-3f);
+        CHECK(r.max_hand_slip < 5e-3f);
+        CHECK(r.max_hand_ik_position < 5e-3f);
+        CHECK(r.max_hand_ik_rotation * deg < 1.f);
+        // The feet as without the hands
+        CHECK(r.steps > 5);
+        CHECK(r.max_penetration < 5e-3f);
+        CHECK(r.max_slip < 2e-3f);
+        CHECK(r.max_ik_position < 2e-3f);
+    }
+}
+
+TEST_CASE("GAIT.13 scrambling changes nothing where the ground is not steep") {
+    if(!haveBody()) return;
+    Walk plain = walk("ik_check", { { "pitch", "12" }, { "roll", "7" } }, 8.);
+    Walk w = walk("ik_check", { { "pitch", "12" }, { "roll", "7" }, { "scramble", "true" } }, 8.);
+    CHECK(w.hash == plain.hash);
+    CHECK(w.report.hand_ticks[0] + w.report.hand_ticks[1] == 0);
+    CHECK(w.report.max_low == 0.f);
+}
+
+TEST_CASE("GAIT.14 scrambling on the marching cubes terrain, and back to walking") {
+    if(!haveBody() || !std::filesystem::exists("resources/mclookup.bin")) return;
+    // The terrain's origin, where slopes pass 45 degrees: the hands come down where the ground is within their reach
+    int planted = 0;
+    float lowest = 0.f;
+    for(float heading : { 0.f, 120.f, 250.f }) {
+        CAPTURE(heading);
+        float gap = 0.f, over = 0.f;
+        Walk w = walk("ik_check_terrain", { { "heading", std::to_string(heading) }, { "scramble", "true" } }, 40., [&](World& world, int) {
+            auto view = world.reg.view<GaitState, GaitReport>();
+            if(view.begin() == view.end()) return;
+            const auto& state = world.reg.get<GaitState>(*view.begin());
+            const auto& report = world.reg.get<GaitReport>(*view.begin());
+            // A palm across an edge between two triangles rests on the edge
+            float now = 0.f;
+            if(state.hands_ready) for(const HandState& hand : state.hand) if(hand.contact == HandContact::Planted) now = std::max(now, hand.current.gap);
+            gap = std::max(gap, now);
+            if(state.time > report.settle) over = std::max(over, report.hand_contact_error - now);
+        });
+        const GaitReport& r = w.report;
+        MESSAGE("heading ", heading, ": palms across edges up to ", gap * 1e3f, " mm | ", describeHands(r), " | ", describe(r));
+        CHECK(std::isfinite(w.balance.com.x + w.balance.com.y + w.balance.com.z));
+        CHECK(over < 5e-3f);
+        CHECK(r.max_hand_slip < 5e-3f);
+        CHECK(r.steps > 8);
+        CHECK(r.max_penetration < 5e-3f);
+        CHECK(r.max_slip < 2e-3f);
+        planted += r.hand_ticks[0] + r.hand_ticks[1];
+        lowest = std::max(lowest, r.max_low);
+    }
+    CHECK(planted > 300);
+    CHECK(lowest > 0.9f);
+
+    // Scrambling turned off on the way: the hands let go and the walker stands up
+    ScenarioRunner runner("ik_check", { { "pitch", "45" }, { "scramble", "true" } }, SceneLoadOptions {});
+    auto& world = runner.world(0);
+    for(int t = 0; t < 600; t++) world.tick();
+    entt::entity e = *world.reg.view<GaitParams>().begin();
+    CHECK(world.reg.get<GaitState>(e).low > 0.5f);
+    world.reg.get<GaitParams>(e).scramble = false;
+    for(int t = 0; t < 300; t++) world.tick();
+    const GaitState& state = world.reg.get<GaitState>(e);
+    CHECK(state.low == 0.f);
+    CHECK(state.hand[0].contact == HandContact::Free);
+    CHECK(state.hand[1].contact == HandContact::Free);
+    CHECK(glm::length(state.trunk_reach) < 1e-3f);
 }
 
 }

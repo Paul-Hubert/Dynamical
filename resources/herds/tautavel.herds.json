@@ -1,0 +1,35 @@
+{
+  "cell": 170,
+  "density": 0.75,
+  "radius": 420,
+  "range": 140,
+  "max_slope": 18,
+  "graze": [20, 60],
+
+  "herds": [
+    { "name": "red deer", "weight": 4, "count": [6, 14], "spacing": 4.5, "where": "edge",
+      "members": { "deer_doe": 5, "deer_stag": 1, "deer_calf": 2 } },
+    { "name": "stags", "weight": 1, "count": [2, 4], "spacing": 6, "where": "forest",
+      "members": { "deer_red": 1, "deer_stag": 1 } },
+    { "name": "reindeer", "weight": 3, "count": [8, 18], "spacing": 4, "where": "open",
+      "members": { "reindeer": 1 } },
+    { "name": "bison", "weight": 3, "count": [6, 14], "spacing": 6, "where": "edge",
+      "members": { "buffalo": 1 } },
+    { "name": "horses", "weight": 3, "count": [5, 11], "spacing": 5.5, "where": "open",
+      "members": { "horse": 1 } },
+    { "name": "rhinoceros", "weight": 1, "count": [1, 3], "spacing": 9, "where": "open",
+      "members": { "rhinoceros": 1 } },
+    { "name": "boars", "weight": 2, "count": [4, 9], "spacing": 2.5, "where": "forest",
+      "members": { "boar_female": 3, "boar": 1 } },
+    { "name": "wolves", "weight": 1, "count": [3, 7], "spacing": 3.5, "where": "any",
+      "members": { "wolf_2": 1 } },
+    { "name": "mouflons", "weight": 2, "count": [5, 12], "spacing": 3, "where": "open",
+      "members": { "ram_realistic": 2, "sheep": 1 } },
+    { "name": "moose", "weight": 1, "count": [1, 3], "spacing": 8, "where": "edge",
+      "members": { "moose": 1, "moose_cow": 2 } },
+    { "name": "lions", "weight": 1, "count": [2, 5], "spacing": 5, "where": "open",
+      "members": { "lioness": 3, "lion": 1 } },
+    { "name": "bears", "weight": 1, "count": [1, 2], "spacing": 8, "where": "forest",
+      "members": { "bearbrown": 1 } }
+  ]
+}
