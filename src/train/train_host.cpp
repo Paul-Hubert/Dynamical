@@ -60,7 +60,8 @@ int TrainHost::run() {
     if(mode == "null") return null();
     if(mode == "train") return agents();
     if(mode == "record-demo") return recordDemo();
-    if(mode == "eval") return animalWorlds() ? evalAnimals() : eval();
+    if(mode == "signals") return signals();
+    if(mode == "eval") return sandboxWorlds() ? evalSandbox() : animalWorlds() ? evalAnimals() : eval();
 
     dy::log(dy::error) << "mode=" << mode << " is not available yet\n";
     return 1;

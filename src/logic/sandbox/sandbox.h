@@ -41,6 +41,12 @@ namespace SandboxSignal {
         herd_count,                                     // of its species within its sight
         since_fed,                                      // of the time a full store lasts
         dt,                                             // seconds of the decision
+        grass_near,                                     // m: the tallest grass 3 m around
+        conceptions,                                    // count: it mated and a young is on its way (both parents)
+        lived,                                          // seconds since it was born or brought in
+        // m the nearest one came closer over the decision (negative: further), at most 3 either way; 0 when there
+        // was none at its start or at its end
+        predator_closing, prey_closing, mate_closing, carcass_closing,
         count
     };
 }
@@ -73,9 +79,15 @@ struct SandboxSpecies {
     GaitRanges ranges;
     RewardProgram rewards;
     std::string walker_behavior, action_behavior;
+    int weapon_segment = -1;            // the body that holds the species' weapon: strikes as the head does
 
     // Counters since the world began
     uint64_t born = 0, spawned = 0, starved = 0, killed = 0, aged = 0, kills = 0, falls = 0;
+    uint64_t lives = 0;                 // that ended
+    double lifetime = 0.;               // ... and the seconds they lasted, summed
+    double work = 0.;                   // positive mechanical power over the reference (0.1 m g v), summed over animal ticks
+    double moved = 0.;                  // m the trunks covered
+    uint64_t ticks = 0;
     int alive = 0;
 };
 
@@ -95,6 +107,8 @@ struct SandboxAnimal {
     float mating = 0.f;                 // seconds together with a partner
     float stun = 0.f;                   // seconds left standing where it was put back up
     float since_fed = 0.f;
+    float lived = 0.f;                  // seconds in this world
+    int offspring = 0;
     bool feeding = false;               // this tick
 
     enum Cause : int { Alive, Starved, Killed, Old };
@@ -121,12 +135,18 @@ struct SandboxAnimal {
     // Since the mind's last decision
     struct Window {
         float energy_gain = 0.f, energy_spent = 0.f, damage_taken = 0.f, damage_dealt = 0.f;
-        int kills = 0, births = 0, falls = 0, feeding = 0, ticks = 0;
+        int kills = 0, births = 0, falls = 0, feeding = 0, ticks = 0, conceptions = 0;
         int modes[animal_modes] = {};
         glm::vec3 from = glm::vec3(0.f);
     } window;
+    float nearest[4] = { -1.f, -1.f, -1.f, -1.f };  // predator, prey, mate, carcass at the mind's last decision; < 0: none
     float objective = 0.f;              // births and its death, to pay with the mind's next decision
     float lifetime_reward = 0.f;
+};
+
+// On the entity of a drawn body (Sandbox::draw), next to its Transform and WorldShape
+struct SandboxShape {
+    entt::entity animal = entt::null;
 };
 
 // On the entity of a mind, next to its AgentIO
@@ -176,7 +196,10 @@ struct Sandbox {
     // slid along their command; no walker agents, the head is where its order asks, a muzzle held on a trunk in
     // Attack mode wounds. Not the sandbox: nothing a body does is learned there
     bool puppet = false;
+    bool heuristic = false;             // the scripted minds answer every mind that asks and that nothing answered
+    bool draw = false;                  // an entity with Transform and WorldShape per body, for WorldView
     std::string rewards_dir;
+    uint64_t contacts = 0, blows = 0;   // contacts between two animals so far, and those that wounded
 
     int speciesIndex(const std::string& id) const;
 };
@@ -187,6 +210,7 @@ entt::entity spawnSandboxAnimal(entt::registry& reg, int species, glm::vec2 at, 
 
 // The mind's observation of an animal (vector and interest rows) and the signals of its reward
 void observeSandboxMind(entt::registry& reg, entt::entity animal, AgentIO& io);
+// (the distances of the decision before are kept on the animal for the closing signals: once per decision)
 void sandboxSignals(entt::registry& reg, entt::entity animal, float seconds, float* out);
 
 // A scripted mind (tests, the rules without a policy): from the observation alone. Deer flee wolves, graze where
@@ -197,8 +221,9 @@ void sandboxHeuristic(const SandboxSpecies& species, AgentIO& io);
 // eaten or rotten leave the world, the fallen are stood up, the young are born and grow, species under their
 // minimum get adults at the edge; then the minds' actions become commands and orders and the walkers' actions drives
 //
-// params: "life" (resources path of the life params), "rewards" (folder of <species>.rewards.json), and to override
-//         the life params: "arena", "species" ({ "<id>": { "start": n, ... } })
+// params: "life" (resources path of the life params), "rewards" (folder of <species>.rewards.json), "puppet",
+//         "heuristic" (the scripted minds, for the minds no policy answers), "draw" (shapes for WorldView), and to
+//         override the life params: "arena", "species" ({ "<id>": { "start": n, ... } }), "only" ([ids])
 class SandboxSys : public System {
 public:
     SandboxSys(entt::registry& reg, const nlohmann::json& params);

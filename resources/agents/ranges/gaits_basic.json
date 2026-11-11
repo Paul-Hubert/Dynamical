@@ -1,0 +1,48 @@
+{
+  "description": "Hard level ground, the style of the clips: stands still (15 draws in 100), walks at 0.8 to 1.2 of the walk's speed, runs at 0.75 to 1 of the run's (35 in 100, for an animal that has a run), gentle turns. Speed alone says which",
+  "stride": 1.0,
+  "step_height": 1.0,
+  "clearance": 0.0,
+  "soft_depth": 0.0,
+  "sink_time": 0.12,
+  "exit_vertical": 0.8,
+  "entry_vertical": 0.5,
+  "exit_part": 0.3,
+  "body_sink": 0.7,
+  "crouch": 0.0,
+  "spread": 0.0,
+  "bend": 1.0,
+  "max_bend": 40.0,
+  "head_lead": 0.6,
+  "bank": 0.5,
+  "turn_step": 1.0,
+  "ik": 1.0,
+  "speed": [
+    0.8,
+    1.2
+  ],
+  "radius": [
+    4.0,
+    12.0
+  ],
+  "straight": 0.4,
+  "soft": 0.0,
+  "scale": [
+    1.0,
+    1.0
+  ],
+  "segment": [
+    2.0,
+    5.0
+  ],
+  "idle": 0.15,
+  "run": 0.35,
+  "run_speed": [
+    0.75,
+    1.0
+  ],
+  "run_radius": [
+    8.0,
+    24.0
+  ]
+}

@@ -80,7 +80,7 @@ float commandSpeed(const AnimalBot& bot, const AnimalWalkState* walk) {
 }
 
 // A new command for a new episode or walk
-void beginCommand(entt::registry& reg, AnimalBot& bot, float yaw, float clip_speed) {
+void beginCommand(entt::registry& reg, AnimalBot& bot, float yaw, float clip_speed, int only = 0) {
     auto& rng = reg.ctx().get<WorldRng>();
     if(bot.spawn.speed > 0.f) {
         bot.command = WalkCommand();
@@ -89,7 +89,7 @@ void beginCommand(entt::registry& reg, AnimalBot& bot, float yaw, float clip_spe
         bot.command.until = std::numeric_limits<float>::max();
         bot.command.started = true;
     } else {
-        startCommand(bot.command, bot.ranges, clip_speed, bot.body->length, yaw, rng);
+        startCommand(bot.command, bot.ranges, clip_speed, bot.body->length, yaw, rng, bot.body->run_speed, only);
     }
 }
 
@@ -197,7 +197,15 @@ AnimalRating dy::rateAnimal(const AnimalBot& bot, double window) {
     r.velocity = (trunk - bot.snapshot_trunk) / (float) window;
     r.along = glm::dot(r.velocity, bot.snapshot_direction);
     r.root = std::min(r.along, bot.snapshot_speed) * p.root_reward;
-    if(bot.snapshot_speed > 0.f) r.root /= bot.snapshot_speed;
+    // Over the speed asked, but not for a command that all but stands: a step back would cost more there than a walk earns
+    if(bot.snapshot_speed > 0.f) r.root /= std::max(bot.snapshot_speed, 0.25f * body.walk_speed);
+    if(p.over_speed > 0.f) {
+        // Faster than asked, any way over the ground, costs too: what makes a command to stand one to stand still
+        const float over = std::max(glm::length(horizontal(r.velocity)) - bot.snapshot_speed, 0.f);
+        const float x = (std::min(r.along, bot.snapshot_speed) - p.over_speed * over) / std::max(bot.snapshot_speed, 0.25f * body.walk_speed);
+        // What a command that is not followed loses stays under what being alive earns: a fall is never the way out
+        r.root = x < 0.f && p.life_reward > 0.f ? -p.life_reward * std::tanh(-x) : x * p.root_reward;
+    }
     HeadingFrame frame = headingFrame(bot.rotation[0]);
     r.heading_error = std::acos(std::clamp(glm::dot(frame.x, bot.snapshot_direction), -1.f, 1.f));
 
@@ -214,8 +222,8 @@ AnimalRating dy::rateAnimal(const AnimalBot& bot, double window) {
     case AnimalMode::Move:
         break;
     case AnimalMode::Feed:
-        // The muzzle down to the ground
-        mode = std::exp(-std::max(r.muzzle_height, 0.f) / (0.25f * body.stand_height));
+        // The muzzle down from where it is standing, all of it at the ground
+        mode = std::clamp(1.f - std::max(r.muzzle_height, 0.f) / std::max(bot.muzzle_stand, 1e-3f), 0.f, 1.f);
         break;
     case AnimalMode::Attack: {
         // The head thrown where it points
@@ -227,9 +235,10 @@ AnimalRating dy::rateAnimal(const AnimalBot& bot, double window) {
         mode = std::exp(-glm::length(horizontal(r.velocity)) / (0.3f * v0));
         break;
     case AnimalMode::Rest: {
+        // The trunk where it is and every body still
         float moving = 0.f;
         for(const glm::vec3& v : bot.origin_velocity) moving += glm::length(v);
-        mode = std::exp(-moving / (float) bot.origin_velocity.size() / (0.2f * v0));
+        mode = std::exp(-(glm::length(horizontal(r.velocity)) + moving / (float) bot.origin_velocity.size()) / (0.5f * v0));
         break;
     }
     }
@@ -263,6 +272,14 @@ void findHead(AnimalBot& bot) {
     }
     bot.head_segment = std::max(head, 0);
 
+    // The neck: from the head up to the first body that carries a leg (the shoulders), or the trunk
+    bot.neck.assign(def.segments.size(), 0);
+    std::vector<char> carries_leg(def.segments.size(), 0);
+    for(const AnimalLegDef& leg : body.legs) {
+        if(!leg.segments.empty() && def.segments[leg.segments[0]].parent >= 0) carries_leg[def.segments[leg.segments[0]].parent] = 1;
+    }
+    for(int s = bot.head_segment; s > 0 && !carries_leg[s]; s = def.segments[s].parent) bot.neck[s] = 1;
+
     const SegmentDef& segment = def.segments[bot.head_segment];
     const ShapeDef& shape = segment.shapes[0];
     // The support point of the shape forward and a little down, at the standing pose (the animal looks down -z)
@@ -278,6 +295,7 @@ void findHead(AnimalBot& bot) {
         support += d * shape.radius;
     }
     bot.muzzle = shape.center + shape.rotation * support;
+    bot.muzzle_stand = std::max((segment.spawn_position + segment.spawn_rotation * bot.muzzle).y, 0.05f * body.height);
 
     // Where the head points standing, in the trunk's heading frame
     HeadingFrame frame = headingFrame(def.segments[0].spawn_rotation);
@@ -454,6 +472,7 @@ AnimalParams dy::parseAnimalParams(const nlohmann::json& j) {
     p.random_yaw = j.value("random_yaw", p.random_yaw);
     p.soft_resistance = j.value("soft_resistance", p.soft_resistance);
     p.soft_lift = j.value("soft_lift", p.soft_lift);
+    p.over_speed = j.value("over_speed", p.over_speed);
     p.head_reward = j.value("head_reward", p.head_reward);
     p.mode_reward = j.value("mode_reward", p.mode_reward);
     return p;
@@ -503,7 +522,7 @@ int AnimalBot::fallen(int* segment) const {
     if(trunkHeight() < params.fall_height * body->stand_height) return 1;
     const float margin = params.touch_margin * body->height;
     for(size_t s = 0; s < position.size(); s++) {
-        if(body->may_touch[s]) continue;
+        if(body->may_touch[s] || (neck_may_touch && neck[s])) continue;
         glm::vec3 low = lowestPoint(body->def.segments[s], position[s], rotation[s]);
         if(low.y - groundUnder(glm::vec3(low.x, low.y + 0.5f * body->height, low.z)) < margin) {
             if(segment) *segment = (int) s;
@@ -638,6 +657,7 @@ void AnimalFactorySys::init() {
     io.configure(body.behavior, bot.observationSize(), bot.actionSize());
     io.sensor_name = "StackingSensor_size2_VectorSensor_size" + std::to_string(bot.frame_size);
     bot.orders = spawn.orders;
+    bot.neck_may_touch = spawn.orders;
     io.sensors.clear();
     if(bot.orders) io.addVector("nogail_order", animal_order_size);
 
@@ -798,6 +818,16 @@ void AnimalRewardsSys::tick(double h) {
     bot.episode.progress += along * (float) window;
     bot.episode.commanded += bot.snapshot_speed * (float) window;
     bot.episode.heading_error += heading_error;
+    if(bot.ranges.idle > 0.f || bot.ranges.run > 0.f) {
+        const int kind = commandKind(bot.ranges, bot.snapshot_speed, body.walk_speed, body.run_speed);
+        static const char* const speed_keys[3] = { "Gait/Idle Speed", "Gait/Walk Speed", "Gait/Run Speed" };
+        stat(speed_keys[kind], glm::length(horizontal(velocity)));
+        if(kind > 0 && bot.snapshot_speed > 0.f) stat(kind == 1 ? "Gait/Walk Speed Ratio" : "Gait/Run Speed Ratio", along / bot.snapshot_speed);
+        bot.episode.kind_seconds[kind] += (float) window;
+        bot.episode.kind_distance[kind] += glm::length(horizontal(trunk - bot.snapshot_trunk));
+        bot.episode.kind_progress[kind] += along * (float) window;
+        bot.episode.kind_commanded[kind] += bot.snapshot_speed * (float) window;
+    }
 
     if(bot.killed) {
         // Death takes the whole reward of the step: a fall costs what would have followed it, nothing more
@@ -939,6 +969,10 @@ void AnimalGaitPlayerSys::init() {
         else {
             state.bind = animalBodyBind(*bot->body, *species);
             state.ready = true;
+            // The run of ranges that run, for an animal that has one
+            if(bot->spawn.gait == "walk" && bot->ranges.run > 0.f && bot->body->run_speed > 0.f && species->run >= 0) {
+                state.has_run = state.run.setup(species, species->run, bot->body->length);
+            }
         }
     } catch(const std::exception& e) {
         state.problem = e.what();
@@ -963,11 +997,15 @@ void AnimalGaitPlayerSys::tick(double h) {
     auto& rng = reg.ctx().get<WorldRng>();
     auto& bodies = physicsWorld(reg).bodies();
     const AnimalBody& body = *bot.body;
-    GaitWalk& gw = state.walk;
     const float dt = (float) h;
     const float clip_speed = commandSpeed(bot, &state);
 
     bool teleport = false;
+    if(bot.demo_restart) {
+        // A walk of the recording is a run from end to end, or a walk (that stands now and then)
+        state.running = state.has_run && rng.uniform() < bot.ranges.run;
+    }
+    GaitWalk& gw = state.running ? state.run : state.walk;
     if(bot.demo_restart) {
         bot.demo_restart = false;
         bot.walks++;
@@ -985,7 +1023,7 @@ void AnimalGaitPlayerSys::tick(double h) {
         }
         bot.origin = from;
         gw.start(style, from, yaw, (float) rng.uniform());
-        beginCommand(reg, bot, yaw, clip_speed);
+        beginCommand(reg, bot, yaw, clip_speed, state.has_run ? (state.running ? 2 : 1) : 0);
         const auto& clock = reg.ctx().get<WorldClock>();
         const int period = (int) clock.decision_period;
         int warm = (int) std::lround((bot.spawn.warmup + rng.uniform() * gw.model.period) / dt);
@@ -1004,9 +1042,33 @@ void AnimalGaitPlayerSys::tick(double h) {
     // The walker turned as the command did: one heading
     bot.command.yaw = gw.walker.yaw;
 
+    // A command that comes to a halt: the pose goes to the standing one, joint by joint in its parent
+    const std::vector<glm::mat4>* joints = &gw.pose.world;
+    if(!state.running && bot.ranges.idle > 0.f) {
+        const float v = bot.command.speed / std::max(body.walk_speed * std::max(bot.ranges.speed[0], 0.1f), 1e-3f);
+        const float t = std::clamp((v - 0.06f) / (0.5f - 0.06f), 0.f, 1.f);
+        const float stand = 1.f - t * t * (3.f - 2.f * t);
+        if(stand > 0.f) {
+            const auto& parents = gw.species->parents;
+            const auto& a = gw.pose.world;
+            const auto& b = state.bind.stand;
+            state.blended.resize(a.size());
+            for(size_t j = 0; j < a.size(); j++) {
+                const int p = parents[j];
+                const glm::mat4 la = p < 0 ? a[j] : glm::inverse(a[p]) * a[j];
+                const glm::mat4 lb = p < 0 ? b[j] : glm::inverse(b[p]) * b[j];
+                const glm::vec3 scale(glm::length(glm::vec3(la[0])), glm::length(glm::vec3(la[1])), glm::length(glm::vec3(la[2])));
+                glm::mat4 local = glm::translate(glm::mat4(1.f), glm::mix(glm::vec3(la[3]), glm::vec3(lb[3]), stand))
+                    * glm::mat4_cast(glm::slerp(matrixRotation(la), matrixRotation(lb), stand)) * glm::scale(glm::mat4(1.f), scale);
+                state.blended[j] = p < 0 ? local : state.blended[p] * local;
+            }
+            joints = &state.blended;
+        }
+    }
+
     std::vector<glm::vec3> positions;
     std::vector<glm::quat> rotations;
-    segmentPoses(body, state.bind, gw.pose.world, gw.transform.matrix(), positions, rotations);
+    segmentPoses(body, state.bind, *joints, gw.transform.matrix(), positions, rotations);
     for(size_t s = 0; s < positions.size(); s++) {
         JPH::RVec3 p(toJolt(positions[s]));
         JPH::Quat q = toJolt(rotations[s]);
@@ -1024,7 +1086,9 @@ nlohmann::json AnimalDemoChecks::json() const {
     return { { "ticks", ticks }, { "decisions", decisions }, { "limit_excess_deg", glm::degrees(limit_excess) }, { "limit_joint", limit_joint },
         { "limit_ticks", limit_ticks }, { "axis_jump", axis_jump }, { "velocity_jump", velocity_jump }, { "axis_jumps", axis_jumps }, { "heading_flips", heading_flips },
         { "lowest", lowest }, { "axis_segment", axis_segment }, { "velocity_segment", velocity_segment }, { "lowest_segment", lowest_segment }, { "falls", falls }, { "fall_cause", fall_cause }, { "fall_segment", fall_segment },
-        { "speed_ratio", commanded > 0. ? progress / commanded : 0. }, { "speed_error", speed_error }, { "stretch", stretch }, { "foot_slide", foot_slide } };
+        { "speed_ratio", commanded > 0. ? progress / commanded : 0. }, { "speed_error", speed_error }, { "stretch", stretch }, { "foot_slide", foot_slide },
+        { "idle_decisions", kind_decisions[0] }, { "walk_decisions", kind_decisions[1] }, { "run_decisions", kind_decisions[2] },
+        { "idle_distance", idle_distance } };
 }
 
 void AnimalChecksSys::preinit() {
@@ -1072,7 +1136,7 @@ void AnimalChecksSys::tick(double h) {
         }
     }
     if(state && state->ready) {
-        const GaitWalk& gw = state->walk;
+        const GaitWalk& gw = state->running ? state->run : state->walk;
         const glm::mat4 to_world = gw.transform.matrix();
         (void) to_world;
         // How far the pose pulls a joint anchor apart: the child where the walk puts it, against where its parent holds it
@@ -1130,6 +1194,11 @@ void AnimalChecksSys::tick(double h) {
     }
     checks.previous = frame;
     checks.decisions++;
+    {
+        const int kind = commandKind(bot.ranges, bot.command.speed, body.walk_speed, body.run_speed);
+        checks.kind_decisions[kind]++;
+        if(kind == 0) checks.idle_distance += glm::length(horizontal(bot.origin_velocity[0])) * clock.dt * (double) clock.decision_period;
+    }
 
 }
 

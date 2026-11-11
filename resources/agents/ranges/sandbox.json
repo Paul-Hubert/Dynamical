@@ -1,0 +1,38 @@
+{
+  "description": "What a mind of the sandbox can ask of a walker (docs/action-agents.md): hard level ground, from standing to 2.6 times the walk's speed, turns down to 1.5 lengths",
+  "stride": 1.0,
+  "step_height": 1.0,
+  "clearance": 0.0,
+  "soft_depth": 0.0,
+  "sink_time": 0.12,
+  "exit_vertical": 0.8,
+  "entry_vertical": 0.5,
+  "exit_part": 0.3,
+  "body_sink": 0.7,
+  "crouch": 0.0,
+  "spread": 0.0,
+  "bend": 1.0,
+  "max_bend": 40.0,
+  "head_lead": 0.6,
+  "bank": 0.5,
+  "turn_step": 1.0,
+  "ik": 1.0,
+  "speed": [
+    0.0,
+    2.6
+  ],
+  "radius": [
+    1.5,
+    12.0
+  ],
+  "straight": 0.35,
+  "soft": 0.0,
+  "scale": [
+    1.0,
+    1.0
+  ],
+  "segment": [
+    2.0,
+    5.0
+  ]
+}

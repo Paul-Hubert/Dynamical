@@ -87,6 +87,8 @@ struct AnimalBody {
     float com_height = 1.f;             // of the centre of mass over the ground, standing
     float stand_height = 1.f;           // of the trunk's origin over the ground, standing
     float walk_speed = 1.f;             // m/s of the walk clip
+    float run_speed = 0.f;              // m/s of the run clip; 0: none, or one whose legs are not read
+    std::string run_clip;
     float max_angular_velocity = 20.f, max_target_angular_velocity = 1.0472f;
     int substeps = 1;
 

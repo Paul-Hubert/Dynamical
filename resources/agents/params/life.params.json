@@ -8,27 +8,27 @@
   "reward_scale": 1.0,
   "mind_every": 6,
   "interests": 16,
-  "wound_threshold": 0.02,
-  "kill_impulse": 1.0,
+  "wound_threshold": 0.01,
+  "kill_impulse": 0.25,
   "weak": 0.5,
   "walker_episode": 33.3,
   "grass": { "cell": 1.0, "cover": 0.55, "patch": 60.0, "shortest": 0.55, "tallest": 1.0, "stubble": 0.04, "regrow": 600.0, "seed": 1337 },
   "defaults": {
     "adult": 120.0, "gestation": 60.0, "old": 1200.0, "heal": 300.0, "mate_time": 3.0, "rot": 300.0,
-    "work": 1.0, "rest_drain": 0.6, "rest_heal": 3.0, "turn_radius": 1.5, "feed_speed": 0.6,
+    "work": 0.4, "rest_drain": 0.6, "rest_heal": 3.0, "turn_radius": 1.5, "feed_speed": 0.6,
     "mate_energy": 0.5, "mate_reach": 1.5, "birth_cost": 0.3, "newborn_energy": 0.7, "young_scale": 0.6,
     "fall_damage": 0.08, "stun": 1.5
   },
   "species": {
     "deer_red": {
       "description": "Grazers: feed on grass, wide field of view, a weak blow",
-      "predator": false, "start": 12, "min": 4, "max": 24,
+      "predator": false, "start": 12, "min": 8, "max": 24,
       "starve": 180.0, "feed": 30.0, "graze": 0.3, "top_speed": 2.2, "meat": 3.0, "bite": 0.3,
       "fov": 300.0, "sight": 80.0, "hearing": 12.0
     },
     "wolf_2": {
       "description": "Predators: feed on carcasses, narrow field of view, a blow that wounds",
-      "predator": true, "start": 4, "min": 2, "max": 8,
+      "predator": true, "start": 4, "min": 3, "max": 8,
       "starve": 360.0, "feed": 30.0, "carcass_reach": 0.35, "top_speed": 2.6, "meat": 2.0, "bite": 1.0,
       "fov": 180.0, "sight": 80.0, "hearing": 15.0
     }

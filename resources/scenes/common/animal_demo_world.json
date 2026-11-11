@@ -52,6 +52,11 @@
       "type": "float",
       "default": 0.0
     },
+    "orders": {
+      "type": "bool",
+      "default": false,
+      "description": "the walker has its order sensor (docs/action-agents.md): recorded as Move with no head offset"
+    },
     "heading": {
       "type": "float",
       "default": -1.0,
@@ -109,7 +114,8 @@
             "soft_depth": "${soft_depth}",
             "warmup": "${warmup}",
             "recording_decisions": "${episode_decisions}",
-            "heading": "${heading}"
+            "heading": "${heading}",
+            "orders": "${orders}"
           }
         }
       ]

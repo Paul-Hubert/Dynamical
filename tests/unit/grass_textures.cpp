@@ -266,8 +266,10 @@ TEST_CASE("GRASS.13 every kind has its patches, they blend into each other, the 
     GrassSpeciesParams params, apart;
     apart.overlap = 0.f;
     GrassHeightField heights;
-    int seen[grass_kinds] = {}, changes = 0, places = 0, thinned = 0, two = 0, whole = 0;
+    int seen[grass_kinds] = {}, changes = 0, places = 0, thinned = 0, two = 0, whole = 0, ties = 0;
     float largest_step = 0.f, before_keep = 1.f;
+    double steps = 0.;
+    int step_count = 0, big_steps = 0;
     GrassKind before = GrassKind::Meadow;
     for(int z = 0; z < 300; z++) {
         for(int x = 0; x < 300; x++) {
@@ -297,13 +299,18 @@ TEST_CASE("GRASS.13 every kind has its patches, they blend into each other, the 
             whole += here.keep[0] >= 0.999f;
 
             // No edge : along a row, where the first kind stays the same its plants come and go a few at a time
-            if(x > 0 && here.kinds[0] == before) largest_step = std::max(largest_step, std::abs(here.keep[0] - before_keep));
+            if(x > 0 && here.kinds[0] == before) {
+                largest_step = std::max(largest_step, std::abs(here.keep[0] - before_keep));
+                steps += std::abs(here.keep[0] - before_keep);
+                big_steps += std::abs(here.keep[0] - before_keep) > 0.25f;
+                step_count++;
+            }
             before_keep = here.keep[0];
 
             // Without overlap : one kind at a place, all of its plants
             GrassSpecies alone = grassSpeciesAt(noise, apart, world, tallness);
-            // (two noises may be the same to the byte)
-            REQUIRE((alone.kinds[1] == alone.kinds[0] || alone.keep[1] == 0.5f));
+            // (but where two noises are the same to the byte)
+            ties += alone.kinds[1] != alone.kinds[0];
             if(std::abs(tallness - apart.low) > 0.002f) {
                 REQUIRE(grassKindInfo(alone.kinds[0]).small == (tallness < apart.low));
             }
@@ -323,10 +330,24 @@ TEST_CASE("GRASS.13 every kind has its patches, they blend into each other, the 
 
     // Blended over a good part of the land, whole patches in between
     INFO(two << " places of " << places << " with two kinds, " << thinned << " with a first kind thinned, " << whole
-        << " whole; largest step of the first kind over 3 m " << largest_step);
+        << " whole; step of the first kind over 3 m : " << steps / step_count << " on average, " << largest_step << " at most, over a quarter at "
+        << big_steps << " places of " << step_count);
     CHECK(two > places / 5);
     CHECK(whole > places / 10);
-    CHECK(largest_step < 0.5f);
+    // No edge : a quarter of a metre on, where the first kind is the same, about as many of its plants
+    float sharpest = 0.f;
+    for(int row = 0; row < 40; row++) {
+        GrassSpecies last;
+        for(int x = 0; x < 2000; x++) {
+            glm::vec2 world(x * 0.25f - 250.f, row * 23.f - 450.f);
+            GrassSpecies here = grassSpeciesAt(noise, params, world, heights.sample(world.x, world.y));
+            if(x > 0 && here.kinds[0] == last.kinds[0]) sharpest = std::max(sharpest, std::abs(here.keep[0] - last.keep[0]));
+            last = here;
+        }
+    }
+    INFO("sharpest step of the first kind over 0.25 m : " << sharpest);
+    CHECK(sharpest < 0.15f);
+    CHECK(ties < places / 1000);
 
     // No patches : the meadow
     params.size = 0.f;

@@ -1,0 +1,42 @@
+{
+  "format_version": 1,
+  "name": "pursuit_eval",
+  "include": [
+    "common/pursuit_world.json"
+  ],
+  "variables": {
+    "num_worlds": {
+      "type": "int",
+      "default": 4
+    },
+    "chaser": {
+      "type": "string",
+      "default": "",
+      "description": "an .onnx of the Chaser behaviour; empty: zero actions"
+    },
+    "runner": {
+      "type": "string",
+      "default": "",
+      "description": "an .onnx of the Runner behaviour; empty: zero actions"
+    }
+  },
+  "worlds": [
+    {
+      "template": "pursuit_world",
+      "count": "${num_worlds}",
+      "systems": {
+        "replace": {
+          "TrainerActions@act": {
+            "name": "Policies@act",
+            "params": {
+              "behaviors": {
+                "Chaser": "${chaser}",
+                "Runner": "${runner}"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

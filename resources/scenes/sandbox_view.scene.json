@@ -1,0 +1,96 @@
+{
+  "format_version": 1,
+  "name": "sandbox_view",
+  "include": [
+    "common/desktop.json",
+    "common/sandbox_world.json"
+  ],
+  "variables": {
+    "num_worlds": {
+      "type": "int",
+      "default": 1
+    },
+    "models": {
+      "type": "string",
+      "default": "",
+      "description": "a run of the trainer: <behavior>.onnx or <behavior>/<behavior>-<step>.onnx for every behaviour it has"
+    },
+    "prefix": {
+      "type": "string",
+      "default": "",
+      "description": "only the behaviours whose name starts with it (Animal_: the walkers, the scripted minds over them)"
+    },
+    "deterministic": {
+      "type": "bool",
+      "default": true
+    },
+    "heuristic": {
+      "type": "bool",
+      "default": true
+    },
+    "draw": {
+      "type": "bool",
+      "default": true
+    },
+    "watch": {
+      "type": "string",
+      "default": "",
+      "description": "the species the camera stays with (empty: a predator)"
+    },
+    "watch_distance": {
+      "type": "float",
+      "default": 6.0,
+      "description": "from the camera to the animal, in its sizes"
+    }
+  },
+  "renderer": {
+    "passes": [
+      "model",
+      "ui"
+    ],
+    "vr": false
+  },
+  "host": {
+    "pre": [
+      "Input",
+      "UI",
+      "PlayerControl",
+      "DebugMenu",
+      "WorldStepper",
+      {
+        "name": "SandboxWatch",
+        "params": {
+          "species": "${watch}",
+          "distance": "${watch_distance}"
+        }
+      }
+    ],
+    "post": [
+      {
+        "name": "WorldView",
+        "params": {
+          "worlds": "all",
+          "spacing": 0.0
+        }
+      }
+    ]
+  },
+  "worlds": [
+    {
+      "template": "sandbox_world",
+      "count": "${num_worlds}",
+      "systems": {
+        "replace": {
+          "TrainerActions@act": {
+            "name": "Policies@act",
+            "params": {
+              "models": "${models}",
+              "prefix": "${prefix}",
+              "deterministic": "${deterministic}"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -62,13 +62,15 @@ def main():
     config = (results / f"{args.run}.console.txt").read_text(encoding="utf-8", errors="replace") if (results / f"{args.run}.console.txt").exists() else ""
     used = re.search(r"var\.ranges=(\S+)", config)
     ranges_file = pathlib.Path(used.group(1)) if used else ranges[0]
+    used = re.search(r"var\.params=(\S+)", config)
+    params_file = pathlib.Path(used.group(1)) if used else env / "resources" / "agents" / "params" / "animal.params.json"
 
     name = args.name or (model.stem + ("_terrain" if args.terrain else "") + ("_stochastic" if args.stochastic else ""))
     out = results / "eval" / args.run / f"{name}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     scene = "animal_terrain_eval" if args.terrain else "animal_eval"
     cmd = [str(env / "TrainingEnv.exe"), f"scene={scene}", "mode=eval", f"var.body={body}", f"var.ranges={ranges_file}",
-           f"var.params={env / 'resources' / 'agents' / 'params' / 'animal.params.json'}", f"var.model={model}", f"var.episodes={args.episodes}",
+           f"var.params={params_file}", f"var.model={model}", f"var.episodes={args.episodes}",
            f"var.num_worlds={args.worlds}", f"var.stochastic={1 if args.stochastic else 0}", f"var.out={out}", *[f"var.{v}" for v in args.var]]
     result = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
     if result.returncode or not out.exists():

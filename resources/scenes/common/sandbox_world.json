@@ -3,17 +3,23 @@
     "life":    { "type": "string", "default": "agents/params/life.params.json", "description": "the rules of life and the species, under resources/" },
     "rewards": { "type": "string", "default": "agents/rewards", "description": "folder of <species>.rewards.json, under resources/" },
     "arena":   { "type": "float",  "default": 100.0, "description": "m: half side of the square the animals live in" },
-    "puppet":  { "type": "bool",   "default": false, "description": "a check without walkers: kinematic bodies slid along their commands, only the minds are agents" }
+    "puppet":  { "type": "bool",   "default": false, "description": "a check without walkers: kinematic bodies slid along their commands, only the minds are agents" },
+    "heuristic": { "type": "bool", "default": false, "description": "the scripted minds answer the minds no policy answers" },
+    "draw":    { "type": "bool",   "default": false, "description": "the bodies as shapes, for the viewer" },
+    "substeps":       { "type": "int", "default": 2,  "description": "physics steps a tick: the most a species of the sandbox needs" },
+    "velocity_steps": { "type": "int", "default": 10, "description": "of the solver: 40 with an animal on two legs" },
+    "position_steps": { "type": "int", "default": 2,  "description": "... 8 with one" }
   },
   "templates": {
     "sandbox_world": {
       "physics": { "threads": 1, "max_bodies": 2048, "max_body_pairs": 16384, "max_contacts": 16384, "temp_bytes": 33554432,
                    "allow_sleeping": false, "friction_combine": "max", "restitution_combine": "min",
-                   "substeps": 2, "velocity_steps": 10, "position_steps": 2, "penetration_slop": 0.0019, "speculative_distance": 0.015 },
+                   "substeps": "${substeps}", "velocity_steps": "${velocity_steps}", "position_steps": "${position_steps}", "penetration_slop": 0.0019, "speculative_distance": 0.015 },
       "clock": { "physics_hz": 60, "control_hz": 30 },
       "fixed": [
         "RigidBody", "TrainerActions@act",
-        { "name": "Sandbox", "params": { "life": "${life}", "rewards": "${rewards}", "arena": "${arena}", "puppet": "${puppet}" } },
+        { "name": "Sandbox", "params": { "life": "${life}", "rewards": "${rewards}", "arena": "${arena}", "puppet": "${puppet}",
+                                         "heuristic": "${heuristic}", "draw": "${draw}" } },
         "PhysicsStep", "SandboxLife", "SandboxObserve@observe"
       ],
       "entities": [

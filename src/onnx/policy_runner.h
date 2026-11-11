@@ -47,12 +47,21 @@ struct PolicyError : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
+class AgentPolicy;
+
 // World context variable: the policy the world's Policy system runs. ModelWatcher (viewer) or a test injects it;
-// replacing it swaps the policy at the next decision
+// replacing it swaps the policy at the next decision. `agent`: for an agent with more than a vector observation and
+// continuous actions (a walker with its order sensor), instead of `runner`
 struct PolicyHandle {
     std::shared_ptr<PolicyRunner> runner;
     bool deterministic = true;
+    std::shared_ptr<AgentPolicy> agent;
 };
+
+// The handle for the world's agent: PolicyRunner for one vector of observations and continuous actions, AgentPolicy
+// (agent_policy.h) otherwise. Throws PolicyError
+struct AgentIO;
+PolicyHandle makePolicyHandle(const std::filesystem::path& onnx, const AgentIO& io, bool deterministic = true);
 
 }
 

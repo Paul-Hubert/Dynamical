@@ -1,0 +1,52 @@
+{
+  "format_version": 1,
+  "name": "animal_orders_eval",
+  "include": [
+    "common/animal_orders_world.json"
+  ],
+  "variables": {
+    "num_worlds": {
+      "type": "int",
+      "default": 16
+    },
+    "view_truncate": {
+      "type": "bool",
+      "default": true
+    },
+    "model": {
+      "type": "string",
+      "default": ""
+    },
+    "episodes": {
+      "type": "int",
+      "default": 100
+    },
+    "out": {
+      "type": "string",
+      "default": ""
+    },
+    "replay": {
+      "type": "string",
+      "default": ""
+    },
+    "replay_seconds": {
+      "type": "float",
+      "default": 30.0
+    },
+    "stochastic": {
+      "type": "int",
+      "default": 0
+    }
+  },
+  "worlds": [
+    {
+      "template": "animal_orders_world",
+      "count": "${num_worlds}",
+      "systems": {
+        "replace": {
+          "TrainerActions@act": "Policy@act"
+        }
+      }
+    }
+  ]
+}

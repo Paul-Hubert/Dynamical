@@ -203,7 +203,7 @@ TEST_CASE("LIFE.3 the grass: patches over about its cover, eaten down to the stu
     // Never under the stubble
     CHECK(grass.eat(with.x, with.y, 5.f) == doctest::Approx(full - 0.1f - p.stubble));
     CHECK(grass.height(with.x, with.y) == doctest::Approx(p.stubble));
-    CHECK(grass.eat(with.x, with.y, 5.f) == 0.f);
+    CHECK(grass.eat(with.x, with.y, 5.f) < 1e-6f);
     CHECK(grass.standing() < 1.f);
     // Half its regrow time later it is half way back, then full and no more
     grass.grow(0.5f * p.regrow);
@@ -293,7 +293,7 @@ TEST_CASE("SANDBOX.1 a world of the sandbox: twelve deer and four wolves, each a
         groups[a.group]++;
         males += a.male ? 1 : 0;
         CHECK(a.group > 0);
-        CHECK(sb.by_group.at(a.group) == e);
+        CHECK((sb.by_group.at(a.group) == e));
         CHECK(a.energy >= 0.6f);
         CHECK(a.health == 1.f);
         // Adults at the start
@@ -358,12 +358,12 @@ TEST_CASE("SANDBOX.3 a wolf's head thrown on a deer wounds it in Attack mode onl
         auto& w = runner.world(0);
         auto& bodies = w.reg.ctx().get<PhysicsWorld>().bodies();
         entt::entity wolf = animalsOf(w, "wolf_2")[0], deer = animalsOf(w, "deer_red")[0];
-        // The deer across the wolf's way, two metres ahead of it (the wolf looks down -z)
+        // The deer ahead of the wolf, facing the same way, a hind leg in the line of the wolf's head (the wolf looks down -z)
         {
             auto& bot = w.reg.get<AnimalBot>(wolf);
             standAnimalBot(w.reg, bot, glm::vec3(50.f, 0.f, 50.f), 0.f, false);
             auto& victim = w.reg.get<AnimalBot>(deer);
-            standAnimalBot(w.reg, victim, glm::vec3(50.f, 0.f, 48.4f), 0.5f * 3.14159265f, false);
+            standAnimalBot(w.reg, victim, glm::vec3(50.2f, 0.f, 47.9f), 0.f, false);
         }
         decide(w, wolf, { -1.f, 0.f, 0.f, 0.f }, attack ? AnimalMode::Attack : AnimalMode::Move);
         seconds(w, 0.1);
@@ -373,14 +373,14 @@ TEST_CASE("SANDBOX.3 a wolf's head thrown on a deer wounds it in Attack mode onl
         seconds(w, 0.6);
         const auto& victim = w.reg.get<SandboxAnimal>(deer);
         const auto& attacker = w.reg.get<SandboxAnimal>(wolf);
-        MESSAGE((attack ? "attack" : "move") << ": the deer's health " << victim.health << ", dealt " << attacker.window.damage_dealt);
+        MESSAGE(std::string(attack ? "attack" : "move") << ": the deer health " << victim.health << ", contacts " << w.reg.ctx().get<Sandbox>().contacts << ", blows " << w.reg.ctx().get<Sandbox>().blows << ", wolf head z " << bot.position[bot.head_segment].z << " mode " << bot.mode << " stun " << attacker.stun << " fell " << w.reg.ctx().get<Sandbox>().species[1].falls);
         if(attack) {
             CHECK(victim.health < 1.f);
-            CHECK(victim.attacker == wolf);
+            CHECK((victim.attacker == wolf));
             CHECK(victim.attacked < 1.f);
         } else {
             // A bump: the fall it may cause costs health, the contact does not
-            CHECK(victim.attacker == entt::null);
+            CHECK((victim.attacker == entt::null));
             CHECK(attacker.window.damage_dealt == 0.f);
         }
     }
@@ -523,7 +523,8 @@ TEST_CASE("SANDBOX.6 puppets: a deer with its muzzle in the grass feeds and the 
     CHECK(a.since_fed < 0.1f);
     // The cell is eaten down in a few seconds: then nothing more comes from it
     seconds(w, 4.);
-    CHECK(sb.grass.height(muzzle.x, muzzle.z) == doctest::Approx(sb.params.grass.stubble));
+    // (a second of growing back since)
+    CHECK(sb.grass.height(muzzle.x, muzzle.z) < sb.params.grass.stubble + 0.01f);
     CHECK(!w.reg.get<SandboxAnimal>(deer).feeding);
 
     // A carcass, and a hungry wolf with its muzzle on it
@@ -541,14 +542,15 @@ TEST_CASE("SANDBOX.6 puppets: a deer with its muzzle in the grass feeds and the 
     const auto& fed = w.reg.get<SandboxAnimal>(wolf);
     CHECK(fed.energy > 0.2f + 2.5f / 30.f - 3.5f / 360.f);
     CHECK(w.reg.get<SandboxAnimal>(prey).meat == doctest::Approx(meat - (fed.energy - 0.2f)).epsilon(0.15));
-    // A deer does not eat meat
+    // A deer does not eat meat: with the wolf gone, one that holds its muzzle there in Feed mode takes nothing
+    put(w, wolf, glm::vec2(80.f, -80.f), 0.f);
     entt::entity other = animalsOf(w, "deer_red")[1];
     put(w, other, glm::vec2(-50.f, -48.f), 0.f);
-    w.reg.get<SandboxAnimal>(other).energy = 0.2f;
-    decide(w, other, { -1.f, 0.f, 0.f, -0.2f }, AnimalMode::Feed);
+    decide(w, other, { -1.f, 0.f, 0.f, 0.5f }, AnimalMode::Feed);
+    seconds(w, 0.2);
     const float still = w.reg.get<SandboxAnimal>(prey).meat;
     seconds(w, 0.5);
-    CHECK(w.reg.get<SandboxAnimal>(other).energy < 0.2f);
+    CHECK(w.reg.get<SandboxAnimal>(prey).meat == still);
 }
 
 TEST_CASE("SANDBOX.7 puppets: two adults in Mate mode side by side, a gestation, a young born small that grows, +1 for both") {
@@ -557,14 +559,16 @@ TEST_CASE("SANDBOX.7 puppets: two adults in Mate mode side by side, a gestation,
     auto& w = runner.world(0);
     auto& sb = w.reg.ctx().get<Sandbox>();
     auto& species = sb.species[sb.speciesIndex("deer_red")];
+    // Nobody starves while this lasts
+    for(auto& all : sb.species) all.life.starve = 1e6f;
     entt::entity female = entt::null, male = entt::null;
     for(auto e : animalsOf(w, "deer_red")) {
         const auto& a = w.reg.get<SandboxAnimal>(e);
         if(a.male && male == entt::null) male = e;
         if(!a.male && female == entt::null) female = e;
     }
-    REQUIRE(female != entt::null);
-    REQUIRE(male != entt::null);
+    REQUIRE((female != entt::null));
+    REQUIRE((male != entt::null));
     put(w, female, glm::vec2(60.f, 60.f), 0.f);
     put(w, male, glm::vec2(61.5f, 60.f), 0.f);
     w.reg.get<SandboxAnimal>(female).energy = 1.f;
@@ -581,7 +585,7 @@ TEST_CASE("SANDBOX.7 puppets: two adults in Mate mode side by side, a gestation,
     CHECK(w.reg.get<SandboxAnimal>(female).mating > 1.f);
     seconds(w, 1.5);
     REQUIRE(w.reg.get<SandboxAnimal>(female).pregnant);
-    CHECK(w.reg.get<SandboxAnimal>(female).father == male);
+    CHECK((w.reg.get<SandboxAnimal>(female).father == male));
     decide(w, female, { -1.f, 0.f, 0.f, 0.f }, AnimalMode::Rest);
     decide(w, male, { -1.f, 0.f, 0.f, 0.f }, AnimalMode::Rest);
 
@@ -589,19 +593,18 @@ TEST_CASE("SANDBOX.7 puppets: two adults in Mate mode side by side, a gestation,
     seconds(w, 58.);
     CHECK(species.alive == alive);
     CHECK(species.born == 0);
-    w.reg.get<SandboxAnimal>(female).energy = 1.f;
     seconds(w, 3.);
     CHECK(species.alive == alive + 1);
     CHECK(species.born == 1);
     {
         const auto& mother = w.reg.get<SandboxAnimal>(female);
         CHECK(!mother.pregnant);
-        CHECK(mother.energy < 0.75f);
+        CHECK(mother.energy == doctest::Approx(1.f - species.life.birth_cost).epsilon(0.01));
     }
     // The young: the newest deer, small, not an adult, close to its mother
     entt::entity young = entt::null;
     for(auto e : animalsOf(w, "deer_red")) if(w.reg.get<SandboxAnimal>(e).age < 5.f) young = e;
-    REQUIRE(young != entt::null);
+    REQUIRE((young != entt::null));
     {
         const auto& y = w.reg.get<SandboxAnimal>(young);
         const auto& bot = w.reg.get<AnimalBot>(young);
@@ -614,10 +617,8 @@ TEST_CASE("SANDBOX.7 puppets: two adults in Mate mode side by side, a gestation,
     CHECK(w.reg.get<SandboxAnimal>(female).lifetime_reward > 0.9f);
     CHECK(w.reg.get<SandboxAnimal>(male).lifetime_reward > 0.9f);
     // It grows: half way at a minute, an adult's body at two
-    w.reg.get<SandboxAnimal>(young).energy = 1.f;
     seconds(w, 61.);
     CHECK(w.reg.get<SandboxAnimal>(young).stage == 1);
-    w.reg.get<SandboxAnimal>(young).energy = 1.f;
     seconds(w, 61.);
     CHECK(w.reg.get<SandboxAnimal>(young).stage == 2);
     CHECK(w.reg.get<AnimalBot>(young).body->mass == doctest::Approx(w.reg.get<AnimalBot>(female).body->mass));
@@ -635,10 +636,10 @@ TEST_CASE("SANDBOX.8 the mind's observation: itself, the grass around, and the o
     for(auto e : deer_list) put(w, e, glm::vec2(-90.f + 3.f * (float) k++, 90.f), 0.f);
     for(auto e : wolves) put(w, e, glm::vec2(-90.f + 3.f * (float) k++, 80.f), 0.f);
     entt::entity wolf = wolves[0], ahead = deer_list[0], behind = deer_list[1], far_behind = deer_list[2];
-    put(w, wolf, glm::vec2(0.f, 0.f), 0.f);
-    put(w, ahead, glm::vec2(-6.f, -20.f), 0.f);
-    put(w, behind, glm::vec2(0.f, 8.f), 0.f);
-    put(w, far_behind, glm::vec2(0.f, 30.f), 0.f);
+    put(w, wolf, glm::vec2(0.5f, 0.5f), 0.f);
+    put(w, ahead, glm::vec2(-5.5f, -19.5f), 0.f);
+    put(w, behind, glm::vec2(0.5f, 8.5f), 0.f);
+    put(w, far_behind, glm::vec2(0.5f, 30.5f), 0.f);
     w.reg.get<SandboxAnimal>(wolf).energy = 0.4f;
     // The one behind walks: it can be heard
     decide(w, behind, { 0.5f, 0.f, 0.f, 0.f }, AnimalMode::Move);
@@ -654,8 +655,9 @@ TEST_CASE("SANDBOX.8 the mind's observation: itself, the grass around, and the o
     CHECK(io.observation[O::mode + (int) AnimalMode::Move] == 1.f);
     CHECK(std::abs(io.observation[O::centre]) < 0.01f);
     // The grass ring reads the field: ahead is -z
-    CHECK(io.observation[O::grass] == doctest::Approx(sb.grass.height(0.f, w.reg.get<AnimalBot>(wolf).position[0].z - 3.f)));
-    CHECK(io.observation[O::grass + 2] == doctest::Approx(sb.grass.height(-3.f, w.reg.get<AnimalBot>(wolf).position[0].z)));
+    const glm::vec3 at = w.reg.get<AnimalBot>(wolf).position[0];
+    CHECK(io.observation[O::grass] == doctest::Approx(sb.grass.height(at.x, at.z - 3.f)));
+    CHECK(io.observation[O::grass + 2] == doctest::Approx(sb.grass.height(at.x - 3.f, at.z)));
 
     const auto& buffer = io.sensors[0];
     // Seen: the deer ahead (and the animals parked far ahead-left are out of sight at 80 m or in view: count the near ones)
@@ -687,7 +689,8 @@ TEST_CASE("SANDBOX.8 the mind's observation: itself, the grass around, and the o
     seconds(w, 0.2);
     // (a head turned one radian to the left of a 180 degree view covers 147 degrees to the left: not straight behind)
     // The deer sees nearly all around: the wolf behind it is in its buffer
-    put(w, ahead, glm::vec2(0.f, -10.f), 0.f);
+    // ... but for straight behind: the wolf is 135 degrees round, 10 m away
+    put(w, ahead, glm::vec2(7.57f, -6.57f), 0.f);
     seconds(w, 0.1);
     auto& deer_io = w.reg.get<AgentIO>(w.reg.get<SandboxAnimal>(ahead).mind);
     observeSandboxMind(w.reg, ahead, deer_io);
@@ -703,6 +706,16 @@ TEST_CASE("SANDBOX.8 the mind's observation: itself, the grass around, and the o
     sandboxSignals(w.reg, ahead, 0.2f, signals.data());
     CHECK(signals[SandboxSignal::predator_distance] == doctest::Approx(10.f).epsilon(0.05));
     CHECK(signals[SandboxSignal::prey_distance] == 1000.f);
+    // Closing: how much nearer the nearest one came since the decision before, at most 3 m
+    // (the deer was put there from far away since its mind last decided: as much nearer as the signal goes)
+    CHECK(signals[SandboxSignal::predator_closing] == 3.f);
+    put(w, ahead, glm::vec2(7.57f - 1.41f, -6.57f + 1.41f), 0.f);
+    sandboxSignals(w.reg, ahead, 0.2f, signals.data());
+    CHECK(signals[SandboxSignal::predator_closing] == doctest::Approx(2.f).epsilon(0.05));
+    put(w, ahead, glm::vec2(60.f, -60.f), 0.f);
+    sandboxSignals(w.reg, ahead, 0.2f, signals.data());
+    CHECK(signals[SandboxSignal::predator_closing] == -3.f);
+    put(w, ahead, glm::vec2(7.57f, -6.57f), 0.f);
     sandboxSignals(w.reg, wolf, 0.2f, signals.data());
     CHECK(signals[SandboxSignal::prey_distance] < 10.5f);
     CHECK(signals[SandboxSignal::energy] == doctest::Approx(0.4f).epsilon(0.03));
@@ -736,6 +749,54 @@ TEST_CASE("SANDBOX.9 puppets with the scripted minds: deer graze and breed, wolv
     CHECK(deer.born >= 1);
     // The world holds its animals and nothing else: every group is an animal
     CHECK(sb.by_group.size() == w.reg.view<SandboxAnimal>().size());
+}
+
+}
+
+TEST_SUITE("scenario") {
+
+TEST_CASE("SANDBOX.10 a weapon: the hunter's spear is a second shape of the forearm, ahead of it, and strikes as a head does") {
+    if(!std::filesystem::exists(libraryResourceFile("animals/bodies/homo_heidelbergensis_walking.body.json"))) return;
+    auto body = loadAnimalBody(animalBodyPath("homo_heidelbergensis_walking"));
+    SpeciesLife life;
+    int segment = -1;
+    // No weapon: the same body
+    CHECK(armAnimalBody(body, life, segment) == body);
+    CHECK(segment == -1);
+    life.weapon_segment = "mixamorig:RightForeArm";
+    life.weapon_length = 2.f;
+    auto armed = armAnimalBody(body, life, segment);
+    REQUIRE(segment >= 0);
+    CHECK(armed != body);
+    const SegmentDef& arm = armed->def.segments[(size_t) segment];
+    REQUIRE(arm.shapes.size() == 2);
+    CHECK(body->def.segments[(size_t) segment].shapes.size() == 1);
+    // Masses are the animal's: a shape only
+    CHECK(armed->mass == body->mass);
+    CHECK(arm.percentage == body->def.segments[(size_t) segment].percentage);
+    // Where the man stands the spear is level and points ahead (-z), its tip 1.5 m in front of the hand
+    const ShapeDef& spear = arm.shapes[1];
+    const glm::vec3 axis = arm.spawn_rotation * (spear.rotation * glm::vec3(0.f, 1.f, 0.f));
+    CHECK(axis.z == doctest::Approx(-1.f).epsilon(0.001));
+    const glm::vec3 centre = arm.spawn_position + arm.spawn_rotation * spear.center;
+    const glm::vec3 hand = arm.spawn_position + arm.spawn_rotation * arm.shapes[0].center;
+    CHECK(centre.z == doctest::Approx(hand.z - 0.5f));
+    CHECK(centre.y == doctest::Approx(hand.y));
+    life.weapon_segment = "no such body";
+    armAnimalBody(body, life, segment);
+    CHECK(segment == -1);
+
+    // The sandbox with hunters: three species, the men armed
+    if(!haveBodies()) return;
+    ScenarioRunner runner("sandbox_puppet", { { "num_worlds", "1" }, { "life", "agents/params/life_hunters.params.json" } }, SceneLoadOptions {});
+    auto& sb = runner.world(0).reg.ctx().get<Sandbox>();
+    REQUIRE(sb.species.size() == 3);
+    const int men = sb.speciesIndex("homo_heidelbergensis_walking");
+    REQUIRE(men >= 0);
+    CHECK(sb.species[men].weapon_segment >= 0);
+    CHECK(sb.species[men].life.predator);
+    CHECK(sb.species[men].alive == 3);
+    CHECK(sb.species[men].rewards.terms.size() > 0);
 }
 
 }

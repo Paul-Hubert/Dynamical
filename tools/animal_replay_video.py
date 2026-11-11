@@ -72,8 +72,10 @@ def main():
     console = results / f"{args.run}.console.txt"
     used = re.search(r"var\.ranges=(\S+)", console.read_text(encoding="utf-8", errors="replace")) if console.exists() else None
     ranges = used.group(1) if used else str(env / "resources" / "agents" / "ranges" / "walk_basic.json")
+    used = re.search(r"var\.params=(\S+)", console.read_text(encoding="utf-8", errors="replace")) if console.exists() else None
+    params = used.group(1) if used else str(env / "resources" / "agents" / "params" / "animal.params.json")
     cmd = ["", "scene=animal_eval", "mode=eval", f"var.body={body_path}", f"var.ranges={ranges}",
-           f"var.params={env / 'resources' / 'agents' / 'params' / 'animal.params.json'}", f"var.model={model}", "var.episodes=1", "var.num_worlds=1",
+           f"var.params={params}", f"var.model={model}", "var.episodes=1", "var.num_worlds=1",
            f"var.stochastic={1 if args.stochastic else 0}", f"var.replay={prefix}", f"var.replay_seconds={args.seconds}"]
     header_file = pathlib.Path(str(prefix) + ".replay.json")
     header_file.unlink(missing_ok=True)

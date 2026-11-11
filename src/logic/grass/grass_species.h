@@ -22,7 +22,7 @@ struct GrassSpeciesParams {
     // How wide the patches blend into each other, 0 to 1 : a kind goes from all of its plants to none over
     // overlap x margin of its noise against the next kind's, and small and tall plants trade places over
     // overlap x band of the heights around `low`. 0 : one kind at a place, edges like lines
-    float overlap = 0.5f;
+    float overlap = 0.8f;
 };
 
 namespace grass_species {
@@ -38,8 +38,8 @@ namespace grass_species {
     constexpr glm::vec2 shifts[3] = {glm::vec2(0.f), glm::vec2(0.31f, 0.67f), glm::vec2(0.59f, 0.13f)};
 
     // GrassSpeciesParams::overlap of 1 : in units of the noises, and of the height of the grass (0 to 1)
-    constexpr float margin = 0.7f;
-    constexpr float band = 0.3f;
+    constexpr float margin = 1.f;
+    constexpr float band = 0.45f;
 
 }
 

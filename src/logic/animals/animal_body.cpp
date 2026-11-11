@@ -1241,6 +1241,21 @@ json dy::generateAnimalBody(const AnimalLibrary::Entry& entry, const AnimalSpeci
     out["stand_height"] = stand_height;
     out["walk_speed"] = species.clips[walk.clip].speed > 0.02f ? species.clips[walk.clip].speed : walk.speed;
     out["walk_period"] = walk.period;
+    {
+        // The run, when the animal has one whose legs the procedural walk reads
+        float run_speed = 0.f;
+        std::string run_clip;
+        if(species.run >= 0 && species.run != walk.clip) {
+            GaitModel run = analyseGait(species, species.run);
+            const float speed = species.clips[species.run].speed > 0.02f ? species.clips[species.run].speed : run.speed;
+            if(run.valid && speed > out["walk_speed"].get<float>()) {
+                run_speed = speed;
+                run_clip = species.clips[species.run].name;
+            }
+        }
+        out["run_speed"] = run_speed;
+        out["run_clip"] = run_clip;
+    }
     out["friction"] = options.friction;
     // Time runs as the square root of the size: a small animal turns faster and needs shorter steps
     out["physics_hz"] = 60;
@@ -1349,6 +1364,8 @@ std::shared_ptr<const AnimalBody> dy::parseAnimalBody(const json& j, const std::
     b.com_height = j.value("com_height", 1.f);
     b.stand_height = j.value("stand_height", 1.f);
     b.walk_speed = j.value("walk_speed", 1.f);
+    b.run_speed = j.value("run_speed", 0.f);
+    b.run_clip = j.value("run_clip", "");
     b.max_angular_velocity = j.value("max_angular_velocity", 20.f);
     b.max_target_angular_velocity = j.value("max_target_angular_velocity", 1.0472f);
     b.substeps = j.value("substeps", 1);

@@ -52,6 +52,13 @@ private:
     void writeAnimalChecks();
     int evalAnimals();
 
+    // The sandbox (sandbox_host.cpp): is this a scene of sandbox worlds; mode=eval on one: var.seconds of what its
+    // policies and scripted minds do, a summary JSON at var.out, the animals from above at var.replay; mode=signals:
+    // what a reward file can read
+    bool sandboxWorlds();
+    int evalSandbox();
+    int signals();
+
     // The handshake, then RESET / STEP / QUIT against the environment `connected` makes from the trainer's seed
     int serve(const std::function<std::unique_ptr<TrainerEnvironment>(int64_t seed)>& connected);
 

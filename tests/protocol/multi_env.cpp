@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <cmath>
+#include <filesystem>
 #include <map>
 #include <set>
 #include <string>
@@ -11,6 +12,7 @@
 #include "support/mock_trainer.h"
 #include "train/train_host.h"
 #include "train/worlds_env.h"
+#include "util/paths.h"
 
 using namespace dy;
 using test::co::UnityInputProto;
@@ -257,6 +259,91 @@ TEST_CASE("MA.3 an action missing for one behaviour stops the host with the beha
     trainer.send(step(*out, 1, "Runner"));
     engine.thread.join();
     CHECK(engine.code == 2);
+}
+
+TEST_CASE("MA.5 MockTrainer drives mode=train on sandbox_train: four behaviours, walkers every window, minds every sixth") {
+
+    if(!std::filesystem::exists(libraryResourceFile("animals/bodies/deer_red.body.json")) || !std::filesystem::exists(libraryResourceFile("animals/bodies/wolf_2.body.json"))) return;
+    Engine engine("sandbox_train", { { "num_worlds", "2" } });
+    auto& trainer = engine.trainer;
+    auto out = trainer.exchange(command(test::co::RESET));
+    REQUIRE(out);
+
+    std::map<std::string, const test::co::BrainParametersProto*> brains;
+    for(auto& brain : out->rl_initialization_output().brain_parameters()) brains[brain.brain_name()] = &brain;
+    REQUIRE(brains.size() == 4);
+    REQUIRE(brains.count("Animal_deer_red") == 1);
+    REQUIRE(brains.count("Action_wolf_2") == 1);
+    CHECK(brains["Animal_deer_red"]->action_spec().num_continuous_actions() == 8 * 21);
+    CHECK(brains["Animal_deer_red"]->action_spec().num_discrete_actions() == 0);
+    CHECK(brains["Animal_wolf_2"]->action_spec().num_continuous_actions() == 8 * 22);
+    CHECK(brains["Action_deer_red"]->action_spec().num_continuous_actions() == 4);
+    REQUIRE(brains["Action_deer_red"]->action_spec().discrete_branch_sizes_size() == 1);
+    CHECK(brains["Action_deer_red"]->action_spec().discrete_branch_sizes(0) == 5);
+
+    const auto& first = out->rl_output().agentinfos();
+    CHECK(first.at("Animal_deer_red").value_size() == 2 * 12);
+    CHECK(first.at("Action_deer_red").value_size() == 2 * 12);
+    CHECK(first.at("Animal_wolf_2").value_size() == 2 * 4);
+    CHECK(first.at("Action_wolf_2").value_size() == 2 * 4);
+    {
+        const auto& walker = first.at("Animal_deer_red").value(0);
+        REQUIRE(walker.observations_size() == 2);
+        CHECK(walker.observations(0).shape(0) == 2 * (7 + 9 * 22));
+        CHECK(walker.observations(1).name() == "nogail_order");
+        CHECK(walker.observations(1).shape(0) == 7);
+        const auto& mind = first.at("Action_wolf_2").value(0);
+        REQUIRE(mind.observations_size() == 2);
+        CHECK(mind.observations(0).shape(0) == 39);
+        CHECK(mind.observations(1).name() == "Interests");
+        REQUIRE(mind.observations(1).shape_size() == 2);
+        CHECK(mind.observations(1).shape(0) == 16);
+        CHECK(mind.observations(1).shape(1) == 12);
+    }
+
+    // What the trainer would send: zeros for the walkers (they stand), a mode and a speed for the minds
+    auto sandboxStep = [](const UnityOutputProto& last, int s) {
+        UnityInputProto input = command(test::co::STEP);
+        for(auto& [name, infos] : last.rl_output().agentinfos()) {
+            const bool mind = name.rfind("Action_", 0) == 0;
+            const int actions = name == "Animal_deer_red" ? 8 * 21 : name == "Animal_wolf_2" ? 8 * 22 : 4;
+            for(auto& info : infos.value()) {
+                if(info.done()) continue;
+                auto* action = (*input.mutable_rl_input()->mutable_agent_actions())[name].add_value();
+                for(int i = 0; i < actions; i++) action->add_continuous_actions(0.f);
+                if(mind) action->add_discrete_actions((s + info.id()) % 5);
+            }
+        }
+        return input;
+    };
+
+    const int steps = 60;
+    int mind_infos = 0, walker_infos = 0, outputs_with_minds = 0;
+    for(int s = 1; s <= steps; s++) {
+        out = trainer.exchange(sandboxStep(*out, s));
+        REQUIRE(out);
+        CHECK(out->rl_initialization_output().brain_parameters_size() == 0);
+        const auto& infos = out->rl_output().agentinfos();
+        // Every walker, every window (nobody falls or dies standing for two seconds)
+        REQUIRE(infos.count("Animal_deer_red") == 1);
+        CHECK(infos.at("Animal_deer_red").value_size() == 24);
+        CHECK(infos.at("Animal_wolf_2").value_size() == 8);
+        walker_infos += infos.at("Animal_deer_red").value_size() + infos.at("Animal_wolf_2").value_size();
+        int minds = 0;
+        for(const char* name : { "Action_deer_red", "Action_wolf_2" }) if(infos.count(name)) minds += infos.at(name).value_size();
+        mind_infos += minds;
+        outputs_with_minds += minds > 0 ? 1 : 0;
+        for(auto& [name, list] : infos) for(auto& info : list.value()) CHECK(std::isfinite(info.reward()));
+    }
+    CHECK(walker_infos == steps * 32);
+    // 32 minds, each a decision in six windows
+    CHECK(mind_infos == steps / 6 * 32);
+    CHECK(outputs_with_minds > steps / 2);
+
+    trainer.send(command(test::co::QUIT));
+    engine.thread.join();
+    CHECK(engine.code == 0);
+
 }
 
 TEST_CASE("MA.4 the check and the description of a scene's agents") {

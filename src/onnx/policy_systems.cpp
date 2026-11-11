@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <regex>
 
+#include "agent_policy.h"
 #include "logic/agents/agent_io.h"
 #include "policy_runner.h"
 #include "scene/run_args.h"
@@ -19,7 +20,17 @@ using namespace dy;
 void PolicySys::tick(double h) {
     auto* handle = reg.ctx().find<PolicyHandle>();
     auto* io = reg.ctx().find<AgentIO>();
-    if(!handle || !handle->runner || !io) return;
+    if(!handle || !io) return;
+    if(handle->agent) {
+        try {
+            handle->agent->run(*io, handle->deterministic);
+        } catch(const PolicyError& e) {
+            dy::log(dy::error) << "Policy: " << e.what() << "\n";
+            handle->agent.reset();
+        }
+        return;
+    }
+    if(!handle->runner) return;
     const auto& info = handle->runner->info();
     if((int) io->observation.size() != info.observation_size || (int) io->action.size() != info.action_size) return;
     handle->runner->run(io->observation.data(), 1, io->action.data(), handle->deterministic);
@@ -177,16 +188,16 @@ void ModelWatcherSys::load(Feed& feed, const std::filesystem::path& file, int64_
     if(!io || io->observation_size == 0) return fail("world " + std::to_string(feed.worlds.front()) + " has no agent");
 
     try {
-        auto runner = std::make_shared<PolicyRunner>(file, io->observation_size, io->action_size);
+        const PolicyHandle handle = makePolicyHandle(file, *io, deterministic);
         for(size_t i : feed.worlds) {
-            worlds[i].reg.ctx().insert_or_assign(PolicyHandle { runner, deterministic });
+            worlds[i].reg.ctx().insert_or_assign(handle);
             auto& source = sources.worlds[i];
             source.file = file;
             source.step = step;
             source.error.clear();
         }
         feed.file = file;
-        dy::log(dy::info) << "ModelWatcher: " << file.string() << " (step " << step << ", version " << runner->info().version << ") in "
+        dy::log(dy::info) << "ModelWatcher: " << file.string() << " (step " << step << (handle.agent ? ", " + handle.agent->describe() : std::string()) << ") in "
             << feed.worlds.size() << " worlds\n";
     } catch(const PolicyError& e) {
         fail(file.filename().string() + ": " + e.what());
@@ -233,6 +244,7 @@ void ModelWatcherSys::tick(double dt) {
 
 
 void dy::registerPolicySystems() {
+    registerAgentPolicies();
     registerSystem("Policy", systemInfo<PolicySys>(SystemScope::World));
     registerSystem("ModelWatcher", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<ModelWatcherSys>(reg, params); },
         SystemScope::Host });

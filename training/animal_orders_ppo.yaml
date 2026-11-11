@@ -1,0 +1,42 @@
+# A physical animal with orders (docs/action-agents.md): the walker of training/animal_ppo.yaml, with the order sensor
+# (mode and head offset, "nogail_order") next to its observation. Where the sandbox's walkers start from: commands from
+# standing to 2.6 walk speeds (resources/agents/ranges/sandbox.json), modes and head offsets drawn at random, the
+# sandbox's physics settings (scene animal_orders_train). GAIL does not see the order and weighs 0.3: the
+# demonstrations only walk, and at 0.5 with order rewards of 0.1 and 0.15 the walkers walked through every order.
+#   tools/train_animal.py --species deer_red --ranges sandbox --scene animal_orders_train --demo-var orders=true \
+#       --config training/animal_orders_ppo.yaml --prefix orders --max-steps 20000000
+default_settings:
+    trainer_type: ppo
+    hyperparameters:
+        batch_size: 5000
+        buffer_size: 50000
+        learning_rate: 3.0e-4
+        beta: 4.0e-5
+        epsilon: 0.2
+        num_epoch: 2
+    network_settings:
+        deterministic: false
+        normalize: true
+        hidden_units: 512
+        num_layers: 3
+    reward_signals:
+        extrinsic:
+            strength: 1
+            gamma: 0.95
+        gail:
+            strength: 0.3
+            gamma: 0.95
+            learning_rate: 1.0e-5
+            use_actions: false
+            use_vail: false
+            demo_path: Demonstrations
+            expected_nogail: [nogail_order]
+    threaded: false
+    max_steps: 20000000
+    checkpoint_interval: 5000000
+    keep_checkpoints: 10
+    time_horizon: 200
+    summary_freq: 100000
+
+env_settings:
+    seed: 42

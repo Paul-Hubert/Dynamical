@@ -1,0 +1,19 @@
+{
+  "round": 2,
+  "notes": "The wolf's terms of round 2 (resources/agents/rewards/wolf_2.rewards.json): a hunter lives as a wolf does, by the carcasses it makes. Not trained yet.",
+  "terms": [
+    { "name": "eat",      "expr": "2 * energy_gain" },
+    { "name": "wound",    "expr": "2 * damage_dealt" },
+    { "name": "kill",     "expr": "1 * kills" },
+    { "name": "strike",   "expr": "0.01 * step(0.9 - energy) * mode_attack * step(3 - prey_distance)" },
+    { "name": "gnaw",     "expr": "0.01 * step(0.95 - energy) * mode_feed * step(2.5 - carcass_distance)" },
+    { "name": "hunt",     "expr": "0.01 * step(0.9 - energy) * max(0, 1 - min(prey_distance, carcass_distance) / 40)" },
+    { "name": "hunger",   "expr": "-0.004 * max(0, 0.5 - energy)" },
+    { "name": "hurt",     "expr": "-0.5 * damage_taken" },
+    { "name": "court",    "expr": "0.004 * adult * (1 - pregnant) * step(energy - 0.5) * max(0, 1 - mate_distance / 20)" },
+    { "name": "pair",     "expr": "0.02 * adult * (1 - pregnant) * step(energy - 0.5) * mode_mate * step(2.5 - mate_distance)" },
+    { "name": "conceive", "expr": "0.3 * conceptions" },
+    { "name": "carry",    "expr": "0.001 * pregnant" }
+  ],
+  "scale": 1.0
+}

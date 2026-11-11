@@ -1,13 +1,22 @@
 {
-  "round": 1,
-  "notes": "Round 1, before any run. A wolf's only food is a carcass, and a carcass has to be made: pay for wounds dealt and for a kill, for the store that eating fills, a little for closing on a deer while hungry, and for courting once fed.",
+  "round": 4,
+  "notes": "Round 3 (puppets_r3, 500k decisions): the wolves' return went from 7 to 11 and none of it is hunting. The hunt term paid 0.008 a decision for being within 150 m of a deer, which a wolf is wherever it stands; strike and gnaw paid nothing, wounds went down, every wolf starved. A term that pays for where the wolf is does not tell it to move. Round 4: the hunt pays by the metre the wolf closes on a deer or a carcass (prey_closing, carcass_closing), nothing for standing far; within 15 m closeness still pays; striking in reach and wounds pay more; courting by the metre as for the deer.",
   "terms": [
-    { "name": "eat",    "expr": "0.5 * energy_gain" },
-    { "name": "wound",  "expr": "0.5 * damage_dealt" },
-    { "name": "kill",   "expr": "0.5 * kills" },
-    { "name": "hurt",   "expr": "-0.25 * damage_taken" },
-    { "name": "hunt",   "expr": "0.005 * step(0.8 - energy) * max(0, 1 - min(prey_distance, carcass_distance) / 30)" },
-    { "name": "court",  "expr": "0.005 * adult * (1 - pregnant) * step(energy - 0.5) * max(0, 1 - mate_distance / 20)" }
+    { "name": "eat",      "expr": "2 * energy_gain" },
+    { "name": "wound",    "expr": "4 * damage_dealt" },
+    { "name": "kill",     "expr": "2 * kills" },
+    { "name": "chase",    "expr": "0.05 * step(0.9 - energy) * prey_closing * step(carcass_distance - 5)" },
+    { "name": "scent",    "expr": "0.05 * step(0.95 - energy) * carcass_closing" },
+    { "name": "close",    "expr": "0.02 * step(0.9 - energy) * max(0, 1 - min(prey_distance, carcass_distance) / 15)" },
+    { "name": "strike",   "expr": "0.05 * step(0.9 - energy) * mode_attack * step(3 - prey_distance)" },
+    { "name": "gnaw",     "expr": "0.05 * step(0.95 - energy) * mode_feed * step(2.5 - carcass_distance)" },
+    { "name": "hunger",   "expr": "-0.008 * max(0, 0.5 - energy)" },
+    { "name": "hurt",     "expr": "-0.5 * damage_taken" },
+    { "name": "court",    "expr": "0.03 * adult * (1 - pregnant) * step(energy - 0.6) * mate_closing" },
+    { "name": "near",     "expr": "0.004 * adult * (1 - pregnant) * step(energy - 0.6) * max(0, 1 - mate_distance / 10)" },
+    { "name": "pair",     "expr": "0.05 * adult * (1 - pregnant) * step(energy - 0.6) * mode_mate * step(2.5 - mate_distance)" },
+    { "name": "conceive", "expr": "2 * conceptions" },
+    { "name": "carry",    "expr": "0.002 * pregnant" }
   ],
   "scale": 1.0
 }

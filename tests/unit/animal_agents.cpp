@@ -329,4 +329,129 @@ TEST_CASE("AA.9 soft ground: the depth is in the observation, the animal stands 
     CHECK(fastest < 0.2f * std::sqrt(9.81f * bot.body->com_height));
 }
 
+TEST_CASE("AA.10 commands that stand, walk and run: ranges that only walk draw what they drew, the three kinds come in their parts, speed alone tells them apart") {
+    const float walk = 1.f, run = 3.4f, length = 2.f;
+    GaitRanges plain = GaitRanges::parse(nlohmann::json::parse(R"({ "speed": [0.8, 1.2], "radius": [4, 12], "straight": 0.4 })"));
+    {
+        // An animal with a run and one without draw the same from ranges that do not run
+        WorldRng a(7), b(7);
+        WalkCommand first, second;
+        startCommand(first, plain, walk, length, 0.3f, a);
+        startCommand(second, plain, walk, length, 0.3f, b, run, 0);
+        for(int n = 0; n < 2000; n++) {
+            stepCommand(first, plain, walk, length, a, 1.f / 60.f);
+            stepCommand(second, plain, walk, length, b, 1.f / 60.f);
+        }
+        CHECK(first.speed == second.speed);
+        CHECK(first.yaw == second.yaw);
+        CHECK(second.kind == 1);
+    }
+    GaitRanges ranges = GaitRanges::parse(nlohmann::json::parse(
+        R"({ "speed": [0.8, 1.2], "radius": [4, 12], "straight": 0.4, "idle": 0.15, "run": 0.35, "run_speed": [0.75, 1], "run_radius": [8, 24] })"));
+    auto draws = [&](float run_speed, int only, int counts[3]) {
+        WorldRng rng(11);
+        WalkCommand command;
+        command.run_speed = run_speed;
+        command.only = only;
+        bool inside = true;
+        for(int n = 0; n < 20000; n++) {
+            drawCommand(command, ranges, walk, length, rng);
+            counts[command.kind]++;
+            const float radius = command.wanted_turn != 0.f ? 1.f / std::abs(command.wanted_turn) / length : 0.f;
+            if(command.kind == 0) inside = inside && command.wanted_speed == 0.f && command.wanted_turn == 0.f;
+            if(command.kind == 1) inside = inside && command.wanted_speed >= 0.8f * walk && command.wanted_speed <= 1.2f * walk && (radius == 0.f || (radius >= 3.999f && radius <= 12.001f));
+            if(command.kind == 2) inside = inside && command.wanted_speed >= 0.75f * run && command.wanted_speed <= run && (radius == 0.f || (radius >= 7.999f && radius <= 24.001f));
+            inside = inside && commandKind(ranges, command.wanted_speed, walk, run_speed) == command.kind;
+        }
+        return inside;
+    };
+    {
+        int counts[3] = { 0, 0, 0 };
+        CHECK(draws(run, 0, counts));
+        CHECK(counts[0] / 20000. == doctest::Approx(0.15).epsilon(0.08));
+        CHECK(counts[2] / 20000. == doctest::Approx(0.35).epsilon(0.05));
+    }
+    {
+        // A walk of the demonstrations stands as often as the whole does, and never runs; a run only runs
+        int walks[3] = { 0, 0, 0 }, runs[3] = { 0, 0, 0 }, none[3] = { 0, 0, 0 };
+        CHECK(draws(run, 1, walks));
+        CHECK(walks[2] == 0);
+        CHECK(walks[0] / 20000. == doctest::Approx(0.15 / 0.65).epsilon(0.08));
+        CHECK(draws(run, 2, runs));
+        CHECK(runs[2] == 20000);
+        // An animal that has no run walks instead
+        CHECK(draws(0.f, 0, none));
+        CHECK(none[2] == 0);
+        CHECK(none[0] / 20000. == doctest::Approx(0.15).epsilon(0.08));
+    }
+}
+
+TEST_CASE("AA.11 an animal that stands, walks and runs: the recording holds the three inside the limits, it stands as the body does, and a command to stand is lost by moving") {
+    if(!haveBody("deer_red")) return;
+    const Vars gaits = { { "body", bodyOf("deer_red") }, { "ranges", "agents/ranges/gaits_basic.json" }, { "params", "agents/params/animal_gaits.params.json" } };
+    {
+        Vars vars = gaits;
+        vars.push_back({ "episode_decisions", "200" });
+        ScenarioRunner runner("animal_demo", vars, SceneLoadOptions {}, 5);
+        auto& world = runner.world(0);
+        auto& bot = world.reg.ctx().get<AnimalBot>();
+        const auto& walk = world.reg.ctx().get<AnimalWalkState>();
+        REQUIRE(walk.ready);
+        if(bot.body->run_speed <= 0.f) return;      // a body generated before the run was read
+        REQUIRE(walk.has_run);
+        float stood = 0.f, drift = 0.f, height = 0.f;
+        for(int t = 0; t < 60 * 120; t++) {
+            world.tick();
+            // The command comes to a halt over a second or two
+            if(bot.warm_left > 0 || bot.command.speed > 0.02f * bot.body->walk_speed || bot.command.kind != 0) continue;
+            stood += 1.f / 60.f;
+            drift = std::max(drift, glm::length(glm::vec2(bot.origin_velocity[0].x, bot.origin_velocity[0].z)));
+            height = std::max(height, std::abs(bot.trunkHeight() / bot.body->stand_height - 1.f));
+        }
+        const auto& checks = world.reg.ctx().get<AnimalDemoChecks>();
+        CHECK(checks.kind_decisions[0] > 100);
+        CHECK(checks.kind_decisions[1] > 300);
+        CHECK(checks.kind_decisions[2] > 300);
+        CAPTURE(checks.limit_joint);
+        CHECK(checks.limit_ticks == 0);
+        CHECK(checks.falls == 0);
+        CHECK(checks.heading_flips == 0);
+        CHECK(checks.progress / checks.commanded == doctest::Approx(1.).epsilon(0.05));
+        // Standing: where the body stands with a zero action, and still
+        CHECK(stood > 1.f);
+        CHECK(drift < 0.04f * bot.body->walk_speed);
+        CHECK(height < 0.03f);
+    }
+    {
+        ScenarioRunner runner("animal_stand", gaits, SceneLoadOptions {}, 1);
+        auto& bot = runner.world(0).reg.ctx().get<AnimalBot>();
+        runner.step(10);
+        REQUIRE(bot.params.over_speed == doctest::Approx(1.f));
+        const double window = 1. / 30.;
+        const float v0 = bot.body->walk_speed;
+        auto rate = [&](float asked, glm::vec3 velocity) {
+            bot.snapshot_speed = asked;
+            bot.snapshot_direction = glm::vec3(1.f, 0.f, 0.f);
+            bot.snapshot_trunk = bot.position[0] - velocity * (float) window;
+            return rateAnimal(bot, window).root;
+        };
+        const float full = bot.params.root_reward;
+        // Asked to stand: nothing to earn, and what moving costs does not depend on where to
+        CHECK(rate(0.f, glm::vec3(0.f)) == doctest::Approx(0.f));
+        CHECK(rate(0.f, glm::vec3(0.5f * v0, 0.f, 0.f)) < -0.9f * bot.params.life_reward);
+        CHECK(rate(0.f, glm::vec3(0.1f * v0, 0.f, 0.f)) < -0.3f * bot.params.life_reward);
+        // ... and never as much as being alive earns
+        CHECK(rate(0.f, glm::vec3(5.f * v0, 0.f, 0.f)) >= -bot.params.life_reward);
+        CHECK(rate(v0, glm::vec3(-3.f * v0, 0.f, 0.f)) >= -bot.params.life_reward);
+        CHECK(rate(0.f, glm::vec3(0.f, 0.f, 0.5f * v0)) == doctest::Approx(rate(0.f, glm::vec3(0.5f * v0, 0.f, 0.f))));
+        // Asked to walk: the whole at the speed asked, as much lost over it as under it
+        CHECK(rate(v0, glm::vec3(v0, 0.f, 0.f)) == doctest::Approx(full));
+        CHECK(rate(v0, glm::vec3(1.3f * v0, 0.f, 0.f)) == doctest::Approx(rate(v0, glm::vec3(0.7f * v0, 0.f, 0.f))).epsilon(0.01));
+        // The walker's own reward does not look over the speed asked
+        bot.params.over_speed = 0.f;
+        CHECK(rate(v0, glm::vec3(1.3f * v0, 0.f, 0.f)) == doctest::Approx(full));
+        CHECK(rate(0.f, glm::vec3(0.5f * v0, 0.f, 0.f)) == doctest::Approx(0.f));
+    }
+}
+
 }

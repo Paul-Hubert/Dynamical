@@ -23,9 +23,12 @@ void readSpecies(const nlohmann::json& j, SpeciesLife& s) {
     f("feed_speed", s.feed_speed); f("graze", s.graze); f("carcass_reach", s.carcass_reach); f("mate_energy", s.mate_energy); f("mate_reach", s.mate_reach);
     f("birth_cost", s.birth_cost); f("newborn_energy", s.newborn_energy); f("young_scale", s.young_scale); f("meat", s.meat); f("bite", s.bite);
     f("fall_damage", s.fall_damage); f("stun", s.stun); f("fov", s.fov); f("sight", s.sight); f("hearing", s.hearing);
+    s.weapon_segment = j.value("weapon_segment", s.weapon_segment);
+    f("weapon_length", s.weapon_length); f("weapon_radius", s.weapon_radius); f("weapon_reach", s.weapon_reach);
     static const char* const known[] = { "predator", "start", "min", "max", "starve", "feed", "adult", "gestation", "old", "heal", "mate_time", "rot", "work",
         "rest_drain", "rest_heal", "top_speed", "turn_radius", "feed_speed", "graze", "carcass_reach", "mate_energy", "mate_reach", "birth_cost", "newborn_energy",
-        "young_scale", "meat", "bite", "fall_damage", "stun", "fov", "sight", "hearing", "description" };
+        "young_scale", "meat", "bite", "fall_damage", "stun", "fov", "sight", "hearing", "description", "weapon_segment", "weapon_length", "weapon_radius",
+        "weapon_reach" };
     for(auto& [key, value] : j.items()) {
         if(std::find_if(std::begin(known), std::end(known), [&](const char* k) { return key == k; }) == std::end(known)) {
             throw std::runtime_error("life params: unknown key '" + key + "' of a species");
@@ -227,4 +230,27 @@ std::shared_ptr<const AnimalBody> dy::scaleAnimalBody(const AnimalBody& body, fl
         drive.max_torque *= s4;
     }
     return out;
+}
+
+std::shared_ptr<const AnimalBody> dy::armAnimalBody(std::shared_ptr<const AnimalBody> body, const SpeciesLife& species, int& segment) {
+    segment = -1;
+    if(species.weapon_segment.empty()) return body;
+    for(size_t i = 0; i < body->def.segments.size(); i++) if(body->def.segments[i].name == species.weapon_segment) segment = (int) i;
+    if(segment < 0) return body;
+    auto armed = std::make_shared<AnimalBody>(*body);
+    SegmentDef& seg = armed->def.segments[(size_t) segment];
+    // Where the animal stands the weapon points ahead (-z), level, most of it in front of the hand
+    const glm::vec3 hand = seg.spawn_position + seg.spawn_rotation * seg.shapes[0].center;
+    const glm::vec3 centre = hand + glm::vec3(0.f, 0.f, -(species.weapon_reach - 0.5f) * species.weapon_length);
+    ShapeDef spear;
+    spear.type = ShapeDef::Type::Capsule;
+    spear.source = "weapon";
+    spear.radius = species.weapon_radius;
+    spear.half_height = 0.5f * species.weapon_length;
+    const glm::quat to_segment = glm::inverse(seg.spawn_rotation);
+    spear.center = to_segment * (centre - seg.spawn_position);
+    // A capsule's axis is its Y: turned onto the world's -z
+    spear.rotation = glm::normalize(to_segment * glm::angleAxis(-1.57079633f, glm::vec3(1.f, 0.f, 0.f)));
+    seg.shapes.push_back(spear);
+    return armed;
 }

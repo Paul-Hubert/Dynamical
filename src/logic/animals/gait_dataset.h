@@ -22,11 +22,17 @@ struct GaitRanges {
     float soft = 0.5f;                      // part of the walks on soft ground (the others have a depth of 0)
     float scale[2] = { 0.9f, 1.1f };        // size of the animal
     float segment[2] = { 2.f, 5.f };        // seconds before the speed and the turn are drawn again
+    // A draw of a command (logic/animals/gait_walk.h) may also stand still or run. Both 0: the walk alone, as before
+    float idle = 0.f;                       // part of the draws that stand: no speed, no turn
+    float run = 0.f;                        // part of the draws that run, for an animal that has a run clip
+    float run_speed[2] = { 0.75f, 1.f };    // times the speed of the run clip
+    float run_radius[2] = { 8.f, 24.f };    // of the turns of a run, in lengths of the animal
 
     // The engine's choice : every parameter of GaitStyle over the range it makes sense in
     static GaitRanges defaults();
     // { "stride": [0.8, 1.25], "soft_depth": [0, 0.15], ..., "speed": [0.6, 1.4], "radius": [1.5, 8], "straight": 0.3,
-    //   "soft": 0.5, "scale": [0.9, 1.1], "segment": [2, 5] } : what is not given keeps `base`'s
+    //   "soft": 0.5, "scale": [0.9, 1.1], "segment": [2, 5], "idle": 0.15, "run": 0.35, "run_speed": [0.75, 1],
+    //   "run_radius": [8, 24] } : what is not given keeps `base`'s
     static GaitRanges parse(const nlohmann::json& j, GaitRanges base = defaults());
     nlohmann::json json() const;
 };

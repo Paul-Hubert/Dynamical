@@ -100,7 +100,7 @@ def freeze(env_dir, species):
 def demo_key(env_dir, exe, body, species, args):
     key = hashlib.sha256()
     frozen = env_dir / "resources"
-    files = [exe, body, frozen / "agents" / "ranges" / f"{args.ranges}.json", frozen / "agents" / "params" / "animal.params.json"]
+    files = [exe, body, frozen / "agents" / "ranges" / f"{args.ranges}.json", frozen / "agents" / "params" / f"{args.params}.params.json"]
     files += sorted(p for sub in ("scenes", "prefabs") for p in (frozen / sub).rglob("*") if p.is_file())
     for f in files:
         key.update(f.relative_to(env_dir).as_posix().encode())
@@ -121,7 +121,7 @@ def record_demo(env_dir, exe, body, species, args, results, out):
         partial = cached.with_suffix(".partial")
         frozen = env_dir / "resources" / "agents"
         demo_args = [f"scene={args.demo_scene}", "mode=record-demo", f"var.body={body}", f"var.ranges={frozen / 'ranges' / (args.ranges + '.json')}",
-                     f"var.params={frozen / 'params' / 'animal.params.json'}",
+                     f"var.params={frozen / 'params' / (args.params + '.params.json')}",
                      f"var.gait={args.gait}", f"var.decisions={args.demo_decisions}", *[f"var.{v}" for v in args.demo_var]]
         tw.log(out, f"recording {cached.name}: {' '.join(demo_args)}")
         subprocess.run([str(exe), *demo_args, f"var.out={partial}", f"var.checks={checks}"], check=True, cwd=ROOT, stdout=out, stderr=subprocess.STDOUT)
@@ -176,10 +176,10 @@ def train(species, args, results):
                 text = re.sub(r"seed: \S+", f"seed: {args.seed}", text)
             config.write_text(re.sub(r"demo_path: \S+", f"demo_path: {demos.as_posix()}", text))
 
-        scene = "animal_terrain_train" if args.terrain else "animal_train"
+        scene = args.scene or ("animal_terrain_train" if args.terrain else "animal_train")
         frozen = env_dir / "resources" / "agents"
         env_args = [f"scene={scene}", f"var.body={body}", f"var.ranges={frozen / 'ranges' / (args.ranges + '.json')}",
-                    f"var.params={frozen / 'params' / 'animal.params.json'}", f"var.num_worlds={args.num_worlds}",
+                    f"var.params={frozen / 'params' / (args.params + '.params.json')}", f"var.num_worlds={args.num_worlds}",
                     *[f"var.{v}" for v in args.env_var], "mode=train", f"threads={args.threads}",
                     f"-envParamsOut={results / run_id / 'envparams.txt'}", f"-gitSha={sha}"]
         port = free_ports(args.num_envs)
@@ -222,7 +222,9 @@ def main():
     parser.add_argument("--results", default=str(ROOT / "build" / "runs"))
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--seed", type=int)
+    parser.add_argument("--params", default="animal", help="resources/agents/params/<name>.params.json (animal_gaits: with gaits_basic)")
     parser.add_argument("--terrain", action="store_true", help="train on the marching cubes terrain (animal_terrain_train)")
+    parser.add_argument("--scene", help="the training scene; default: animal_train, animal_terrain_train with --terrain (animal_orders_train: with orders)")
     parser.add_argument("--gait", default="walk", choices=["walk", "trot", "run"], help="the clip the demonstrations are made from")
     parser.add_argument("--demo-scene", help="default: animal_demo, animal_demo_terrain with --terrain")
     parser.add_argument("--demo-decisions", type=int, default=9000)

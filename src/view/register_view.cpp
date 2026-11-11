@@ -14,6 +14,7 @@
 #include "view/roller_player.h"
 #include "view/world_view.h"
 #include "view/fixed_camera.h"
+#include "view/sandbox_watch.h"
 #include "view/camera_walk.h"
 #include "view/walker_view.h"
 #include "view/gait_view.h"
@@ -35,6 +36,8 @@ void dy::registerViewSystems() {
     registerSystem("Terrain", systemInfo<TerrainSys>(SystemScope::Host, true));
     registerSystem("WorldStepper", systemInfo<WorldStepperSys>(SystemScope::Host, true));
     registerSystem("FixedCamera", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<FixedCameraSys>(reg, params); },
+        SystemScope::Host, true });
+    registerSystem("SandboxWatch", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<SandboxWatchSys>(reg, params); },
         SystemScope::Host, true });
     registerSystem("CameraWalk", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<CameraWalkSys>(reg, params); },
         SystemScope::Host, true });

@@ -73,8 +73,8 @@ layout(set = 1, binding = 10) uniform sampler2D u_species;
 // How much the patches of the kinds of plants overlap, 0 to 1 (GrassSpeciesParams::overlap) : the kinds within
 // species_margin of the best noise grow together, small and tall plants over species_band of the heights
 #define species_overlap (float(layer_bits >> 8) / 1000.0)
-const float species_margin = 0.7;
-const float species_band = 0.3;
+const float species_margin = 1.0;
+const float species_band = 0.45;
 
 layout(std140, set = 0, binding = 0) uniform View {
     mat4 viewproj;
@@ -401,7 +401,11 @@ void species(vec2 root, float tallness, out ivec3 kind, out vec3 keep, out float
     }
     // How much the place is for the tall kinds, -1 to 1 over the band
     float band = max(species_band * species_overlap, 1e-3);
-    float tall = clamp((tallness - species_low) / band, -1.0, 1.0);
+    // Gently over the middle of the band, where the noises still decide : the two groups blend like two kinds.
+    // For good on its sides
+    float width = max(species_margin * species_overlap, 1e-6);
+    float across = (tallness - species_low) / band;
+    float tall = width * clamp(across, -0.5, 0.5) + 2.0 * (clamp(across - 0.5, 0.0, 0.5) - clamp(-across - 0.5, 0.0, 0.5));
 
     vec2 at = root / (species_size * 4.0);
     vec4 read[3] = vec4[](
@@ -428,7 +432,6 @@ void species(vec2 root, float tallness, out ivec3 kind, out vec3 keep, out float
         }
     }
     // The first kind against the second, the others against the first
-    float width = max(species_margin * species_overlap, 1e-3);
     keep = clamp(0.5 + vec3(best.x - best.y, best.y - best.x, best.z - best.x) / width, 0.0, 1.0);
     // Where no other kind is close the layers are all of the first one, as dense
     if(kind.y < 0 || keep.y <= 0.0) {
@@ -534,7 +537,11 @@ void main() {
     ivec3 kinds_here;
     vec3 kinds_keep;
     float under_keep;
-    species(patch_root, (v_height / grass_height - (1.0 - patch_amount)) / max(patch_amount, 1e-3), kinds_here, kinds_keep, under_keep);
+    // The height of the grass is the same along straight lines between the vertices of the terrain : a noise
+    // of a few metres winds the line where small and tall plants meet
+    float tallness = (v_height / grass_height - (1.0 - patch_amount)) / max(patch_amount, 1e-3)
+        + 0.25 * textureLod(u_noise, patch_root / 37.0 + vec2(0.71, 0.29), 0.0).y;
+    species(patch_root, tallness, kinds_here, kinds_keep, under_keep);
     bool hit_bare = false;      // the plant that was met is not there : the ground of its layer
     int layers = layer_bits & 255;
 
@@ -621,11 +628,11 @@ void main() {
 
         // Towards the edge of its patch a kind loses its plants one by one, the last of the order of its
         // tile first : what is left stays spread evenly. A plant that is not there leaves the ground of
-        // its layer, the other layers show behind it. Far away texels are means of plants : as many pixels
+        // its layer, the other layers show behind it. Far away texels are means of plants : the kind that has more than half of its own
         bool bare = false;
         if(keep < 0.999) {
             float plant = hitPlant(tile_middle, heading, dx, dy, push, dither.x, layer_lower, layer_weight);
-            if(mix(plant, dither.y, smoothstep(1.0, 3.0, lod)) >= keep) {
+            if(mix(plant, 0.5, smoothstep(1.0, 3.0, lod)) >= keep) {
                 bare = true;
                 layer_hit = 0.0;
                 layer_baked = 0.0;

@@ -20,6 +20,16 @@
       "type": "float",
       "default": 70.0,
       "description": "degrees the camera is swung from behind the commanded heading"
+    },
+    "marks": {
+      "type": "float",
+      "default": 0.0,
+      "description": "m: a chequer of this size on the ground around the animal"
+    },
+    "view_log": {
+      "type": "string",
+      "default": "",
+      "description": "a file: a line per frame (command, position, speed)"
     }
   },
   "renderer": {
@@ -41,7 +51,9 @@
         "name": "AnimalAgentView",
         "params": {
           "distance": "${view_distance}",
-          "azimuth": "${view_side}"
+          "azimuth": "${view_side}",
+          "marks": "${marks}",
+          "log": "${view_log}"
         }
       }
     ],

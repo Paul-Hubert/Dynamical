@@ -34,7 +34,8 @@ struct SpeciesLife {
     float mate_time = 3.f;          // together, both in Mate mode
     float rot = 300.f;              // its carcass lasts this long if nothing eats it
 
-    float work = 1.f;               // what positive mechanical work costs: at 0.1 m g v watts (v its walk speed) as much as the basal rate again
+    float work = 0.4f;              // what positive mechanical work costs: at 0.1 m g v watts (v its walk speed) this much of the basal rate
+                                    // again. The first walkers spend 2.5 times that reference at a slow walk: walking doubles the drain
     float rest_drain = 0.6f;        // of the basal rate, in Rest mode
     float rest_heal = 3.f;          // times faster, in Rest mode
     float top_speed = 2.2f;         // walk speeds asked for a speed action of 1
@@ -54,6 +55,13 @@ struct SpeciesLife {
     float fov = 300.f;              // degrees of its field of view, around where the head points
     float sight = 80.f;             // m
     float hearing = 12.f;           // m: moving animals this close are heard whatever the direction
+
+    // A weapon in the hand (a hunter's spear): a capsule fixed to a body of the ragdoll, pointing ahead where the
+    // animal stands. It strikes as the head does, in Attack mode. No weapon without a segment
+    std::string weapon_segment;     // name of the body that holds it
+    float weapon_length = 2.f;      // m
+    float weapon_radius = 0.02f;
+    float weapon_reach = 0.75f;     // of its length ahead of the hand
 };
 
 struct GrassParams {
@@ -74,8 +82,9 @@ struct LifeParams {
     float reward_scale = 1.f;       // of the reward file's terms (rewardScale): the objective is not scaled
     int mind_every = 6;             // walker decisions per action decision
     int interests = 16;             // rows of the interest buffer
-    float wound_threshold = 0.02f;  // m/s: a blow's impulse over the victim's mass under this does not wound
-    float kill_impulse = 1.f;       // m/s: ... and this much over it takes a full health at a bite of 1
+    float wound_threshold = 0.01f;  // m/s: a blow's impulse over the victim's mass under this does not wound (a push, a brush)
+    float kill_impulse = 0.25f;     // m/s: ... and this much over it takes a full health at a bite of 1. The impulse is the one
+                                    // of the two bodies that meet (a head of 10 kg on a leg, on a trunk): 15 to 50 N s at 5 m/s
     float weak = 0.5f;              // the drives of an animal with no health left keep this part of their strength
     float walker_episode = 33.3f;   // seconds: a walker's episode is cut (a truncation, the animal goes on)
     GrassParams grass;
@@ -126,6 +135,10 @@ private:
 // A body of the same animal at another size: lengths x scale, masses x scale^3, inertias x scale^5, the drives with
 // the weight and the lever (x scale^4), speeds as Froude has them (x sqrt(scale))
 std::shared_ptr<const AnimalBody> scaleAnimalBody(const AnimalBody& body, float scale);
+
+// The body with its species' weapon as a second shape of the body that holds it (a shape only: masses stay the
+// animal's). `segment`: which body that is, -1 when the species has no weapon or the body no such segment
+std::shared_ptr<const AnimalBody> armAnimalBody(std::shared_ptr<const AnimalBody> body, const SpeciesLife& species, int& segment);
 
 }
 

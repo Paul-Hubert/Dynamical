@@ -1,0 +1,64 @@
+{
+  "format_version": 1,
+  "name": "sandbox_eval",
+  "include": [
+    "common/sandbox_world.json"
+  ],
+  "variables": {
+    "num_worlds": {
+      "type": "int",
+      "default": 1
+    },
+    "models": {
+      "type": "string",
+      "default": "",
+      "description": "a run of the trainer: <behavior>.onnx or <behavior>/<behavior>-<step>.onnx for every behaviour it has"
+    },
+    "prefix": {
+      "type": "string",
+      "default": "",
+      "description": "only the behaviours whose name starts with it (Animal_: the walkers, the scripted minds over them)"
+    },
+    "deterministic": {
+      "type": "bool",
+      "default": true
+    },
+    "heuristic": {
+      "type": "bool",
+      "default": true
+    },
+    "seconds": {
+      "type": "float",
+      "default": 300.0,
+      "description": "simulated, per world"
+    },
+    "out": {
+      "type": "string",
+      "default": "",
+      "description": "a json file: what the animals did"
+    },
+    "replay": {
+      "type": "string",
+      "default": "",
+      "description": "a prefix: the bodies of world 0 ten times a second, as <prefix>.sandbox.json and .bin"
+    }
+  },
+  "worlds": [
+    {
+      "template": "sandbox_world",
+      "count": "${num_worlds}",
+      "systems": {
+        "replace": {
+          "TrainerActions@act": {
+            "name": "Policies@act",
+            "params": {
+              "models": "${models}",
+              "prefix": "${prefix}",
+              "deterministic": "${deterministic}"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

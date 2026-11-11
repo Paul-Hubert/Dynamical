@@ -318,6 +318,9 @@ std::shared_ptr<AnimalSpecies> AnimalLibrary::loadSpecies(const std::filesystem:
         clip.frames = c.at("frames").get<uint32_t>();
         clip.fps = c.value("fps", 30.f);
         clip.loop = c.value("loop", false);
+        // A gait is a cycle whatever its file says (seven of the library's are not marked): played as one it would
+        // hold its last pose, and the procedural walk would bend a frozen body
+        if(clip.kind == "walk" || clip.kind == "trot" || clip.kind == "run") clip.loop = true;
         clip.speed = c.value("speed", 0.f);
         clip.motion_joint = c.value("motion_joint", -1);
         if(auto it = c.find("root_motion"); it != c.end()) clip.root_motion = readVec3(*it);

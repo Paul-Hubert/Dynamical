@@ -1,0 +1,17 @@
+{
+  "format_version": 1,
+  "kind": "animal_params",
+  "description": "The animals that stand, walk and run on speed alone (ranges gaits_basic): going faster than the command costs what going slower loses, so a command to stand is one to stand still; a decision alive earns life_reward, and a command that is not followed never loses more. The rest is animal.params.json's",
+  "max_frames_60hz": 2000,
+  "root_reward": 0.34,
+  "death_penalty": 0.0,
+  "life_reward": 0.1,
+  "reward_factor": 1.0,
+  "die_on_fall": true,
+  "fall_height": 0.55,
+  "touch_margin": 0.004,
+  "random_yaw": true,
+  "soft_resistance": 3.0,
+  "soft_lift": 0.25,
+  "over_speed": 1.0
+}

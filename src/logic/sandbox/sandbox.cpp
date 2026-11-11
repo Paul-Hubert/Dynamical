@@ -16,6 +16,8 @@
 #include "logic/agents/agent_env_params.h"
 #include "logic/agents/agent_io.h"
 #include "logic/agents/humanbot.h"
+#include "logic/components/model_ref.h"
+#include "logic/components/transform.h"
 #include "physics/physics_sys.h"
 #include "physics/physics_world.h"
 #include "scene/system_registry.h"
@@ -118,9 +120,61 @@ glm::vec2 freePlace(entt::registry& reg, const Sandbox& sb, WorldRng& rng, bool 
     return best;
 }
 
+// The drawn bodies of an animal (Sandbox::draw): brown deer, grey wolves, the males darker
+void removeShapes(entt::registry& reg, entt::entity animal) {
+    std::vector<entt::entity> shapes;
+    for(auto [e, shape] : reg.view<SandboxShape>().each()) if(shape.animal == animal) shapes.push_back(e);
+    for(auto e : shapes) reg.destroy(e);
+}
+
+void makeShapes(entt::registry& reg, const Sandbox& sb, entt::entity animal) {
+    if(!sb.draw) return;
+    removeShapes(reg, animal);
+    const auto& a = reg.get<SandboxAnimal>(animal);
+    const auto& bot = reg.get<AnimalBot>(animal);
+    const BodyDef& def = bot.body->def;
+    glm::vec3 colour = sb.species[a.species].life.predator ? glm::vec3(0.55f, 0.56f, 0.6f) : glm::vec3(0.62f, 0.42f, 0.22f);
+    if(a.male) colour *= 0.75f;
+    for(size_t i = 0; i < def.segments.size(); i++) {
+        for(const ShapeDef& s : def.segments[i].shapes) {
+            auto e = reg.create();
+            reg.emplace<Transform>(e);
+            reg.emplace<SandboxShape>(e, SandboxShape { animal });
+            auto& shape = reg.emplace<WorldShape>(e);
+            shape.segment = (int) i;
+            shape.local_position = s.center;
+            shape.local_rotation = s.rotation;
+            if(s.type == ShapeDef::Type::Capsule) { shape.type = WorldShape::Type::Capsule; shape.half_extent = glm::vec3(s.radius, s.half_height, s.radius); }
+            else if(s.type == ShapeDef::Type::Sphere) { shape.type = WorldShape::Type::Sphere; shape.half_extent = glm::vec3(s.radius); }
+            else { shape.type = WorldShape::Type::Box; shape.half_extent = s.half_extents; }
+            // The head a little lighter: where the animal looks shows
+            const float shade = (int) i == bot.head_segment ? 1.35f : 0.9f + 0.2f * (float) ((i * 37) % 8) / 8.f;
+            reg.emplace<ModelRef>(e, ModelRef { "", glm::vec4(glm::min(colour * shade, glm::vec3(1.f)), 1.f) });
+        }
+    }
+}
+
+void moveShapes(entt::registry& reg) {
+    for(auto [e, link, shape, transform] : reg.view<SandboxShape, WorldShape, Transform>().each()) {
+        const auto* bot = reg.try_get<AnimalBot>(link.animal);
+        if(!bot || shape.segment >= (int) bot->position.size()) continue;
+        const glm::vec3 position = bot->position[shape.segment] + bot->rotation[shape.segment] * shape.local_position;
+        const glm::quat rotation = glm::normalize(bot->rotation[shape.segment] * shape.local_rotation);
+        auto* pose = reg.try_get<PhysicsPose>(e);
+        if(!pose) pose = &reg.emplace<PhysicsPose>(e, PhysicsPose { position, position, rotation, rotation });
+        pose->prev_position = pose->position;
+        pose->prev_rotation = pose->rotation;
+        pose->position = position;
+        pose->rotation = rotation;
+        transform.position = position;
+        transform.rotation = rotation;
+    }
+}
+
 void removeAnimal(entt::registry& reg, Sandbox& sb, entt::entity e) {
     auto& a = reg.get<SandboxAnimal>(e);
     auto& bot = reg.get<AnimalBot>(e);
+    if(sb.draw) removeShapes(reg, e);
     if(reg.valid(a.mind)) reg.destroy(a.mind);
     destroyAnimalRagdoll(reg, bot);
     sb.by_group.erase(a.group);
@@ -132,6 +186,10 @@ void populate(entt::registry& reg, Sandbox& sb) {
     for(auto& s : sb.species) {
         s.alive = 0;
         s.born = s.spawned = s.starved = s.killed = s.aged = s.kills = s.falls = 0;
+        s.lives = 0;
+        s.lifetime = 0.;
+        s.work = s.moved = 0.;
+        s.ticks = 0;
     }
     auto& rng = reg.ctx().get<WorldRng>();
     for(size_t s = 0; s < sb.species.size(); s++) {
@@ -160,6 +218,8 @@ void die(entt::registry& reg, Sandbox& sb, entt::entity e, int cause) {
     a.rot = 0.f;
     a.pregnant = false;
     species.alive--;
+    species.lives++;
+    species.lifetime += a.lived;
     if(cause == SandboxAnimal::Starved) species.starved++;
     else if(cause == SandboxAnimal::Killed) species.killed++;
     else species.aged++;
@@ -223,7 +283,8 @@ const std::vector<std::string>& dy::sandboxSignalNames() {
     static const std::vector<std::string> names = {
         "energy", "health", "age", "adult", "male", "pregnant", "energy_gain", "energy_spent", "damage_taken", "damage_dealt", "kills", "births", "falls",
         "speed", "mode_move", "mode_feed", "mode_attack", "mode_mate", "mode_rest", "feeding", "grass_here", "muzzle_height", "predator_distance",
-        "prey_distance", "mate_distance", "carcass_distance", "herd_distance", "herd_count", "since_fed", "dt" };
+        "prey_distance", "mate_distance", "carcass_distance", "herd_distance", "herd_count", "since_fed", "dt", "grass_near", "conceptions", "lived",
+        "predator_closing", "prey_closing", "mate_closing", "carcass_closing" };
     return names;
 }
 
@@ -300,6 +361,7 @@ entt::entity dy::spawnSandboxAnimal(entt::registry& reg, int species_index, glm:
     bot.ranges = species.ranges;
     bot.kinematic = sb.puppet;
     bot.orders = true;
+    bot.neck_may_touch = true;
     applyAnimalEnvParams(reg, bot);
     buildAnimalRagdoll(reg, bot, AnimalBuild { a.group, true });
     bot.origin = glm::vec3(at.x, 0.f, at.y);
@@ -328,6 +390,7 @@ entt::entity dy::spawnSandboxAnimal(entt::registry& reg, int species_index, glm:
     mio.addBuffer("Interests", sb.params.interests, MindObs::row);
 
     species.alive++;
+    makeShapes(reg, sb, e);
     return e;
 
 }
@@ -335,7 +398,7 @@ entt::entity dy::spawnSandboxAnimal(entt::registry& reg, int species_index, glm:
 void dy::sandboxSignals(entt::registry& reg, entt::entity e, float seconds, float* out) {
 
     const auto& sb = reg.ctx().get<Sandbox>();
-    const auto& a = reg.get<SandboxAnimal>(e);
+    auto& a = reg.get<SandboxAnimal>(e);
     const auto& bot = reg.get<AnimalBot>(e);
     const SandboxSpecies& species = sb.species[a.species];
     const float scale = sb.params.life_scale;
@@ -391,6 +454,24 @@ void dy::sandboxSignals(entt::registry& reg, entt::entity e, float seconds, floa
     out[S::herd_count] = (float) herd_count;
     out[S::since_fed] = a.since_fed / (species.life.starve * scale);
     out[S::dt] = seconds;
+    {
+        HeadingFrame frame = headingFrame(bot.rotation[0]);
+        float near = sb.grass.height(here.x, here.z);
+        for(int d = 0; d < 8; d++) {
+            const float angle = (float) d * (2.f * pi / 8.f);
+            const glm::vec3 p = here + 3.f * (std::cos(angle) * frame.x - std::sin(angle) * frame.z);
+            near = std::max(near, sb.grass.height(p.x, p.z));
+        }
+        out[S::grass_near] = near;
+    }
+    out[S::conceptions] = (float) a.window.conceptions;
+    out[S::lived] = a.lived;
+    const float now[4] = { predator, prey, mate, carcass };
+    for(int k = 0; k < 4; k++) {
+        const bool has = now[k] < far_away;
+        out[S::predator_closing + k] = has && a.nearest[k] >= 0.f ? std::clamp(a.nearest[k] - now[k], -3.f, 3.f) : 0.f;
+        a.nearest[k] = has ? now[k] : -1.f;
+    }
 
 }
 
@@ -661,6 +742,8 @@ void SandboxSys::preinit() {
     auto& sb = reg.ctx().emplace<Sandbox>();
     if(!reg.ctx().find<AgentsReset>()) reg.ctx().emplace<AgentsReset>();
     sb.puppet = params.value("puppet", false);
+    sb.heuristic = params.value("heuristic", false);
+    sb.draw = params.value("draw", false);
 
     // The life params, with the scene's overrides
     const std::string path = libraryResourceFile(params.value("life", std::string("agents/params/life.params.json"))).string();
@@ -693,7 +776,8 @@ void SandboxSys::preinit() {
     for(const SpeciesLife& life : sb.base.species) {
         SandboxSpecies s;
         s.life = life;
-        auto adult = loadAnimalBody(animalBodyPath(life.id));
+        auto adult = armAnimalBody(loadAnimalBody(animalBodyPath(life.id)), life, s.weapon_segment);
+        if(!life.weapon_segment.empty() && s.weapon_segment < 0) throw std::runtime_error("Sandbox: " + life.id + " has no body named " + life.weapon_segment + " to hold its weapon");
         // Born small, half way to full size at half the age of an adult
         if(life.young_scale < 0.999f) {
             const float scales[2] = { life.young_scale, 0.5f * (life.young_scale + 1.f) };
@@ -736,10 +820,36 @@ void SandboxSys::init() {
         contacts->walls.push_back(world.bodies().CreateAndAddBody(settings, JPH::EActivation::DontActivate));
     }
 
+    // For the viewer: the grass as it starts, a flat tile for every 5 m square that is mostly grass, darker where it is taller
+    if(sb.draw) {
+        const float tile = 5.f;
+        for(float z = -sb.params.arena; z < sb.params.arena; z += tile) {
+            for(float x = -sb.params.arena; x < sb.params.arena; x += tile) {
+                float height = 0.f;
+                int covered = 0;
+                for(int k = 0; k < 25; k++) {
+                    const float h = sb.grass.full(x + 0.5f + (float) (k % 5), z + 0.5f + (float) (k / 5));
+                    height += h;
+                    covered += h > 0.f ? 1 : 0;
+                }
+                if(covered < 13) continue;
+                height /= (float) covered;
+                auto e = reg.create();
+                reg.emplace<Transform>(e).position = glm::vec3(x + 0.5f * tile, 0.01f, z + 0.5f * tile);
+                auto& shape = reg.emplace<WorldShape>(e);
+                shape.type = WorldShape::Type::Box;
+                shape.half_extent = glm::vec3(0.5f * tile, 0.01f, 0.5f * tile);
+                reg.emplace<ModelRef>(e, ModelRef { "", glm::vec4(0.42f - 0.2f * height, 0.62f - 0.18f * height, 0.25f - 0.1f * height, 1.f) });
+            }
+        }
+    }
     populate(reg, sb);
     for(const SandboxSpecies& s : sb.species) {
-        dy::log(dy::debug) << "Sandbox: " << s.alive << " " << s.life.id << " (" << s.bodies.back()->def.segments.size() << " bodies each, "
-            << s.rewards.terms.size() << " reward terms of round " << s.rewards.round << ")\n";
+        // Where its muzzle is when it stands: what the grass has to reach, or the head to come down to
+        float muzzle = 0.f;
+        for(auto [e, a, bot] : reg.view<SandboxAnimal, AnimalBot>().each()) if(&sb.species[a.species] == &s && a.stage + 1 == (int) s.bodies.size()) muzzle = bot.muzzlePoint().y;
+        dy::log(dy::debug) << "Sandbox: " << s.alive << " " << s.life.id << " (" << s.bodies.back()->def.segments.size() << " bodies each, the muzzle "
+            << muzzle << " m up standing, " << s.rewards.terms.size() << " reward terms of round " << s.rewards.round << ")\n";
     }
 
 }
@@ -800,6 +910,7 @@ void SandboxSys::tick(double h) {
                 destroyAnimalRagdoll(reg, bot);
                 bot.body = species.bodies[a.stage];
                 buildAnimalRagdoll(reg, bot, AnimalBuild { a.group, true });
+                makeShapes(reg, sb, e);
             } else if(!a.grow) {
                 a.stun = species.life.stun;
             }
@@ -839,10 +950,12 @@ void SandboxSys::tick(double h) {
             a.energy = std::max(0.02f, a.energy - species.life.birth_cost);
             a.objective += 1.f;
             a.window.births++;
+            a.offspring++;
             species.born++;
             if(SandboxAnimal* f = living(reg, father)) {
                 f->objective += 1.f;
                 f->window.births++;
+                f->offspring++;
             }
             // (the references above are not used after this: a new animal may move the components)
             spawnSandboxAnimal(reg, species_index, glm::vec2(at.x, at.z), yaw, 0.f);
@@ -855,6 +968,18 @@ void SandboxSys::tick(double h) {
                 const float yaw = std::atan2(at.x, at.y);     // toward the middle
                 spawnSandboxAnimal(reg, (int) s, at, yaw, -1.f);
                 sb.species[s].spawned++;
+            }
+        }
+
+        // The scripted minds, for whoever asked and was not answered
+        if(sb.heuristic) {
+            for(auto [m, mind, io] : reg.view<SandboxMind, AgentIO>().each()) {
+                if(!io.requested || io.done) continue;
+                const auto* a = reg.try_get<SandboxAnimal>(mind.animal);
+                if(!a) continue;
+                sandboxHeuristic(sb.species[a->species], io);
+                io.requested = false;
+                io.stats.clear();
             }
         }
 
@@ -920,6 +1045,7 @@ void SandboxLifeSys::tick(double h) {
         a.window.ticks++;
         a.window.modes[std::clamp(bot.mode, 0, animal_modes - 1)]++;
         a.age += dt;
+        a.lived += dt;
         a.attacked += dt;
         a.since_fed += dt;
         a.stun = std::max(0.f, a.stun - dt);
@@ -950,6 +1076,12 @@ void SandboxLifeSys::tick(double h) {
             a.mechanical_valid = true;
             // Over a quarter of a second: a single step's jolt is not work
             a.power += (power - a.power) * std::min(4.f * dt, 1.f);
+        }
+        {
+            SandboxSpecies& counted = sb.species[a.species];
+            counted.work += a.power / (0.1f * body.mass * 9.81f * std::max(body.walk_speed, 0.05f));
+            counted.moved += glm::length(horizontal(bot.origin_velocity[0])) * dt;
+            counted.ticks++;
         }
         const float spent = energyDrain(life, scale, a.power, body.mass, body.walk_speed, bot.mode == (int) AnimalMode::Rest) * dt;
         a.energy -= spent;
@@ -1023,6 +1155,7 @@ void SandboxLifeSys::tick(double h) {
         }
     } else if(auto* system = static_cast<SandboxSys::Contacts*>(physicsWorld(reg).system().GetContactListener())) {
         for(const auto& event : system->take()) {
+            sb.contacts++;
             auto first = sb.by_group.find(event.group1), second = sb.by_group.find(event.group2);
             if(first == sb.by_group.end() || second == sb.by_group.end()) continue;
             for(int side = 0; side < 2; side++) {
@@ -1033,9 +1166,11 @@ void SandboxLifeSys::tick(double h) {
                 auto& victim = reg.get<SandboxAnimal>(victim_entity);
                 const auto& attacker_bot = reg.get<AnimalBot>(attacker_entity);
                 if(attacker.dead || victim.dead || attacker.stun > 0.f) continue;
-                if(attacker_bot.mode != (int) AnimalMode::Attack || segment != attacker_bot.head_segment) continue;
+                if(attacker_bot.mode != (int) AnimalMode::Attack) continue;
+                if(segment != attacker_bot.head_segment && segment != sb.species[attacker.species].weapon_segment) continue;
                 const float damage = woundOf(sb.params, sb.species[attacker.species].life, event.impulse, reg.get<AnimalBot>(victim_entity).body->mass);
                 if(damage <= 0.f) continue;
+                sb.blows++;
                 victim.health -= damage;
                 victim.window.damage_taken += damage;
                 victim.attacker = attacker_entity;
@@ -1067,6 +1202,8 @@ void SandboxLifeSys::tick(double h) {
                     female.gestation = 0.f;
                     female.father = other;
                     female.mating = male.mating = 0.f;
+                    female.window.conceptions++;
+                    male.window.conceptions++;
                 }
                 break;
             }
@@ -1084,6 +1221,8 @@ void SandboxLifeSys::tick(double h) {
         else if(a.energy <= 0.f) die(reg, sb, e, SandboxAnimal::Starved);
         else if(a.age >= life.old * scale) die(reg, sb, e, SandboxAnimal::Old);
     }
+
+    if(sb.draw) moveShapes(reg);
 
     // The grass grows back, a second at a time
     const auto& clock = reg.ctx().get<WorldClock>();
@@ -1157,12 +1296,15 @@ void SandboxObserveSys::tick(double h) {
                     // Events: summed by the trainer over a summary period
                     const int sum = 2;
                     if(a.window.births > 0) io.stats.emplace_back(statKey("Life", species, "Births"), (float) a.window.births, sum);
+                    if(a.window.conceptions > 0) io.stats.emplace_back(statKey("Life", species, "Conceptions"), (float) a.window.conceptions, sum);
                     if(a.window.kills > 0) io.stats.emplace_back(statKey("Life", species, "Kills"), (float) a.window.kills, sum);
                     if(a.window.falls > 0) io.stats.emplace_back(statKey("Life", species, "Falls"), (float) a.window.falls, sum);
                     if(a.window.damage_dealt > 0.f) io.stats.emplace_back(statKey("Life", species, "Damage dealt"), a.window.damage_dealt, sum);
                     a.lifetime_reward += reward;
                     if(died) {
-                        io.stats.emplace_back(statKey("Life", species, "Lifetime"), a.age);
+                        io.stats.emplace_back(statKey("Life", species, "Lifetime"), a.lived);
+                        io.stats.emplace_back(statKey("Life", species, "Offspring"), (float) a.offspring);
+                        io.stats.emplace_back(statKey("Life", species, "Return"), a.lifetime_reward);
                         io.stats.emplace_back(statKey("Life", species, "Died starved"), a.cause == SandboxAnimal::Starved ? 1.f : 0.f);
                         io.stats.emplace_back(statKey("Life", species, "Died killed"), a.cause == SandboxAnimal::Killed ? 1.f : 0.f);
                         io.stats.emplace_back(statKey("Life", species, "Died old"), a.cause == SandboxAnimal::Old ? 1.f : 0.f);

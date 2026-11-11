@@ -57,9 +57,14 @@ struct AnimalParams {
     bool random_yaw = true;                 // episodes start facing anywhere
     float soft_resistance = 3.f;            // soft ground: how hard the layer holds a body, in weights of that body per m/s sideways
     float soft_lift = 0.25f;                // ... and upwards, as a part of that
-    float head_reward = 0.1f;               // with orders, per decision: the head where it is asked to point
-    float mode_reward = 0.15f;              // ... and what the mode asks: the muzzle down (feed), the head thrown forward
-                                            // (attack), standing still (mate), everything still (rest)
+    float over_speed = 0.f;                 // what going faster than the command costs, against what going slower loses
+                                            // (0: nothing, the walker's reward; 1: as much, and a command to stand is one
+                                            // to stand still)
+    // With orders, per decision: the head where it is asked to point, and what the mode asks: the muzzle down (feed),
+    // the head thrown forward (attack), standing still (mate), everything still (rest). As much as the command's
+    // reward: at 0.1 and 0.15 the first walkers kept walking through every order (GAIL and the command paid more)
+    float head_reward = 0.3f;
+    float mode_reward = 0.4f;
 };
 
 AnimalParams parseAnimalParams(const nlohmann::json& json);
@@ -95,6 +100,9 @@ struct AnimalEpisode {
     float commanded = 0.f;                  // m the command asked for
     float heading_error = 0.f;              // mean |angle| between the trunk's heading and the command, radians
     float soft_depth = 0.f;
+    // The same per kind of command (commandKind: 0 stands, 1 walks, 2 runs)
+    float kind_seconds[3] = { 0.f, 0.f, 0.f }, kind_distance[3] = { 0.f, 0.f, 0.f };
+    float kind_progress[3] = { 0.f, 0.f, 0.f }, kind_commanded[3] = { 0.f, 0.f, 0.f };
 };
 
 struct AnimalBot {
@@ -132,6 +140,10 @@ struct AnimalBot {
     int head_segment = 0;
     glm::vec3 muzzle = glm::vec3(0.f);      // the front of the head, in the head segment's frame
     glm::vec3 head_stand = glm::vec3(1.f, 0.f, 0.f);    // from the head's origin to the muzzle, in the trunk's heading frame, standing
+    float muzzle_stand = 1.f;               // m: how high the muzzle is when the animal stands
+    std::vector<char> neck;                 // per segment: the head and what carries it up to the shoulders. With orders
+                                            // (neck_may_touch) the ground is theirs too: an animal that feeds puts its head down
+    bool neck_may_touch = false;
 
     int frame_size = 0;                     // animal_header + 9 x segments
     std::vector<float> previous_frame;
@@ -308,6 +320,12 @@ public:
 // variable AnimalWalkState holds the walk. Before PhysicsStep
 struct AnimalWalkState {
     GaitWalk walk;
+    // With ranges that run (GaitRanges::run) a recorded walk is a run from end to end or has none: the two gaits are
+    // not blended. With ranges that stand (idle), a walk goes to the standing pose as its command comes to a halt
+    GaitWalk run;
+    bool has_run = false;
+    bool running = false;                   // this walk is a run
+    std::vector<glm::mat4> blended;
     std::shared_ptr<GroundField> plane;     // when the world has no ground field
     bool ready = false;
     std::string problem;
@@ -341,6 +359,8 @@ struct AnimalDemoChecks {
     float speed_error = 0.f;                // the worst |progress / commanded - 1| over a recorded walk
     float stretch = 0.f;                    // m: the furthest a segment's origin was from its joint of the skeleton
     float foot_slide = 0.f;                 // m/s: the fastest a planted foot's segment moved, 99 ticks in 100
+    uint64_t kind_decisions[3] = { 0, 0, 0 };   // recorded decisions whose command stands, walks, runs
+    double idle_distance = 0.;              // m the trunk covered while its command stood
     std::vector<float> slides;
     double walk_progress = 0., walk_commanded = 0.;
     std::vector<float> previous;            // the last recorded frame

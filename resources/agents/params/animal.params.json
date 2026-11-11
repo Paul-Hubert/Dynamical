@@ -12,5 +12,7 @@
   "touch_margin": 0.004,
   "random_yaw": true,
   "soft_resistance": 3.0,
-  "soft_lift": 0.25
+  "soft_lift": 0.25,
+  "head_reward": 0.3,
+  "mode_reward": 0.4
 }

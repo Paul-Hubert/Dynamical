@@ -99,12 +99,13 @@ int TrainHost::evalAnimals() {
     int episodes = vars.contains("episodes") ? vars["episodes"]["default"].get<int>() : 100;
     bool stochastic = vars.contains("stochastic") && vars["stochastic"]["default"].get<int>() != 0;
     auto& first = runner.world(0).reg.ctx().get<AnimalBot>();
-    std::shared_ptr<PolicyRunner> policy;
-    if(!model.empty()) policy = std::make_shared<PolicyRunner>(model, first.observationSize(), first.actionSize());
+    PolicyHandle policy;
+    // A walker with orders has its order sensor next to its observation: the handle takes what the agent has
+    if(!model.empty()) policy = makePolicyHandle(model, runner.world(0).reg.ctx().get<AgentIO>(), !stochastic);
     else dy::log(dy::info) << "eval without var.model: zero actions (the standing pose held)\n";
     for(size_t i = 0; i < runner.worldCount(); i++) {
         auto& reg = runner.world(i).reg;
-        if(policy) reg.ctx().insert_or_assign(PolicyHandle { policy, !stochastic });
+        if(policy.runner || policy.agent) reg.ctx().insert_or_assign(policy);
         reg.ctx().get<AgentIO>().reset_requested = true;
         runner.world(i).systems.fixed_observe_only();
     }
@@ -166,6 +167,21 @@ int TrainHost::evalAnimals() {
         { "walk_speed", body.walk_speed }, { "falls_per_100_lengths", distance > 0. ? falls / (distance / (100. * body.length)) : 0. },
         { "mean_heading_error_deg", heading / n * 57.2957795 }, { "stochastic", stochastic },
         { "observations", first.observationSize() }, { "actions", first.actionSize() } };
+    // What it does when its command stands, walks and runs
+    summary["run_speed"] = body.run_speed;
+    static const char* const kinds[3] = { "idle", "walk", "run" };
+    for(int k = 0; k < 3; k++) {
+        double seconds = 0., covered = 0., along = 0., asked = 0.;
+        for(auto& e : done) {
+            seconds += e.kind_seconds[k];
+            covered += e.kind_distance[k];
+            along += e.kind_progress[k];
+            asked += e.kind_commanded[k];
+        }
+        if(seconds <= 0.) continue;
+        summary[kinds[k]] = { { "seconds", seconds }, { "mean_speed", covered / seconds }, { "progress_speed", along / seconds },
+            { "commanded_speed", asked / seconds }, { "speed_ratio", asked > 0. ? along / asked : 0. } };
+    }
     if(!replay.empty()) {
         std::ofstream(replay + ".replay.bin", std::ios::binary).write(reinterpret_cast<const char*>(replay_data.data()), (std::streamsize) (replay_data.size() * sizeof(float)));
         nlohmann::json header = { { "species", body.species }, { "segments", first.position.size() }, { "frames", replay_data.size() / (first.position.size() * 7) },

@@ -78,7 +78,11 @@ GrassSpecies grassSpeciesAt(const std::vector<int8_t>& noise, const GrassSpecies
 
     // How much the place is for the tall kinds, -1 to 1 over the band
     const float band = std::max(grass_species::band * overlap, 1e-3f);
-    const float tall = std::clamp((tallness - params.low) / band, -1.f, 1.f);
+    // Gently over the middle of the band, where the noises still decide : the two groups blend like two kinds.
+    // For good on its sides
+    const float width = std::max(grass_species::margin * overlap, 1e-6f);
+    const float across = (tallness - params.low) / band;
+    const float tall = width * std::clamp(across, -0.5f, 0.5f) + 2.f * (std::clamp(across - 0.5f, 0.f, 0.5f) - std::clamp(-across - 0.5f, 0.f, 0.5f));
 
     glm::vec2 at = world / (params.size * grass_species::periods);
     glm::vec4 read[3];
@@ -105,7 +109,6 @@ GrassSpecies grassSpeciesAt(const std::vector<int8_t>& noise, const GrassSpecies
 
     // The first kind against the second, the others against the first : all of its plants half a blend
     // width inside its patch, none as far outside
-    const float width = std::max(grass_species::margin * overlap, 1e-3f);
     out.keep[0] = std::clamp(0.5f + (best[0] - best[1]) / width, 0.f, 1.f);
     for(int rank = 1; rank < 3; rank++) {
         out.keep[rank] = std::clamp(0.5f + (best[rank] - best[0]) / width, 0.f, 1.f);

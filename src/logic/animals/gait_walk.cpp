@@ -22,15 +22,43 @@ bool inHeights(const std::string& name) {
 
 void dy::drawCommand(WalkCommand& command, const GaitRanges& ranges, float clip_speed, float length, WorldRng& rng) {
     command.until = command.time + between(rng, ranges.segment);
-    command.wanted_speed = clip_speed * between(rng, ranges.speed);
-    float radius = between(rng, ranges.radius) * length;
+    // Stand, walk or run. Ranges that only walk draw what they always drew
+    float idle = ranges.idle, run = command.run_speed > 0.f ? ranges.run : 0.f;
+    if(command.only == 1) {
+        idle = run < 1.f ? idle / (1.f - run) : 0.f;
+        run = 0.f;
+    } else if(command.only == 2) {
+        idle = 0.f;
+        run = 1.f;
+    }
+    command.kind = 1;
+    if(idle + run > 0.f) {
+        const float u = (float) rng.uniform();
+        command.kind = u < idle ? 0 : u < idle + run ? 2 : 1;
+    }
+    const bool running = command.kind == 2;
+    command.wanted_speed = running ? command.run_speed * between(rng, ranges.run_speed) : clip_speed * between(rng, ranges.speed);
+    float radius = between(rng, running ? ranges.run_radius : ranges.radius) * length;
     bool straight = rng.uniform() < ranges.straight;
     bool left = rng.uniform() < 0.5;
     command.wanted_turn = straight ? 0.f : (left ? 1.f : -1.f) / std::max(radius, 0.1f);
+    if(command.kind == 0) {
+        command.wanted_speed = 0.f;
+        command.wanted_turn = 0.f;
+    }
 }
 
-void dy::startCommand(WalkCommand& command, const GaitRanges& ranges, float clip_speed, float length, float yaw, WorldRng& rng) {
+int dy::commandKind(const GaitRanges& ranges, float speed, float walk_speed, float run_speed) {
+    if(ranges.idle > 0.f && speed < 0.5f * ranges.speed[0] * walk_speed) return 0;
+    if(run_speed > 0.f && ranges.run > 0.f && speed > 0.5f * (ranges.speed[1] * walk_speed + ranges.run_speed[0] * run_speed)) return 2;
+    return 1;
+}
+
+void dy::startCommand(WalkCommand& command, const GaitRanges& ranges, float clip_speed, float length, float yaw, WorldRng& rng,
+    float run_speed, int only) {
     command = WalkCommand();
+    command.run_speed = run_speed;
+    command.only = only;
     command.yaw = yaw;
     drawCommand(command, ranges, clip_speed, length, rng);
     command.speed = command.wanted_speed;
@@ -94,6 +122,8 @@ void GaitWalk::step(float speed, float turn, const GroundField* ground, float dt
     stepWalker(walker, transform, length, sole, ground, dt);
     // As AnimalAnimation then AnimalGait do
     animal.time += dt * animal.rate;
+    // A gait is a cycle whatever its clip says: one that is not marked as a loop (many runs) would hold its last pose
+    if(model.period > 0.f) animal.time -= std::floor(animal.time / model.period) * model.period;
     evaluate(*species, animal, pose, scratch);
     const float stride = std::max(model.speed, 0.05f * model.height) * model.period * std::max(gait.style.stride, 0.1f);
     gait.period = std::clamp(stride / std::max(std::abs(gait.speed), 1e-3f), 0.55f * model.period, 1.8f * model.period);

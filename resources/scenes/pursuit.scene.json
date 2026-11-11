@@ -1,29 +1,19 @@
 {
   "format_version": 1,
   "name": "pursuit",
+  "include": [
+    "common/pursuit_world.json"
+  ],
   "variables": {
-    "num_worlds":       { "type": "int",   "default": 16 },
-    "field":            { "type": "float", "default": 20.0, "description": "m: half side of the square" },
-    "chasers":          { "type": "int",   "default": 2 },
-    "runners":          { "type": "int",   "default": 4 },
-    "catch_radius":     { "type": "float", "default": 1.0 },
-    "chaser_decisions": { "type": "int",   "default": 300, "description": "a chaser's episode, 10 decisions a second" },
-    "runner_decisions": { "type": "int",   "default": 200, "description": "a runner's old age, in its own decisions" },
-    "runner_every":     { "type": "int",   "default": 2,   "description": "windows between two decisions of a runner" },
-    "runners_still":    { "type": "bool",  "default": false, "description": "runners do not move: a check that chasers learn" },
-    "approach_reward":  { "type": "float", "default": 0.0, "description": "a chaser's, per metre closer to the nearest runner: a dense check of the learning" }
-  },
-  "templates": {
-    "pursuit_world": {
-      "physics": { "threads": 1, "max_bodies": 16, "max_body_pairs": 16, "max_contacts": 16, "temp_bytes": 1048576 },
-      "clock": { "physics_hz": 60, "control_hz": 10 },
-      "fixed": [ "TrainerActions@act",
-                 { "name": "Pursuit", "params": { "field": "${field}", "chasers": "${chasers}", "runners": "${runners}",
-                                                  "catch_radius": "${catch_radius}", "chaser_decisions": "${chaser_decisions}",
-                                                  "runner_decisions": "${runner_decisions}", "runner_every": "${runner_every}",
-                                                  "runners_still": "${runners_still}", "approach_reward": "${approach_reward}" } },
-                 "PursuitObserve@observe" ]
+    "num_worlds": {
+      "type": "int",
+      "default": 16
     }
   },
-  "worlds": [ { "template": "pursuit_world", "count": "${num_worlds}" } ]
+  "worlds": [
+    {
+      "template": "pursuit_world",
+      "count": "${num_worlds}"
+    }
+  ]
 }

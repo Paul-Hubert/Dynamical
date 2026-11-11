@@ -91,8 +91,12 @@ GaitRanges GaitRanges::parse(const nlohmann::json& j, GaitRanges r) {
     pair(j, "radius", r.radius);
     pair(j, "scale", r.scale);
     pair(j, "segment", r.segment);
+    pair(j, "run_speed", r.run_speed);
+    pair(j, "run_radius", r.run_radius);
     r.straight = j.value("straight", r.straight);
     r.soft = j.value("soft", r.soft);
+    r.idle = j.value("idle", r.idle);
+    r.run = j.value("run", r.run);
     return r;
 }
 
@@ -106,6 +110,10 @@ nlohmann::json GaitRanges::json() const {
     j["segment"] = { segment[0], segment[1] };
     j["straight"] = straight;
     j["soft"] = soft;
+    j["idle"] = idle;
+    j["run"] = run;
+    j["run_speed"] = { run_speed[0], run_speed[1] };
+    j["run_radius"] = { run_radius[0], run_radius[1] };
     return j;
 }
 
