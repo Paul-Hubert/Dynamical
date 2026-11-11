@@ -189,7 +189,21 @@ void RayScene::onChunkGone(entt::registry& registry, entt::entity entity) {
     auto it = chunks.find(entity);
     if(it == chunks.end()) return;
     retire(std::move(it->second.accel));
+    free_geometries.push_back({ it->second.geometry, 0 });
     chunks.erase(it);
+}
+
+// An entry of the table for a chunk : one a chunk long gone had, or a new one
+uint32_t RayScene::chunkGeometry(const GeometryEntry& entry) {
+    for(auto it = free_geometries.begin(); it != free_geometries.end(); ++it) {
+        if(it->frames <= (int) NUM_FRAMES + 1) continue;
+        uint32_t index = it->index;
+        free_geometries.erase(it);
+        table_pointer[index] = entry;
+        vmaFlushAllocation(ctx.device, table.allocation, 0, VK_WHOLE_SIZE);
+        return index;
+    }
+    return addGeometries({ entry });
 }
 
 void RayScene::updateChunks() {
@@ -241,6 +255,13 @@ void RayScene::updateChunks() {
         chunk.slot = triangles.slot;
         if(!queueBuild(chunk.accel, vk::AccelerationStructureTypeKHR::eBottomLevel, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace,
             { geometry }, { triangles.count })) break;
+
+        // What a ray that hits it reads : its triangles
+        GeometryEntry entry;
+        entry.vertices = data.vertexData.deviceAddress;
+        entry.kind = (uint32_t) RayMesh::Kind::Terrain;
+        entry.stride = sizeof(TerrainVertex) / sizeof(float);
+        chunk.geometry = chunkGeometry(entry);
         chunks.emplace(entity, std::move(chunk));
         reg.emplace<ChunkLit>(entity);
         built++;
@@ -300,6 +321,7 @@ void RayScene::updateMeshes() {
             entry.color = part.color;
             entry.kind = (uint32_t) source.kind;
             entry.transmission = part.transmission;
+            entry.stride = source.vertex_stride / sizeof(float);
             entries.push_back(entry);
         }
 
@@ -339,7 +361,7 @@ void RayScene::gatherInstances() {
 
     instances.clear();
 
-    for(auto& [entity, chunk] : chunks) addInstance(glm::mat4(1.f), chunk.accel.address, 0, Terrain);
+    for(auto& [entity, chunk] : chunks) addInstance(glm::mat4(1.f), chunk.accel.address, chunk.geometry, Terrain);
 
     // Who looks, and how far plants are their leaves for them : one scene for both targets, the larger range
     std::vector<glm::vec3> viewers;
@@ -448,6 +470,7 @@ void RayScene::buildTop(vk::CommandBuffer command) {
 void RayScene::update() {
 
     // Structures let go once no frame in flight traces them
+    for(auto& entry : free_geometries) entry.frames++;
     for(auto it = retired.begin(); it != retired.end();) {
         if(++it->frames > (int) NUM_FRAMES + 1) {
             if(it->accel.handle) ctx.device->destroyAccelerationStructureKHR(it->accel.handle);

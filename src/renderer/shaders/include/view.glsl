@@ -29,6 +29,7 @@ layout(std140, set = 0, binding = 3) uniform Lights {
     vec4 ambient_sky;       // rgb : light of the sky on a surface facing up, w : sky light for a sky colour
     vec4 ambient_ground;    // rgb : light the ground sends back up, w : number of point lights
     vec4 light_frame;       // x : frames drawn so far, y : seconds
+    vec4 sky_light[3];      // red, green, blue : the light of the open sky and of the ground under it, as a probe stores it
     PointLight point_lights[max_point_lights];
 };
 

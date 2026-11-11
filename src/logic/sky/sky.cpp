@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <cmath>
 
+#include "logic/components/camera.h"
+#include "logic/components/point_light.h"
+#include "logic/components/transform.h"
 #include "scene/run_args.h"
 #include "scene/system_registry.h"
 
@@ -147,7 +150,49 @@ void SkySys::tick(double dt) {
     }
 }
 
+TorchSys::TorchSys(entt::registry& reg, const nlohmann::json& params) : System(reg), params(params) {
+
+}
+
+void TorchSys::init() {
+
+    PointLight light;
+    if(auto it = params.find("color"); it != params.end() && it->is_array() && it->size() == 3) {
+        light.color = glm::vec3(it->at(0).get<float>(), it->at(1).get<float>(), it->at(2).get<float>());
+    }
+    light.intensity = params.value("intensity", light.intensity);
+    light.radius = params.value("radius", light.radius);
+
+    carried = params.value("carried", true);
+    glm::vec3 position(0.f);
+    for(const char* key : { "offset", "position" }) {
+        auto it = params.find(key);
+        if(it == params.end() || !it->is_array() || it->size() != 3) continue;
+        glm::vec3 value(it->at(0).get<float>(), it->at(1).get<float>(), it->at(2).get<float>());
+        (std::string(key) == "offset" ? offset : position) = value;
+    }
+
+    torch = reg.create();
+    reg.emplace<Transform>(torch, position);
+    reg.emplace<PointLight>(torch, light);
+
+}
+
+void TorchSys::tick(double dt) {
+    if(!carried || !reg.valid(torch)) return;
+    auto* camera = reg.ctx().find<Camera>();
+    if(!camera) return;
+    glm::vec3 forward = camera->forward(), right = camera->right();
+    reg.get<Transform>(torch).position = camera->position + right * offset.x + glm::cross(right, forward) * offset.y + forward * offset.z;
+}
+
+void TorchSys::finish() {
+    if(reg.valid(torch)) reg.destroy(torch);
+}
+
 void dy::registerSky() {
     registerSystem("Sky", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<SkySys>(reg, params); },
+        SystemScope::Host });
+    registerSystem("Torch", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<TorchSys>(reg, params); },
         SystemScope::Host });
 }

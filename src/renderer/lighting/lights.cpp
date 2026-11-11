@@ -10,6 +10,7 @@
 #include "logic/components/render_settings.h"
 #include "logic/components/transform.h"
 #include "logic/components/vr.h"
+#include "logic/lighting/probes.h"
 #include "logic/sky/sky.h"
 
 using namespace dy;
@@ -50,6 +51,17 @@ void Lights::update(uint32_t frame_index, float time) {
     ubo.ambient_sky = glm::vec4(sky.ambient_sky, sky_light_scale);
     ubo.ambient_ground = glm::vec4(sky.ambient_ground, 0.f);
     ubo.frame = glm::vec4((float) (frames++ % 65536), time, 0.f, 0.f);
+
+    // What a probe in the open stores : the sky over it, the lit ground under it
+    ProbeLight open;
+    const int directions = 256;
+    for(int i = 0; i < directions; i++) {
+        glm::vec3 direction = fibonacciDirection(i, directions);
+        open.add(direction, direction.y > 0.f ? skyRadiance(sky, direction) : sky.ambient_ground, directions);
+    }
+    ubo.sky_light[0] = open.r;
+    ubo.sky_light[1] = open.g;
+    ubo.sky_light[2] = open.b;
 
     // The point lights nearest to a viewer
     std::vector<glm::vec3> viewers;

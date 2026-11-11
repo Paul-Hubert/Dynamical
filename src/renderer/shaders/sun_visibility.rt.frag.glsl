@@ -12,6 +12,7 @@
 
 #include "include/view.glsl"
 #include "include/rays.glsl"
+#include "include/probes.glsl"
 
 layout(location = 0) in vec2 v_uv;
 
@@ -50,7 +51,7 @@ void main() {
     int rays = int(view_lighting.y);
 
     // The sky, and a light that is not there
-    if(depth >= 1.0 || range <= 0.0 || rays <= 0 || dot(light_color.rgb, vec3(1.0)) <= 0.0) {
+    if(depth >= 1.0 || dot(light_color.rgb, vec3(1.0)) <= 0.0) {
         outVisibility = vec4(1.0, 1.0, 1.0, 1e4);
         return;
     }
@@ -59,8 +60,12 @@ void main() {
     vec3 position = world.xyz / world.w;
     vec3 to_eye = viewpos.xyz - position;
     float far = length(to_eye);
-    if(far >= range) {
-        outVisibility = vec4(1.0, 1.0, 1.0, far);
+    // Beyond the traced range, and more and more over its last fifth : what the probes around saw of the
+    // sun, soft
+    float beyond = rays > 0 ? smoothstep(0.8 * range, range, far) : 1.0;
+    vec3 from_probes = beyond > 0.0 ? probeDirect(position + vec3(0.0, 1.0, 0.0)).rgb : vec3(1.0);
+    if(beyond >= 1.0) {
+        outVisibility = vec4(from_probes, max(far, range));
         return;
     }
 
@@ -84,6 +89,6 @@ void main() {
         visible += traceShadow(origin, direction, 4000.0, ray_all);
     }
 
-    outVisibility = vec4(visible / float(rays), far);
+    outVisibility = vec4(mix(visible / float(rays), from_probes, beyond), far);
 
 }

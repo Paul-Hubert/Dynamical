@@ -53,6 +53,14 @@ public:
     const std::vector<vk::DescriptorImageInfo>* ray_textures = nullptr;
     static constexpr uint32_t max_ray_textures = 512;
 
+    // The irradiance probes (ProbeVolume) : the table that finds the brick of a chunk (binding 7), and per
+    // page of bricks three textures of light (8) and one of the sun and the sky (9). Pages are only ever added
+    vk::ImageView probe_index_view;
+    vk::Sampler probe_index_sampler;
+    const std::vector<vk::DescriptorImageInfo>* probe_light = nullptr;
+    const std::vector<vk::DescriptorImageInfo>* probe_direct = nullptr;
+    static constexpr uint32_t max_probe_pages = 16;
+
     // Usage a vertex or an index buffer needs to be traced, nothing without ray tracing
     vk::BufferUsageFlags rayInputUsage() {
         if(!device.ray.enabled()) return {};
@@ -75,6 +83,7 @@ public:
 private:
     // Textures of the rays each set already has
     std::unordered_map<VkDescriptorSet, size_t> ray_textures_written;
+    std::unordered_map<VkDescriptorSet, size_t> probe_pages_written;
 
 };
 

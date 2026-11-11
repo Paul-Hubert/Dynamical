@@ -30,6 +30,7 @@ struct LightsUBO {
     glm::vec4 ambient_sky;      // rgb : light of the sky on a surface facing up, w : sky light for a sky colour
     glm::vec4 ambient_ground;   // rgb : light the ground sends back up, w : number of point lights
     glm::vec4 frame;            // x : frames drawn so far (seeds of the noises), y : seconds
+    glm::vec4 sky_light[3];     // red, green, blue : the light of the open sky and of the ground under it, as a probe stores it (ProbeLight)
     struct Point {
         glm::vec4 position;     // w : radius
         glm::vec4 color;        // rgb : light a metre away

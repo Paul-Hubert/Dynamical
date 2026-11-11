@@ -1,4 +1,4 @@
-#version 450
+#version 460
 #extension GL_GOOGLE_include_directive : require
 
 // The ground. Seen from above : earth (under the grass of the grass pass), and patches of mud, stones and

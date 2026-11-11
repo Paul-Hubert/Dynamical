@@ -35,6 +35,10 @@ struct RunArgs {
 
     // dynamical: false draws without the ray traced lighting on a GPU that has it (docs/lighting.md)
     bool ray_tracing = true;
+    // dynamical: the tier of the ray traced lighting of both targets (off, low, medium, high), empty : the defaults
+    std::string lighting;
+    // dynamical: rays the probes may cast a frame, -1 : the default of the RenderSettings
+    int probe_rays = -1;
 
     // Probes
     std::string probe;                      // csv file

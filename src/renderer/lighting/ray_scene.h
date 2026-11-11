@@ -65,7 +65,7 @@ private:
         glm::vec3 color = glm::vec3(0.5f);
         uint32_t kind = 0;          // RayMesh::Kind
         glm::vec3 transmission = glm::vec3(0.f);
-        uint32_t pad = 0;
+        uint32_t stride = 0;        // floats in a vertex
     };
     static_assert(sizeof(GeometryEntry) == 56);
 
@@ -110,7 +110,15 @@ private:
     struct ChunkAccel {
         Accel accel;
         uint32_t slot = 0;
+        uint32_t geometry = 0;      // its entry of the table : the address of its vertices
     };
+    // Entries of chunks that are gone, taken again once no frame in flight traces their chunk
+    struct FreeGeometry {
+        uint32_t index;
+        int frames = 0;
+    };
+    std::vector<FreeGeometry> free_geometries;
+    uint32_t chunkGeometry(const GeometryEntry& entry);
     std::unordered_map<entt::entity, ChunkAccel> chunks;
 
     // Meshes of the passes, by their index in RayMeshes

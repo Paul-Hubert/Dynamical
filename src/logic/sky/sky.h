@@ -71,6 +71,23 @@ public:
     const char* name() override { return "Sky"; }
 };
 
+// "Torch" : a point light of the scene. Params : color, intensity, radius (PointLight); carried (true : it stays
+// `offset` from the desktop camera, x to its right, y up, z ahead; false : it is left at `position`)
+class TorchSys : public System {
+public:
+    TorchSys(entt::registry& reg, const nlohmann::json& params);
+    void init() override;
+    void tick(double dt) override;
+    void finish() override;
+    const char* name() override { return "Torch"; }
+
+private:
+    nlohmann::json params;
+    entt::entity torch = entt::null;
+    bool carried = true;
+    glm::vec3 offset = glm::vec3(0.35f, -0.25f, 0.8f);
+};
+
 void registerSky();
 
 }

@@ -3,7 +3,11 @@
 #include <algorithm>
 #include <cmath>
 
+#include "logic/lighting/probes.h"
 #include "logic/sky/sky.h"
+
+#include <set>
+#include <tuple>
 
 using namespace dy;
 
@@ -163,6 +167,148 @@ TEST_CASE("LIGHT.4 the Sky system starts where the scene says and turns the sun 
     SkySys usual(reg, nlohmann::json::object());
     CHECK(reg.ctx().get<Sky>().day_length == doctest::Approx(Sky::default_day_length));
     CHECK(reg.ctx().get<Sky>().time == doctest::Approx(Sky::default_time));
+
+}
+
+TEST_CASE("LIGHT.5 the light of a probe : two bands per colour give back the light of a sky and of a lamp on a surface") {
+
+    const int rays = 4096;
+
+    // A sky of one colour over a black ground : a surface facing up sees all of it, a wall half, the
+    // underside of a roof nothing
+    {
+        ProbeLight light;
+        const glm::vec3 sky(0.3f, 0.5f, 0.8f);
+        for(int i = 0; i < rays; i++) {
+            glm::vec3 d = fibonacciDirection(i, rays);
+            CHECK(std::abs(glm::length(d) - 1.f) < 1e-4f);
+            light.add(d, d.y > 0.f ? sky : glm::vec3(0.f), rays);
+        }
+        CHECK(glm::distance(light.irradiance(glm::vec3(0.f, 1.f, 0.f)), sky) < 0.01f);
+        CHECK(glm::distance(light.irradiance(glm::vec3(1.f, 0.f, 0.f)), 0.5f * sky) < 0.01f);
+        CHECK(glm::length(light.irradiance(glm::vec3(0.f, -1.f, 0.f))) < 0.01f);
+    }
+
+    // The same light from everywhere : the same on any surface
+    {
+        ProbeLight light;
+        for(int i = 0; i < rays; i++) light.add(fibonacciDirection(i, rays), glm::vec3(0.4f), rays);
+        for(glm::vec3 n : { glm::vec3(0.f, 1.f, 0.f), glm::vec3(0.f, -1.f, 0.f), glm::normalize(glm::vec3(1.f, 1.f, -1.f)) }) {
+            CHECK(glm::distance(light.irradiance(n), glm::vec3(0.4f)) < 0.005f);
+        }
+    }
+
+    // A lamp in one direction : brightest on the surface that faces it, never negative behind
+    {
+        ProbeLight light;
+        glm::vec3 lamp = glm::normalize(glm::vec3(1.f, 0.5f, 0.2f));
+        for(int i = 0; i < rays; i++) {
+            glm::vec3 d = fibonacciDirection(i, rays);
+            light.add(d, glm::dot(d, lamp) > 0.95f ? glm::vec3(10.f, 5.f, 0.f) : glm::vec3(0.f), rays);
+        }
+        glm::vec3 facing = light.irradiance(lamp), side = light.irradiance(glm::normalize(glm::cross(lamp, glm::vec3(0.f, 1.f, 0.f))));
+        glm::vec3 behind = light.irradiance(-lamp);
+        CHECK(facing.r > 2.f * side.r);
+        CHECK(facing.r == doctest::Approx(2.f * facing.g).epsilon(0.01));
+        CHECK(facing.b == 0.f);
+        CHECK(behind.r >= 0.f);
+        CHECK(behind.r < 0.2f * facing.r);
+    }
+
+}
+
+TEST_CASE("LIGHT.6 the probes of a chunk : traced in the air near the ground and the plants, filled just under the ground, left alone elsewhere") {
+
+    // Flat ground at 100 m in a chunk at the origin : sample y of the volume is at (y - border) * 4 m
+    const float ground = 100.f;
+    std::vector<float> densities(chunk::num_values);
+    for(int x = 0; x < chunk::values; x++) {
+        for(int z = 0; z < chunk::values; z++) {
+            for(int y = 0; y < chunk::values; y++) {
+                densities[chunk::index(x, y, z)] = ground - (float) ((y - chunk::border) * chunk::cube_size) - 0.5f;
+            }
+        }
+    }
+
+    ProbeClasses flat = classifyProbes(densities, glm::vec3(0.f), {});
+    REQUIRE(flat.classes.size() == probes::count);
+
+    auto at = [&](const ProbeClasses& c, int x, int y, int z) { return c.classes[probes::index(x, y, z)]; };
+    // Probes at 96 m and under are in the ground (density > 0), from 100 m in the air
+    for(int x : { 0, 31, 64 }) {
+        for(int z : { 0, 17, 64 }) {
+            CHECK(at(flat, x, 20, z) == probes::Rock);
+            CHECK(at(flat, x, 23, z) == probes::Rock);
+            CHECK(at(flat, x, 24, z) == probes::Fill);      // 96 m : next to the air
+            CHECK(at(flat, x, 25, z) == probes::Active);    // 100 m
+            CHECK(at(flat, x, 26, z) == probes::Active);    // 104 m : 8 m over the last probe of the ground
+            CHECK(at(flat, x, 27, z) == probes::Open);
+            CHECK(at(flat, x, 60, z) == probes::Open);
+        }
+    }
+    CHECK(flat.active.size() == (size_t) 2 * probes::size * probes::size);
+    CHECK(flat.fill.size() == (size_t) probes::size * probes::size);
+    for(uint32_t i : flat.active) CHECK(flat.classes[i] == probes::Active);
+    for(uint32_t i : flat.fill) CHECK(flat.classes[i] == probes::Fill);
+
+    // A tree of 20 m : the air around its crown is traced too, further up than over the bare ground
+    PlantBounds tree { glm::vec3(128.f, ground, 128.f), 6.f, 20.f };
+    ProbeClasses planted = classifyProbes(densities, glm::vec3(0.f), { tree });
+    CHECK(at(planted, 32, 29, 32) == probes::Active);       // 116 m, in the crown
+    CHECK(at(planted, 32, 31, 32) == probes::Active);       // 124 m : under 8 m over its top
+    CHECK(at(planted, 32, 33, 32) == probes::Open);         // 132 m
+    CHECK(at(planted, 35, 29, 32) == probes::Active);       // 12 m aside : within 8 m of its bounds
+    CHECK(at(planted, 36, 29, 32) == probes::Open);         // 16 m aside
+    CHECK(at(planted, 32, 20, 32) == probes::Rock);         // the ground stays the ground
+    CHECK(planted.active.size() > flat.active.size());
+
+    // The origin of the chunk moves the plants, not the densities
+    ProbeClasses moved = classifyProbes(densities, glm::vec3(256.f, 0.f, 0.f), { tree });
+    CHECK(moved.active.size() == flat.active.size());
+
+}
+
+TEST_CASE("LIGHT.7 the bricks of the chunks : eight to a page, found through a table that wraps") {
+
+    ProbeBricks bricks(2);
+    CHECK(bricks.pages() == 0);
+
+    // The first eight chunks fill a page, each at its corner of it
+    std::set<std::tuple<int, int, int>> corners;
+    for(int i = 0; i < 8; i++) {
+        int brick = bricks.allocate(glm::ivec3(i, 0, -i));
+        CHECK(brick == i);
+        CHECK(ProbeBricks::page(brick) == 0);
+        glm::ivec3 offset = ProbeBricks::offset(brick);
+        CHECK(offset.x % probes::size == 0);
+        CHECK(glm::all(glm::lessThan(offset, glm::ivec3(ProbeBricks::page_side * probes::size))));
+        corners.insert({ offset.x, offset.y, offset.z });
+    }
+    CHECK(corners.size() == 8);
+    CHECK(bricks.pages() == 1);
+    CHECK(bricks.allocate(glm::ivec3(3, 0, -3)) == 3);      // the same chunk : the same brick
+
+    // The table : brick + 1 at the cell of the chunk, also for negative coordinates
+    const auto& table = bricks.indirection();
+    REQUIRE(table.size() == (size_t) 16 * 16 * 16);
+    CHECK(table[ProbeBricks::cell(glm::ivec3(5, 0, -5))] == 6);
+    CHECK(ProbeBricks::cell(glm::ivec3(5, 0, -5)) == (size_t) (11 * 16 + 0) * 16 + 5);
+    CHECK(ProbeBricks::cell(glm::ivec3(-1, -1, -1)) == (size_t) (15 * 16 + 15) * 16 + 15);
+    CHECK(table[ProbeBricks::cell(glm::ivec3(9, 9, 9))] == 0);
+
+    // A chunk 16 further shares the cell of another : no brick while that one has its own
+    CHECK(bricks.allocate(glm::ivec3(5 + 16, 0, -5)) == -1);
+    bricks.release(glm::ivec3(5, 0, -5));
+    CHECK(bricks.find(glm::ivec3(5, 0, -5)) == -1);
+    CHECK(table[ProbeBricks::cell(glm::ivec3(5, 0, -5))] == 0);
+    CHECK(bricks.allocate(glm::ivec3(5 + 16, 0, -5)) == 5);  // the brick that was freed
+
+    // Two pages and no more
+    for(int i = 8; i < 16; i++) CHECK(bricks.allocate(glm::ivec3(0, 1, i - 8)) == i);
+    CHECK(bricks.pages() == 2);
+    CHECK(ProbeBricks::page(15) == 1);
+    CHECK(bricks.allocate(glm::ivec3(7, 7, 7)) == -1);
+    CHECK(bricks.used() == 16);
 
 }
 

@@ -1,4 +1,4 @@
-#version 450
+#version 460
 #extension GL_GOOGLE_include_directive : require
 
 // Grass without blade geometry. The pixel is on a shell at the top of the grass; its view ray is looked up

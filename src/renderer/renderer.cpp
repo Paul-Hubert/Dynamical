@@ -39,10 +39,21 @@ per_frame(NUM_FRAMES) {
     }
 
     reg.ctx().emplace<ModelManager>(reg);
-    reg.ctx().emplace<RenderSettings>();
+    auto& render_settings = reg.ctx().emplace<RenderSettings>();
+    if(auto* args = reg.ctx().find<RunArgs>()) {
+        const char* const tiers[] = { "off", "low", "medium", "high" };
+        for(int tier = 0; tier < 4; tier++) {
+            if(args->lighting != tiers[tier]) continue;
+            for(auto& lighting : render_settings.lighting) lighting = RenderSettings::Lighting::of((RenderSettings::LightingTier) tier);
+        }
+        if(args->probe_rays >= 0) render_settings.probe_rays_per_frame = args->probe_rays;
+    }
 
     lights = std::make_unique<Lights>(ctx, reg);
-    if(ctx.device.ray.enabled()) ray_scene = std::make_unique<RayScene>(ctx, reg);
+    if(ctx.device.ray.enabled()) {
+        ray_scene = std::make_unique<RayScene>(ctx, reg);
+        probe_volume = std::make_unique<ProbeVolume>(ctx, reg);
+    }
     tree_shade = std::make_unique<TreeShade>(ctx, reg);
     soil_maps = std::make_unique<SoilMaps>(ctx, reg);
     classic = std::make_unique<ClassicRender>(ctx, reg);
@@ -128,6 +139,8 @@ void Renderer::render() {
 
     // What the rays of this frame see : built in its compute commands
     if(ray_scene) ray_scene->update();
+    // and what its probes trace of it
+    if(probe_volume) probe_volume->update(time);
 
 
     // Transfer -> compute -> graphics, each stage waiting on the previous one if it had work
@@ -231,6 +244,7 @@ Renderer::~Renderer() {
     classic.reset();
     soil_maps.reset();
     tree_shade.reset();
+    probe_volume.reset();
     ray_scene.reset();
     lights.reset();
 

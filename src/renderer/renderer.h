@@ -10,6 +10,7 @@
 #include "tree_shade.h"
 #include "lighting/lights.h"
 #include "lighting/ray_scene.h"
+#include "lighting/probe_volume.h"
 #include "terrain/soil_maps.h"
 #include "scene/scene_def.h"
 
@@ -47,6 +48,7 @@ private:
 
     std::unique_ptr<Lights> lights;
     std::unique_ptr<RayScene> ray_scene;    // with ray tracing
+    std::unique_ptr<ProbeVolume> probe_volume;
     std::unique_ptr<TreeShade> tree_shade;
     std::unique_ptr<SoilMaps> soil_maps;
     std::unique_ptr<ClassicRender> classic;

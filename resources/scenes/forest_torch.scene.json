@@ -1,0 +1,33 @@
+{
+  "format_version": 1,
+  "name": "forest_torch",
+  "include": ["common/desktop.json"],
+  "variables": {
+    "time":        { "type": "float",  "default": 20.6, "description": "hours : dusk, the torch lights more than the sky" },
+    "day_length":  { "type": "float",  "default": 0, "description": "the sun does not move" },
+    "forest":      { "type": "string", "default": "forest/tautavel.forest.json", "description": "stands, layers and species (docs/forest.md)" },
+    "forest_seed": { "type": "int",    "default": 1,   "description": "places the forests and their plants" },
+    "patch_size":  { "type": "float",  "default": 320, "description": "metres : size of the forests and of the open land between them" },
+    "coverage":    { "type": "float",  "default": 0.5, "description": "part of the gentle land under forest" },
+    "max_slope":   { "type": "float",  "default": 24,  "description": "degrees : slope of the land no forest grows on" },
+    "distance":    { "type": "float",  "default": 280, "description": "metres walked, from open land through a forest and out" },
+    "speed":       { "type": "float",  "default": 1.4, "description": "m/s" },
+    "eye_height":  { "type": "float",  "default": 1.7 },
+    "torch_intensity": { "type": "float", "default": 12, "description": "light of the torch a metre away" },
+    "torch_radius":    { "type": "float", "default": 18, "description": "metres : nothing is lit beyond" }
+  },
+
+  "renderer": { "passes": ["terrain", "grass", "vegetation", "model", "ui"], "vr": false },
+
+  "host": {
+    "pre": [
+      "Input", "UI", "Time", "PlayerControl", "DebugMenu",
+      { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } },
+      "ChunkManager", "ChunkGenerator",
+      { "name": "Forest", "params": { "definition": "${forest}", "seed": "${forest_seed}", "patch_size": "${patch_size}", "coverage": "${coverage}", "max_slope": "${max_slope}" } },
+      { "name": "CameraWalk", "params": { "distance": "${distance}", "speed": "${speed}", "eye_height": "${eye_height}" } },
+      { "name": "Torch", "params": { "carried": true, "intensity": "${torch_intensity}", "radius": "${torch_radius}" } }
+    ],
+    "post": ["Terrain"]
+  }
+}

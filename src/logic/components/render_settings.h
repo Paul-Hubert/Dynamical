@@ -39,8 +39,8 @@ struct RenderSettings {
         }
     };
     Lighting lighting[2] = { Lighting::of(LightingTier::High), Lighting::of(LightingTier::Medium) };    // desktop, VR
-    int probe_rays_per_frame = 1000000;
-    int rays_per_probe = 64;
+    int probe_rays_per_frame = 250000;     // measured : a million is 20 ms a frame in a forest on an RTX 5080
+    int rays_per_probe = 48;
 
     // Patches of mud, stones and sand in the ground, a map per chunk (SoilMaps, docs/ground.md) : no grass on them
     bool soil = true;
