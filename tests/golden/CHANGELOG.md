@@ -72,3 +72,5 @@ shaders had it before. Probes are untouched (S0.1, S1.1 pass), two runs give ide
 | 2026-11-11 | `images/base_ring.png` | replaced | 6db72a6 | master's soil, grass and menu changes, then the sky and the lights (see note above) |
 | 2026-11-11 | `images/worlds_boxes.png` | replaced | 6db72a6 | the sky and the lights, the Sky section of the menu (see note above) |
 | 2026-11-11 | `images/worlds_boxes_close.png` | replaced | 6db72a6 | the sky and the lights, the Sky section of the menu (see note above) |
+| 2026-11-11 | `images/base_spawn.png` | replaced | 1723857 | lighting rebased on master: the kinds of plants of the grass in blended patches, the relief of the soil |
+| 2026-11-11 | `images/base_ring.png` | replaced | 1723857 | lighting rebased on master: the kinds of plants of the grass in blended patches, the relief of the soil |
