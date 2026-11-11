@@ -197,8 +197,12 @@ AnimalRating dy::rateAnimal(const AnimalBot& bot, double window) {
     r.velocity = (trunk - bot.snapshot_trunk) / (float) window;
     r.along = glm::dot(r.velocity, bot.snapshot_direction);
     r.root = std::min(r.along, bot.snapshot_speed) * p.root_reward;
+    // With orders the speed asked is a speed to keep, not one to reach: what the animal goes over it costs as much as
+    // what it falls short (the first walkers with orders went 1.4 to 1.6 times what was asked, and walked on when
+    // asked to stand)
+    if(bot.orders) r.root -= std::max(r.along - bot.snapshot_speed, 0.f) * p.root_reward;
     // Over the speed asked, but not for a command that all but stands: a step back would cost more there than a walk earns
-    if(bot.snapshot_speed > 0.f) r.root /= std::max(bot.snapshot_speed, 0.25f * body.walk_speed);
+    if(bot.snapshot_speed > 0.f || bot.orders) r.root /= std::max(bot.snapshot_speed, 0.25f * body.walk_speed);
     if(p.over_speed > 0.f) {
         // Faster than asked, any way over the ground, costs too: what makes a command to stand one to stand still
         const float over = std::max(glm::length(horizontal(r.velocity)) - bot.snapshot_speed, 0.f);

@@ -179,7 +179,7 @@ int TrainHost::evalAnimals() {
             asked += e.kind_commanded[k];
         }
         if(seconds <= 0.) continue;
-        summary[kinds[k]] = { { "seconds", seconds }, { "mean_speed", covered / seconds }, { "progress_speed", along / seconds },
+        summary["kinds"][kinds[k]] = { { "seconds", seconds }, { "mean_speed", covered / seconds }, { "progress_speed", along / seconds },
             { "commanded_speed", asked / seconds }, { "speed_ratio", asked > 0. ? along / asked : 0. } };
     }
     if(!replay.empty()) {

@@ -77,6 +77,11 @@ def main():
         print((result.stdout + result.stderr)[-2000:])
         sys.exit(1)
     summary = json.loads(out.read_text())
+    # A run frozen before the kinds had a block of their own wrote them beside the rest ("run" is the run's name here)
+    kinds = summary.setdefault("kinds", {})
+    for kind in ("idle", "walk", "run"):
+        if isinstance(summary.get(kind), dict):
+            kinds[kind] = summary.pop(kind)
     summary["run"] = args.run
     summary["body"] = str(body)
     out.write_text(json.dumps(summary, indent=2) + "\n")
@@ -85,6 +90,9 @@ def main():
           f"{summary['mean_length_seconds']:.1f} s of {summary['episode_seconds']:.1f}, "
           f"speed along the command {summary['progress_speed']:.3f} m/s of {summary['commanded_speed']:.3f} commanded ({summary['speed_ratio']:.2f}), "
           f"heading error {summary['mean_heading_error_deg']:.1f} deg")
+    for kind, k in kinds.items():
+        asked = "" if kind == "idle" else f" of {k['commanded_speed']:.3f} commanded ({k['speed_ratio']:.2f})"
+        print(f"    {kind}: {k['seconds']:.0f} s, {k['mean_speed']:.3f} m/s, along the command {k['progress_speed']:.3f} m/s{asked}")
     print(out)
 
 

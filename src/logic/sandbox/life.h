@@ -31,11 +31,12 @@ struct SpeciesLife {
     float gestation = 60.f;
     float old = 1200.f;             // age at which the life ends, without penalty
     float heal = 300.f;             // no health to full, when nothing wounds
-    float mate_time = 3.f;          // together, both in Mate mode
+    float mate_time = 2.f;          // together, both in Mate mode
     float rot = 300.f;              // its carcass lasts this long if nothing eats it
 
-    float work = 0.4f;              // what positive mechanical work costs: at 0.1 m g v watts (v its walk speed) this much of the basal rate
-                                    // again. The first walkers spend 2.5 times that reference at a slow walk: walking doubles the drain
+    float work = 0.1f;              // what positive mechanical work costs: at 0.1 m g v watts (v its walk speed) this much of the basal rate
+                                    // again. The walkers spend 4.5 to 6.7 times that reference at the speeds the minds ask (the jolts of
+                                    // their drives more than the work of a gait): at 0.1 walking takes a store half as fast again
     float rest_drain = 0.6f;        // of the basal rate, in Rest mode
     float rest_heal = 3.f;          // times faster, in Rest mode
     float top_speed = 2.2f;         // walk speeds asked for a speed action of 1
@@ -44,7 +45,7 @@ struct SpeciesLife {
     float graze = 0.3f;             // m of grass height a second eaten at the full feeding rate
     float carcass_reach = 0.35f;    // heights: the muzzle this close to a body of a carcass feeds on it
     float mate_energy = 0.5f;       // both need this much to mate
-    float mate_reach = 1.5f;        // lengths between the trunks
+    float mate_reach = 2.f;          // lengths between the trunks
     float birth_cost = 0.3f;        // of the mother's store
     float newborn_energy = 0.7f;
     float young_scale = 0.6f;       // size at birth; 1: born full size

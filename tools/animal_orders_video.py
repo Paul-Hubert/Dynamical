@@ -178,7 +178,8 @@ def main():
         d = ImageDraw.Draw(over)
         w, h = image.size
 
-        speed, turn = r["speed"], r["turn"]
+        # The text says the order, the chart where the eased command is on its way to it
+        speed, turn = r["wanted_speed"], r["wanted_turn"]
         curvature = turn * length                               # 1 / radius in lengths, > 0 left
         running = runs and speed / walk > 0.5 * (fast + run * ranges["run_speed"][0])
         if speed < 0.05 * walk:
@@ -231,7 +232,7 @@ def main():
         d.text((inner[0], box[3] - 17), "left", font=f_small, fill=(230, 230, 230, 255))
         d.text((inner[2] - 26, box[3] - 17), "right", font=f_small, fill=(230, 230, 230, 255))
         d.text((0.5 * (inner[0] + inner[2]) - 20, box[3] - 17), "straight", font=f_small, fill=(230, 230, 230, 255))
-        trail.append(chart_xy(inner, speed / walk, curvature))
+        trail.append(chart_xy(inner, r["speed"] / walk, r["turn"] * length))
         if len(trail) > 1:
             d.line(trail, fill=(255, 226, 150, 200), width=1)
         p = trail[-1]
@@ -240,13 +241,19 @@ def main():
         # The path from above, -z up: where it went, where it is asked to go
         m = (w - 192, h - 192, w - 12, h - 12)
         d.rectangle(m, fill=(20, 24, 28, 150))
-        d.text((m[0] + 6, m[1] + 3), f"its path from above ({span:.0f} m across)", font=f_small, fill=(255, 255, 255, 255))
+        d.text((m[0] + 6, m[1] + 3), f"its path from above ({span:.0f} m)", font=f_small, fill=(255, 255, 255, 255))
 
         def on_map(x, z):
             return (0.5 * (m[0] + m[2]) + (x - cx) / span * (m[2] - m[0]), 0.5 * (m[1] + m[3]) + 10 + (z - cz) / span * (m[3] - m[1] - 20))
 
-        if i:
-            d.line([on_map(xs[k], zs[k]) for k in range(0, i + 1)], fill=(225, 235, 245, 255), width=2)
+        # A fall puts it back where it started: the path is cut there
+        k0 = 0
+        for k in range(1, i + 1):
+            if falls[k] != falls[k - 1] or k == i:
+                piece = [on_map(xs[j], zs[j]) for j in range(k0, k + 1 if k == i and falls[k] == falls[k - 1] else k)]
+                if len(piece) > 1:
+                    d.line(piece, fill=(225, 235, 245, 255), width=2)
+                k0 = k
         here = on_map(r["x"], r["z"])
         yaw = r["yaw"]
         tip = (here[0] - math.sin(yaw) * 16, here[1] - math.cos(yaw) * 16)

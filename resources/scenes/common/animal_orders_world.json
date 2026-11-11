@@ -30,6 +30,16 @@
       "type": "float",
       "default": 0.0,
       "description": "> 0: this speed straight ahead, in speeds of the walk clip, instead of the drawn commands"
+    },
+    "velocity_steps": {
+      "type": "int",
+      "default": 10,
+      "description": "of the solver: 40 for an animal on two legs (the sandbox with men runs at that)"
+    },
+    "position_steps": {
+      "type": "int",
+      "default": 2,
+      "description": "... 8 for one"
     }
   },
   "templates": {
@@ -44,8 +54,8 @@
         "friction_combine": "max",
         "restitution_combine": "min",
         "substeps": 2,
-        "velocity_steps": 10,
-        "position_steps": 2,
+        "velocity_steps": "${velocity_steps}",
+        "position_steps": "${position_steps}",
         "penetration_slop": 0.0019,
         "speculative_distance": 0.015
       },

@@ -1,18 +1,19 @@
 {
-  "round": 4,
-  "notes": "Round 3 (puppets_r3, 1.5M decisions): surviving is learned. The deer feed 74% of the time, the store stays at 0.96, four in five die of old age after 800 s in the world. Still not one conception: Mate mode is at 2%, Feed at 83%. The court term paid 0.003 a decision for standing within 100 m of the other sex, which the deer collected while grazing; it never told them to come closer (0.00006 a metre). Round 4: eating pays only under 0.85 of a store, so a fed deer has nothing to gain from grass; courting pays by the metre it comes closer (the new mate_closing signal) and for staying within 10 m; pairing and conceiving pay more. Fear pays by the metre too.",
+  "round": 7,
+  "notes": "Round 6 (puppets_r6, 2.2M decisions; sandbox_r1, 420k decisions on the ragdolls). Puppets: the deer learned the wolves. Four in five deaths were kills at the start of the round and none at its end; 98% die of old age after 790 s. Ragdolls: the deer graze with their own necks (feeding 18% of the time, the grass goes down), a life in the world went from 100 s to 320 s, all still starve there. On both, no conception: near and pair pay 0.001 a decision, the deer are seldom within 10 m of a mate and never both in Mate mode long enough. Round 7: the rules ask less of a pair (2 s together within two lengths, not 3 s within one and a half), the time a pair has spent together is paid as it builds (the new mating signal), pairing in reach pays more, courting by the metre is paid whatever the store.",
   "terms": [
     { "name": "eat",      "expr": "2 * energy_gain * step(0.85 - energy)" },
     { "name": "graze",    "expr": "0.004 * step(0.8 - energy) * mode_feed * step(grass_here - 0.1) * max(0, 1 - muzzle_height)" },
     { "name": "pasture",  "expr": "0.002 * step(0.8 - energy) * step(grass_near - 0.3)" },
     { "name": "hunger",   "expr": "-0.01 * max(0, 0.6 - energy)" },
     { "name": "hurt",     "expr": "-1 * damage_taken" },
-    { "name": "fear",     "expr": "-0.01 * max(0, 1 - predator_distance / 15)" },
-    { "name": "flee",     "expr": "-0.03 * step(30 - predator_distance) * predator_closing" },
-    { "name": "court",    "expr": "0.03 * adult * (1 - pregnant) * step(energy - 0.6) * mate_closing" },
-    { "name": "near",     "expr": "0.004 * adult * (1 - pregnant) * step(energy - 0.6) * max(0, 1 - mate_distance / 10)" },
-    { "name": "pair",     "expr": "0.05 * adult * (1 - pregnant) * step(energy - 0.5) * mode_mate * step(3 - mate_distance)" },
-    { "name": "conceive", "expr": "2 * conceptions" },
+    { "name": "fear",     "expr": "-0.02 * max(0, 1 - predator_distance / 15)" },
+    { "name": "flee",     "expr": "-0.06 * step(30 - predator_distance) * predator_closing" },
+    { "name": "court",    "expr": "0.08 * adult * (1 - pregnant) * step(energy - 0.4) * mate_closing" },
+    { "name": "near",     "expr": "0.02 * adult * (1 - pregnant) * step(energy - 0.4) * max(0, 1 - mate_distance / 10)" },
+    { "name": "pair",     "expr": "0.2 * adult * (1 - pregnant) * step(energy - 0.5) * mode_mate * step(4 - mate_distance)" },
+    { "name": "together", "expr": "1 * adult * (1 - pregnant) * mating" },
+    { "name": "conceive", "expr": "3 * conceptions" },
     { "name": "carry",    "expr": "0.002 * pregnant" }
   ],
   "scale": 1.0

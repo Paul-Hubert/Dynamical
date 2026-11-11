@@ -20,7 +20,7 @@
         "AnimalTask", "AnimalTermination", "AnimalRewards@observe", "AnimalObservation@observe", "AnimalEpisode@observe"
       ],
       "entities": [
-        { "prefab": "ground_flat" },
+        { "prefab": "ground_flat_wide" },
         { "AnimalSpawn": { "body": "${body}", "params": "${params}", "ranges": "${ranges}", "draw": "${draw}", "view": "${view}",
                            "view_truncate": "${view_truncate}", "speed": "${speed}", "soft_depth": "${soft_depth}" } }
       ]

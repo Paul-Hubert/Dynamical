@@ -99,7 +99,7 @@
       ],
       "entities": [
         {
-          "prefab": "ground_flat"
+          "prefab": "ground_flat_wide"
         },
         {
           "AnimalSpawn": {

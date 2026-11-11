@@ -284,7 +284,7 @@ const std::vector<std::string>& dy::sandboxSignalNames() {
         "energy", "health", "age", "adult", "male", "pregnant", "energy_gain", "energy_spent", "damage_taken", "damage_dealt", "kills", "births", "falls",
         "speed", "mode_move", "mode_feed", "mode_attack", "mode_mate", "mode_rest", "feeding", "grass_here", "muzzle_height", "predator_distance",
         "prey_distance", "mate_distance", "carcass_distance", "herd_distance", "herd_count", "since_fed", "dt", "grass_near", "conceptions", "lived",
-        "predator_closing", "prey_closing", "mate_closing", "carcass_closing" };
+        "predator_closing", "prey_closing", "mate_closing", "carcass_closing", "mating" };
     return names;
 }
 
@@ -466,6 +466,7 @@ void dy::sandboxSignals(entt::registry& reg, entt::entity e, float seconds, floa
     }
     out[S::conceptions] = (float) a.window.conceptions;
     out[S::lived] = a.lived;
+    out[S::mating] = std::min(a.mating / std::max(species.life.mate_time * scale, 1e-3f), 1.f);
     const float now[4] = { predator, prey, mate, carcass };
     for(int k = 0; k < 4; k++) {
         const bool has = now[k] < far_away;
@@ -588,7 +589,8 @@ void dy::observeSandboxMind(entt::registry& reg, entt::entity e, AgentIO& io) {
             row[O::row_prey] = b.species != a.species && life.predator && !other_predator ? 1.f : 0.f;
             row[O::row_predator] = b.species != a.species && other_predator && !life.predator ? 1.f : 0.f;
             row[O::row_male] = b.male ? 1.f : 0.f;
-            row[O::row_mating] = other_bot.mode == (int) AnimalMode::Mate && isAdult(sb, b) ? 1.f : 0.f;
+            // A possible mate (an adult of its species and of the other sex, itself an adult): 0.5, 1 when it is in Mate mode
+            if(b.species == a.species && b.male != a.male && isAdult(sb, b) && isAdult(sb, a)) row[O::row_mating] = other_bot.mode == (int) AnimalMode::Mate ? 1.f : 0.5f;
         }
         row[O::row_size] = std::min(other_bot.body->mass / (3.f * std::max(body.mass, 1e-3f)), 1.f);
         row[O::row_seen] = 1.f;

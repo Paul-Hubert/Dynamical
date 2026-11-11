@@ -14,9 +14,9 @@
   "walker_episode": 33.3,
   "grass": { "cell": 1.0, "cover": 0.55, "patch": 60.0, "shortest": 0.55, "tallest": 1.0, "stubble": 0.04, "regrow": 600.0, "seed": 1337 },
   "defaults": {
-    "adult": 120.0, "gestation": 60.0, "old": 1200.0, "heal": 300.0, "mate_time": 3.0, "rot": 300.0,
-    "work": 0.4, "rest_drain": 0.6, "rest_heal": 3.0, "turn_radius": 1.5, "feed_speed": 0.6,
-    "mate_energy": 0.5, "mate_reach": 1.5, "birth_cost": 0.3, "newborn_energy": 0.7, "young_scale": 0.6,
+    "adult": 120.0, "gestation": 60.0, "old": 1200.0, "heal": 300.0, "mate_time": 2.0, "rot": 300.0,
+    "work": 0.1, "rest_drain": 0.6, "rest_heal": 3.0, "turn_radius": 1.5, "feed_speed": 0.6,
+    "mate_energy": 0.5, "mate_reach": 2.0, "birth_cost": 0.3, "newborn_energy": 0.7, "young_scale": 0.6,
     "fall_damage": 0.08, "stun": 1.5
   },
   "species": {

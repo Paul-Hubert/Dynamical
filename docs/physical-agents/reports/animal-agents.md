@@ -28,6 +28,10 @@ trainer. Then `tools/animal_eval.py --run <run>` and `tools/animal_video.py --sp
 - **The red deer walks.** After 20M steps on level ground (1 h 45 min, never restarted) it covers 1.00 of the
   commanded speed along the commanded heading, with no fall in 512 episodes, and lifts each hoof 0.70 to 0.77 times a
   second where its demonstrations lift it 0.70 to 0.74 times. At 10M it was still a shuffle at four times that pace.
+- **It stands, walks and runs** (added after the run, see "Stand, walk and run"): trained again for 20M steps on orders
+  from 0 to its run clip's 3.47 m/s, speed alone saying which, it does 0.95 of the walk's orders and 0.94 of the
+  run's and stands at 0.12 m/s, with no fall in 512 episodes. Its heading is held less well than by the walk-only
+  policy (9.0° against 3.0°).
 - **The human walker's tests pass unchanged** (golden rollouts included); its two params files were changed by
   another session, not by this run (see the end).
 
@@ -312,6 +316,110 @@ finds alone); give the speed of the order a reward on both sides (it holds half 
 the demonstrations as above for every animal trained, since "no fall at the commanded speed" was already true at 15M
 of a gait I did not check there.
 
+## Stand, walk and run: the red deer, 20M
+
+Asked after the run above: orders to stand still and to run, beside the walk. Three choices were the user's: it is the
+walker that learns them (not the mind of docs/action-agents.md), **speed alone says which** (one commanded speed from
+0 to the run clip's, no flag and no new observation), and the red deer is trained from scratch for 20M steps.
+
+```
+build/venv/Scripts/python tools/train_animal.py --species deer_red --ranges gaits_basic --params animal_gaits --max-steps 20000000
+build/venv/Scripts/python tools/animal_eval.py --run <run>
+build/venv/Scripts/python tools/animal_orders_video.py --run <run>
+```
+
+**What was added.**
+
+- **Orders** (`GaitRanges`: `idle`, `run`, `run_speed`, `run_radius`; `resources/agents/ranges/gaits_basic.json`): of
+  100 draws 15 stand still, 35 run at 0.75 to 1 of the run clip's speed on turns of 8 to 24 lengths, the others walk as
+  `walk_basic` does. The body file gains `run_speed` and `run_clip` (the red deer: `Run_forward_IP`, 3.47 m/s, 3.4
+  times its walk); an animal whose run is not read never draws one. Ranges that only walk draw what they drew, number
+  for number (`AA.10`).
+- **Demonstrations**: a recorded walk is a run from end to end (35 in 100) or a walk that also stands. Standing is the
+  body's standing pose: as the command falls under half the slowest walk, the pose is blended to it joint by joint.
+  There is no idle clip in it and **no walk that becomes a run**: the policy never sees that change demonstrated.
+- **Reward** (`resources/agents/params/animal_gaits.params.json`, `over_speed` 1, `life_reward` 0.1): going faster
+  than the order costs what going slower loses, so an order to stand is one to stand still; a decision alive earns
+  0.1, and an order that is not followed never loses more than that (`-life_reward tanh`): a fall is never the better
+  answer. `animal.params.json` is unchanged, the walk-only runs and the sandbox keep their reward.
+- **Evaluation** per kind of order (`idle`, `walk`, `run` under `kinds` in the summary), and the film's tour for ranges
+  that stand and run.
+
+**A fault found on the way: gait clips that do not loop.** Seven walk and run clips of the library are not marked as
+loops (the red deer's run, `buffalo_2`'s walk and run, `chick`'s, `horse_farm`'s). `sample()` clamps those at their last
+frame, so the procedural gait bent a frozen body from the second cycle on: the deer's run left its limits by 20° and
+flipped a leg once a cycle. The loader now loops every clip of kind walk, trot or run. The deer's run after it: limits
+held, planted feet slide 0.03 m/s. Of the others only `buffalo_2` has an agent: it was recording its **walk** with
+that fault, and its row in the tables above was measured before the fix and not again.
+
+**The ground was too small for a run.** `ground_flat` is 150 m wide and every episode starts at its middle: 21 s of
+run in a line reach the edge. The 2 falls in 512 episodes of the first evaluation (a fore thigh on the ground) were
+that edge: on a ground of 1200 m, same policy, same draws, **0 of 512**. The animal worlds now use
+`ground_flat_wide`; this run trained on the small one (a few episodes in a thousand ended there), and the numbers
+below are on the wide one (a copy of the run's frozen engine with that one file changed). `animal_orders_world.json`
+(the orders of the sandbox, up to 2.6 walks) still uses the small ground: not mine to change.
+
+**The run.** `animal_deer_red_gaits_20m`, 20M steps in 7472 s, **2680 steps/s**, beside `puppets_r1` of another
+session and this session's builds. Exit 0, no restart. The demonstration: 18000 decisions in 60 walks (2895 standing,
+7905 walking, 7200 running), speed 1.00 of the order, no fall, no flip of the heading. Its checks do **not** all pass:
+a limit left by 1.6° on 8 ticks of 35940 (`hip_1_f.L`), the fore hooves' axis jumps 0.64 rad on 39 decisions (they
+flick at lift-off in the run), planted feet slide 0.25 m/s (the blend to the standing pose moves them), a fore hoof
+6.6 cm under the ground in the run.
+
+![curves](figures/animal_deer_red_gaits_20m_curves.png)
+
+| Steps | Training: death rate | Extrinsic | D(expert) / D(policy) | Eval: episodes ending in a fall | Standing: speed | Walk: along the order / ordered | Run: along the order / ordered | Heading error |
+|---|---|---|---|---|---|---|---|---|
+| 5M | 0.21 | 217 | 0.50 / 0.50 | 0 of 512 | 0.86 m/s | 0.72 | 0.67 | 43.8° |
+| 10M | 0.09 | 311 | 0.59 / 0.42 | 27 of 501 (head 14, fore thigh 4, trunk low 9) | 0.21 m/s | 0.84 | 0.94 | 17.2° |
+| 15M | 0.02 | 337 | 0.59 / 0.43 | 30 of 500 (head 12, thighs 18) | 0.18 m/s | 0.89 | 0.99 | 9.1° |
+| **20M** | 0 | 351 | 0.65 / 0.40 | **0 of 512** | 0.12 m/s | **0.95** (1.00 m/s of 1.05) | **0.94** (2.74 m/s of 2.91) | 9.0° |
+| 20M, actions sampled as in training | | | | 0 of 512 | 0.20 m/s | 0.95 | 0.95 | 9.5° |
+
+"Standing" is the speed of the trunk over all the time an order to stand is in force, the 1 to 2 s it takes to stop
+from a run included (the eased command is 0.06 m/s over that time).
+
+- **It does the three.** No fall, 0.95 of the walk's orders and 0.94 of the run's. The walk-only policy did 1.00 of
+  its orders and held its heading to 3.0°; this one is at 9.0°, with 3.4 times the range of speeds to cover in the
+  same 20M steps.
+- **It falls on the way there**: 5 to 6 % of the episodes at 10M and 15M, on its head or a fore thigh, none at 5M
+  (when it barely runs) and none at 20M. One run: I do not know that 20M is always past it.
+- **It walks later than it runs**: the run is at 0.94 of its orders at 10M, the walk at 0.84.
+
+**The film.** `build/runs/animal_videos/animal_deer_red_gaits_20m_orders.mp4`: one take of 118 s, no fall, on the wide
+ground. From its log, the first 2 s of each order left out:
+
+| Order | Asked | Does |
+|---|---|---|
+| Stand, from the start (5 s) | 0 | 0.02 m/s |
+| Walk, straight (8 s) | 1.01 m/s | 0.99 m/s |
+| Stand, from the walk (6 s) | 0 | still after 3.4 s, 1.0 m further |
+| Walk again (6 s) | 1.01 m/s | 0.85 m/s |
+| Run, straight, the run's speed (8 s) | 3.47 m/s | 3.38 m/s |
+| Run, left, radius 8 lengths, slowest (10 s, 88°) | 2.60 m/s | 2.55 m/s |
+| Run, right, radius 8 lengths, fastest (10 s, 110°) | 3.47 m/s | 3.16 m/s |
+| Stand, from the run (6 s) | 0 | still after 1.4 s, 2.2 m further |
+| Walk, left, radius 4 lengths, slowest (8 s) | 0.81 m/s | **0.67 m/s** |
+| Walk, right, radius 4 lengths, fastest (8 s) | 1.22 m/s | 1.13 m/s |
+| Run, left, radius 24 lengths (8 s) | 3.04 m/s | 2.99 m/s |
+| Stand (5 s) | 0 | 0.02 m/s, still after 1.6 s |
+| Drawn as in training, 30 s | 1.36 m/s | 1.34 m/s |
+
+- **It stops faster from a run than from a walk**, and from the walk it shuffles on the spot for 3 s first. "Still" is
+  the trunk under 0.2 m/s for a second.
+- It is slow to walk off after standing (0.85 of the order over 4 s) and slow in the slowest tight turn (0.67 of
+  0.81); the tightest run turn at full speed loses a tenth of the speed.
+- The first take of this film had a fall in it, at the same place with three seeds: the deer had reached the edge of
+  the 150 m ground. That is how the ground was found.
+- I looked at frames, I cannot watch it: standing it is on four legs at its standing height; of the run I
+  saw a few frames, legs gathered under it, and nothing wrong in them. I did not measure its gait against the demonstrations as for the walk above.
+
+**Limits.** One animal, one run, level hard ground. Orders between 1.2 walks and 0.75 of the run (1.2 to 2.6 m/s for
+the deer) are never drawn; the command passes through them while it eases, 0.5 s. Standing is a held pose, the animal
+does not graze or look around. `wolf_2`'s run still does not record cleanly (limits by 14°), and no other animal's run
+was looked at. Every body file is generated again on the next training of its animal (the generator changed), which
+empties the demonstration caches once.
+
 ## Every animal: 100k steps
 
 `tools/train_animal.py --species all --max-steps 100000 --prefix aa100k`, one frozen engine for the queue, beside the
@@ -327,9 +435,9 @@ passed.
 | Soft ground | Built as the prompt's default: the hard ground stays, the layer is `depth` over it, a body inside is dragged against its velocity (3 weights of the body per walk speed sideways, a quarter of that upwards, nothing downwards); the depth is drawn per episode and is in the header. Tested: the deer stands in it, the direction of the drag, a limp body comes to rest (`AA.9`). A 50k-step training on `walk_soft` runs through. **Not validated:** no policy was trained in it, and the first resistance I set (60) stopped a body within a step on every axis, up included |
 | Terrain | `animal_terrain_train`, `_eval`, `_view`, `animal_demo_terrain` load, spawn on routes in the slope band, end a limp animal on the colliders and record (`AA.8`). A 50k-step training with a demonstration recorded on the routes runs through (`--terrain`). No policy was trained on it |
 | Slope band, red deer | On planes, straight up or down at the clip's speed, 1500 decisions each: limits hold, no jump, no flip, no fall, speed exact from **-20° to +20° along and to 15° across** (`build/runs/animal_slopes/deer_red.md`, `tools/animal_slope_band.py`). The terrain worlds default to 15° up, 15° down, 12° across. Steeper was not measured, and only one animal was |
-| Run | `wolf_2` records 3000 decisions, but leaves a limit by 14° on a third of the ticks, stretches its bones by its own height and slides its planted feet at 0.55 m/s: not usable as it is |
+| Run | The red deer's run records and trains (see "Stand, walk and run"). `wolf_2` records 3000 decisions, but leaves a limit by 14° on a third of the ticks, stretches its bones by its own height and slides its planted feet at 0.55 m/s: not usable as it is |
 | Trot | No clip of the 38 animals is tagged `trot` (the red deer's `Trot_forward_IP` is tagged `other`): nothing to record. The recorder says so and exits |
-| Looking at trot and run | Not done; the run's numbers above are all I have |
+| Looking at trot and run | The red deer's run: its film and a few frames. No trot, no other animal's run |
 
 ## What changed in the engine, and why
 

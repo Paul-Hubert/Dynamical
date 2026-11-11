@@ -196,6 +196,7 @@ build/venv/Scripts/python tools/train_animal.py --species deer_red --ranges walk
 build/venv/Scripts/python tools/animal_eval.py --run animal_deer_red_walk_basic
 build/venv/Scripts/python tools/animal_video.py --species deer_red --run animal_deer_red_walk_basic
 build/venv/Scripts/python tools/animal_orders_video.py --run animal_deer_red_walk_basic   # one take through every order of its ranges
+build/venv/Scripts/python tools/train_animal.py --species deer_red --ranges gaits_basic --params animal_gaits --max-steps 20000000   # stands, walks and runs
 ```
 
 - `src/logic/animals/animal_body.{h,cpp}`: `generateAnimalBody` (which joints are bodies, shapes and masses from the
@@ -206,15 +207,21 @@ build/venv/Scripts/python tools/animal_orders_video.py --run animal_deer_red_wal
   recorder of demonstrations (`AnimalGaitPlayer`: `proceduralWalk` played on the kinematic body, `AnimalChecks`).
 - `src/logic/animals/gait_walk.{h,cpp}`: `WalkCommand` (the speed and turn drawn from `GaitRanges`, the same object
   for the task and for the recorded walk) and `GaitWalk` (one animal walking procedurally, no registry).
-- Ranges: `resources/agents/ranges/walk_basic.json`, `walk_style.json`, `walk_soft.json`. Scenes: `animal_train`,
+- Standing and running are orders too, by speed alone: ranges with `idle` and `run` (`gaits_basic.json`: 15 draws in
+  100 stand, 35 run at 0.75 to 1 of the run clip's speed, `AnimalBody::run_speed`), the reward of
+  `resources/agents/params/animal_gaits.params.json` (speed over the order costs too). A recorded walk is a run or a
+  walk that also stands. The red deer does the three after 20M steps (the report's "Stand, walk and run").
+- Ranges: `resources/agents/ranges/walk_basic.json`, `walk_style.json`, `walk_soft.json`, `gaits_basic.json`. The
+  worlds stand on `ground_flat_wide` (1200 m: a run leaves the 150 m of `ground_flat`). Scenes: `animal_train`,
   `animal_eval`, `animal_view`, `animal_demo`, `animal_demo_view`, `animal_stand` and their `_terrain` variants.
 
 ## Not done
 
 - The 12 animals whose rig holds the feet with controls, and `cat_farm` whose skeleton is not one tree: no body.
   The library's men have bodies of their own, generated like the others; they are not mapped on the walker's rig.
-- Trot and run: no clip of the 38 animals is tagged trot; a run is recorded like the walk but leaves its joint limits
-  and stretches its bones (see the report). Animals that hop (hare, rabbit) let their feet slide more (0.3 to 0.7 m/s).
+- Trot and run: no clip of the 38 animals is tagged trot. The red deer's run records and trains; `wolf_2`'s leaves its
+  joint limits and stretches its bones, the others were not looked at (see the report). No walk that becomes a run in
+  the demonstrations, no idle clip in the standing. Animals that hop (hare, rabbit) let their feet slide more (0.3 to 0.7 m/s).
 - The pose of a walking animal does not blend with the walk of the clip it comes from beyond the 0.3 s fade.
 - Herds: no flight, no predators, no drinking or resting clips; an animal can still clip a low branch.
 - Drawing: no shadows of the animals, no instancing, no fur shells (the two fur models are plain).

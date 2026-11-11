@@ -99,10 +99,12 @@ void AnimalAgentViewSys::tick(double dt) {
     int order = -1;
     if(!orders.empty()) {
         WalkCommand& command = bot->command;
+        tour += std::max(command.time - last_time, 0.f);
+        last_time = command.time;
         float from = 0.f;
         for(size_t i = 0; i < orders.size(); i++) {
             order = (int) i;
-            if(command.time < from + orders[i][0]) break;
+            if(tour < from + orders[i][0]) break;
             from += orders[i][0];
         }
         const auto& o = orders[order];

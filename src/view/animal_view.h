@@ -52,6 +52,8 @@ private:
     float view_heading = 0.f;
     bool has_focus = false;
     std::vector<std::array<float, 3>> orders;
+    // The time of the orders runs on through a fall: the episode that follows takes the tour where it was
+    float tour = 0.f, last_time = 0.f;
     float marks = 0.f;
     std::vector<entt::entity> tiles;
     std::string log_path;

@@ -580,9 +580,16 @@ TEST_CASE("SANDBOX.7 puppets: two adults in Mate mode side by side, a gestation,
     seconds(w, 4.);
     CHECK(!w.reg.get<SandboxAnimal>(female).pregnant);
     decide(w, male, { -1.f, 0.f, 0.f, 0.f }, AnimalMode::Mate);
-    seconds(w, 2.);
+    seconds(w, 1.2);
     CHECK(!w.reg.get<SandboxAnimal>(female).pregnant);
-    CHECK(w.reg.get<SandboxAnimal>(female).mating > 1.f);
+    CHECK(w.reg.get<SandboxAnimal>(female).mating > 0.8f);
+    {
+        // The signal a reward file reads: how far the pair is to a conception
+        std::vector<float> signals(SandboxSignal::count);
+        sandboxSignals(w.reg, female, 0.2f, signals.data());
+        CHECK(signals[SandboxSignal::mating] > 0.4f);
+        CHECK(signals[SandboxSignal::mating] < 0.7f);
+    }
     seconds(w, 1.5);
     REQUIRE(w.reg.get<SandboxAnimal>(female).pregnant);
     CHECK((w.reg.get<SandboxAnimal>(female).father == male));

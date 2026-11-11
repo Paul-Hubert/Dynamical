@@ -47,6 +47,7 @@ namespace SandboxSignal {
         // m the nearest one came closer over the decision (negative: further), at most 3 either way; 0 when there
         // was none at its start or at its end
         predator_closing, prey_closing, mate_closing, carcass_closing,
+        mating,                                         // how far the pair is to a conception: 0 to 1 of the time it takes together
         count
     };
 }
@@ -176,7 +177,7 @@ namespace MindObs {
     constexpr int row_own = 4, row_prey = 5, row_predator = 6, row_carcass = 7;
     constexpr int row_male = 8;
     constexpr int row_size = 9;             // its mass over three times the observer's, at most 1
-    constexpr int row_mating = 10;          // an adult in Mate mode
+    constexpr int row_mating = 10;          // a possible mate (adult, its species, the other sex; the observer an adult too): 0.5, and 1 in Mate mode
     constexpr int row_seen = 11;            // 1 seen, 0.5 only heard (then: no kind, no sex, no size, a rough distance)
     constexpr int row = 12;
 }
