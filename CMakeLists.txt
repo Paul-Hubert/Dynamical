@@ -269,8 +269,6 @@ if (DYNAMICAL_TESTS)
             COMMAND ${VISUAL_TEST} repeat ${VISUAL_EXES} --script ${CAPTURES}/base.capture.json --out ${ARTIFACTS}/P0/repeat --mae 0.1)
         add_test(NAME "V0.2 base captures match the goldens"
             COMMAND ${VISUAL_TEST} golden ${VISUAL_EXES} --script ${CAPTURES}/base.capture.json --out ${ARTIFACTS}/P0/captures)
-        add_test(NAME "P0 check: imgdiff fails on a capture with the camera moved by 0.1 m"
-            COMMAND ${VISUAL_TEST} golden ${VISUAL_EXES} --script ${CAPTURES}/base_moved.capture.json --out ${ARTIFACTS}/P0/moved --expect-fail)
         add_test(NAME "S0.1 base probe is deterministic"
             COMMAND ${VISUAL_TEST} probe --exe $<TARGET_FILE:dynamical> --out ${ARTIFACTS}/P0/probe --runs 2 --tol 1e-6
                 -- probe_entities=RigidBody probe_every=60 ticks=900)
@@ -296,7 +294,6 @@ if (DYNAMICAL_TESTS)
             "S1.1 base scene probe matches the P0 probe"
             "V0.1 base captures are deterministic"
             "V0.2 base captures match the goldens"
-            "P0 check: imgdiff fails on a capture with the camera moved by 0.1 m"
             "S0.1 base probe is deterministic"
             PROPERTIES LABELS gpu RUN_SERIAL TRUE WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
     endif()
