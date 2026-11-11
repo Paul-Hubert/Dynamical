@@ -1,0 +1,1814 @@
+{
+  "systems": [
+    {
+      "name": "InputSys",
+      "kind": "system",
+      "registry_name": "Input",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/view/systems",
+      "sources": [
+        "src/view/systems/input.h",
+        "src/view/systems/input.cpp"
+      ],
+      "summary": "Emplaces the Input context variable and fills it each frame from the SDL event queue and window state."
+    },
+    {
+      "name": "UISys",
+      "kind": "system",
+      "registry_name": "UI",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/view/systems",
+      "sources": [
+        "src/view/systems/ui.h",
+        "src/view/systems/ui.cpp"
+      ],
+      "summary": "Feeds Input into ImGui's IO, starts the ImGui frame and masks mouse clicks ImGui captured."
+    },
+    {
+      "name": "TimeSys",
+      "kind": "system",
+      "registry_name": "Time",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/view/systems",
+      "sources": [
+        "src/view/systems/system_list.h",
+        "src/view/systems/time.cpp"
+      ],
+      "summary": "Legacy in-game calendar clock (Time context variable) with pause key, speed radio buttons and a frame-time window."
+    },
+    {
+      "name": "PlayerControlSys",
+      "kind": "system",
+      "registry_name": "PlayerControl",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/view/systems",
+      "sources": [
+        "src/view/systems/system_list.h",
+        "src/view/systems/player_control.cpp"
+      ],
+      "summary": "Emplaces the desktop Camera and flies it with WASD/Space/Ctrl and right-mouse look; R moves the VR play area under it."
+    },
+    {
+      "name": "VRControlSys",
+      "kind": "system",
+      "registry_name": "VRControl",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/view/systems",
+      "sources": [
+        "src/view/systems/system_list.h",
+        "src/view/systems/vr_control.cpp"
+      ],
+      "summary": "VR stick locomotion and turning of the VRRig, right-trigger box throwing, and kinematic controller boxes following the hands."
+    },
+    {
+      "name": "DebugMenuSys",
+      "kind": "system",
+      "registry_name": "DebugMenu",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/view/systems",
+      "sources": [
+        "src/view/systems/system_list.h",
+        "src/view/systems/debug_menu.cpp"
+      ],
+      "summary": "ImGui 'Dynamical' window: frame time, camera, chunk counts, render toggles, physics stats, grass parameters, VR state."
+    },
+    {
+      "name": "BoxRingSys",
+      "kind": "system",
+      "registry_name": "BoxRing",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/view/systems",
+      "sources": [
+        "src/view/systems/system_list.h",
+        "src/view/systems/base_scene.cpp"
+      ],
+      "summary": "At init drops a ring of 12 dynamic boxes above the terrain around the origin (base scene)."
+    },
+    {
+      "name": "ModelLineupSys",
+      "kind": "system",
+      "registry_name": "ModelLineup",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/view/systems",
+      "sources": [
+        "src/view/systems/system_list.h",
+        "src/view/systems/base_scene.cpp"
+      ],
+      "summary": "At init lines up every glTF file of resources/models (except box.gltf) as a dynamic box-collider model (base scene)."
+    },
+    {
+      "name": "BoxThrowerSys",
+      "kind": "system",
+      "registry_name": "BoxThrower",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/view/systems",
+      "sources": [
+        "src/view/systems/system_list.h",
+        "src/view/systems/base_scene.cpp"
+      ],
+      "summary": "Left click (not captured by ImGui) throws a 1 m dynamic box from the desktop camera."
+    },
+    {
+      "name": "WorldStepperSys",
+      "kind": "system",
+      "registry_name": "WorldStepper",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/view",
+      "sources": [
+        "src/view/world_stepper.h",
+        "src/view/world_stepper.cpp"
+      ],
+      "summary": "Steps the scene's Worlds in real time from the frame dt (fixed-step accumulator, max 8 ticks a frame) with a pause/step panel."
+    },
+    {
+      "name": "FixedCameraSys",
+      "kind": "system",
+      "registry_name": "FixedCamera",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/view",
+      "sources": [
+        "src/view/fixed_camera.h",
+        "src/view/fixed_camera.cpp"
+      ],
+      "summary": "Places the desktop Camera once at init from JSON pos / look_at."
+    },
+    {
+      "name": "SphereViewSys",
+      "kind": "system",
+      "registry_name": "SphereView",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/view",
+      "sources": [
+        "src/view/sphere_view.h",
+        "src/view/sphere_view.cpp"
+      ],
+      "summary": "Follow camera, velocity bars, rotation dots and an ImGui panel for one world's SphereAgent."
+    },
+    {
+      "name": "RollerPlayerSys",
+      "kind": "system",
+      "registry_name": "VRRoller / DesktopRoller",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/view",
+      "sources": [
+        "src/view/roller_player.h",
+        "src/view/roller_player.cpp"
+      ],
+      "summary": "Turns VR (stick or lean) or desktop (WASD) input into a steerSphere command for one world's sphere and puts the play area / camera on it."
+    },
+    {
+      "name": "WorldViewSys",
+      "kind": "system",
+      "registry_name": "WorldView",
+      "scope": "Host",
+      "lane": "Post",
+      "folder": "src/view",
+      "sources": [
+        "src/view/world_view.h",
+        "src/view/world_view.cpp"
+      ],
+      "summary": "Mirrors the bodies and grounds of the worlds into host entities (Transform + ModelRenderable + WorldViewLink) so the renderer can draw them."
+    },
+    {
+      "name": "Game",
+      "kind": "service",
+      "registry_name": "—",
+      "scope": "n/a",
+      "lane": "per-frame loop owner (called from main)",
+      "folder": "src/view",
+      "sources": [
+        "src/view/game.h",
+        "src/view/game.cpp"
+      ],
+      "summary": "Owns the host registry, emplaces Settings/tf::Executor/RunArgs/FrameClock/Worlds, builds renderer and SystemSet from the scene, runs the frame loop."
+    },
+    {
+      "name": "Capture",
+      "kind": "service",
+      "registry_name": "—",
+      "scope": "n/a",
+      "lane": "per-frame call from Game::start",
+      "folder": "src/view",
+      "sources": [
+        "src/view/capture.h",
+        "src/view/capture.cpp"
+      ],
+      "summary": "Capture script runner: injects scripted SDL input, moves the desktop Camera per shot, waits for terrain and writes PNGs."
+    }
+  ],
+  "components": [
+    {
+      "name": "Input",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/view/components",
+      "sources": [
+        "src/view/components/input.h"
+      ],
+      "summary": "Per-frame keyboard, mouse and window state of the desktop window.",
+      "description": "Host context variable emplaced by InputSys's constructor (so it exists as soon as the scene's host systems are built). InputSys rewrites it every frame from SDL events: action bits in `on` follow key down/up (they stay set while the key is held), click flags and wheel/motion deltas are reset at the start of InputSys::tick and are therefore valid for one frame. UISys consumes `text` and masks clicks/downs captured by ImGui. Several systems consume one-shot action bits by clearing them: TimeSys clears PAUSE, PlayerControlSys clears VR_RIG, Game::start clears EXIT. DebugMenuSys sets VR_RIG from a button. Not registered with the component registry; Game::start requires it (reg.ctx().get<Input>() after init), so every rendered scene must list the Input system.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "text",
+          "type": "std::optional<std::array<char, SDL_TEXTINPUTEVENT_TEXT_SIZE>>",
+          "default": "std::nullopt",
+          "desc": "Last SDL_TEXTINPUT of the frame; consumed (reset) by UISys."
+        },
+        {
+          "name": "on",
+          "type": "std::bitset<Action::END_ENUM>",
+          "default": "all false",
+          "desc": "Action bits. Mapped keys: W FORWARD, S BACKWARD, A LEFT, D RIGHT, P PAUSE, Space UP, LCtrl DOWN, LShift SPRINT, R VR_RIG, M MENU, K DEBUG, Backspace BACKSPACE, Left ROTATE_LEFT, Right ROTATE_RIGHT, Up ANGLE_UP, Down ANGLE_DOWN, Tab TAB. RESIZE set on window resize (never cleared by InputSys); EXIT set by SDL_QUIT or Escape."
+        },
+        {
+          "name": "mousePos",
+          "type": "glm::ivec2",
+          "default": "uninitialized",
+          "desc": "Mouse position in window pixels, updated only while focused."
+        },
+        {
+          "name": "mouseWheel",
+          "type": "glm::ivec2",
+          "default": "uninitialized (zeroed each tick)",
+          "desc": "Wheel of the last SDL_MOUSEWHEEL event this frame (not summed)."
+        },
+        {
+          "name": "mouseDelta",
+          "type": "glm::ivec2",
+          "default": "uninitialized (zeroed each tick)",
+          "desc": "Sum of relative mouse motion this frame."
+        },
+        {
+          "name": "screenSize",
+          "type": "glm::ivec2",
+          "default": "uninitialized",
+          "desc": "SDL_GetWindowSize of the desktop window, each tick."
+        },
+        {
+          "name": "mouseLeft / mouseRight / mouseMiddle",
+          "type": "bool",
+          "default": "false",
+          "desc": "Raw button held state from SDL."
+        },
+        {
+          "name": "leftDown / rightDown / middleDown",
+          "type": "bool",
+          "default": "false",
+          "desc": "Button held state; UISys forces false while ImGui wants the mouse, else copies the raw state."
+        },
+        {
+          "name": "leftClick / rightClick / middleClick",
+          "type": "bool",
+          "default": "false",
+          "desc": "Button pressed this frame; UISys clears them while ImGui wants the mouse."
+        },
+        {
+          "name": "focused",
+          "type": "bool",
+          "default": "false",
+          "desc": "Window has keyboard focus (SDL focus gained/lost events)."
+        },
+        {
+          "name": "window_showing",
+          "type": "bool",
+          "default": "true",
+          "desc": "False after minimize, true after restore."
+        }
+      ]
+    },
+    {
+      "name": "Time",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/view/components",
+      "sources": [
+        "src/view/components/time.h"
+      ],
+      "summary": "Legacy in-game calendar clock in integer game seconds.",
+      "description": "Host context variable emplaced by TimeSys::preinit and only used by TimeSys. Game time advances by speed * speed_modifier * frame_dt * 10 game seconds per frame (truncated to uint64). The header also defines Date (calendar breakdown: 60 s, 60 min, 24 h, 28-day months, 4 months named Spring/Summer/Automn/Winter), which is not stored in a registry. Leftover of the archived tile-map simulation; nothing else reads it.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "current",
+          "type": "time_t (uint64_t)",
+          "default": "0",
+          "desc": "Game seconds since start."
+        },
+        {
+          "name": "speed",
+          "type": "time_t",
+          "default": "60",
+          "desc": "Game seconds per real second (before the x10 factor and the modifier)."
+        },
+        {
+          "name": "speed_modifier",
+          "type": "time_t",
+          "default": "1",
+          "desc": "0 paused; radio buttons offer 0, 1, 3, 10, 50."
+        },
+        {
+          "name": "last_speed_modifier",
+          "type": "time_t",
+          "default": "1",
+          "desc": "Last non-zero modifier, restored when unpausing with P."
+        },
+        {
+          "name": "dt",
+          "type": "time_t",
+          "default": "0",
+          "desc": "Game seconds added this frame."
+        },
+        {
+          "name": "minute / hour / day / month / year",
+          "type": "static constexpr time_t",
+          "default": "60 / 3600 / 86400 / 2419200 / 9676800",
+          "desc": "Calendar constants."
+        }
+      ]
+    },
+    {
+      "name": "ModelRenderable",
+      "kind": "component",
+      "registry": "host",
+      "folder": "src/view/components",
+      "sources": [
+        "src/view/components/model_renderable.h"
+      ],
+      "summary": "Draws the ModelC held by another entity at this entity's Transform, tinted.",
+      "description": "Per-entity host component read by the renderer's ModelPass (view<const Transform, const ModelRenderable>). `model` is the entity returned by ModelManager::load / add, which holds the GPU ModelC. Emplaced by spawnBox (BoxRingSys, BoxThrowerSys, DebugMenuSys, VRControlSys), ModelLineupSys, VRControlSys (hands), SphereViewSys (bar and dot parts), WorldViewSys (world body mirrors) and the scene component `ModelRenderable` (register_view.cpp), which needs the renderer's ModelManager. Only meaningful in the host registry of dynamical (world registries use ModelRef instead).",
+      "scene_json": "\"ModelRenderable\": { \"path\": \"<file under resources/>\", \"tint\": [r, g, b, a] (default [1,1,1,1]) }. Unknown keys throw (JsonFields::finish). Throws ComponentError if there is no ModelManager (no renderer) or the model cannot be loaded (/path). Saved back as { \"tint\": [...] } only (the path is not saved).",
+      "fields": [
+        {
+          "name": "model",
+          "type": "entt::entity",
+          "default": "(constructor argument)",
+          "desc": "Host entity holding the ModelC; entt::null draws nothing (renderer side)."
+        },
+        {
+          "name": "tint",
+          "type": "glm::vec4",
+          "default": "glm::vec4(1.f)",
+          "desc": "RGBA multiplier."
+        }
+      ]
+    },
+    {
+      "name": "WorldViewLink",
+      "kind": "component",
+      "registry": "host",
+      "folder": "src/view",
+      "sources": [
+        "src/view/world_view.h"
+      ],
+      "summary": "Marks a host entity created by WorldViewSys as the mirror of one shape of a world entity.",
+      "description": "Emplaced by WorldViewSys::tick with Transform and ModelRenderable when a world body or ground is first seen; the host entity is destroyed when the source is no longer seen (or the model cannot be resolved), and all are destroyed in WorldViewSys::finish. WorldViewSys keeps its own map (world, entity) -> host entity and never reads this component back; it exists so other code can identify mirror entities.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "world",
+          "type": "uint32_t",
+          "default": "(set at creation)",
+          "desc": "Index of the world in Worlds."
+        },
+        {
+          "name": "entity",
+          "type": "entt::entity",
+          "default": "(set at creation)",
+          "desc": "Source entity in that world's registry."
+        }
+      ]
+    },
+    {
+      "name": "WorldStepperState",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/view",
+      "sources": [
+        "src/view/world_stepper.h"
+      ],
+      "summary": "Interpolation factor and pause state of the real-time world stepper.",
+      "description": "Host context variable emplaced by WorldStepperSys::preinit and rewritten each tick (when worlds exist). alpha in [0, 1) is where the frame sits between the last two fixed ticks (1 when paused); WorldViewSys, SphereViewSys and RollerPlayerSys use it to interpolate PhysicsPose. paused/step_once are toggled by the stepper's own ImGui panel. Readers fall back to alpha = 1 when it is absent.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "alpha",
+          "type": "double",
+          "default": "1.",
+          "desc": "accumulator / h after stepping, or 1 when paused."
+        },
+        {
+          "name": "h",
+          "type": "double",
+          "default": "1. / 60.",
+          "desc": "World 0's WorldClock::dt, refreshed each tick."
+        },
+        {
+          "name": "paused",
+          "type": "bool",
+          "default": "false",
+          "desc": "Panel checkbox; no real-time ticks while set."
+        },
+        {
+          "name": "step_once",
+          "type": "bool",
+          "default": "false",
+          "desc": "Panel Step button: pauses and runs exactly one tick on the next frame."
+        },
+        {
+          "name": "ticks",
+          "type": "uint64_t",
+          "default": "0",
+          "desc": "Total ticks stepped by the stepper."
+        }
+      ]
+    },
+    {
+      "name": "VRHands",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/view/systems",
+      "sources": [
+        "src/view/systems/vr_control.cpp"
+      ],
+      "summary": "The two host entities drawing (and colliding as) the VR controllers.",
+      "description": "Anonymous-namespace struct in vr_control.cpp, emplaced by VRControlSys::preinit. Filled in VRControlSys::init only when VRInput exists and is enabled and resources/models/box.gltf loads; each hand is then an entity with Transform (scale 0), ModelRenderable (box, blue left / red right) and a kinematic RigidBody of half extent 0.04. Not reachable from other translation units.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "hands",
+          "type": "entt::entity[2]",
+          "default": "{ entt::null, entt::null }",
+          "desc": "Left (0) and right (1) hand entities, entt::null when not created."
+        }
+      ]
+    },
+    {
+      "name": "tf::Executor",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/view",
+      "sources": [
+        "src/view/game.cpp"
+      ],
+      "summary": "The host's Taskflow thread pool.",
+      "description": "Emplaced default-constructed (one worker per hardware thread) by Game's constructor. Used by ChunkGeneratorSys, TerrainColliders and the Renderer's parallel command recording. WorldStepperSys does not pass it to Worlds::step, so worlds step sequentially in dynamical. Defined by Taskflow, not by the engine.",
+      "scene_json": null,
+      "fields": []
+    }
+  ],
+  "access": [
+    {
+      "system": "InputSys",
+      "component": "Input",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "constructor",
+      "details": "reg.ctx().emplace<Input>() in the constructor.",
+      "side_effects": []
+    },
+    {
+      "system": "InputSys",
+      "component": "Input",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Resets leftClick/rightClick/middleClick, mouseWheel, mouseDelta; then per SDL event sets on[RESIZE], focused, window_showing, on[EXIT], mapped action bits, mouse button flags, mouseDelta (summed), mouseWheel (last event), text; then screenSize and, when focused, mousePos.",
+      "side_effects": [
+        "drains the SDL event queue (SDL_PollEvent)",
+        "SDL_GetWindowSize, SDL_GetMouseState"
+      ]
+    },
+    {
+      "system": "InputSys",
+      "component": "Context*",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Dereferences reg.ctx().get<Context*>() for ctx.win (SDL_GetWindowSize).",
+      "side_effects": []
+    },
+    {
+      "system": "UISys",
+      "component": "Input",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Reads mouseLeft/Right/Middle, text, on[BACKSPACE], on[TAB], focused, mousePos, screenSize into ImGuiIO; resets text to nullopt; after ImGui::NewFrame clears leftClick/rightClick/middleClick and leftDown/rightDown/middleDown if io.WantCaptureMouse, else copies mouseLeft/Right/Middle into leftDown/rightDown/middleDown.",
+      "side_effects": [
+        "ImGui::NewFrame",
+        "writes ImGuiIO (MouseDown, MousePos, DisplaySize, DeltaTime, key and text events)"
+      ]
+    },
+    {
+      "system": "UISys",
+      "component": "RunArgs",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<RunArgs>(): when deterministic(), io.DeltaTime = frame dt instead of the SDL performance counter delta.",
+      "side_effects": []
+    },
+    {
+      "system": "TimeSys",
+      "component": "Time",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "preinit",
+      "details": "reg.ctx().emplace<Time>().",
+      "side_effects": []
+    },
+    {
+      "system": "TimeSys",
+      "component": "Time",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Toggles speed_modifier on PAUSE (restoring last_speed_modifier), sets speed_modifier from the radio buttons, updates last_speed_modifier, dt = speed * speed_modifier * dt * 10, current += dt.",
+      "side_effects": [
+        "ImGui windows 'Time' and 'Frame time'"
+      ]
+    },
+    {
+      "system": "TimeSys",
+      "component": "Input",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Reads on[PAUSE] and clears it; reads screenSize.x to pin the Time window to the top-right corner.",
+      "side_effects": []
+    },
+    {
+      "system": "PlayerControlSys",
+      "component": "Camera",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "preinit",
+      "details": "reg.ctx().emplace<Camera>() (default position (0,150,0), yaw 0, pitch -0.4).",
+      "side_effects": []
+    },
+    {
+      "system": "PlayerControlSys",
+      "component": "Camera",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "position = (0, surface + 20 or 0, 60), pitch = -0.3.",
+      "side_effects": []
+    },
+    {
+      "system": "PlayerControlSys",
+      "component": "std::shared_ptr<TerrainGenerator>",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "find<>(): surfaceHeight(0, 60) for the spawn height; skipped when absent.",
+      "side_effects": []
+    },
+    {
+      "system": "PlayerControlSys",
+      "component": "Camera",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "yaw/pitch from mouseDelta while rightDown (pitch clamped to +-1.55); position += normalized move * speed; sprinting = on[SPRINT]; reads forward()/right()/position/yaw for movement and for VR_RIG.",
+      "side_effects": []
+    },
+    {
+      "system": "PlayerControlSys",
+      "component": "Input",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Reads rightDown, mouseDelta, mouseWheel, on[FORWARD/BACKWARD/LEFT/RIGHT/UP/DOWN/SPRINT/VR_RIG]; clears on[VR_RIG] when handling it.",
+      "side_effects": [
+        "SDL_SetRelativeMouseMode every tick (on while the right button is down)"
+      ]
+    },
+    {
+      "system": "PlayerControlSys",
+      "component": "VRRig",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "On VR_RIG: rig.position = camera.position with y on the terrain surface (when the generator exists), rig.yaw = camera.yaw.",
+      "side_effects": []
+    },
+    {
+      "system": "PlayerControlSys",
+      "component": "std::shared_ptr<TerrainGenerator>",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): surfaceHeight under the camera when handling VR_RIG.",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "VRHands",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "preinit",
+      "details": "reg.ctx().emplace<VRHands>().",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "VRRig",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "rig.position.y = surfaceHeight(0, 0) when the TerrainGenerator exists (get<VRRig>: required).",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "std::shared_ptr<TerrainGenerator>",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "find<>(): ground height of the play area at the origin.",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "VRInput",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "find<>(): hands are only created when present and enabled.",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "ModelManager",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "load(\"./resources/models/box.gltf\") for the hand models; no hands if it fails.",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "VRHands",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "Stores the two hand entities.",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "Transform",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "Hand entities: Transform(0, identity, scale 0).",
+      "side_effects": [
+        "creates 2 host entities"
+      ]
+    },
+    {
+      "system": "VRControlSys",
+      "component": "ModelRenderable",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "Hand entities: box model, blue (left) / red (right).",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "RigidBody",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "Hand entities: Kinematic box, half_extent 0.04.",
+      "side_effects": [
+        "Jolt kinematic bodies created later by the physics systems"
+      ]
+    },
+    {
+      "system": "VRControlSys",
+      "component": "VRInput",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "session_running (early-out), focused, head.valid/rotation, left thumbstick, right thumbstick.x, right trigger_pressed, pose, linear_velocity, both hands' pose.",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "VRRig",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Reads stick_locomotion, transform(), yaw; writes position (stick move, y snapped to the terrain surface while moving) and yaw (right stick turn).",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "std::shared_ptr<TerrainGenerator>",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): surfaceHeight under the rig while moving.",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "VRHands",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Hand entities to place.",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "Transform",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Hand entities: position = rig * pose.position, rotation = rig yaw * pose.rotation, scale = 0.08 when the pose is valid else 0.",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "ModelManager",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "spawnBox calls ModelManager::load(\"./resources/models/box.gltf\") (cached after the first load). Right trigger press with a valid pose: size 0.3, 0.2 m in front of the hand, velocity 1.5 x hand velocity (world).",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "Transform",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "spawnBox emplaces Transform(position, identity, vec3(size)) on a new entity. Right trigger press with a valid pose: size 0.3, 0.2 m in front of the hand, velocity 1.5 x hand velocity (world).",
+      "side_effects": [
+        "creates a host entity per box"
+      ]
+    },
+    {
+      "system": "VRControlSys",
+      "component": "ModelRenderable",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "spawnBox emplaces ModelRenderable(box model, color). Right trigger press with a valid pose: size 0.3, 0.2 m in front of the hand, velocity 1.5 x hand velocity (world).",
+      "side_effects": []
+    },
+    {
+      "system": "VRControlSys",
+      "component": "RigidBody",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "spawnBox emplaces a default (Dynamic, Box) RigidBody with half_extent = size/2 and initial_velocity. Right trigger press with a valid pose: size 0.3, 0.2 m in front of the hand, velocity 1.5 x hand velocity (world).",
+      "side_effects": [
+        "PhysicsSys / RigidBodySys later creates the Jolt body"
+      ]
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "Settings",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Slider writes view_distance (256..2048); reads vr_mode for the 'No OpenXR headset' text.",
+      "side_effects": []
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "RenderSettings",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Checkboxes terrain/grass/models; sliders on grass_params tile_size, height, base_normal.xyz, noise_frequency, noise_amplitude.",
+      "side_effects": []
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "Camera",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "position for the text and for 'Drop 50 boxes' (position + forward() * 15).",
+      "side_effects": []
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "ChunkC",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "reg.view<ChunkC>().size() as loaded chunk count.",
+      "side_effects": []
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "ChunkGenerated",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "reg.view<ChunkGenerated>().size() as generated chunk count.",
+      "side_effects": []
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "ChunkReady",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "reg.view<ChunkReady>().size() as meshed chunk count.",
+      "side_effects": []
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "PhysicsStats",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): bodies, active_bodies, terrain_cells, terrain_triangles, step_ms, steps_last_frame, colliders_ms.",
+      "side_effects": []
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "VRInput",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): enabled, session_running, focused.",
+      "side_effects": []
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "VRRig",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "position (only when VRInput is enabled).",
+      "side_effects": []
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "Input",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Button 'Move play area to camera (R)' sets on[VR_RIG] (handled by PlayerControlSys next frame or later in the same frame if it runs after).",
+      "side_effects": []
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "ModelManager",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "spawnBox calls ModelManager::load(\"./resources/models/box.gltf\") (cached after the first load). 'Drop 50 boxes' button: 50 boxes of size 1 in a 5 x 5 x 2 grid 15 m in front of and 10 m above the camera.",
+      "side_effects": []
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "Transform",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "spawnBox emplaces Transform(position, identity, vec3(size)) on a new entity. 'Drop 50 boxes' button: 50 boxes of size 1 in a 5 x 5 x 2 grid 15 m in front of and 10 m above the camera.",
+      "side_effects": [
+        "creates a host entity per box"
+      ]
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "ModelRenderable",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "spawnBox emplaces ModelRenderable(box model, color). 'Drop 50 boxes' button: 50 boxes of size 1 in a 5 x 5 x 2 grid 15 m in front of and 10 m above the camera.",
+      "side_effects": []
+    },
+    {
+      "system": "DebugMenuSys",
+      "component": "RigidBody",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "spawnBox emplaces a default (Dynamic, Box) RigidBody with half_extent = size/2 and initial_velocity. 'Drop 50 boxes' button: 50 boxes of size 1 in a 5 x 5 x 2 grid 15 m in front of and 10 m above the camera.",
+      "side_effects": [
+        "PhysicsSys / RigidBodySys later creates the Jolt body"
+      ]
+    },
+    {
+      "system": "BoxRingSys",
+      "component": "std::shared_ptr<TerrainGenerator>",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "get<>() (required, emplaced by ChunkGeneratorSys or the physics terrain colliders in preinit): surfaceHeight for each box.",
+      "side_effects": []
+    },
+    {
+      "system": "BoxRingSys",
+      "component": "ModelManager",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "spawnBox calls ModelManager::load(\"./resources/models/box.gltf\") (cached after the first load). 12 boxes on a circle of radius 25, sizes 1..4 cycling, y = surface + size + 4.",
+      "side_effects": []
+    },
+    {
+      "system": "BoxRingSys",
+      "component": "Transform",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "spawnBox emplaces Transform(position, identity, vec3(size)) on a new entity. 12 boxes on a circle of radius 25, sizes 1..4 cycling, y = surface + size + 4.",
+      "side_effects": [
+        "creates a host entity per box"
+      ]
+    },
+    {
+      "system": "BoxRingSys",
+      "component": "ModelRenderable",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "spawnBox emplaces ModelRenderable(box model, color). 12 boxes on a circle of radius 25, sizes 1..4 cycling, y = surface + size + 4.",
+      "side_effects": []
+    },
+    {
+      "system": "BoxRingSys",
+      "component": "RigidBody",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "spawnBox emplaces a default (Dynamic, Box) RigidBody with half_extent = size/2 and initial_velocity. 12 boxes on a circle of radius 25, sizes 1..4 cycling, y = surface + size + 4.",
+      "side_effects": [
+        "PhysicsSys / RigidBodySys later creates the Jolt body"
+      ]
+    },
+    {
+      "system": "BoxRingSys",
+      "component": "Transform",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "Sets the new boxes' rotation to angleAxis(angle, normalize(1,1,0)) after spawnBox.",
+      "side_effects": []
+    },
+    {
+      "system": "ModelLineupSys",
+      "component": "ModelManager",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "load() of every .gltf/.glb in ./resources/models except box.gltf.",
+      "side_effects": [
+        "reads glTF files from disk (directory_iterator, non-recursive)"
+      ]
+    },
+    {
+      "system": "ModelLineupSys",
+      "component": "std::shared_ptr<TerrainGenerator>",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "get<>() (required): surfaceHeight(x, 15).",
+      "side_effects": []
+    },
+    {
+      "system": "ModelLineupSys",
+      "component": "ModelC",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "min/max bounds of the loaded model entity (scale = 4 / height, collider extents).",
+      "side_effects": []
+    },
+    {
+      "system": "ModelLineupSys",
+      "component": "Transform",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "New entity: position (x, surface - min.y*scale + 2, 15), x from -20 by 8, identity rotation, uniform scale.",
+      "side_effects": [
+        "creates one host entity per model file"
+      ]
+    },
+    {
+      "system": "ModelLineupSys",
+      "component": "ModelRenderable",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "New entity: ModelRenderable(model), white tint.",
+      "side_effects": []
+    },
+    {
+      "system": "ModelLineupSys",
+      "component": "RigidBody",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "New entity: Dynamic box, half_extent = (max-min)/2*scale, offset = (max+min)/2*scale.",
+      "side_effects": []
+    },
+    {
+      "system": "BoxThrowerSys",
+      "component": "Input",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "leftClick (already cleared by UISys when ImGui wants the mouse).",
+      "side_effects": []
+    },
+    {
+      "system": "BoxThrowerSys",
+      "component": "Camera",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "position and forward().",
+      "side_effects": []
+    },
+    {
+      "system": "BoxThrowerSys",
+      "component": "ModelManager",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "spawnBox calls ModelManager::load(\"./resources/models/box.gltf\") (cached after the first load). Size 1 at camera + forward * 3, velocity forward * 25, color from a function-static counter.",
+      "side_effects": []
+    },
+    {
+      "system": "BoxThrowerSys",
+      "component": "Transform",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "spawnBox emplaces Transform(position, identity, vec3(size)) on a new entity. Size 1 at camera + forward * 3, velocity forward * 25, color from a function-static counter.",
+      "side_effects": [
+        "creates a host entity per box"
+      ]
+    },
+    {
+      "system": "BoxThrowerSys",
+      "component": "ModelRenderable",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "spawnBox emplaces ModelRenderable(box model, color). Size 1 at camera + forward * 3, velocity forward * 25, color from a function-static counter.",
+      "side_effects": []
+    },
+    {
+      "system": "BoxThrowerSys",
+      "component": "RigidBody",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "spawnBox emplaces a default (Dynamic, Box) RigidBody with half_extent = size/2 and initial_velocity. Size 1 at camera + forward * 3, velocity forward * 25, color from a function-static counter.",
+      "side_effects": [
+        "PhysicsSys / RigidBodySys later creates the Jolt body"
+      ]
+    },
+    {
+      "system": "WorldStepperSys",
+      "component": "WorldStepperState",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "preinit",
+      "details": "reg.ctx().emplace<WorldStepperState>().",
+      "side_effects": []
+    },
+    {
+      "system": "WorldStepperSys",
+      "component": "WorldStepperState",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Writes h, ticks, alpha; reads paused/step_once; the panel writes paused and step_once.",
+      "side_effects": [
+        "ImGui window 'Worlds'"
+      ]
+    },
+    {
+      "system": "WorldStepperSys",
+      "component": "Worlds",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): size(), (*worlds)[0], step(ticks) without executor (sequential).",
+      "side_effects": [
+        "runs every world's fixed lane (World::tick) ticks times: world registries, Jolt steps"
+      ]
+    },
+    {
+      "system": "WorldStepperSys",
+      "component": "WorldClock",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "World 0's dt becomes the step h for every world.",
+      "side_effects": []
+    },
+    {
+      "system": "FixedCameraSys",
+      "component": "Camera",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "position = pos; pitch/yaw so that the camera looks at look_at.",
+      "side_effects": []
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "Worlds",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): size() and the selected world (index clamped).",
+      "side_effects": []
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "SphereAgent",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "First entity of view<SphereAgent, Transform, RigidBody>: targetVelocity(), heading, speed, decisions, max_decisions, steered.",
+      "side_effects": []
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "Transform",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Sphere position/rotation (fallback when there is no PhysicsPose).",
+      "side_effects": []
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "RigidBody",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "half_extent.x (radius), body / created() for the linear velocity.",
+      "side_effects": []
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "PhysicsPose",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "prev/current position and rotation, interpolated with alpha.",
+      "side_effects": []
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "PhysicsWorld",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "bodies().GetLinearVelocity; castStatic(look, eye) and groundBelow for the follow camera.",
+      "side_effects": []
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "AgentIO",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): reward shown in the panel.",
+      "side_effects": []
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "WorldStepperState",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): alpha (1 when absent).",
+      "side_effects": []
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "Camera",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "When follow: get<>() and write position, pitch, yaw. Always: find<>() position to hide the dots when the camera is inside the sphere.",
+      "side_effects": []
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "ModelManager",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): load(\"./resources/models/primitives/box.gltf\") when creating a part.",
+      "side_effects": []
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "Transform",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "5 part entities (2 bars, 3 dots), created lazily, transform rewritten every tick.",
+      "side_effects": [
+        "creates up to 5 host entities"
+      ]
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "ModelRenderable",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "Part entities: emplaced with the box model, tint rewritten every tick.",
+      "side_effects": []
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "PolicySources",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Only with DYNAMICAL_ONNX: find<>()->find(world) error / file / step shown in the panel.",
+      "side_effects": []
+    },
+    {
+      "system": "SphereViewSys",
+      "component": "Transform",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "destroy"
+      ],
+      "phase": "finish",
+      "details": "Destroys the part entities.",
+      "side_effects": []
+    },
+    {
+      "system": "RollerPlayerSys",
+      "component": "VRRig",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "VRRoller only: stick_locomotion = false (find<>()), so VRControl stops moving the rig with the stick.",
+      "side_effects": []
+    },
+    {
+      "system": "RollerPlayerSys",
+      "component": "Worlds",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): world index must be in range, else the tick does nothing.",
+      "side_effects": []
+    },
+    {
+      "system": "RollerPlayerSys",
+      "component": "SphereAgent",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "steerSphere on the first entity of view<SphereAgent, Transform, RigidBody>: goal_heading (when the command is non-zero) and goal_speed.",
+      "side_effects": []
+    },
+    {
+      "system": "RollerPlayerSys",
+      "component": "Transform",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Sphere position (fallback when there is no PhysicsPose).",
+      "side_effects": []
+    },
+    {
+      "system": "RollerPlayerSys",
+      "component": "PhysicsPose",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Interpolated position with alpha.",
+      "side_effects": []
+    },
+    {
+      "system": "RollerPlayerSys",
+      "component": "RigidBody",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "half_extent.x: the floor is the sphere's lowest point.",
+      "side_effects": []
+    },
+    {
+      "system": "RollerPlayerSys",
+      "component": "WorldStepperState",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): alpha (1 when absent).",
+      "side_effects": []
+    },
+    {
+      "system": "RollerPlayerSys",
+      "component": "VRInput",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "VRRoller: session_running, focused, head.valid/position/rotation, right primary_pressed, left thumbstick.",
+      "side_effects": []
+    },
+    {
+      "system": "RollerPlayerSys",
+      "component": "VRRig",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "VRRoller: reads transform() to turn stick/lean into world space; writes position = (sphere x, floor, sphere z).",
+      "side_effects": []
+    },
+    {
+      "system": "RollerPlayerSys",
+      "component": "Input",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "DesktopRoller: on[FORWARD/BACKWARD/LEFT/RIGHT/SPRINT].",
+      "side_effects": []
+    },
+    {
+      "system": "RollerPlayerSys",
+      "component": "Camera",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "DesktopRoller: reads yaw and right(); writes position = (sphere x, floor + eye_height, sphere z).",
+      "side_effects": []
+    },
+    {
+      "system": "WorldViewSys",
+      "component": "Worlds",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): every world (filtered by params.worlds).",
+      "side_effects": []
+    },
+    {
+      "system": "WorldViewSys",
+      "component": "ModelManager",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): load() of the box and sphere primitives; add(\"capsule:<r>:<h>\", capsuleMesh) for capsules.",
+      "side_effects": [
+        "may upload a generated capsule mesh to the GPU (ModelManager::add)"
+      ]
+    },
+    {
+      "system": "WorldViewSys",
+      "component": "WorldStepperState",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find<>(): alpha (1 when absent).",
+      "side_effects": []
+    },
+    {
+      "system": "WorldViewSys",
+      "component": "Ground",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "size, top_y, created(): one grey box mirror per created ground.",
+      "side_effects": []
+    },
+    {
+      "system": "WorldViewSys",
+      "component": "Transform",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "position/rotation of entities with Transform + RigidBody (fallback when there is no PhysicsPose).",
+      "side_effects": []
+    },
+    {
+      "system": "WorldViewSys",
+      "component": "RigidBody",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "created(), shape, half_extent, offset.",
+      "side_effects": []
+    },
+    {
+      "system": "WorldViewSys",
+      "component": "PhysicsPose",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "prev/current pose interpolated with alpha (lerp / slerp).",
+      "side_effects": []
+    },
+    {
+      "system": "WorldViewSys",
+      "component": "ModelRef",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "color (overrides the entity-hash color; itself overridden by params.colors).",
+      "side_effects": []
+    },
+    {
+      "system": "WorldViewSys",
+      "component": "Transform",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create",
+        "destroy"
+      ],
+      "phase": "tick",
+      "details": "Mirror entities: created on first sight, position = grid offset + pose, rotation, scale rewritten every tick.",
+      "side_effects": [
+        "creates/destroys host entities"
+      ]
+    },
+    {
+      "system": "WorldViewSys",
+      "component": "ModelRenderable",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create",
+        "destroy"
+      ],
+      "phase": "tick",
+      "details": "Mirror entities: emplaced once with model and color (never updated afterwards).",
+      "side_effects": []
+    },
+    {
+      "system": "WorldViewSys",
+      "component": "WorldViewLink",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create",
+        "destroy"
+      ],
+      "phase": "tick",
+      "details": "Mirror entities: emplaced once with (world index, source entity).",
+      "side_effects": []
+    },
+    {
+      "system": "WorldViewSys",
+      "component": "WorldViewLink",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "destroy"
+      ],
+      "phase": "finish",
+      "details": "Destroys every mirror entity.",
+      "side_effects": []
+    },
+    {
+      "system": "Game",
+      "component": "Settings",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "constructor",
+      "details": "Settings(argc, argv): loads/saves ./config.6.json then applies key=value overrides; in deterministic runs window 960x540, windowed, vr_mode 0.",
+      "side_effects": []
+    },
+    {
+      "system": "Game",
+      "component": "tf::Executor",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "constructor",
+      "details": "Default-constructed thread pool.",
+      "side_effects": []
+    },
+    {
+      "system": "Game",
+      "component": "RunArgs",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "constructor",
+      "details": "parseRunArgs(argc, argv).args.",
+      "side_effects": []
+    },
+    {
+      "system": "Game",
+      "component": "FrameClock",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "constructor",
+      "details": "Zeroed frame clock.",
+      "side_effects": []
+    },
+    {
+      "system": "Game",
+      "component": "RunArgs",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "start",
+      "details": "scene, vars, capture, seed, probe, deterministic(), fixed_frame_dt, exit_after_capture, ticks.",
+      "side_effects": []
+    },
+    {
+      "system": "Game",
+      "component": "Settings",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "start",
+      "details": "vr_mode = 0 when the scene's renderer block has vr false.",
+      "side_effects": []
+    },
+    {
+      "system": "Game",
+      "component": "Worlds",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "start",
+      "details": "Emplaced when the scene has worlds; create(scene, seed), then preinit/init.",
+      "side_effects": [
+        "creates every World (own registry, Jolt PhysicsSystem)"
+      ]
+    },
+    {
+      "system": "Game",
+      "component": "Input",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "Reads on[EXIT] after renderer->prepare() and clears it; stops the loop after the current iteration.",
+      "side_effects": []
+    },
+    {
+      "system": "Game",
+      "component": "FrameClock",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "dt (wall clock, or fixed_frame_dt when deterministic), time += dt, frame++ before the systems tick.",
+      "side_effects": []
+    },
+    {
+      "system": "Game",
+      "component": "Worlds",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "finish",
+      "details": "~Game: find<Worlds>()->finish() before the host systems' and renderer's finish.",
+      "side_effects": []
+    },
+    {
+      "system": "Capture",
+      "component": "Camera",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "beginFrame: remembers the first-seen camera as spawn; while a shot with a camera spec is pending, writes position (pos or spawn + offset), yaw, pitch (or the look_at direction).",
+      "side_effects": []
+    },
+    {
+      "system": "Capture",
+      "component": "ChunkC",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "terrainReady(): no ChunkC without ChunkGenerated (excluding ChunkDestroying) and no ChunkMeshPending (excluding ChunkDestroying).",
+      "side_effects": []
+    },
+    {
+      "system": "Capture",
+      "component": "ChunkGenerated",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "terrainReady(): no ChunkC without ChunkGenerated (excluding ChunkDestroying) and no ChunkMeshPending (excluding ChunkDestroying).",
+      "side_effects": []
+    },
+    {
+      "system": "Capture",
+      "component": "ChunkDestroying",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "terrainReady(): no ChunkC without ChunkGenerated (excluding ChunkDestroying) and no ChunkMeshPending (excluding ChunkDestroying).",
+      "side_effects": []
+    },
+    {
+      "system": "Capture",
+      "component": "ChunkMeshPending",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "terrainReady(): no ChunkC without ChunkGenerated (excluding ChunkDestroying) and no ChunkMeshPending (excluding ChunkDestroying).",
+      "side_effects": []
+    }
+  ]
+}

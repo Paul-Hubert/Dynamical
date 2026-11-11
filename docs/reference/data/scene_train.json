@@ -1,0 +1,646 @@
+{
+  "systems": [
+    {
+      "name": "World",
+      "kind": "service",
+      "registry_name": null,
+      "scope": "World",
+      "lane": "per-frame call from Worlds::step (WorldStepperSys in dynamical, ScenarioRunner::step headless)",
+      "folder": "src/scene",
+      "sources": [
+        "src/scene/world.h",
+        "src/scene/world.cpp"
+      ],
+      "summary": "One independent simulation: owns its registry, PhysicsWorld, WorldClock, WorldRng, WorldInfo and fixed-lane SystemSet; creates the template's entities and runs one fixed tick with the Act/Observe phases."
+    },
+    {
+      "name": "Worlds",
+      "kind": "service",
+      "registry_name": null,
+      "scope": "Host",
+      "lane": "per-frame call from WorldStepperSys (dynamical) / ScenarioRunner::step",
+      "folder": "src/scene",
+      "sources": [
+        "src/scene/world.h",
+        "src/scene/world.cpp"
+      ],
+      "summary": "The worlds of a scene in index order (host context variable in dynamical); creates them with per-index seeds and steps them, in parallel on taskflow when given an executor."
+    },
+    {
+      "name": "ScenarioRunner",
+      "kind": "service",
+      "registry_name": null,
+      "scope": "n/a",
+      "lane": "called by TrainHost / WorldsEnvironment and tests",
+      "folder": "src/scene",
+      "sources": [
+        "src/scene/scenario_runner.h",
+        "src/scene/scenario_runner.cpp"
+      ],
+      "summary": "Headless scene driver: loads a scene, creates, preinits and inits its worlds, steps them and can restart them with another base seed."
+    },
+    {
+      "name": "SceneLoader",
+      "kind": "service",
+      "registry_name": null,
+      "scope": "n/a",
+      "lane": "one-shot call (loadScene) from Game::start, ScenarioRunner, tests",
+      "folder": "src/scene",
+      "sources": [
+        "src/scene/scene_def.h",
+        "src/scene/scene_loader.cpp"
+      ],
+      "summary": "Loads a .scene.json with includes, variables, file references, prefabs and world templates into a SceneDef; validates every entity by emplacing its components in a scratch registry."
+    },
+    {
+      "name": "Probe",
+      "kind": "service",
+      "registry_name": null,
+      "scope": "Host",
+      "lane": "per-frame call from Game::start, after post_tick",
+      "folder": "src/scene",
+      "sources": [
+        "src/scene/probe.h",
+        "src/scene/probe.cpp"
+      ],
+      "summary": "Behaviour probe: every probe_every frames writes one CSV row (frame, rank, entity, position, rotation) per host entity holding Transform (and RigidBody)."
+    },
+    {
+      "name": "TrainHost",
+      "kind": "service",
+      "registry_name": null,
+      "scope": "n/a",
+      "lane": "main loop of dynamical_train (TrainHost::run from train_main.cpp)",
+      "folder": "src/train",
+      "sources": [
+        "src/train/train_host.h",
+        "src/train/train_host.cpp"
+      ],
+      "summary": "dynamical_train's loop: mode bench/null/train, environment parameters, ML-Agents handshake and RESET/STEP/QUIT serving against a TrainerEnvironment."
+    },
+    {
+      "name": "WorldsEnvironment",
+      "kind": "service",
+      "registry_name": null,
+      "scope": "World",
+      "lane": "per trainer message from TrainHost::serve",
+      "folder": "src/train",
+      "sources": [
+        "src/train/worlds_env.h",
+        "src/train/worlds_env.cpp"
+      ],
+      "summary": "mode=train environment: one agent per world (its AgentIO), writes actions, steps one decision window of every world, and turns AgentIO outputs into AgentInfos and stats."
+    }
+  ],
+  "components": [
+    {
+      "name": "WorldClock",
+      "kind": "context",
+      "registry": "world",
+      "folder": "src/scene",
+      "sources": [
+        "src/scene/world.h",
+        "src/scene/world.cpp"
+      ],
+      "summary": "A world's fixed tick length, decision period and tick counter.",
+      "description": "World registry context variable emplaced by the World constructor from the template's \"clock\" block (worldClock(def)): dt = 1 / physics_hz, decision_period = physics_hz / control_hz. physics_hz defaults to 60, control_hz to physics_hz (0 means physics_hz); physics_hz must be a positive multiple of control_hz or a SceneError is thrown at <template>/clock. World::tick reads tick % decision_period to pick the Act (k == 0) and Observe (k == period - 1) phases, then increments tick. Read by PhysicsStep/WorldTerrain, the sphere roller systems, WorldStepperSys (world 0's dt) and WorldsEnvironment (decision_period). Units: seconds, ticks.",
+      "scene_json": "template \"clock\": { \"physics_hz\": int = 60, \"control_hz\": int = physics_hz }",
+      "fields": [
+        {
+          "name": "dt",
+          "type": "double",
+          "default": "1/60",
+          "desc": "fixed tick length in seconds, 1 / physics_hz"
+        },
+        {
+          "name": "decision_period",
+          "type": "uint32_t",
+          "default": "1",
+          "desc": "ticks per decision window, physics_hz / control_hz"
+        },
+        {
+          "name": "tick",
+          "type": "uint64_t",
+          "default": "0",
+          "desc": "ticks done since creation; incremented after each World::tick"
+        }
+      ]
+    },
+    {
+      "name": "WorldRng",
+      "kind": "context",
+      "registry": "world",
+      "folder": "src/scene",
+      "sources": [
+        "src/scene/world.h",
+        "src/scene/world.cpp"
+      ],
+      "summary": "The world's own deterministic random stream (mt19937_64 with platform-independent distributions).",
+      "description": "World registry context variable emplaced by the World constructor, seeded worldSeed(base_seed, index) (splitmix64-based). Its distributions are implemented by hand so results do not depend on the standard library: uniform() uses the top 53 bits of one engine draw, normal() is Box-Muller from two uniforms (u1 clamped to >= 1e-300, one draw pair per call, the second value discarded), unitSphere() draws z then an angle. Consumers: BoxDropSys::init, the sphere roller code (goal and speed draws, stagger), RigidBodySys::createGrounds (one raw engine() draw for a HeightField with seed 0). HeightField generation also constructs a local WorldRng from an explicit seed.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "engine",
+          "type": "std::mt19937_64",
+          "default": "seeded with the constructor argument (0)",
+          "desc": "raw engine; uniform/normal/unitSphere draw from it"
+        }
+      ]
+    },
+    {
+      "name": "WorldInfo",
+      "kind": "context",
+      "registry": "world",
+      "folder": "src/scene",
+      "sources": [
+        "src/scene/world.h",
+        "src/scene/world.cpp"
+      ],
+      "summary": "A world's index, seed and template name.",
+      "description": "World registry context variable emplaced by the World constructor and never changed afterwards. index is the world's position in Worlds (global across all world entries of the scene), seed the value passed to WorldRng, template_name the template without the @<entry> suffix of per-entry variable resolution. Read by resetSphereEpisode in logic/agents/sphere_roller.cpp (spawn centre x = index * spawn_spacing).",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "index",
+          "type": "uint32_t",
+          "default": "0",
+          "desc": "world index in the scene, 0-based"
+        },
+        {
+          "name": "seed",
+          "type": "uint64_t",
+          "default": "0",
+          "desc": "worldSeed(base_seed, index)"
+        },
+        {
+          "name": "template_name",
+          "type": "std::string",
+          "default": "\"\"",
+          "desc": "world template name, '@<n>' suffix dropped"
+        }
+      ]
+    },
+    {
+      "name": "Worlds",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/scene",
+      "sources": [
+        "src/scene/world.h",
+        "src/scene/world.cpp"
+      ],
+      "summary": "The scene's worlds, in index order (host context variable in dynamical).",
+      "description": "Emplaced in the host registry by Game::start only when the scene has worlds; filled by Worlds::create(scene, RunArgs::seed), then preinit/init with the host systems, and finished in ~Game. Not copyable. ScenarioRunner owns its own Worlds member (not in a registry). Read by WorldStepperSys (steps it), WorldViewSys, SphereViewSys, RollerPlayerSys and ModelWatcherSys (which inserts a PolicyHandle into each world registry).",
+      "scene_json": "scene \"worlds\": [{ \"template\", \"count\", \"systems\", \"variables\", \"variable_files\" }] (see the scene loader)",
+      "fields": [
+        {
+          "name": "list",
+          "type": "std::vector<std::unique_ptr<World>>",
+          "default": "empty",
+          "desc": "the worlds; index i holds WorldInfo.index == i"
+        }
+      ]
+    },
+    {
+      "name": "RunArgs",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/scene",
+      "sources": [
+        "src/scene/run_args.h",
+        "src/scene/run_args.cpp"
+      ],
+      "summary": "Parsed key=value process arguments: scene, variables, mode, capture and probe settings.",
+      "description": "Produced by parseRunArgs (argv[0] skipped). In dynamical it is emplaced in the host registry by the Game constructor; dynamical_train keeps it as a local and passes it to TrainHost. With capture or probe set, fixed_frame_dt defaults to 1/60 and window_hidden to true unless given. deterministic() is fixed_frame_dt > 0 and switches off wall-clock use (frame clock, physics timings), asynchronous terrain generation and collider prefetch. Read via ctx().find by Renderer, Windu, UISys, the physics systems (deterministic() helper in physics_sys.cpp), ChunkGeneratorSys::tick and ModelWatcherSys::tick.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "scene",
+          "type": "std::string",
+          "default": "\"\"",
+          "desc": "scene=: scene name or .json path; empty: base (dynamical) / walker_train or null (dynamical_train)"
+        },
+        {
+          "name": "vars",
+          "type": "std::vector<std::pair<std::string,std::string>>",
+          "default": "empty",
+          "desc": "var.<name>=<value>, command-line order, last wins"
+        },
+        {
+          "name": "mode",
+          "type": "std::string",
+          "default": "\"\"",
+          "desc": "mode=: dynamical_train bench | null | train (empty: train)"
+        },
+        {
+          "name": "threads",
+          "type": "int",
+          "default": "0",
+          "desc": "threads= >= 0: worker threads (bench, train)"
+        },
+        {
+          "name": "ticks",
+          "type": "int64_t",
+          "default": "0",
+          "desc": "ticks= >= 0: dynamical exits after this many frames when > 0; bench tick count (600 when 0)"
+        },
+        {
+          "name": "episodes",
+          "type": "int",
+          "default": "0",
+          "desc": "episodes= >= 0; parsed but not read by code in this area"
+        },
+        {
+          "name": "seed",
+          "type": "int64_t",
+          "default": "0",
+          "desc": "seed= >= 0: base seed of the worlds in dynamical"
+        },
+        {
+          "name": "capture",
+          "type": "std::string",
+          "default": "\"\"",
+          "desc": "capture=: capture script (JSON)"
+        },
+        {
+          "name": "capture_dir",
+          "type": "std::string",
+          "default": "\"captures\"",
+          "desc": "capture_dir=: output directory of the PNGs"
+        },
+        {
+          "name": "fixed_frame_dt",
+          "type": "double",
+          "default": "0 (1/60 with capture or probe)",
+          "desc": "fixed_frame_dt= >= 0, decimal or fraction a/b; > 0 makes the frame clock ignore the wall clock"
+        },
+        {
+          "name": "window_hidden",
+          "type": "bool",
+          "default": "false (true with capture or probe)",
+          "desc": "window_hidden=true|false|1|0"
+        },
+        {
+          "name": "exit_after_capture",
+          "type": "bool",
+          "default": "true",
+          "desc": "exit_after_capture=: quit when the capture script is done"
+        },
+        {
+          "name": "probe",
+          "type": "std::string",
+          "default": "\"\"",
+          "desc": "probe=: CSV output file of the Probe"
+        },
+        {
+          "name": "probe_entities",
+          "type": "std::string",
+          "default": "\"RigidBody\"",
+          "desc": "probe_entities=: RigidBody or Transform (validated by Probe)"
+        },
+        {
+          "name": "probe_every",
+          "type": "int",
+          "default": "60",
+          "desc": "probe_every= > 0: sampling period in frames"
+        }
+      ]
+    }
+  ],
+  "access": [
+    {
+      "system": "World",
+      "component": "PhysicsWorld",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "construct",
+      "details": "PhysicsWorld(physicsConfig(def)): the template's \"physics\" block (threads, max_bodies, max_body_pairs, max_contacts, temp_bytes, gravity, substeps, allow_sleeping, friction_combine, restitution_combine, velocity_steps, position_steps, speculative_distance, penetration_slop)",
+      "side_effects": [
+        "creates a Jolt PhysicsSystem with its job system and temp allocator"
+      ]
+    },
+    {
+      "system": "World",
+      "component": "WorldClock",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "construct",
+      "details": "worldClock(def): dt = 1/physics_hz, decision_period = physics_hz/control_hz, tick 0",
+      "side_effects": []
+    },
+    {
+      "system": "World",
+      "component": "WorldRng",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "construct",
+      "details": "seeded with worldSeed(base_seed, index)",
+      "side_effects": []
+    },
+    {
+      "system": "World",
+      "component": "WorldInfo",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "construct",
+      "details": "{ index, seed, def.template_name }",
+      "side_effects": []
+    },
+    {
+      "system": "World",
+      "component": "Parked",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "construct",
+      "details": "default (value = false)",
+      "side_effects": []
+    },
+    {
+      "system": "World",
+      "component": "Transform",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "World::init creates one entity per template EntityDef and emplace_or_replace's Transform from its JSON fields through the component registry (findComponent(\"Transform\")->emplace); components of an entity are emplaced in JSON key order (alphabetical)",
+      "side_effects": [
+        "creates entities in the world registry"
+      ]
+    },
+    {
+      "system": "World",
+      "component": "RigidBody",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "World::init creates one entity per template EntityDef and emplace_or_replace's RigidBody from its JSON fields through the component registry (findComponent(\"RigidBody\")->emplace); components of an entity are emplaced in JSON key order (alphabetical)",
+      "side_effects": []
+    },
+    {
+      "system": "World",
+      "component": "Ground",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "World::init creates one entity per template EntityDef and emplace_or_replace's Ground from its JSON fields through the component registry (findComponent(\"Ground\")->emplace); components of an entity are emplaced in JSON key order (alphabetical)",
+      "side_effects": []
+    },
+    {
+      "system": "World",
+      "component": "HeightField",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "World::init creates one entity per template EntityDef and emplace_or_replace's HeightField from its JSON fields through the component registry (findComponent(\"HeightField\")->emplace); components of an entity are emplaced in JSON key order (alphabetical)",
+      "side_effects": []
+    },
+    {
+      "system": "World",
+      "component": "ModelRef",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "World::init creates one entity per template EntityDef and emplace_or_replace's ModelRef from its JSON fields through the component registry (findComponent(\"ModelRef\")->emplace); components of an entity are emplaced in JSON key order (alphabetical)",
+      "side_effects": []
+    },
+    {
+      "system": "World",
+      "component": "SphereAgent",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "World::init creates one entity per template EntityDef and emplace_or_replace's SphereAgent from its JSON fields through the component registry (findComponent(\"SphereAgent\")->emplace); components of an entity are emplaced in JSON key order (alphabetical)",
+      "side_effects": []
+    },
+    {
+      "system": "World",
+      "component": "WorldClock",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "reads dt, decision_period and tick to compute k = tick % decision_period (Act when k == 0, Observe when k == period - 1), then tick++",
+      "side_effects": []
+    },
+    {
+      "system": "World",
+      "component": "RigidBody",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "hash",
+      "details": "World::hash (determinism tests): body id of every created RigidBody, entities in sorted order",
+      "side_effects": []
+    },
+    {
+      "system": "World",
+      "component": "PhysicsWorld",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "hash",
+      "details": "World::hash: find<PhysicsWorld>, reads each body's position and rotation through the body interface",
+      "side_effects": []
+    },
+    {
+      "system": "SceneLoader",
+      "component": "Transform",
+      "registry": "scratch",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "load",
+      "details": "validateComponents: a scratch entt::registry local to the call; one entity per component, Transform emplaced from the merged JSON fields to surface field errors (ComponentError -> SceneError with file and JSON pointer). The registry is discarded",
+      "side_effects": [
+        "creates and discards a scratch registry per validated entity or prefab"
+      ]
+    },
+    {
+      "system": "SceneLoader",
+      "component": "RigidBody",
+      "registry": "scratch",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "load",
+      "details": "validateComponents: a scratch entt::registry local to the call; one entity per component, RigidBody emplaced from the merged JSON fields to surface field errors (ComponentError -> SceneError with file and JSON pointer). The registry is discarded",
+      "side_effects": []
+    },
+    {
+      "system": "SceneLoader",
+      "component": "Ground",
+      "registry": "scratch",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "load",
+      "details": "validateComponents: a scratch entt::registry local to the call; one entity per component, Ground emplaced from the merged JSON fields to surface field errors (ComponentError -> SceneError with file and JSON pointer). The registry is discarded",
+      "side_effects": []
+    },
+    {
+      "system": "SceneLoader",
+      "component": "HeightField",
+      "registry": "scratch",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "load",
+      "details": "validateComponents: a scratch entt::registry local to the call; one entity per component, HeightField emplaced from the merged JSON fields to surface field errors (ComponentError -> SceneError with file and JSON pointer). The registry is discarded",
+      "side_effects": []
+    },
+    {
+      "system": "SceneLoader",
+      "component": "ModelRef",
+      "registry": "scratch",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "load",
+      "details": "validateComponents: a scratch entt::registry local to the call; one entity per component, ModelRef emplaced from the merged JSON fields to surface field errors (ComponentError -> SceneError with file and JSON pointer). The registry is discarded",
+      "side_effects": []
+    },
+    {
+      "system": "SceneLoader",
+      "component": "SphereAgent",
+      "registry": "scratch",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "load",
+      "details": "validateComponents: a scratch entt::registry local to the call; one entity per component, SphereAgent emplaced from the merged JSON fields to surface field errors (ComponentError -> SceneError with file and JSON pointer). The registry is discarded",
+      "side_effects": []
+    },
+    {
+      "system": "SceneLoader",
+      "component": "ModelManager",
+      "registry": "scratch",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "load",
+      "details": "ModelRenderable's emplace (registered by registerViewSystems) looks up ctx().find<ModelManager>() in the scratch registry, which never holds one: a ModelRenderable in a scene entity or prefab is always rejected with \"ModelRenderable needs the renderer\"",
+      "side_effects": []
+    },
+    {
+      "system": "Probe",
+      "component": "Transform",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "sample",
+      "details": "position and rotation (w, x, y, z) of every sampled entity; with probe_entities=Transform every entity holding a Transform",
+      "side_effects": []
+    },
+    {
+      "system": "Probe",
+      "component": "RigidBody",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "sample",
+      "details": "only membership: with probe_entities=RigidBody, the view<Transform, RigidBody> selects entities; no field read",
+      "side_effects": [
+        "appends CSV rows to the probe file and flushes"
+      ]
+    },
+    {
+      "system": "TrainHost",
+      "component": "AgentIO",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "run",
+      "details": "world 0's AgentIO.behavior (via ctx().get after WorldsEnvironment::check) names the behaviour in the envparams.txt header, in run() for mode=train and again in agents()",
+      "side_effects": []
+    },
+    {
+      "system": "WorldsEnvironment",
+      "component": "AgentIO",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "check",
+      "details": "static check(): ctx().find<AgentIO>() in every world; behavior non-empty, same behavior, observation_size and action_size as world 0; the constructor stores a pointer to each world's AgentIO",
+      "side_effects": []
+    },
+    {
+      "system": "WorldsEnvironment",
+      "component": "WorldClock",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "check",
+      "details": "decision_period of every world must equal world 0's; the constructor keeps world 0's as the window length",
+      "side_effects": []
+    },
+    {
+      "system": "WorldsEnvironment",
+      "component": "AgentIO",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "reset",
+      "details": "sets reset_requested = true in every world, then runs that world's Observe systems only (SystemSet::fixed_observe_only)",
+      "side_effects": []
+    },
+    {
+      "system": "WorldsEnvironment",
+      "component": "AgentIO",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "step",
+      "details": "action[0..action_size) from the trainer's continuous actions for agents not done in the last output; zeros for done agents. Then every world steps decision_period ticks",
+      "side_effects": []
+    },
+    {
+      "system": "WorldsEnvironment",
+      "component": "AgentIO",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "write",
+      "details": "observation, observation_size, reward, done, truncated (max_step_reached = done && truncated), sensor_name, stats (averaged across worlds per key), action_size (brain parameters, first output only)",
+      "side_effects": [
+        "writes stats side-channel messages (Average aggregation) into the output"
+      ]
+    }
+  ]
+}

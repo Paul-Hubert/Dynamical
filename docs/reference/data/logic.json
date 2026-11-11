@@ -1,0 +1,1977 @@
+{
+  "systems": [
+    {
+      "name": "BoxDropSys",
+      "kind": "system",
+      "registry_name": "BoxDrop",
+      "scope": "World",
+      "lane": "Fixed (Every)",
+      "folder": "src/logic/systems",
+      "sources": [
+        "src/logic/systems/box_drop.h",
+        "src/logic/systems/box_drop.cpp"
+      ],
+      "summary": "init only: creates `count` box (or capsule) RigidBody entities on a jittered centered grid above the ground with the world RNG; tick is a no-op."
+    },
+    {
+      "name": "ChunkManagerSys",
+      "kind": "system",
+      "registry_name": "ChunkManager",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/logic/systems",
+      "sources": [
+        "src/logic/systems/chunk_systems.h",
+        "src/logic/systems/chunk_systems.cpp"
+      ],
+      "summary": "Creates ChunkC entities within view_distance of the desktop Camera and the VR rig, tags chunks beyond view_distance + one chunk with ChunkDestroying."
+    },
+    {
+      "name": "ChunkGeneratorSys",
+      "kind": "system",
+      "registry_name": "ChunkGenerator",
+      "scope": "Host",
+      "lane": "Pre",
+      "folder": "src/logic/systems",
+      "sources": [
+        "src/logic/systems/chunk_systems.h",
+        "src/logic/systems/chunk_systems.cpp"
+      ],
+      "summary": "Generates chunk densities with TerrainGenerator on the taskflow executor (at most 16 jobs, nearest first; all at once and synchronously in deterministic runs) and tags the results."
+    },
+    {
+      "name": "SphereControlSys",
+      "kind": "system",
+      "registry_name": "SphereControl",
+      "scope": "World",
+      "lane": "Fixed (Every)",
+      "folder": "src/logic/agents",
+      "sources": [
+        "src/logic/agents/sphere_roller.h",
+        "src/logic/agents/sphere_roller.cpp"
+      ],
+      "summary": "Before PhysicsStep: on the first tick of a decision window runs the pending episode reset and converts AgentIO::action into a world torque; every tick applies the held torque to the sphere's Jolt body."
+    },
+    {
+      "name": "SphereTaskSys",
+      "kind": "system",
+      "registry_name": "SphereTask",
+      "scope": "World",
+      "lane": "Fixed (Every)",
+      "folder": "src/logic/agents",
+      "sources": [
+        "src/logic/agents/sphere_roller.h",
+        "src/logic/agents/sphere_roller.cpp"
+      ],
+      "summary": "After PhysicsStep: accumulates the per-tick reward against the decision target, drifts the live target toward its goal, ends and parks the episode when out of bounds or fallen."
+    },
+    {
+      "name": "SphereObserveSys",
+      "kind": "system",
+      "registry_name": "SphereObserve",
+      "scope": "World",
+      "lane": "Fixed (Observe)",
+      "folder": "src/logic/agents",
+      "sources": [
+        "src/logic/agents/sphere_roller.h",
+        "src/logic/agents/sphere_roller.cpp"
+      ],
+      "summary": "Observe phase: handles a host RESET or publishes the window's reward / done / stats into AgentIO, then writes the 16-float observation of the live target."
+    },
+    {
+      "name": "TrainerActionsSys",
+      "kind": "system",
+      "registry_name": "TrainerActions",
+      "scope": "World",
+      "lane": "Fixed (Act)",
+      "folder": "src/logic/agents",
+      "sources": [
+        "src/logic/agents/sphere_roller.h"
+      ],
+      "summary": "Empty Act-phase placeholder of training templates: the training host writes AgentIO::action directly; scenes replace it with Policy or SphereHeuristic."
+    },
+    {
+      "name": "SphereHeuristicSys",
+      "kind": "system",
+      "registry_name": "SphereHeuristic",
+      "scope": "World",
+      "lane": "Fixed (Act)",
+      "folder": "src/logic/agents",
+      "sources": [
+        "src/logic/agents/sphere_roller.h",
+        "src/logic/agents/sphere_roller.cpp"
+      ],
+      "summary": "Act phase: writes sphereHeuristic(observation) (gain 1) into AgentIO::action when the observation has 16 floats."
+    },
+    {
+      "name": "SystemSet",
+      "kind": "service",
+      "registry_name": "—",
+      "scope": "n/a",
+      "lane": "owns the Pre / Post / Fixed lanes; fixed_tick called by World::tick",
+      "folder": "src/logic/systems",
+      "sources": [
+        "src/logic/systems/system_set.h",
+        "src/logic/systems/system_set.cpp"
+      ],
+      "summary": "Ordered lists of systems (Pre, Post, Fixed lanes); fixed_tick gates Every/Act systems on the world's Parked flag and runs Act/Observe systems on the first/last tick of the decision window."
+    }
+  ],
+  "components": [
+    {
+      "name": "Transform",
+      "kind": "component",
+      "registry": "both",
+      "folder": "src/logic/components",
+      "sources": [
+        "src/logic/components/transform.h"
+      ],
+      "summary": "Position, rotation and scale of an entity in world space.",
+      "description": "World-space pose (Y up, -Z forward) of an entity; matrix() returns T * R * S. Required next to RigidBody (PhysicsSys / PhysicsStepSys write it for dynamic bodies, read it for kinematic ones) and ModelRenderable / ModelRef. Created from scene JSON (`Transform` key, registered in src/scene/system_registry.cpp), by BoxDropSys::init, and by host-side view systems (BoxRing, BoxThrower, VRControl hands, WorldView proxies, spawn helpers). resetSphereEpisode writes it on respawn.",
+      "scene_json": "\"Transform\": { \"position\": [x, y, z], \"rotation\": [x, y, z, w], \"scale\": [x, y, z] } (all optional; unknown keys rejected)",
+      "fields": [
+        {
+          "name": "position",
+          "type": "glm::vec3",
+          "default": "(0, 0, 0)",
+          "desc": "world units / metres"
+        },
+        {
+          "name": "rotation",
+          "type": "glm::quat",
+          "default": "identity (w=1)",
+          "desc": "JSON order [x, y, z, w]"
+        },
+        {
+          "name": "scale",
+          "type": "glm::vec3",
+          "default": "(1, 1, 1)",
+          "desc": "applied last in matrix(); RigidBody::half_extent already includes it"
+        }
+      ]
+    },
+    {
+      "name": "RigidBody",
+      "kind": "component",
+      "registry": "both",
+      "folder": "src/logic/components",
+      "sources": [
+        "src/logic/components/rigid_body.h"
+      ],
+      "summary": "A Jolt body (box, sphere or capsule; static, dynamic or kinematic) attached to the entity's Transform.",
+      "description": "Request for a Jolt body: RigidBodySys creates it on its first tick after the component appears (needs a Transform) and stores the BodyID in `body`; destroying the entity or removing the component destroys the body (on_destroy hook). Dynamic bodies are simulated and their Transform written back (interpolated through PhysicsPose); kinematic ones follow their Transform; static ones never move. Units are world units (metres in the agent worlds), kg. Created from scene JSON (`RigidBody` key), by BoxDropSys::init and by host view systems (BoxRing, BoxThrower, VRControl hands). The sphere agent's SphereControl / SphereTask / SphereObserve read `body` and `half_extent`.",
+      "scene_json": "\"RigidBody\": { \"motion\": \"static|dynamic|kinematic\", \"shape\": \"box|sphere|capsule\", \"half_extent\", \"offset\", \"friction\", \"restitution\", \"angular_damping\", \"mass\", \"initial_velocity\", \"initial_angular_velocity\" } (all optional; unknown keys and enum values rejected)",
+      "fields": [
+        {
+          "name": "motion",
+          "type": "RigidBody::Motion (Static, Dynamic, Kinematic)",
+          "default": "Motion::Dynamic",
+          "desc": "simulation mode"
+        },
+        {
+          "name": "shape",
+          "type": "RigidBody::Shape (Box, Sphere, Capsule)",
+          "default": "Shape::Box",
+          "desc": "collision shape"
+        },
+        {
+          "name": "half_extent",
+          "type": "glm::vec3",
+          "default": "(0.5, 0.5, 0.5)",
+          "desc": "world units, scale included; sphere radius = x; capsule radius = x, cylinder half-height = y (local Y)"
+        },
+        {
+          "name": "offset",
+          "type": "glm::vec3",
+          "default": "(0, 0, 0)",
+          "desc": "shape centre relative to the Transform position, local space"
+        },
+        {
+          "name": "friction",
+          "type": "float",
+          "default": "0.6",
+          "desc": "Jolt friction"
+        },
+        {
+          "name": "restitution",
+          "type": "float",
+          "default": "0.1",
+          "desc": "Jolt restitution"
+        },
+        {
+          "name": "angular_damping",
+          "type": "float",
+          "default": "0.05",
+          "desc": "Jolt's default"
+        },
+        {
+          "name": "mass",
+          "type": "float",
+          "default": "0",
+          "desc": "kg, inertia scaled to it; 0 = Jolt's density of 1000 kg/m^3"
+        },
+        {
+          "name": "initial_velocity",
+          "type": "glm::vec3",
+          "default": "(0, 0, 0)",
+          "desc": "m/s at body creation"
+        },
+        {
+          "name": "initial_angular_velocity",
+          "type": "glm::vec3",
+          "default": "(0, 0, 0)",
+          "desc": "rad/s at body creation"
+        },
+        {
+          "name": "body",
+          "type": "uint32_t",
+          "default": "0xffffffff",
+          "desc": "JPH::BodyID index+sequence, assigned by RigidBodySys; created() is body != 0xffffffff"
+        }
+      ]
+    },
+    {
+      "name": "Ground",
+      "kind": "component",
+      "registry": "world",
+      "folder": "src/logic/components",
+      "sources": [
+        "src/logic/components/rigid_body.h"
+      ],
+      "summary": "A flat static Jolt box whose top face is at top_y, centred on the origin in XZ.",
+      "description": "Flat ground of the test worlds (physics.md): RigidBodySys creates a static box of `size` full extents on the STATIC layer at (0, top_y - size.y/2, 0) in init (so world systems can place bodies on it in their init) and again in every tick for new ones; the on_destroy hook removes it. Scene JSON only (scene entities exist in worlds), usually through the `ground_flat` prefab; WorldView draws it.",
+      "scene_json": "\"Ground\": { \"size\": [x, y, z], \"top_y\", \"friction\", \"restitution\" } (sizes must be positive)",
+      "fields": [
+        {
+          "name": "size",
+          "type": "glm::vec3",
+          "default": "(150, 10, 150)",
+          "desc": "full extents, world units"
+        },
+        {
+          "name": "top_y",
+          "type": "float",
+          "default": "0",
+          "desc": "height of the top face"
+        },
+        {
+          "name": "friction",
+          "type": "float",
+          "default": "1",
+          "desc": "Jolt friction"
+        },
+        {
+          "name": "restitution",
+          "type": "float",
+          "default": "0",
+          "desc": "Jolt restitution"
+        },
+        {
+          "name": "body",
+          "type": "uint32_t",
+          "default": "0xffffffff",
+          "desc": "JPH::BodyID, assigned by RigidBodySys"
+        }
+      ]
+    },
+    {
+      "name": "HeightField",
+      "kind": "component",
+      "registry": "world",
+      "folder": "src/logic/components",
+      "sources": [
+        "src/logic/components/rigid_body.h"
+      ],
+      "summary": "Static Jolt height field of rolling hills, a sum of random plane waves, centred on the origin.",
+      "description": "Rolling-hills ground of sphere_roll_hills: RigidBodySys draws `waves` plane waves into wave_list (from `seed`, or one draw of WorldRng when 0) and creates a static height field of samples x samples points spaced `spacing` on the STATIC layer, together with the grounds. height(x, z) is the smooth surface (defined in src/physics/height_field.cpp); size() = (samples - 1) * spacing. Scene JSON only.",
+      "scene_json": "\"HeightField\": { \"samples\" (power of 2, >= 8), \"spacing\" (> 0), \"waves\" (>= 0), \"wavelength\": [min, max] (0 < min <= max), \"wave_slope\", \"friction\", \"restitution\", \"seed\" (>= 0) }",
+      "fields": [
+        {
+          "name": "samples",
+          "type": "int",
+          "default": "256",
+          "desc": "per side, power of 2 >= 8"
+        },
+        {
+          "name": "spacing",
+          "type": "float",
+          "default": "0.5",
+          "desc": "metres between samples"
+        },
+        {
+          "name": "waves",
+          "type": "int",
+          "default": "6",
+          "desc": "number of plane waves"
+        },
+        {
+          "name": "wavelength",
+          "type": "glm::vec2",
+          "default": "(6, 40)",
+          "desc": "log-uniform range of the wavelengths, metres"
+        },
+        {
+          "name": "wave_slope",
+          "type": "float",
+          "default": "0.07",
+          "desc": "steepest slope of each wave (amplitude x wavenumber)"
+        },
+        {
+          "name": "friction",
+          "type": "float",
+          "default": "1",
+          "desc": "Jolt friction"
+        },
+        {
+          "name": "restitution",
+          "type": "float",
+          "default": "0",
+          "desc": "Jolt restitution"
+        },
+        {
+          "name": "seed",
+          "type": "uint32_t",
+          "default": "0",
+          "desc": "0 = one draw of the world RNG"
+        },
+        {
+          "name": "wave_list",
+          "type": "std::vector<HeightField::Wave {vec2 k; float amplitude; float phase}>",
+          "default": "empty",
+          "desc": "drawn at creation by RigidBodySys"
+        },
+        {
+          "name": "body",
+          "type": "uint32_t",
+          "default": "0xffffffff",
+          "desc": "JPH::BodyID, assigned by RigidBodySys"
+        }
+      ]
+    },
+    {
+      "name": "PhysicsStats",
+      "kind": "context",
+      "registry": "both",
+      "folder": "src/logic/components",
+      "sources": [
+        "src/logic/components/rigid_body.h"
+      ],
+      "summary": "Physics counters and timings shown by the debug menu.",
+      "description": "Context variable created on demand by physicsStats(reg) (src/physics/physics_sys.cpp), first called from RigidBodySys::preinit; PhysicsSys and TerrainCollidersSys fill it each frame on the host registry; DebugMenuSys displays it.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "bodies",
+          "type": "uint32_t",
+          "default": "0",
+          "desc": "bodies in the PhysicsSystem"
+        },
+        {
+          "name": "active_bodies",
+          "type": "uint32_t",
+          "default": "0",
+          "desc": "awake bodies"
+        },
+        {
+          "name": "terrain_cells",
+          "type": "uint32_t",
+          "default": "0",
+          "desc": "active terrain collider cells"
+        },
+        {
+          "name": "terrain_triangles",
+          "type": "uint32_t",
+          "default": "0",
+          "desc": "triangles of the terrain colliders"
+        },
+        {
+          "name": "steps_last_frame",
+          "type": "int",
+          "default": "0",
+          "desc": "fixed steps taken this frame"
+        },
+        {
+          "name": "step_ms",
+          "type": "float",
+          "default": "0",
+          "desc": "time spent stepping"
+        },
+        {
+          "name": "colliders_ms",
+          "type": "float",
+          "default": "0",
+          "desc": "time spent building terrain colliders"
+        }
+      ]
+    },
+    {
+      "name": "ModelRef",
+      "kind": "component",
+      "registry": "world",
+      "folder": "src/logic/components",
+      "sources": [
+        "src/logic/components/model_ref.h"
+      ],
+      "summary": "A glTF path and tint to draw at the entity's Transform.",
+      "description": "Scene-level model reference by path under resources/; headless runs ignore it. In the current code only WorldViewSys reads it, and only its `color` (the mesh is chosen from RigidBody::shape); nothing resolves `path` into a ModelRenderable yet. Created from scene JSON and by BoxDropSys::init (box: models/primitives/box.gltf; capsule: models/primitives/capsule, a path with no file under resources/).",
+      "scene_json": "\"ModelRef\": { \"path\": \"<required, non-empty>\", \"color\": [r, g, b, a] }",
+      "fields": [
+        {
+          "name": "path",
+          "type": "std::string",
+          "default": "\"\"",
+          "desc": "model path under resources/, required in JSON"
+        },
+        {
+          "name": "color",
+          "type": "glm::vec4",
+          "default": "(1, 1, 1, 1)",
+          "desc": "RGBA tint"
+        }
+      ]
+    },
+    {
+      "name": "Camera",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/logic/components",
+      "sources": [
+        "src/logic/components/camera.h"
+      ],
+      "summary": "Free-flying desktop camera: position, yaw, pitch and projection parameters.",
+      "description": "Host context variable emplaced by PlayerControlSys::preinit and driven by it (FixedCamera, SphereView, RollerPlayer also write it). yaw 0 looks toward -Z; forward() / right() / getView() derive from position, yaw, pitch; getProjection(aspect) is Vulkan clip space (depth 0..1, Y flipped). Read by ClassicRender, TerrainSys, ChunkManagerSys (load centre) and ChunkGeneratorSys (priority centre), DebugMenu, Capture.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "position",
+          "type": "glm::vec3",
+          "default": "(0, 150, 0)",
+          "desc": "world units"
+        },
+        {
+          "name": "yaw",
+          "type": "float",
+          "default": "0",
+          "desc": "radians, 0 looks toward -Z"
+        },
+        {
+          "name": "pitch",
+          "type": "float",
+          "default": "-0.4",
+          "desc": "radians"
+        },
+        {
+          "name": "fov",
+          "type": "float",
+          "default": "radians(70)",
+          "desc": "vertical field of view"
+        },
+        {
+          "name": "near_plane",
+          "type": "float",
+          "default": "0.1",
+          "desc": "world units"
+        },
+        {
+          "name": "far_plane",
+          "type": "float",
+          "default": "3000",
+          "desc": "world units"
+        },
+        {
+          "name": "sprinting",
+          "type": "bool",
+          "default": "false",
+          "desc": "PlayerControl sprint state"
+        }
+      ]
+    },
+    {
+      "name": "FrameClock",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/logic/components",
+      "sources": [
+        "src/logic/components/frame_clock.h"
+      ],
+      "summary": "Frame delta, accumulated time and frame number of the dynamical frame loop.",
+      "description": "Host context variable emplaced in the Game constructor (src/view/game.cpp) and advanced by the frame loop before the systems tick (dt, time += dt, frame++). With RunArgs::fixed_frame_dt, dt is fixed and time = frame * dt, so nothing reads the wall clock. Read by the Renderer (shader time) and capture/probe code.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "dt",
+          "type": "double",
+          "default": "0",
+          "desc": "seconds of this frame"
+        },
+        {
+          "name": "time",
+          "type": "double",
+          "default": "0",
+          "desc": "seconds since start"
+        },
+        {
+          "name": "frame",
+          "type": "uint64_t",
+          "default": "0",
+          "desc": "1 for the first frame"
+        }
+      ]
+    },
+    {
+      "name": "RenderSettings",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/logic/components",
+      "sources": [
+        "src/logic/components/render_settings.h"
+      ],
+      "summary": "Runtime toggles of the scene passes and the grass shader parameters.",
+      "description": "Host context variable emplaced by the Renderer constructor; DebugMenuSys edits it; TerrainPass, GrassPass and ModelPass read it (find) to skip drawing and to fill the grass parameters.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "terrain",
+          "type": "bool",
+          "default": "true",
+          "desc": "draw TerrainPass"
+        },
+        {
+          "name": "grass",
+          "type": "bool",
+          "default": "true",
+          "desc": "draw GrassPass"
+        },
+        {
+          "name": "models",
+          "type": "bool",
+          "default": "true",
+          "desc": "draw ModelPass"
+        },
+        {
+          "name": "grass_params.base_normal",
+          "type": "glm::vec4",
+          "default": "(0, 1, 0, 0)",
+          "desc": "grass shell base normal"
+        },
+        {
+          "name": "grass_params.tile_size",
+          "type": "float",
+          "default": "1",
+          "desc": "grass tile size"
+        },
+        {
+          "name": "grass_params.height",
+          "type": "float",
+          "default": "1",
+          "desc": "grass height"
+        },
+        {
+          "name": "grass_params.noise_frequency",
+          "type": "float",
+          "default": "0.0001",
+          "desc": "grass noise frequency"
+        },
+        {
+          "name": "grass_params.noise_amplitude",
+          "type": "float",
+          "default": "0.1",
+          "desc": "grass noise amplitude"
+        }
+      ]
+    },
+    {
+      "name": "VRRig",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/logic/components",
+      "sources": [
+        "src/logic/components/vr.h"
+      ],
+      "summary": "Placement of the OpenXR stage space (play area) in the world.",
+      "description": "Host context variable emplaced by the VRRender constructor. VRControlSys moves and turns it (left stick locomotion only while stick_locomotion), RollerPlayer (VRRoller) drives it and clears stick_locomotion. transform() = translate(position) * rotateY(yaw). ChunkManagerSys uses position as a load centre while VRInput::session_running.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "position",
+          "type": "glm::vec3",
+          "default": "(0, 0, 0)",
+          "desc": "world position of the stage origin"
+        },
+        {
+          "name": "yaw",
+          "type": "float",
+          "default": "0",
+          "desc": "radians about +Y"
+        },
+        {
+          "name": "stick_locomotion",
+          "type": "bool",
+          "default": "true",
+          "desc": "VRControl moves the rig with the left stick; off when a system drives it"
+        }
+      ]
+    },
+    {
+      "name": "VRInput",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/logic/components",
+      "sources": [
+        "src/logic/components/vr.h"
+      ],
+      "summary": "Head and controller poses and buttons, in stage space, written each frame by the VR renderer.",
+      "description": "Host context variable emplaced by VRActions (src/renderer/vr_render/vr_input.cpp; also registered when VR is disabled) and written after xrWaitFrame. Holds the head VRPose and two Hand entries (index VRInput::left = 0, VRInput::right = 1) with pose, linear velocity (stage space, m/s), trigger/grip values, thumbstick and rising-edge flags. Read by VRControlSys, RollerPlayer, DebugMenu, VRRender, ChunkManagerSys (session_running).",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "default": "false",
+          "desc": "a headset is connected"
+        },
+        {
+          "name": "session_running",
+          "type": "bool",
+          "default": "false",
+          "desc": "OpenXR session running"
+        },
+        {
+          "name": "focused",
+          "type": "bool",
+          "default": "false",
+          "desc": "session focused"
+        },
+        {
+          "name": "head",
+          "type": "VRPose {bool valid; vec3 position; quat rotation}",
+          "default": "invalid, origin, identity",
+          "desc": "head pose, stage space"
+        },
+        {
+          "name": "hands[2].pose",
+          "type": "VRPose",
+          "default": "invalid",
+          "desc": "controller pose, stage space"
+        },
+        {
+          "name": "hands[2].linear_velocity",
+          "type": "glm::vec3",
+          "default": "(0, 0, 0)",
+          "desc": "stage space, m/s"
+        },
+        {
+          "name": "hands[2].trigger",
+          "type": "float",
+          "default": "0",
+          "desc": "0..1"
+        },
+        {
+          "name": "hands[2].grip",
+          "type": "float",
+          "default": "0",
+          "desc": "0..1"
+        },
+        {
+          "name": "hands[2].thumbstick",
+          "type": "glm::vec2",
+          "default": "(0, 0)",
+          "desc": "-1..1"
+        },
+        {
+          "name": "hands[2].trigger_pressed",
+          "type": "bool",
+          "default": "false",
+          "desc": "rising edge this frame"
+        },
+        {
+          "name": "hands[2].primary",
+          "type": "bool",
+          "default": "false",
+          "desc": "A (right) / X (left) on Touch, A on Index"
+        },
+        {
+          "name": "hands[2].primary_pressed",
+          "type": "bool",
+          "default": "false",
+          "desc": "rising edge this frame"
+        }
+      ]
+    },
+    {
+      "name": "Parked",
+      "kind": "context",
+      "registry": "world",
+      "folder": "src/logic/systems",
+      "sources": [
+        "src/logic/systems/system_set.h"
+      ],
+      "summary": "World flag: the agent's episode ended mid-window and the world waits for the Observe phase.",
+      "description": "World context variable emplaced by the World constructor (src/scene/world.cpp). While value is true, SystemSet::fixed_tick skips the Every and Act systems and runs only the Observe systems (simulation.md, parking). The sphere agent sets it in SphereTaskSys when the sphere leaves the bounds or falls, and clears it in SphereObserveSys at the end of the episode and in resetSphereEpisode. fixed_observe_only ignores it.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "value",
+          "type": "bool",
+          "default": "false",
+          "desc": "true: only Observe systems run"
+        }
+      ]
+    },
+    {
+      "name": "AgentIO",
+      "kind": "context",
+      "registry": "world",
+      "folder": "src/logic/agents",
+      "sources": [
+        "src/logic/agents/agent_io.h"
+      ],
+      "summary": "The world's agent as the training host sees it: behaviour, sizes, action in, observation / reward / done / stats out.",
+      "description": "World context variable, one agent per world. Created on demand by agentIO(reg) (find or emplace), first by SphereControlSys::preinit; SphereControlSys::init calls configure(behavior, 16, 3), which sets sensor_name = \"VectorSensor_size<obs>\" and zero-fills action and observation. The host (WorldsEnvironment, PolicySys, SphereHeuristicSys, tests) writes `action` and `reset_requested` between windows; SphereObserveSys writes observation, reward, done, truncated and stats in the Observe phase; resetSphereEpisode zeroes action and clears reward / done / truncated / stats.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "behavior",
+          "type": "std::string",
+          "default": "\"\"",
+          "desc": "behaviour name (checkpoints <behavior>-<step>.onnx)"
+        },
+        {
+          "name": "observation_size",
+          "type": "int",
+          "default": "0",
+          "desc": "floats per observation"
+        },
+        {
+          "name": "action_size",
+          "type": "int",
+          "default": "0",
+          "desc": "continuous actions"
+        },
+        {
+          "name": "sensor_name",
+          "type": "std::string",
+          "default": "\"\"",
+          "desc": "VectorSensor_size<observation_size>"
+        },
+        {
+          "name": "action",
+          "type": "std::vector<float>",
+          "default": "empty (action_size zeros after configure)",
+          "desc": "host to world: the decision for the coming window"
+        },
+        {
+          "name": "reset_requested",
+          "type": "bool",
+          "default": "false",
+          "desc": "host to world: start a new episode at the next Observe phase (RESET)"
+        },
+        {
+          "name": "observation",
+          "type": "std::vector<float>",
+          "default": "empty (observation_size zeros after configure)",
+          "desc": "world to host, written by the Observe phase"
+        },
+        {
+          "name": "reward",
+          "type": "float",
+          "default": "0",
+          "desc": "mean per-tick reward over the window that just ended"
+        },
+        {
+          "name": "done",
+          "type": "bool",
+          "default": "false",
+          "desc": "the episode ended with this observation"
+        },
+        {
+          "name": "truncated",
+          "type": "bool",
+          "default": "false",
+          "desc": "ended by a limit (time, bounds), not a terminal state"
+        },
+        {
+          "name": "stats",
+          "type": "std::vector<std::pair<std::string, float>>",
+          "default": "empty",
+          "desc": "this window's values, averaged by the host"
+        }
+      ]
+    },
+    {
+      "name": "SphereAgent",
+      "kind": "component",
+      "registry": "world",
+      "folder": "src/logic/agents",
+      "sources": [
+        "src/logic/agents/sphere_roller.h"
+      ],
+      "summary": "The sphere_roll agent next to the sphere's Transform and RigidBody: task settings and episode state.",
+      "description": "Exactly one entity per world is expected to carry SphereAgent + Transform + RigidBody (sphere shape; half_extent.x is the radius); the systems use the first one of the view. Created from scene JSON (`SphereAgent` key, registered by registerSphereRoller with validation). The settings come from JSON; the episode state is written by resetSphereEpisode, SphereControlSys, SphereTaskSys and SphereObserveSys, and by steerSphere (RollerPlayer: VRRoller / DesktopRoller). The serializer writes back only the settings.",
+      "scene_json": "\"SphereAgent\": { \"behavior\", \"max_torque\", \"speed_range\", \"stop_chance\", \"turn_rate\", \"acceleration\", \"goal_interval\", \"max_goal_turn\", \"home_radius\", \"bounds\", \"fall_depth\", \"spawn_radius\", \"spawn_spacing\", \"stagger\", \"reward_scale\", \"probe_distance\", \"max_decisions\", \"steered\" } (validated: behavior non-empty, max_decisions >= 1, 0 <= speed_range.x <= speed_range.y, 0 < goal_interval.x <= goal_interval.y, reward_scale > 0)",
+      "fields": [
+        {
+          "name": "behavior",
+          "type": "std::string",
+          "default": "\"SphereRoller\"",
+          "desc": "trainer behaviour name; must be non-empty"
+        },
+        {
+          "name": "max_torque",
+          "type": "float",
+          "default": "20",
+          "desc": "N m for an action component of 1"
+        },
+        {
+          "name": "speed_range",
+          "type": "glm::vec2",
+          "default": "(0.5, 3)",
+          "desc": "target speeds, m/s; 0 <= min <= max"
+        },
+        {
+          "name": "stop_chance",
+          "type": "float",
+          "default": "0.1",
+          "desc": "probability that a drawn target speed is 0"
+        },
+        {
+          "name": "turn_rate",
+          "type": "float",
+          "default": "0.7",
+          "desc": "rad/s of the target heading toward its goal"
+        },
+        {
+          "name": "acceleration",
+          "type": "float",
+          "default": "0.75",
+          "desc": "m/s^2 of the target speed toward its goal"
+        },
+        {
+          "name": "goal_interval",
+          "type": "glm::vec2",
+          "default": "(2, 6)",
+          "desc": "seconds between goal draws; 0 < min <= max"
+        },
+        {
+          "name": "max_goal_turn",
+          "type": "float",
+          "default": "2.1",
+          "desc": "rad: new goal heading within this of the current heading"
+        },
+        {
+          "name": "home_radius",
+          "type": "float",
+          "default": "30",
+          "desc": "beyond it from home, new goals point back (+-45 deg); 0 off"
+        },
+        {
+          "name": "bounds",
+          "type": "float",
+          "default": "55",
+          "desc": "|x| or |z| beyond it truncates the episode; 0 off"
+        },
+        {
+          "name": "fall_depth",
+          "type": "float",
+          "default": "100",
+          "desc": "this far below home truncates the episode"
+        },
+        {
+          "name": "spawn_radius",
+          "type": "float",
+          "default": "10",
+          "desc": "spawn points uniform in a disc of this radius around the spawn centre"
+        },
+        {
+          "name": "spawn_spacing",
+          "type": "float",
+          "default": "0",
+          "desc": "world i spawns around (i * spawn_spacing, 0)"
+        },
+        {
+          "name": "stagger",
+          "type": "bool",
+          "default": "true",
+          "desc": "on RESET start at a random decision count in [0, max_decisions)"
+        },
+        {
+          "name": "reward_scale",
+          "type": "float",
+          "default": "1",
+          "desc": "r = exp(-|v_xz - v*| / reward_scale), m/s; must be > 0"
+        },
+        {
+          "name": "probe_distance",
+          "type": "float",
+          "default": "1",
+          "desc": "horizontal distance of the look-ahead ground normals, m"
+        },
+        {
+          "name": "max_decisions",
+          "type": "int",
+          "default": "600",
+          "desc": "decisions per episode (not when steered); >= 1"
+        },
+        {
+          "name": "steered",
+          "type": "bool",
+          "default": "false",
+          "desc": "a player sets the goal (steerSphere): no goal draws, no time limit"
+        },
+        {
+          "name": "home",
+          "type": "glm::vec3",
+          "default": "(0, 0, 0)",
+          "desc": "episode state: spawn point"
+        },
+        {
+          "name": "heading",
+          "type": "float",
+          "default": "0",
+          "desc": "episode state: live target heading, rad (direction (cos h, 0, sin h))"
+        },
+        {
+          "name": "speed",
+          "type": "float",
+          "default": "0",
+          "desc": "episode state: live target speed, m/s"
+        },
+        {
+          "name": "goal_heading",
+          "type": "float",
+          "default": "0",
+          "desc": "episode state: heading the target turns toward"
+        },
+        {
+          "name": "goal_speed",
+          "type": "float",
+          "default": "0",
+          "desc": "episode state: speed the target accelerates toward"
+        },
+        {
+          "name": "goal_timer",
+          "type": "float",
+          "default": "0",
+          "desc": "episode state: seconds until the next goal draw"
+        },
+        {
+          "name": "decision_target",
+          "type": "glm::vec3",
+          "default": "(0, 0, 0)",
+          "desc": "episode state: target velocity of the last observation (rewards use it)"
+        },
+        {
+          "name": "decision_heading",
+          "type": "float",
+          "default": "0",
+          "desc": "episode state: heading of the last observation (frame of the action torque)"
+        },
+        {
+          "name": "has_decision",
+          "type": "bool",
+          "default": "false",
+          "desc": "episode state: an observation was sent this episode and the episode has not ended"
+        },
+        {
+          "name": "torque",
+          "type": "glm::vec3",
+          "default": "(0, 0, 0)",
+          "desc": "episode state: world torque held over the window, N m"
+        },
+        {
+          "name": "reward_sum",
+          "type": "double",
+          "default": "0",
+          "desc": "episode state: sum of per-tick rewards this window"
+        },
+        {
+          "name": "error_sum",
+          "type": "double",
+          "default": "0",
+          "desc": "episode state: sum of |v_xz - target| this window"
+        },
+        {
+          "name": "reward_ticks",
+          "type": "int",
+          "default": "0",
+          "desc": "episode state: ticks summed this window"
+        },
+        {
+          "name": "decisions",
+          "type": "int",
+          "default": "0",
+          "desc": "episode state: observations sent this episode"
+        },
+        {
+          "name": "ended",
+          "type": "bool",
+          "default": "false",
+          "desc": "episode state: episode over (time limit or out of bounds)"
+        },
+        {
+          "name": "out_of_bounds",
+          "type": "bool",
+          "default": "false",
+          "desc": "episode state: ended by bounds / fall"
+        },
+        {
+          "name": "pending_reset",
+          "type": "bool",
+          "default": "false",
+          "desc": "episode state: terminal observation sent, reset at the next window"
+        }
+      ]
+    },
+    {
+      "name": "ChunkC",
+      "kind": "component",
+      "registry": "host",
+      "folder": "src/logic/terrain",
+      "sources": [
+        "src/logic/terrain/chunk.h"
+      ],
+      "summary": "A marching cubes chunk at integer chunk coordinates.",
+      "description": "Created by ChunkManagerSys on a new entity (and registered in ChunkMap) for every chunk whose centre is within view_distance of a load centre. A chunk covers chunk::length = 256 world units per side (64 cubes of 4 units); origin() = pos * 256, center() = origin + 128. TerrainSys destroys the entity once it is tagged ChunkDestroying and not ChunkGenerating.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "pos",
+          "type": "glm::ivec3",
+          "default": "constructor argument",
+          "desc": "chunk coordinates (no default constructor)"
+        }
+      ]
+    },
+    {
+      "name": "ChunkVolume",
+      "kind": "component",
+      "registry": "host",
+      "folder": "src/logic/terrain",
+      "sources": [
+        "src/logic/terrain/chunk.h"
+      ],
+      "summary": "The 67^3 density samples of a chunk that crosses the surface.",
+      "description": "Emplaced by ChunkGeneratorSys::collect when the generated chunk has both solid (> 0) and empty (<= 0) samples. chunk::num_values = 67^3 floats, layout [x][z][y] (chunk::index), sample (x, y, z) at chunk::samplePosition(pos, x, y, z) (one-sample border). Read by TerrainSys (upload for GPU meshing) and TerrainColliders (CPU colliders).",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "values",
+          "type": "std::vector<float>",
+          "default": "empty",
+          "desc": "chunk::num_values densities, > 0 is solid"
+        }
+      ]
+    },
+    {
+      "name": "ChunkEmpty",
+      "kind": "component",
+      "registry": "host",
+      "folder": "src/logic/terrain",
+      "sources": [
+        "src/logic/terrain/chunk.h"
+      ],
+      "summary": "Marks a chunk whose samples are all on the same side of the surface, with their mean.",
+      "description": "Emplaced by ChunkGeneratorSys::collect instead of ChunkVolume when no surface crosses the chunk (all samples > 0 or all <= 0). TerrainColliders treats a cell inside such a chunk as having no surface (no collider), whatever the sign; nothing outside src/logic reads `mean`.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "mean",
+          "type": "float",
+          "default": "uninitialized (set from the constructor argument)",
+          "desc": "mean density of the chunk's samples"
+        }
+      ]
+    },
+    {
+      "name": "ChunkGenerating",
+      "kind": "tag",
+      "registry": "host",
+      "folder": "src/logic/terrain",
+      "sources": [
+        "src/logic/terrain/chunk.h"
+      ],
+      "summary": "Chunk density is being computed on a worker thread.",
+      "description": "Emplaced by ChunkGeneratorSys::tick when it starts a job, removed by ChunkGeneratorSys::collect when the job is done. TerrainSys does not destroy ChunkDestroying chunks that still have it.",
+      "scene_json": null,
+      "fields": []
+    },
+    {
+      "name": "ChunkGenerated",
+      "kind": "tag",
+      "registry": "host",
+      "folder": "src/logic/terrain",
+      "sources": [
+        "src/logic/terrain/chunk.h"
+      ],
+      "summary": "Chunk densities are ready: ChunkVolume or ChunkEmpty is present.",
+      "description": "Emplaced by ChunkGeneratorSys::collect. Excludes the chunk from further generation; counted by DebugMenu and Capture.",
+      "scene_json": null,
+      "fields": []
+    },
+    {
+      "name": "ChunkMeshPending",
+      "kind": "tag",
+      "registry": "host",
+      "folder": "src/logic/terrain",
+      "sources": [
+        "src/logic/terrain/chunk.h"
+      ],
+      "summary": "Chunk waits for a marching cubes dispatch.",
+      "description": "Emplaced by ChunkGeneratorSys::collect next to ChunkVolume; removed by TerrainSys once it has recorded the chunk's compute dispatch.",
+      "scene_json": null,
+      "fields": []
+    },
+    {
+      "name": "ChunkDestroying",
+      "kind": "tag",
+      "registry": "host",
+      "folder": "src/logic/terrain",
+      "sources": [
+        "src/logic/terrain/chunk.h"
+      ],
+      "summary": "Chunk is beyond the unload distance and will be destroyed once no worker uses it.",
+      "description": "Emplaced (emplace_or_replace) by ChunkManagerSys when the chunk's centre is farther than view_distance + chunk::length from every load centre; the chunk is removed from ChunkMap at the same time. TerrainSys destroys the entity (and recycles its GPU slot) once it is not ChunkGenerating. ChunkGeneratorSys never starts a job for it.",
+      "scene_json": null,
+      "fields": []
+    },
+    {
+      "name": "ChunkMap",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/logic/terrain",
+      "sources": [
+        "src/logic/terrain/chunk.h"
+      ],
+      "summary": "Chunk coordinates to chunk entity, for the live (not unloading) chunks.",
+      "description": "Host context variable emplaced by ChunkManagerSys::preinit; ChunkManagerSys inserts new chunks and erases unloaded ones. get(pos) returns entt::null when absent. TerrainColliders reads loaded densities through it (falls back to TerrainGenerator::sample otherwise). Keyed with IVec3Hash.",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "chunks",
+          "type": "std::unordered_map<glm::ivec3, entt::entity, IVec3Hash>",
+          "default": "empty",
+          "desc": "chunk coordinates to entity"
+        }
+      ]
+    },
+    {
+      "name": "std::shared_ptr<TerrainGenerator>",
+      "kind": "context",
+      "registry": "both",
+      "folder": "src/logic/terrain",
+      "sources": [
+        "src/logic/terrain/terrain_generator.h",
+        "src/logic/terrain/terrain_generator.cpp"
+      ],
+      "summary": "Shared density function of the marching cubes world (FastNoise2 heightfield plus 3D overhang noise).",
+      "description": "Context variable holding a shared TerrainGenerator, safe to call from several threads. Host: emplaced by ChunkGeneratorSys::preinit (default seed 1337); worlds: emplaced by WorldTerrainSys::preinit with its `seed` param. EnTT's ctx().emplace keeps an existing value, so the first emplacer wins. Density at world height y: base_level + height_amplitude * fbm2D(x, z) - y + overhang_amplitude * fbm3D; > 0 is solid. Used by ChunkGeneratorSys jobs, TerrainColliders (creates its own when absent), PlayerControl, VRControl and base scene systems (surfaceHeight).",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "seed",
+          "type": "int",
+          "default": "1337",
+          "desc": "FastNoise seed (seed + 1 for the 3D noise)"
+        },
+        {
+          "name": "base_level",
+          "type": "float",
+          "default": "60",
+          "desc": "world units"
+        },
+        {
+          "name": "height_amplitude",
+          "type": "float",
+          "default": "90",
+          "desc": "world units"
+        },
+        {
+          "name": "height_frequency",
+          "type": "float",
+          "default": "1/700",
+          "desc": "per world unit (5 octaves FBm, gain 0.5, lacunarity 2)"
+        },
+        {
+          "name": "overhang_amplitude",
+          "type": "float",
+          "default": "14",
+          "desc": "world units"
+        },
+        {
+          "name": "overhang_frequency",
+          "type": "float",
+          "default": "1/90",
+          "desc": "per world unit (3 octaves FBm)"
+        }
+      ]
+    },
+    {
+      "name": "Settings",
+      "kind": "context",
+      "registry": "host",
+      "folder": "src/logic/settings",
+      "sources": [
+        "src/logic/settings/settings.h",
+        "src/logic/settings/settings.cpp"
+      ],
+      "summary": "User settings loaded from ./config.6.json and overridden by key=value arguments.",
+      "description": "Host context variable emplaced in the Game constructor (dynamical only) as Settings(argc, argv): load() reads DYNAMICAL_CONFIG_FILE (DYNAMICAL_CONFIG_DIR \"config.6.json\", default ./config.6.json) with cereal JSON if it exists and always rewrites it, then argument_override applies key=value arguments (window_width, window_height, fullscreen, fps_max, username, server_side, client_side, vr_mode, view_distance; spectator_mode cannot be overridden; booleans are true only for the string \"true\"). Game forces vr_mode = 0 when the scene's renderer has vr false. Read by Windu, VRContext, DebugMenu, ChunkManagerSys (view_distance, with Settings::default_view_distance = 768 when absent).",
+      "scene_json": null,
+      "fields": [
+        {
+          "name": "window_width",
+          "type": "int",
+          "default": "0",
+          "desc": "0: picked by Windu"
+        },
+        {
+          "name": "window_height",
+          "type": "int",
+          "default": "0",
+          "desc": "0: picked by Windu"
+        },
+        {
+          "name": "fullscreen",
+          "type": "bool",
+          "default": "true",
+          "desc": ""
+        },
+        {
+          "name": "fps_max",
+          "type": "int",
+          "default": "60",
+          "desc": ""
+        },
+        {
+          "name": "username",
+          "type": "std::string",
+          "default": "\"John Doe\"",
+          "desc": "legacy"
+        },
+        {
+          "name": "server_side",
+          "type": "bool",
+          "default": "false",
+          "desc": "legacy"
+        },
+        {
+          "name": "client_side",
+          "type": "bool",
+          "default": "false",
+          "desc": "legacy"
+        },
+        {
+          "name": "vr_mode",
+          "type": "int",
+          "default": "1",
+          "desc": "0 desktop only, 1 VR alongside the desktop when a headset is available"
+        },
+        {
+          "name": "spectator_mode",
+          "type": "int",
+          "default": "2",
+          "desc": "serialized only"
+        },
+        {
+          "name": "view_distance",
+          "type": "int",
+          "default": "768 (default_view_distance)",
+          "desc": "chunks load within this distance of the cameras, world units"
+        }
+      ]
+    }
+  ],
+  "access": [
+    {
+      "system": "BoxDropSys",
+      "component": "WorldRng",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "get; per body draws half size, x jitter, height, z jitter, rotation angle, unitSphere axis (2 draws), and for boxes one more for the colour",
+      "side_effects": [
+        "consumes 7 (capsule) or 8 (box) uniform draws per body"
+      ]
+    },
+    {
+      "system": "BoxDropSys",
+      "component": "Transform",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "new entity at the jittered grid position (height + half above y=0), random rotation, scale 1",
+      "side_effects": [
+        "creates `count` entities"
+      ]
+    },
+    {
+      "system": "BoxDropSys",
+      "component": "RigidBody",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "dynamic, friction 1, restitution 0; box half_extent = half, or capsule (every capsule_every-th) half_extent (0.6h, 1.5h, 0.6h) with angular_damping 1",
+      "side_effects": [
+        "Jolt bodies created later by RigidBodySys"
+      ]
+    },
+    {
+      "system": "BoxDropSys",
+      "component": "ModelRef",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "init",
+      "details": "box: models/primitives/box.gltf, colour (0.3 + 0.5u, 0.45, 0.85, 1); capsule: models/primitives/capsule, colour (0.95, 0.75, 0.25, 1)",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkManagerSys",
+      "component": "ChunkMap",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "preinit",
+      "details": "emplaces an empty ChunkMap",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkManagerSys",
+      "component": "ChunkMap",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "erases unloaded chunks, inserts new chunk entities by coordinates",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkManagerSys",
+      "component": "Settings",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find; view_distance, Settings::default_view_distance (768) when absent",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkManagerSys",
+      "component": "Camera",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find; position is a load centre",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkManagerSys",
+      "component": "VRInput",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find; session_running gates the VR rig as a load centre",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkManagerSys",
+      "component": "VRRig",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find; position is a load centre while the VR session runs",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkManagerSys",
+      "component": "ChunkC",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "reads center() of mapped chunks for unloading; creates an entity with ChunkC(pos) for each new chunk in range",
+      "side_effects": [
+        "creates chunk entities"
+      ]
+    },
+    {
+      "system": "ChunkManagerSys",
+      "component": "ChunkDestroying",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "emplace_or_replace on chunks farther than view_distance + chunk::length from every centre",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkGeneratorSys",
+      "component": "std::shared_ptr<TerrainGenerator>",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "preinit",
+      "details": "emplaces a new TerrainGenerator (seed 1337) and keeps a copy of the pointer for jobs",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkGeneratorSys",
+      "component": "RunArgs",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find; deterministic() (fixed_frame_dt > 0) switches to synchronous generation of every pending chunk",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkGeneratorSys",
+      "component": "Camera",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find; position orders candidates (origin when absent)",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkGeneratorSys",
+      "component": "ChunkC",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "view of chunks without ChunkGenerated / ChunkGenerating / ChunkDestroying; center() for distance, pos for the job",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkGeneratorSys",
+      "component": "ChunkGenerating",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [
+        "create",
+        "remove"
+      ],
+      "phase": "tick",
+      "details": "excluded from candidates; emplaced when a job starts; removed in collect when the job is done",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkGeneratorSys",
+      "component": "ChunkGenerated",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "excluded from candidates; emplaced in collect",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkGeneratorSys",
+      "component": "ChunkDestroying",
+      "registry": "host",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "excluded from candidates (still collected if already generating)",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkGeneratorSys",
+      "component": "ChunkVolume",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "collect: emplaced with the job's values when the chunk crosses the surface",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkGeneratorSys",
+      "component": "ChunkMeshPending",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "collect: emplaced next to ChunkVolume",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkGeneratorSys",
+      "component": "ChunkEmpty",
+      "registry": "host",
+      "access": "write",
+      "lifecycle": [
+        "create"
+      ],
+      "phase": "tick",
+      "details": "collect: emplaced with the mean when all samples share a sign",
+      "side_effects": []
+    },
+    {
+      "system": "ChunkGeneratorSys",
+      "component": "tf::Executor",
+      "registry": "host",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "get; silent_async one task per started job",
+      "side_effects": [
+        "spawns TerrainGenerator::generate tasks on taskflow; in deterministic runs and in finish, busy-waits (yield) for them"
+      ]
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "AgentIO",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [
+        "emplace_ctx"
+      ],
+      "phase": "preinit",
+      "details": "agentIO(reg) emplaces it when absent",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "SphereAgent",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "counts SphereAgent+Transform+RigidBody entities (error log unless exactly 1); behavior for configure; resetSphereEpisode writes the episode state",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "Transform",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "view membership; resetSphereEpisode sets position to the spawn point and rotation to identity",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "RigidBody",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "view membership; resetSphereEpisode reads half_extent.x and body (not yet created at init: RigidBodySys creates it on its first tick)",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "AgentIO",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "configure(behavior, 16, 3); resetSphereEpisode zeroes action and clears reward / done / truncated / stats",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "WorldRng",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "resetSphereEpisode: spawn radius and angle; unsteered: heading, speed (stop chance + range), goal timer",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "WorldInfo",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "resetSphereEpisode: find; index * spawn_spacing is the spawn centre x",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "std::shared_ptr<TerrainColliders>",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "resetSphereEpisode: find; surfaceHeight / overhangAmplitude and require() the column around the spawn point",
+      "side_effects": [
+        "builds marching cubes terrain colliders around the spawn point"
+      ]
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "WorldClock",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "resetSphereEpisode: tick * dt as the time of the require() call (only with TerrainColliders)",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "PhysicsWorld",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "resetSphereEpisode: groundBelow raycast; SetPositionRotationAndVelocity when the body exists (physicsWorld() emplaces a default world if absent)",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "PhysicsPose",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "resetSphereEpisode: try_get; both poses set to the spawn pose",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "Parked",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "init",
+      "details": "resetSphereEpisode: find; value = false",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "SphereAgent",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "pending_reset, has_decision, decision_heading, max_torque read; torque written on the first tick of a window; reset when pending",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "RigidBody",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "body (created()) and, via reset, half_extent.x",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "WorldClock",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "tick % decision_period == 0 marks the first tick of a window",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "AgentIO",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "reads action[0..2] (non-finite -> 0, clamped to [-1, 1]) when has_decision; resetSphereEpisode clears it on a pending reset",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "PhysicsWorld",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "AddTorque(body, torque) every tick the torque is non-zero; reset: groundBelow, SetPositionRotationAndVelocity",
+      "side_effects": [
+        "applies a torque to the Jolt body"
+      ]
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "Transform",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "view membership; written by resetSphereEpisode on a pending reset",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "WorldRng",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "resetSphereEpisode on a pending reset",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "WorldInfo",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "resetSphereEpisode on a pending reset",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "std::shared_ptr<TerrainColliders>",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "resetSphereEpisode on a pending reset: require() around the new spawn point",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "PhysicsPose",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "resetSphereEpisode on a pending reset",
+      "side_effects": []
+    },
+    {
+      "system": "SphereControlSys",
+      "component": "Parked",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "resetSphereEpisode on a pending reset: value = false",
+      "side_effects": []
+    },
+    {
+      "system": "SphereTaskSys",
+      "component": "SphereAgent",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "adds to reward_sum / error_sum / reward_ticks when has_decision; goal_timer, goal draws (unsteered), heading / speed toward the goal; ended, out_of_bounds",
+      "side_effects": []
+    },
+    {
+      "system": "SphereTaskSys",
+      "component": "RigidBody",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "body; early-out when not created",
+      "side_effects": []
+    },
+    {
+      "system": "SphereTaskSys",
+      "component": "Transform",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "position for goal draws (home_radius) and bounds / fall checks",
+      "side_effects": []
+    },
+    {
+      "system": "SphereTaskSys",
+      "component": "PhysicsWorld",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "GetLinearVelocity of the body",
+      "side_effects": []
+    },
+    {
+      "system": "SphereTaskSys",
+      "component": "WorldRng",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "drawGoal when goal_timer <= 0 (unsteered): heading offset, stop chance, speed, interval",
+      "side_effects": []
+    },
+    {
+      "system": "SphereTaskSys",
+      "component": "Parked",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find; value = true when out of bounds or fallen",
+      "side_effects": []
+    },
+    {
+      "system": "SphereObserveSys",
+      "component": "AgentIO",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "reads / clears reset_requested; writes reward, stats, done, truncated, observation[16]",
+      "side_effects": []
+    },
+    {
+      "system": "SphereObserveSys",
+      "component": "SphereAgent",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "window sums -> reward then cleared; decisions++, ended, pending_reset; decision_target / decision_heading / has_decision; reset on RESET",
+      "side_effects": []
+    },
+    {
+      "system": "SphereObserveSys",
+      "component": "WorldRng",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "on RESET: resetSphereEpisode draws, plus one draw for stagger",
+      "side_effects": []
+    },
+    {
+      "system": "SphereObserveSys",
+      "component": "Parked",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "value = false at the end of an episode; resetSphereEpisode also clears it",
+      "side_effects": []
+    },
+    {
+      "system": "SphereObserveSys",
+      "component": "RigidBody",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "body (velocities when created), half_extent.x for the probe height",
+      "side_effects": []
+    },
+    {
+      "system": "SphereObserveSys",
+      "component": "Transform",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "position for the observation; written by resetSphereEpisode on RESET",
+      "side_effects": []
+    },
+    {
+      "system": "SphereObserveSys",
+      "component": "PhysicsWorld",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "GetLinearVelocity, GetAngularVelocity, three groundBelow raycasts; on RESET resetSphereEpisode moves the body",
+      "side_effects": []
+    },
+    {
+      "system": "SphereObserveSys",
+      "component": "WorldInfo",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "resetSphereEpisode on RESET",
+      "side_effects": []
+    },
+    {
+      "system": "SphereObserveSys",
+      "component": "std::shared_ptr<TerrainColliders>",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "resetSphereEpisode on RESET: require() around the new spawn point",
+      "side_effects": []
+    },
+    {
+      "system": "SphereObserveSys",
+      "component": "WorldClock",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "resetSphereEpisode on RESET (with TerrainColliders)",
+      "side_effects": []
+    },
+    {
+      "system": "SphereObserveSys",
+      "component": "PhysicsPose",
+      "registry": "world",
+      "access": "write",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "resetSphereEpisode on RESET",
+      "side_effects": []
+    },
+    {
+      "system": "SphereHeuristicSys",
+      "component": "AgentIO",
+      "registry": "world",
+      "access": "readwrite",
+      "lifecycle": [],
+      "phase": "tick",
+      "details": "find; when observation.size() == 16, action = sphereHeuristic(observation, 1)",
+      "side_effects": []
+    },
+    {
+      "system": "SystemSet",
+      "component": "Parked",
+      "registry": "world",
+      "access": "read",
+      "lifecycle": [],
+      "phase": "fixed_tick",
+      "details": "find; value true skips Every and Act systems",
+      "side_effects": []
+    }
+  ]
+}
