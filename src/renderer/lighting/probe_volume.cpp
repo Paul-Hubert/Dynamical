@@ -544,6 +544,10 @@ void ProbeVolume::update(float time) {
 
 }
 
+vk::DescriptorSet ProbeVolume::viewSet() const {
+    return rings[ctx.frame_index].view_set;
+}
+
 ProbeVolume::~ProbeVolume() {
 
     Device& device = ctx.device;

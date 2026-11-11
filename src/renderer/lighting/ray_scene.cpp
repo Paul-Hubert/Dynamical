@@ -45,6 +45,8 @@ RayScene::RayScene(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg), inst
     reg.ctx().emplace<LightingStats>();
     reg.ctx().emplace<RayMeshes>();
     reg.storage<PlantInRays>();
+    reg.storage<PlantRayTransforms>();
+    reg.ctx().emplace<RayBake>();
 
     // Entry 0 of the geometry table : the chunks
     GeometryEntry terrain;
@@ -337,6 +339,39 @@ void RayScene::updateMeshes() {
     }
     stats.structures_pending = pending;
 
+    // The unit box of the plants far away, once : a geometry that is not triangles, the rays that cross it
+    // read the volume of the species in it (include/rays.glsl)
+    if(!box_queued && !full) {
+        VmaAllocationCreateInfo alloc {};
+        alloc.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        alloc.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        box_bounds = VmaBuffer(device, &alloc, vk::BufferCreateInfo({}, sizeof(vk::AabbPositionsKHR),
+            vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress,
+            vk::SharingMode::eExclusive, 1, &device.g_i));
+        VmaAllocationInfo info;
+        vmaGetAllocationInfo(device, box_bounds.allocation, &info);
+        vk::AabbPositionsKHR unit(0.f, 0.f, 0.f, 1.f, 1.f, 1.f);
+        std::memcpy(info.pMappedData, &unit, sizeof(unit));
+        vmaFlushAllocation(device, box_bounds.allocation, 0, VK_WHOLE_SIZE);
+
+        vk::AccelerationStructureGeometryAabbsDataKHR data(device->getBufferAddress(vk::BufferDeviceAddressInfo(box_bounds)), sizeof(vk::AabbPositionsKHR));
+        vk::AccelerationStructureGeometryKHR geometry(vk::GeometryTypeKHR::eAabbs, vk::AccelerationStructureGeometryDataKHR(data),
+            vk::GeometryFlagBitsKHR::eNoDuplicateAnyHitInvocation);
+        box_queued = queueBuild(box, vk::AccelerationStructureTypeKHR::eBottomLevel, vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace,
+            { geometry }, { 1 });
+    }
+
+    // An entry of the table for each volume the plants were given
+    while(box_geometries.size() < given.boxes.size()) {
+        const RayBox& bounds = given.boxes[box_geometries.size()];
+        GeometryEntry entry;
+        entry.kind = (uint32_t) RayMesh::Kind::Volume;
+        entry.texture = bounds.volume;
+        entry.alpha_cutoff = bounds.voxel;
+        entry.color = bounds.size;
+        box_geometries.push_back(addGeometries({ entry }));
+    }
+
 }
 
 void RayScene::addInstance(const glm::mat4& matrix, vk::DeviceAddress structure, uint32_t first_geometry, uint32_t mask) {
@@ -381,27 +416,70 @@ void RayScene::gatherInstances() {
     stats.plants_near = 0;
     stats.plants_far = 0;
     if(auto* plant_meshes = reg.ctx().find<RayPlantMeshes>()) {
+        const auto& given = reg.ctx().get<RayMeshes>();
         const float enter2 = range * range, leave2 = enter2 * 1.15f * 1.15f;
-        std::vector<entt::entity> entering, leaving;
-        auto view = reg.view<const Transform, const Plant>();
-        for(auto [entity, transform, plant] : view.each()) {
+        std::vector<entt::entity> entering, leaving, fresh;
+        auto rows = [](float* out, const glm::mat4& matrix) {
+            for(int row = 0; row < 3; row++) {
+                for(int column = 0; column < 4; column++) out[row * 4 + column] = matrix[column][row];
+            }
+        };
+        auto place = [&](const float* transform, vk::DeviceAddress structure, uint32_t first_geometry, uint32_t mask) {
+            vk::AccelerationStructureInstanceKHR instance;
+            std::memcpy(&instance.transform, transform, 12 * sizeof(float));
+            instance.instanceCustomIndex = first_geometry;
+            instance.mask = mask;
+            instance.instanceShaderBindingTableRecordOffset = 0;
+            instance.flags = (VkGeometryInstanceFlagsKHR) vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable;
+            instance.accelerationStructureReference = structure;
+            instances.push_back(instance);
+        };
+
+        // Plants do not move : where their instances go is worked out once
+        for(auto entity : reg.view<const Transform, const Plant>(entt::exclude<PlantRayTransforms>)) fresh.push_back(entity);
+        for(auto entity : fresh) {
+            auto& transforms = reg.emplace<PlantRayTransforms>(entity);
+            rows(transforms.mesh, reg.get<Transform>(entity).matrix());
+        }
+
+        for(auto [entity, transform, plant, transforms] : reg.view<const Transform, const Plant, PlantRayTransforms>().each()) {
             float distance2 = 1e30f;
             for(auto& viewer : viewers) distance2 = std::min(distance2, glm::distance2(viewer, transform.position));
             bool was = reg.all_of<PlantInRays>(entity);
             bool in = distance2 < (was ? leave2 : enter2);
             if(in != was) (in ? entering : leaving).push_back(entity);
-            if(!in) {
-                stats.plants_far++;
+            if(plant.species >= plant_meshes->mesh.size()) continue;
+
+            if(in) {
+                int32_t id = plant_meshes->mesh[plant.species];
+                if(id < 0 || (size_t) id >= meshes.size() || !meshes[id].built || !meshes[id].accel.handle) continue;
+                place(transforms.mesh, meshes[id].accel.address, meshes[id].first_geometry, Plants);
+                stats.plants_near++;
                 continue;
             }
-            if(plant.species >= plant_meshes->mesh.size()) continue;
-            int32_t id = plant_meshes->mesh[plant.species];
-            if(id < 0 || (size_t) id >= meshes.size() || !meshes[id].built || !meshes[id].accel.handle) continue;
-            addInstance(transform.matrix(), meshes[id].accel.address, meshes[id].first_geometry, Plants);
-            stats.plants_near++;
+
+            // Far away : the box of the species over the bounds of the plant, once its volume is baked
+            int32_t id = plant.species < plant_meshes->box.size() ? plant_meshes->box[plant.species] : -1;
+            if(id < 0 || (size_t) id >= box_geometries.size() || !box.address || (settings && !settings->far_plants_in_rays)) continue;
+            if(transforms.boxed != id) {
+                const RayBox& bounds = given.boxes[id];
+                rows(transforms.box, glm::scale(glm::translate(transform.matrix(), bounds.min), bounds.size));
+                transforms.boxed = id;
+            }
+            place(transforms.box, box.address, box_geometries[id], Volumes);
+            stats.plants_far++;
         }
         for(auto entity : entering) reg.emplace<PlantInRays>(entity);
         for(auto entity : leaving) reg.remove<PlantInRays>(entity);
+    }
+
+    // A mesh on its own for the rays of a bake : far under the world, seen through its own mask only
+    if(auto* bake = reg.ctx().find<RayBake>()) {
+        bake->placed = false;
+        if(bake->mesh >= 0 && (size_t) bake->mesh < meshes.size() && meshes[bake->mesh].built && meshes[bake->mesh].accel.handle) {
+            addInstance(glm::translate(glm::mat4(1.f), bake->origin), meshes[bake->mesh].accel.address, meshes[bake->mesh].first_geometry, Bake);
+            bake->placed = true;
+        }
     }
 
     // Models : boxes, hands, what the scenes place. Those physics or a hand move are left out of the rays
@@ -505,7 +583,10 @@ RayScene::~RayScene() {
     }
     ctx.ray_geometries = nullptr;
     ctx.ray_textures = nullptr;
+    if(box.handle) ctx.device->destroyAccelerationStructureKHR(box.handle);
     reg.clear<PlantInRays>();
+    reg.clear<PlantRayTransforms>();
+    reg.ctx().erase<RayBake>();
     reg.ctx().erase<RayMeshes>();
     for(auto& old : retired) {
         if(old.accel.handle) ctx.device->destroyAccelerationStructureKHR(old.accel.handle);

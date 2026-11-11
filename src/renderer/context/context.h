@@ -61,6 +61,11 @@ public:
     const std::vector<vk::DescriptorImageInfo>* probe_direct = nullptr;
     static constexpr uint32_t max_probe_pages = 16;
 
+    // The baked volumes of the plants (PlantVolumes) : density, colour and normal of each (bindings 10 to 12),
+    // only ever added
+    const std::array<std::vector<vk::DescriptorImageInfo>, 3>* plant_volumes = nullptr;
+    static constexpr uint32_t max_plant_volumes = 128;
+
     // Usage a vertex or an index buffer needs to be traced, nothing without ray tracing
     vk::BufferUsageFlags rayInputUsage() {
         if(!device.ray.enabled()) return {};
@@ -84,6 +89,7 @@ private:
     // Textures of the rays each set already has
     std::unordered_map<VkDescriptorSet, size_t> ray_textures_written;
     std::unordered_map<VkDescriptorSet, size_t> probe_pages_written;
+    std::unordered_map<VkDescriptorSet, size_t> plant_volumes_written;
 
 };
 

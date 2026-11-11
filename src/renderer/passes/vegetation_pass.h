@@ -100,6 +100,16 @@ private:
     // Leaves are drawn from both sides
     std::array<vk::Pipeline, NUM_RENDER_TARGETS> two_sided_pipelines {};
 
+    // With ray tracing, plants far away are drawn from the baked volume of their species (PlantVolumes) in
+    // place of their billboard : the box of their bounds
+    struct VolumeInstance {
+        uint32_t species;
+        glm::mat4 matrix;
+    };
+    vk::PipelineLayout volume_layout;
+    std::array<vk::Pipeline, NUM_RENDER_TARGETS> volume_pipelines {};
+    std::array<std::vector<VolumeInstance>, NUM_RENDER_TARGETS> volume_instances;
+
     std::shared_ptr<VmaImage> white, flat_normal, default_extra, black;
 
     // Textures are shared between species (the same bark on five pines), keyed by their path in the library

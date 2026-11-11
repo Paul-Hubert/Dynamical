@@ -15,6 +15,8 @@ namespace dy {
 struct Plant {
     uint32_t species = 0;   // index in VegetationLibrary::species
     int32_t lod = -1;       // >= 0 : always drawn with this level of detail (clamped to the species' last)
+                            // `volume` : always from the baked volume of the species (ray traced lighting), its last level without it
+    static constexpr int32_t volume = -2;
 };
 
 // One level of detail of a species : a range of the species' vertices and its draw calls

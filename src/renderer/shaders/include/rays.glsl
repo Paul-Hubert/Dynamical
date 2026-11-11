@@ -16,6 +16,7 @@ layout(buffer_reference, scalar, buffer_reference_align = 4) readonly buffer Ray
 const uint ray_kind_terrain = 0u;   // a chunk : a list of triangles, no indices
 const uint ray_kind_solid = 1u;
 const uint ray_kind_plant = 2u;     // VegetationVertex : texture coordinates at floats 5 and 6
+const uint ray_kind_volume = 3u;    // the box of a plant far away : `texture` is its volume, color its size in metres, alpha_cutoff a texel of it in metres
 
 struct RayGeometry {
     RayFloats vertices;         // where the indices count from
@@ -38,7 +39,63 @@ const uint ray_terrain = 1u;
 const uint ray_plants = 2u;
 const uint ray_static = 4u;
 const uint ray_dynamic = 8u;
-const uint ray_all = 0xFFu;
+const uint ray_bake = 16u;          // a mesh on its own, for the bake of its volume
+const uint ray_volumes = 32u;       // the boxes of the plants far away
+const uint ray_all = 0x2Fu;
+const uint ray_still = ray_terrain | ray_plants | ray_static | ray_volumes;     // what does not move : what the probes see
+
+// The baked volumes of the species (renderer/lighting/plant_volumes.h), over the bounds of each : what the
+// plant is far away, in the rays and on screen.
+// density : rgb how much of the light a texel of the plant stops, per colour, a : how likely a ray is to
+// meet something across it. color : rgb mean colour of what is there, a : how much of it is leaf.
+// normal : rg mean normal (octahedral), b : how much of the sky the texel sees through its own plant
+layout(set = 0, binding = 10) uniform sampler3D u_plant_density[];
+layout(set = 0, binding = 11) uniform sampler3D u_plant_color[];
+layout(set = 0, binding = 12) uniform sampler3D u_plant_normal[];
+
+vec3 octDecode(vec2 e) {
+    e = e * 2.0 - 1.0;
+    vec3 n = vec3(e.x, 1.0 - abs(e.x) - abs(e.y), e.y);
+    float t = max(-n.y, 0.0);
+    n.x += n.x >= 0.0 ? -t : t;
+    n.z += n.z >= 0.0 ? -t : t;
+    return normalize(n);
+}
+
+vec2 octEncode(vec3 n) {
+    n /= abs(n.x) + abs(n.y) + abs(n.z);
+    vec2 e = n.y >= 0.0 ? n.xz : (1.0 - abs(n.zx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.z >= 0.0 ? 1.0 : -1.0);
+    return e * 0.5 + 0.5;
+}
+
+// The part of a ray that is in the unit box, in the space of the box. false : none
+bool rayBox(vec3 origin, vec3 direction, float from, float to, out float enter, out float leave) {
+    vec3 inverse_direction = 1.0 / direction;
+    vec3 a = -origin * inverse_direction, b = (1.0 - origin) * inverse_direction;
+    vec3 low = min(a, b), high = max(a, b);
+    enter = max(max(low.x, low.y), max(low.z, from));
+    leave = min(min(high.x, high.y), min(high.z, to));
+    return leave > enter;
+}
+
+// Texels of the volume of a plant that a metre of a ray crosses (the plant may be scaled)
+float volumeTexels(RayGeometry geometry, vec3 direction) {
+    return length(direction * geometry.color) / geometry.alpha_cutoff;
+}
+
+// What a plant in its box lets through of a light along a part of a ray : marched on a coarse level
+vec3 volumeShadow(RayGeometry geometry, vec3 origin, vec3 direction, float enter, float leave) {
+    const int steps = 12;
+    float span = (leave - enter) / float(steps);
+    float texels = span * volumeTexels(geometry, direction);
+    vec3 light = vec3(1.0);
+    for(int i = 0; i < steps; i++) {
+        vec3 at = origin + direction * (enter + (float(i) + 0.5) * span);
+        vec3 stopped = min(textureLod(u_plant_density[nonuniformEXT(geometry.texture)], at, 2.0).rgb, vec3(0.999));
+        light *= pow(1.0 - stopped, vec3(texels));
+    }
+    return light;
+}
 
 // The three vertices of a triangle of a geometry
 uvec3 rayCorners(RayGeometry geometry, int primitive) {
@@ -76,13 +133,19 @@ vec3 traceShadow(vec3 origin, vec3 direction, float distance, uint mask) {
     rayQueryEXT query;
     rayQueryInitializeEXT(query, u_scene, gl_RayFlagsTerminateOnFirstHitEXT, mask, origin, 0.0, direction, distance);
     while(rayQueryProceedEXT(query)) {
-        if(rayQueryGetIntersectionTypeEXT(query, false) != gl_RayQueryCandidateIntersectionTriangleEXT) continue;
-
         int index = rayQueryGetIntersectionInstanceCustomIndexEXT(query, false) + rayQueryGetIntersectionGeometryIndexEXT(query, false);
         RayGeometry geometry = ray_geometries[index];
-        if(!rayLeaf(geometry, rayQueryGetIntersectionPrimitiveIndexEXT(query, false), rayQueryGetIntersectionBarycentricsEXT(query, false))) continue;
 
-        light *= geometry.transmission;
+        if(rayQueryGetIntersectionTypeEXT(query, false) != gl_RayQueryCandidateIntersectionTriangleEXT) {
+            // The box of a plant far away : what its volume lets through
+            vec3 from = rayQueryGetIntersectionObjectRayOriginEXT(query, false), along = rayQueryGetIntersectionObjectRayDirectionEXT(query, false);
+            float enter, leave;
+            if(!rayBox(from, along, 0.0, distance, enter, leave)) continue;
+            light *= volumeShadow(geometry, from, along, enter, leave);
+        } else {
+            if(!rayLeaf(geometry, rayQueryGetIntersectionPrimitiveIndexEXT(query, false), rayQueryGetIntersectionBarycentricsEXT(query, false))) continue;
+            light *= geometry.transmission;
+        }
         if(max(light.r, max(light.g, light.b)) < 0.02) {
             rayQueryTerminateEXT(query);
             return vec3(0.0);

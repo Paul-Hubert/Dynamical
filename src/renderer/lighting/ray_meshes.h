@@ -22,6 +22,7 @@ struct RayMesh {
         Terrain = 0,    // the chunks : no table
         Solid = 1,      // nothing to read in its vertices
         Plant = 2,      // VegetationVertex
+        Volume = 3,     // a box : the baked volume of a species
     };
 
     struct Part {
@@ -38,6 +39,15 @@ struct RayMesh {
     uint32_t vertex_stride = 0;
     uint32_t first_vertex = 0, vertex_count = 0;
     std::vector<Part> parts;
+};
+
+// A plant far from the viewers is a box in the rays, which read the baked volume of its species in it
+// (PlantVolumes) : the unit box of RayScene placed over the bounds of the species
+struct RayBox {
+    int32_t volume = -1;                // index of the textures of the volume (bindings 10 to 12 of the view set)
+    glm::vec3 min = glm::vec3(0.f);     // bounds of the species, in its own space
+    glm::vec3 size = glm::vec3(1.f);
+    float voxel = 1.f;                  // metres a side of a texel of the volume
 };
 
 // Context variable, only with ray tracing : the meshes and the textures the passes gave to the rays.
@@ -62,17 +72,53 @@ public:
 
     static constexpr uint32_t max_textures = 512;
 
+    uint32_t add(RayBox box) {
+        boxes.push_back(box);
+        return (uint32_t) boxes.size() - 1;
+    }
+
     std::vector<RayMesh> meshes;
+    std::vector<RayBox> boxes;
     std::vector<vk::DescriptorImageInfo> textures;
+};
+
+// Context variable : a mesh to put in the scene of this frame on its own, where only the rays of a bake see it
+// (PlantVolumes asks, RayScene answers)
+struct RayBake {
+    int32_t mesh = -1;                  // of RayMeshes, -1 : none
+    glm::vec3 origin = glm::vec3(0.f);  // where its instance goes
+    bool placed = false;                // it is in the top level structure of this frame
 };
 
 // Context variable written by VegetationPass : the mesh of each species of the library, -1 while it is not loaded
 struct RayPlantMeshes {
     std::vector<int32_t> mesh;
+    std::vector<int32_t> box;       // of RayMeshes::boxes, -1 while the volume of the species is not baked
+    std::vector<glm::vec3> min, max;    // bounds of the most detailed level of each species
+};
+
+// Context variable written by PlantVolumes : the baked volume of each species of the library, for the pass
+// that draws the plants far away from it
+struct PlantVolumeSet {
+    struct Volume {
+        int32_t index = -1;                 // of its textures in bindings 10 to 12 of the view set, -1 : not baked
+        glm::vec3 min = glm::vec3(0.f);     // bounds, in the space of the plant
+        glm::vec3 size = glm::vec3(1.f);
+        float voxel = 1.f;                  // metres a texel
+    };
+    std::vector<Volume> species;
 };
 
 // A plant that is its leaves in the rays (within the plant geometry range of the tiers, with a margin to leave)
 struct PlantInRays {};
+
+// Where the instances of a plant go in the top level structure, worked out once (plants do not move) : its
+// mesh, and the box of its species over its bounds
+struct PlantRayTransforms {
+    float mesh[12];     // three rows of four
+    float box[12];
+    int32_t boxed = -1; // the RayBox `box` was made for
+};
 
 }
 

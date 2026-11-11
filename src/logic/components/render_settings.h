@@ -39,6 +39,8 @@ struct RenderSettings {
         }
     };
     Lighting lighting[2] = { Lighting::of(LightingTier::High), Lighting::of(LightingTier::Medium) };    // desktop, VR
+    bool far_plants_in_rays = true;     // plants beyond the plant geometry range are a box in the rays, which read their baked volume
+    bool far_plants_on_screen = true;   // and are drawn from it in place of their billboard
     int probe_rays_per_frame = 250000;     // measured : a million is 20 ms a frame in a forest on an RTX 5080
     int rays_per_probe = 48;
 

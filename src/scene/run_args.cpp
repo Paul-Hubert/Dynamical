@@ -71,6 +71,7 @@ RunArgsResult dy::parseRunArgs(const std::vector<std::string>& args) {
         else if(key == "ray_tracing") ok = parseBool(value, a.ray_tracing);
         else if(key == "lighting") ok = (a.lighting = value) == "off" || value == "low" || value == "medium" || value == "high";
         else if(key == "probe_rays") ok = parseInt(value, a.probe_rays) && a.probe_rays >= 0;
+        else if(key == "far_plants") ok = (a.far_plants = value) == "volumes" || value == "rays" || value == "screen" || value == "none";
         else if(key == "probe") a.probe = value;
         else if(key == "probe_entities") a.probe_entities = value;
         else if(key == "probe_every") ok = parseInt(value, a.probe_every) && a.probe_every > 0;

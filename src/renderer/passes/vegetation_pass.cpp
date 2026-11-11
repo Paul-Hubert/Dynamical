@@ -40,6 +40,13 @@ struct MapSlot {
 };
 
 // Bindings 0 to 3 of the material set
+// Push constants of vegetation_volume.*.glsl
+struct VolumePC {
+    glm::mat4 model;
+    glm::vec4 low;      // w : index of the textures of the volume
+    glm::vec4 size;     // w : a texel in metres
+};
+
 const MapSlot map_slots[] = {
     { &VegetationMaterial::color, true, true },
     { &VegetationMaterial::normal, false, false },
@@ -89,6 +96,9 @@ VegetationPass::VegetationPass(Context& ctx, entt::registry& reg) : ctx(ctx), re
 
     auto layouts = std::vector { ctx.view_layout, materialLayout };
     auto pcRange = vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(PlantPC));
+    auto volumeRange = vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(VolumePC));
+    volume_layout = ctx.device->createPipelineLayout(vk::PipelineLayoutCreateInfo({}, ctx.view_layout, volumeRange));
+
     layout = ctx.device->createPipelineLayout(vk::PipelineLayoutCreateInfo({}, layouts, pcRange));
 
 }
@@ -115,6 +125,18 @@ void VegetationPass::createPipeline(RenderTarget target, vk::RenderPass renderpa
 
     desc.cull = vk::CullModeFlagBits::eNone;
     two_sided_pipelines[index(target)] = createGraphicsPipeline(ctx.device, desc);
+
+    // The box of a plant far away, both sides drawn (its fragment shader keeps the near one)
+    if(ctx.device.ray.enabled()) {
+        GraphicsPipelineDesc box;
+        box.vertex_shader = "./resources/shaders/vegetation_volume.vert.glsl.spv";
+        box.fragment_shader = "./resources/shaders/vegetation_volume.rt.frag.glsl.spv";
+        box.color_attachments = ctx.sceneAttachments();
+        box.layout = volume_layout;
+        box.renderpass = renderpass;
+        box.cull = vk::CullModeFlagBits::eNone;
+        volume_pipelines[index(target)] = createGraphicsPipeline(ctx.device, box);
+    }
 
 }
 
@@ -288,6 +310,12 @@ void VegetationPass::finishJob(Job& job) {
         }
         auto& plant_meshes = reg.ctx().get<RayPlantMeshes>();
         if(plant_meshes.mesh.size() < species.size()) plant_meshes.mesh.resize(species.size(), -1);
+        if(plant_meshes.min.size() < species.size()) {
+            plant_meshes.min.resize(species.size(), glm::vec3(0.f));
+            plant_meshes.max.resize(species.size(), glm::vec3(0.f));
+        }
+        plant_meshes.min[job.species] = s.def.min;
+        plant_meshes.max[job.species] = s.def.max;
         plant_meshes.mesh[job.species] = (int32_t) ray_meshes->add(std::move(mesh));
     }
 
@@ -303,6 +331,8 @@ void VegetationPass::finishJob(Job& job) {
 void VegetationPass::update(uint32_t frame_index) {
 
     for(auto& list : instances) list.clear();
+    for(auto& list : volume_instances) list.clear();
+    auto* volumes = reg.ctx().find<PlantVolumeSet>();
 
     for(auto it = jobs.begin(); it != jobs.end();) {
         if((*it)->done.load()) {
@@ -400,7 +430,10 @@ void VegetationPass::update(uint32_t frame_index) {
             }
 
             int lod = -1;
-            if(force_lod >= 0 || plant.lod >= 0) {
+            bool held_volume = plant.lod == Plant::volume;
+            if(held_volume) {
+                lod = (int) s.def.lods.size() - 1;
+            } else if(force_lod >= 0 || plant.lod >= 0) {
                 lod = std::min(plant.lod >= 0 ? plant.lod : force_lod, (int) s.def.lods.size() - 1);
             } else {
                 float distance = std::max(glm::distance(eye.position, center), 0.01f);
@@ -417,6 +450,13 @@ void VegetationPass::update(uint32_t frame_index) {
             if(!have_matrix) {
                 matrix = transform.matrix();
                 have_matrix = true;
+            }
+            // Far away : the volume of the species where it is baked, in place of the billboard
+            bool far_volume = s.def.lods[lod].billboard && plant.lod == -1 && force_lod < 0 && (!settings || settings->far_plants_on_screen);
+            if((far_volume || held_volume) && volumes && plant.species < volumes->species.size() && volumes->species[plant.species].index >= 0
+                && volume_pipelines[target]) {
+                volume_instances[target].push_back({ plant.species, matrix });
+                continue;
             }
             instances[target].push_back({ plant.species, (uint32_t) lod, matrix });
         }
@@ -440,7 +480,8 @@ void VegetationPass::record(vk::CommandBuffer command, const RenderView& view) {
     const entt::registry& creg = reg;
 
     const auto& list = instances[index(view.target)];
-    if(list.empty()) return;
+    const auto& boxes = volume_instances[index(view.target)];
+    if(list.empty() && boxes.empty()) return;
 
     auto* settings = creg.ctx().find<RenderSettings>();
     bool normal_maps = !settings || settings->vegetation_params.normal_maps;
@@ -488,6 +529,22 @@ void VegetationPass::record(vk::CommandBuffer command, const RenderView& view) {
         }
     }
 
+    // The plants far away : the box of each, its fragment shader finds the plant in the volume of the species
+    auto* volumes = creg.ctx().find<PlantVolumeSet>();
+    if(!boxes.empty() && volumes) {
+        command.bindPipeline(vk::PipelineBindPoint::eGraphics, volume_pipelines[index(view.target)]);
+        command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, volume_layout, 0, {view.view_set}, {});
+        for(const VolumeInstance& instance : boxes) {
+            const auto& volume = volumes->species[instance.species];
+            VolumePC pc;
+            pc.model = instance.matrix;
+            pc.low = glm::vec4(volume.min, (float) volume.index);
+            pc.size = glm::vec4(volume.size, volume.voxel);
+            command.pushConstants(volume_layout, stages, 0, sizeof(VolumePC), &pc);
+            command.draw(36, 1, 0, 0);
+        }
+    }
+
 }
 
 VegetationPass::~VegetationPass() {
@@ -506,6 +563,10 @@ VegetationPass::~VegetationPass() {
     for(auto pipeline : two_sided_pipelines) {
         if(pipeline) ctx.device->destroy(pipeline);
     }
+    for(auto pipeline : volume_pipelines) {
+        if(pipeline) ctx.device->destroy(pipeline);
+    }
+    ctx.device->destroy(volume_layout);
     for(auto& [path, texture] : textures) {
         if(texture.view) ctx.device->destroy(texture.view);
     }

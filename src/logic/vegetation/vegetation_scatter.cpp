@@ -250,15 +250,19 @@ void VegetationLineupSys::init() {
         x += entry.radius + spacing * 0.5f;
 
         // The first one picks its level with the distance, the copies behind it are held at levels 0, 1, ...
-        for(int row = 0; row <= (lods ? (int) entry.lods : 0); row++) {
+        // and the last one is drawn from the baked volume of the species
+        const int rows = lods ? (int) entry.lods + 1 : 0;
+        for(int row = 0; row <= rows; row++) {
             glm::vec3 position(x, 0.f, origin.y - row * (2.f * entry.radius + spacing));
             if(!groundHeight(**generator, position.x, position.z, position.y)) position.y = (*generator)->surfaceHeight(position.x, position.z);
 
             auto plant = reg.create();
             reg.emplace<Transform>(plant, position);
-            reg.emplace<Plant>(plant, s, row - 1);
+            bool volume = lods && row == rows;
+            reg.emplace<Plant>(plant, s, volume ? Plant::volume : row - 1);
             auto& out = dy::log(dy::info) << "VegetationLineup : " << entry.id;
-            if(row > 0) out << " level " << row - 1;
+            if(volume) out << " volume";
+            else if(row > 0) out << " level " << row - 1;
             out << " at " << position.x << " " << position.y << " " << position.z;
             if(row == 0) out << " (" << entry.height << " m)";
             out << "\n";

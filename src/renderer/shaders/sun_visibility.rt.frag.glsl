@@ -81,12 +81,16 @@ void main() {
     vec3 over = cross(sun_direction, side);
     uint seed = uint(pixel.x) * 1973u + uint(pixel.y) * 9277u + uint(light_frame.x) * 26699u;
 
+    // The plants far away only reach the pixels near the eye with their shadows when the sun is low :
+    // their boxes are left out of these rays the rest of the day
+    uint mask = sun_direction.y < 0.26 ? ray_all : ray_all & ~ray_volumes;
+
     vec3 visible = vec3(0.0);
     for(int i = 0; i < rays; i++) {
         float radius = light_direction.w * sqrt(random(seed));
         float angle = 6.2831853 * random(seed);
         vec3 direction = normalize(sun_direction + (side * cos(angle) + over * sin(angle)) * radius);
-        visible += traceShadow(origin, direction, 4000.0, ray_all);
+        visible += traceShadow(origin, direction, 4000.0, mask);
     }
 
     outVisibility = vec4(mix(visible / float(rays), from_probes, beyond), far);

@@ -39,6 +39,9 @@ struct RunArgs {
     std::string lighting;
     // dynamical: rays the probes may cast a frame, -1 : the default of the RenderSettings
     int probe_rays = -1;
+    // dynamical: what the plants far away are with ray tracing. volumes : their baked volume in the rays and on
+    // screen, rays : in the rays only (billboards on screen), screen : on screen only, none : as without ray tracing
+    std::string far_plants = "volumes";
 
     // Probes
     std::string probe;                      // csv file

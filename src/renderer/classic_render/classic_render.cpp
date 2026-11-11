@@ -13,6 +13,7 @@
 #include "view/components/input.h"
 
 #include <algorithm>
+#include <chrono>
 #include <iomanip>
 #include <sstream>
 
@@ -109,8 +110,12 @@ void ClassicRender::logPassTimes() {
         line << times.names[i] << " " << times.sums[i] / times.frames << ", ";
         total += times.sums[i];
     }
+    // And the whole frame on the clock, whatever else it holds (the compute commands of the lighting, the CPU)
+    auto now = std::chrono::steady_clock::now();
+    double frame = std::chrono::duration<double, std::milli>(now - times.since).count() / times.frames;
+    times.since = now;
     dy::log(dy::info) << "GPU ms over " << times.frames << " frames (" << ctx.swap.extent.width << " x " << ctx.swap.extent.height << ") : "
-        << line.str() << "all " << total / times.frames << "\n";
+        << line.str() << "all " << total / times.frames << ", frame " << frame << "\n";
 
     std::fill(times.sums.begin(), times.sums.end(), 0.);
     times.frames = 0;

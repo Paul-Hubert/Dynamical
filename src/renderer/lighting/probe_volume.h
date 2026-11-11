@@ -36,6 +36,9 @@ public:
     // Main thread, after RayScene::update(), before the compute commands of the frame are submitted
     void update(float time);
 
+    // The view set update() wrote for this frame, for the other compute passes of the lighting
+    vk::DescriptorSet viewSet() const;
+
     static constexpr int max_pages = 8;
 
 private:

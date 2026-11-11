@@ -13,6 +13,7 @@
 
 #include <memory>
 
+#include <chrono>
 #include <vector>
 
 namespace dy {
@@ -96,6 +97,7 @@ private:
         std::vector<const char*> names;
         std::vector<double> sums;           // milliseconds, per pass
         uint32_t frames = 0;
+        std::chrono::steady_clock::time_point since = std::chrono::steady_clock::now();    // the last log
     } times;
     void readPassTimes(uint32_t frame_index);
     void logPassTimes();

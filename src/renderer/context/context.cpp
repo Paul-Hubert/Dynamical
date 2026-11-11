@@ -28,10 +28,11 @@ Context::Context(entt::registry& reg) : vr(*this, reg), win(*this, reg), instanc
         bindings.push_back(vk::DescriptorSetLayoutBinding(7, vk::DescriptorType::eCombinedImageSampler, 1, stages));
         bindings.push_back(vk::DescriptorSetLayoutBinding(8, vk::DescriptorType::eCombinedImageSampler, 3 * max_probe_pages, stages));
         bindings.push_back(vk::DescriptorSetLayoutBinding(9, vk::DescriptorType::eCombinedImageSampler, max_probe_pages, stages));
+        for(uint32_t i = 0; i < 3; i++) bindings.push_back(vk::DescriptorSetLayoutBinding(10 + i, vk::DescriptorType::eCombinedImageSampler, max_plant_volumes, stages));
     }
     // The textures of the rays come as the species load : most of that array is not there
     std::vector<vk::DescriptorBindingFlags> flags(bindings.size());
-    if(device.ray.enabled()) flags[6] = flags[8] = flags[9] = vk::DescriptorBindingFlagBits::ePartiallyBound;
+    if(device.ray.enabled()) flags[6] = flags[8] = flags[9] = flags[10] = flags[11] = flags[12] = vk::DescriptorBindingFlagBits::ePartiallyBound;
     vk::DescriptorSetLayoutBindingFlagsCreateInfo binding_flags(flags);
     vk::DescriptorSetLayoutCreateInfo layout_info({}, bindings);
     if(device.ray.enabled()) layout_info.pNext = &binding_flags;
@@ -47,7 +48,7 @@ std::vector<vk::DescriptorPoolSize> Context::viewPoolSizes(uint32_t sets) const 
     if(device.ray.enabled()) {
         sizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, sets));
         sizes.push_back(vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, sets));
-        sizes[1].descriptorCount += sets * (max_ray_textures + 1 + 4 * max_probe_pages);
+        sizes[1].descriptorCount += sets * (max_ray_textures + 1 + 4 * max_probe_pages + 3 * max_plant_volumes);
     }
     return sizes;
 }
@@ -99,6 +100,18 @@ void Context::writeViewSet(vk::DescriptorSet set, uint32_t frame, bool first) {
                 vk::DescriptorType::eCombinedImageSampler, probe_light->data() + written * 3, nullptr, nullptr));
             writes.push_back(vk::WriteDescriptorSet(set, 9, (uint32_t) written, (uint32_t) (count - written),
                 vk::DescriptorType::eCombinedImageSampler, probe_direct->data() + written, nullptr, nullptr));
+            written = count;
+        }
+    }
+
+    if(device.ray.enabled() && plant_volumes) {
+        size_t& written = plant_volumes_written[(VkDescriptorSet) set];
+        size_t count = std::min<size_t>((*plant_volumes)[0].size(), max_plant_volumes);
+        if(written < count) {
+            for(uint32_t i = 0; i < 3; i++) {
+                writes.push_back(vk::WriteDescriptorSet(set, 10 + i, (uint32_t) written, (uint32_t) (count - written),
+                    vk::DescriptorType::eCombinedImageSampler, (*plant_volumes)[i].data() + written, nullptr, nullptr));
+            }
             written = count;
         }
     }

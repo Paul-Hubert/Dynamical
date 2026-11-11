@@ -46,6 +46,8 @@ public:
         Plants = 2,
         Static = 4,     // models that do not move
         Dynamic = 8,    // boxes, hands, animals
+        Bake = 16,      // a mesh on its own, for the rays that bake its volume (RayBake)
+        Volumes = 32,   // the boxes of the plants far away
     };
 
     RayScene(Context& ctx, entt::registry& reg);
@@ -128,6 +130,12 @@ private:
         bool built = false;
     };
     std::vector<MeshAccel> meshes;
+
+    // The unit box the plants far away are in the rays, and the entry of the table of each RayBox
+    Accel box;
+    VmaBuffer box_bounds;
+    bool box_queued = false;
+    std::vector<uint32_t> box_geometries;
 
     // The geometry table : entries are only added, in place (the frames in flight do not know the new ones)
     VmaBuffer table;

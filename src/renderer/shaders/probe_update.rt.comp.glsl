@@ -118,7 +118,7 @@ vec3 torchLight(vec3 position, vec3 normal) {
         float window = 1.0 - d2 * d2 / (radius * radius * radius * radius);
         vec3 towards = to / max(d, 1e-4);
         sum += point_lights[i].color.rgb * (facing * window * window / (d2 + 0.25))
-            * traceShadow(position + normal * 0.05, towards, max(d - 0.15, 0.0), ray_terrain | ray_plants | ray_static);
+            * traceShadow(position + normal * 0.05, towards, max(d - 0.15, 0.0), ray_still);
     }
     return sum;
 }
@@ -128,11 +128,29 @@ vec3 traceRadiance(vec3 origin, vec3 direction, inout uint state, out float miss
 
     // What moves is left out : the probes are slow to forget
     rayQueryEXT query;
-    rayQueryInitializeEXT(query, u_scene, 0u, ray_terrain | ray_plants | ray_static, origin, 0.02, direction, 1500.0);
+    rayQueryInitializeEXT(query, u_scene, 0u, ray_still, origin, 0.02, direction, 1500.0);
     while(rayQueryProceedEXT(query)) {
-        if(rayQueryGetIntersectionTypeEXT(query, false) != gl_RayQueryCandidateIntersectionTriangleEXT) continue;
         int index = rayQueryGetIntersectionInstanceCustomIndexEXT(query, false) + rayQueryGetIntersectionGeometryIndexEXT(query, false);
         RayGeometry geometry = ray_geometries[index];
+        if(rayQueryGetIntersectionTypeEXT(query, false) != gl_RayQueryCandidateIntersectionTriangleEXT) {
+            // The box of a plant far away : the ray gets through its volume less and less likely, where
+            // it stops is drawn
+            vec3 from = rayQueryGetIntersectionObjectRayOriginEXT(query, false), along = rayQueryGetIntersectionObjectRayDirectionEXT(query, false);
+            float enter, leave;
+            if(!rayBox(from, along, 0.02, 1500.0, enter, leave)) continue;
+            const int steps = 12;
+            float span = (leave - enter) / float(steps);
+            float texels = span * volumeTexels(geometry, along);
+            for(int i = 0; i < steps; i++) {
+                vec3 at = from + along * (enter + (float(i) + 0.5) * span);
+                float likely = min(textureLod(u_plant_density[nonuniformEXT(geometry.texture)], at, 2.0).a, 0.999);
+                if(random(state) < 1.0 - pow(1.0 - likely, texels)) {
+                    rayQueryGenerateIntersectionEXT(query, enter + (float(i) + 0.5) * span);
+                    break;
+                }
+            }
+            continue;
+        }
         if(!rayLeaf(geometry, rayQueryGetIntersectionPrimitiveIndexEXT(query, false), rayQueryGetIntersectionBarycentricsEXT(query, false))) continue;
         // A leaf stops the ray as often as it is opaque
         float through = max(geometry.transmission.r, max(geometry.transmission.g, geometry.transmission.b));
@@ -147,7 +165,25 @@ vec3 traceRadiance(vec3 origin, vec3 direction, inout uint state, out float miss
 
     int index = rayQueryGetIntersectionInstanceCustomIndexEXT(query, true) + rayQueryGetIntersectionGeometryIndexEXT(query, true);
     RayGeometry geometry = ray_geometries[index];
-    vec3 hit = origin + direction * rayQueryGetIntersectionTEXT(query, true);
+    float reached = rayQueryGetIntersectionTEXT(query, true);
+    vec3 hit = origin + direction * reached;
+
+    if(rayQueryGetIntersectionTypeEXT(query, true) == gl_RayQueryCommittedIntersectionGeneratedEXT) {
+        // In the volume of a plant far away : the mean colour and normal of what is there, lit as a
+        // leaf is, from both sides, through the rest of its own crown
+        vec3 at = rayQueryGetIntersectionObjectRayOriginEXT(query, true) + rayQueryGetIntersectionObjectRayDirectionEXT(query, true) * reached;
+        vec4 colour = textureLod(u_plant_color[nonuniformEXT(geometry.texture)], at, 1.0);
+        vec4 baked = textureLod(u_plant_normal[nonuniformEXT(geometry.texture)], at, 1.0);
+        vec3 normal = normalize(mat3(rayQueryGetIntersectionObjectToWorldEXT(query, true)) * (octDecode(baked.rg) / geometry.color));
+        float facing = dot(normal, sun_direction);
+        vec3 light = vec3(0.0);
+        if(dot(light_color.rgb, vec3(1.0)) > 0.0) {
+            light += light_color.rgb * (max(facing, 0.0) + 0.5 * colour.a * max(-facing, 0.0))
+                * traceShadow(hit, sun_direction, 4000.0, ray_still);
+        }
+        light += probeLight(hit, normal, mix(ambient_ground.rgb, ambient_sky.rgb, normal.y * 0.5 + 0.5)) * baked.b;
+        return colour.rgb * light;
+    }
 
     // The face that was hit, towards where the ray came from
     uvec3 corners = rayCorners(geometry, rayQueryGetIntersectionPrimitiveIndexEXT(query, true));
@@ -166,13 +202,13 @@ vec3 traceRadiance(vec3 origin, vec3 direction, inout uint state, out float miss
     vec3 light = vec3(0.0);
     float facing = dot(normal, sun_direction);
     if(facing > 0.0 && dot(light_color.rgb, vec3(1.0)) > 0.0) {
-        light += light_color.rgb * facing * traceShadow(hit + normal * 0.05, sun_direction, 4000.0, ray_terrain | ray_plants | ray_static);
+        light += light_color.rgb * facing * traceShadow(hit + normal * 0.05, sun_direction, 4000.0, ray_still);
     }
     vec3 through = vec3(0.0);
     if(geometry.texture >= 0 && facing < 0.0 && dot(light_color.rgb, vec3(1.0)) > 0.0) {
         // A leaf seen from under : the sun on its other side comes through it, in its colour
         through = geometry.transmission * light_color.rgb * (-facing)
-            * traceShadow(hit - normal * 0.05, sun_direction, 4000.0, ray_terrain | ray_plants | ray_static);
+            * traceShadow(hit - normal * 0.05, sun_direction, 4000.0, ray_still);
     }
     light += torchLight(hit, normal);
     // The light the probes around the hit hold now : a bounce more at every update
@@ -257,7 +293,7 @@ void main() {
                 float radius = light_direction.w * sqrt(random(state));
                 float angle = 6.2831853 * random(state);
                 vec3 direction = normalize(sun_direction + (side * cos(angle) + over * sin(angle)) * radius);
-                sun = traceShadow(position, direction, 4000.0, ray_terrain | ray_plants | ray_static);
+                sun = traceShadow(position, direction, 4000.0, ray_still);
             }
             found[count * rays + slot * sun_rays + ray] = vec4(sun, 0.0);
         }
