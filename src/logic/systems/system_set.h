@@ -59,6 +59,8 @@ private:
         std::unique_ptr<System> system;
         Phase phase;
         std::string name;
+        // Its zones in the profiler : `name` around a tick, these around the rest
+        std::string preinit_zone, init_zone, finish_zone;
     };
 
     std::vector<Entry>& entries(List list);

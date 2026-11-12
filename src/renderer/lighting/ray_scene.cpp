@@ -169,6 +169,9 @@ bool RayScene::queueBuild(Accel& out, vk::AccelerationStructureTypeKHR type, vk:
 
 void RayScene::flushBuilds(vk::CommandBuffer command) {
 
+    DY_ZONE();
+    DY_GPU_ZONE(ctx.gpu_profile, command, "Build bottom structures");
+
     if(builds.empty()) return;
 
     std::vector<vk::AccelerationStructureBuildGeometryInfoKHR> infos;
@@ -215,6 +218,8 @@ uint32_t RayScene::chunkGeometry(const GeometryEntry& entry) {
 
 void RayScene::updateChunks() {
 
+    DY_ZONE();
+
     auto* buffers = reg.ctx().find<TerrainBuffers>();
     auto& stats = reg.ctx().get<LightingStats>();
     if(!buffers) {
@@ -242,9 +247,11 @@ void RayScene::updateChunks() {
     }
     std::sort(todo.begin(), todo.end());
 
+    auto* render_settings = reg.ctx().find<RenderSettings>();
+    const uint32_t most = render_settings ? (uint32_t) std::max(render_settings->streaming.ray_chunks, 1) : max_chunk_builds;
     uint32_t built = 0;
     for(auto& [distance, entity] : todo) {
-        if(built >= max_chunk_builds) break;
+        if(built >= most) break;
         const auto& triangles = reg.get<ChunkTriangles>(entity);
         if(triangles.count == 0) {
             reg.emplace<ChunkLit>(entity);
@@ -283,6 +290,8 @@ void RayScene::updateChunks() {
 
 // A structure for each mesh the passes gave since the last frame, and its entries in the geometry table
 void RayScene::updateMeshes() {
+
+    DY_ZONE();
 
     Device& device = ctx.device;
     auto& given = reg.ctx().get<RayMeshes>();
@@ -384,6 +393,8 @@ void RayScene::updateMeshes() {
 // build again now and then : a structure refitted many times traces slowly
 void RayScene::updateAnimals() {
 
+    DY_ZONE();
+
     Device& device = ctx.device;
     constexpr int rebuild_after = 240;
 
@@ -463,6 +474,8 @@ void RayScene::addInstance(const glm::mat4& matrix, vk::DeviceAddress structure,
 
 // What the top level structure of this frame holds
 void RayScene::gatherInstances() {
+
+    DY_ZONE();
 
     auto& stats = reg.ctx().get<LightingStats>();
     auto* settings = reg.ctx().find<RenderSettings>();
@@ -576,6 +589,9 @@ void RayScene::gatherInstances() {
 
 void RayScene::buildTop(vk::CommandBuffer command) {
 
+    DY_ZONE();
+    DY_GPU_ZONE(ctx.gpu_profile, command, "Build top structure");
+
     Device& device = ctx.device;
 
     // The buffer of this compute command buffer : the GPU is done with what it held
@@ -637,6 +653,7 @@ void RayScene::update() {
     }
 
     vk::CommandBuffer command = ctx.compute.getCommandBuffer();
+    DY_GPU_ZONE(ctx.gpu_profile, command, "Ray scene");
 
     // The frames before may still trace the structures and use the scratch memory : after them
     command.pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {},

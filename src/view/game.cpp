@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <taskflow/taskflow.hpp>
-#include "extra/optick/optick.h"
+#include "util/profile_workers.h"
 
 #include "renderer/renderer.h"
 #include "logic/systems/system_set.h"
@@ -13,6 +13,7 @@
 #include "util/entt_util.h"
 
 #include "logic/settings/settings.h"
+#include "logic/settings/graphics.h"
 #include "scene/run_args.h"
 
 #include "logic/components/frame_clock.h"
@@ -24,6 +25,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <thread>
 
 using namespace std::chrono_literals;
 
@@ -33,11 +35,11 @@ Game::Game(int argc, char** argv) {
     registry = std::make_unique<entt::registry>();
     entt::registry& reg = *registry;
     reg.ctx().emplace<Settings>(argc, argv);
-    reg.ctx().emplace<tf::Executor>();
+    reg.ctx().emplace<tf::Executor>(std::thread::hardware_concurrency(), profile::namedWorkers());
 
     // Settings parses its own keys from the same arguments, anything else unknown is only a warning here
     static const char* settings_keys[] = { "window_width", "window_height", "fullscreen", "fps_max", "username",
-        "server_side", "client_side", "vr_mode", "view_distance", "grass_kind", "ground_relief" };
+        "server_side", "client_side", "vr_mode", "view_distance", "graphics", "grass_kind", "ground_relief" };
     auto parsed = parseRunArgs(argc, argv);
     for(auto& key : parsed.unknown) {
         if(std::find(std::begin(settings_keys), std::end(settings_keys), key) == std::end(settings_keys)) {
@@ -61,6 +63,34 @@ Game::Game(int argc, char** argv) {
         settings.fullscreen = false;
         settings.vr_mode = 0;
     }
+
+    // The level of the graphics (resources/graphics.json) : the one of the config file, or graphics=<name>. What the
+    // command line asks for itself stays. Captures and probes are drawn with the defaults of the code unless a level
+    // is asked for : the goldens do not depend on the config file
+    {
+        auto given = [&](const std::string& key) {
+            for(int i = 1; i < argc; i++) {
+                if(std::string(argv[i]).rfind(key + "=", 0) == 0) return true;
+            }
+            return false;
+        };
+        auto& settings = reg.ctx().get<Settings>();
+        auto& args = reg.ctx().get<RunArgs>();
+        auto& graphics = reg.ctx().emplace<Graphics>();
+        if(args.deterministic() && !given("graphics")) settings.graphics.clear();
+        if(!settings.graphics.empty()) {
+            graphics.presets = loadGraphicsPresets();
+            graphics.current = findGraphicsPreset(graphics.presets, settings.graphics);
+            if(graphics.current < 0 && !graphics.presets.empty()) dy::log(dy::warning) << "Unknown graphics " << settings.graphics << "\n";
+        }
+        if(graphics.current >= 0) {
+            const GraphicsPreset& preset = graphics.presets[graphics.current];
+            if(!given("view_distance")) settings.view_distance = preset.view_distance;
+            if(!given("ray_tracing")) args.ray_tracing = preset.ray_tracing;
+            dy::log(dy::info) << "Graphics : " << preset.name << "\n";
+        }
+    }
+
     reg.ctx().emplace<FrameClock>();
 }
 
@@ -87,6 +117,7 @@ int Game::start() {
                 vars.insert(vars.begin(), script_vars.begin(), script_vars.end());
             }
         }
+        DY_ZONE_N("load scene");
         scene = loadScene(name.empty() ? "base" : name, vars, SceneLoadOptions {});
     } catch(const SceneError& e) {
         dy::log(dy::error) << "Scene: " << e.what() << "\n";
@@ -99,7 +130,10 @@ int Game::start() {
 
     // Creates the Vulkan context, OpenXR session, both render targets and the scene passes
     if(!scene.renderer->vr) reg.ctx().get<Settings>().vr_mode = 0;
-    renderer = std::make_unique<Renderer>(reg, *scene.renderer);
+    {
+        DY_ZONE_N("create renderer");
+        renderer = std::make_unique<Renderer>(reg, *scene.renderer);
+    }
 
     set = std::make_unique<SystemSet>(reg);
 
@@ -121,20 +155,28 @@ int Game::start() {
 
     // preinit
 
-    renderer->preinit();
+    {
+        DY_ZONE_N("preinit");
 
-    set->preinit();
+        renderer->preinit();
 
-    if(worlds) worlds->preinit();
+        set->preinit();
+
+        if(worlds) worlds->preinit();
+    }
 
 
     // init
 
-    set->init();
+    {
+        DY_ZONE_N("init");
 
-    if(worlds) worlds->init();
+        set->init();
 
-    renderer->init();
+        if(worlds) worlds->init();
+
+        renderer->init();
+    }
 
     Input& input = reg.ctx().get<Input>();
     const RunArgs& args = reg.ctx().get<RunArgs>();
@@ -168,8 +210,6 @@ int Game::start() {
     bool running = true;
     while(running) {
 
-        OPTICK_FRAME("Main");
-
         renderer->prepare();
 
         if (input.on[Input::EXIT]) {
@@ -191,13 +231,17 @@ int Game::start() {
 
         set->post_tick(dt);
 
-        if(probe) probe->sample(reg, frame_clock.frame);
+        if(probe) {
+            DY_ZONE_N("probe");
+            probe->sample(reg, frame_clock.frame);
+        }
 
         bool shoot = capture && capture->due(frame_clock.frame) && renderer->requestCapture();
 
         renderer->render();
 
         if(shoot) {
+            DY_ZONE_N("capture");
             uint32_t width, height;
             if(renderer->takeCapture(pixels, width, height)) capture->save(pixels, width, height);
             else capture->error = "frame readback failed";
@@ -211,6 +255,8 @@ int Game::start() {
             if(capture->done() && args.exit_after_capture) running = false;
         }
         if(args.ticks > 0 && frame_clock.frame >= (uint64_t) args.ticks) running = false;
+
+        DY_FRAME();
 
     }
 

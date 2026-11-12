@@ -19,7 +19,8 @@
     "speed":       { "type": "float",  "default": 3.3, "description": "m/s" },
     "eye_height":  { "type": "float",  "default": 1.7 },
     "soil":        { "type": "float",  "default": 1,   "description": "how much the walk is picked for the mud, the stones and the sand it crosses; 0 : not looked at" },
-    "watch":       { "type": "float",  "default": 45,  "description": "metres : the camera turns to the herds this close; 0 : not looked at" }
+    "watch":       { "type": "float",  "default": 45,  "description": "metres : the camera turns to the herds this close; 0 : not looked at" },
+    "exit":        { "type": "bool",   "default": false, "description": "the process ends with the walk (a profile of it : tools/profile_run.py)" }
   },
 
   "renderer": { "passes": ["terrain", "grass", "vegetation", "animals", "model", "ui"], "vr": false },
@@ -30,7 +31,7 @@
       { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator",
       { "name": "Forest", "params": { "definition": "${forest}", "seed": "${forest_seed}", "patch_size": "${patch_size}", "coverage": "${coverage}", "max_slope": "${max_slope}" } },
       { "name": "Herds", "params": { "definition": "${herds}", "seed": "${herd_seed}", "cell": "${herd_cell}", "density": "${herd_density}", "range": "${herd_range}", "radius": "${herd_radius}" } },
-      { "name": "CameraWalk", "params": { "distance": "${distance}", "speed": "${speed}", "eye_height": "${eye_height}", "lead": "${lead}", "soil": "${soil}", "herds": "${watch}" } },
+      { "name": "CameraWalk", "params": { "distance": "${distance}", "speed": "${speed}", "eye_height": "${eye_height}", "lead": "${lead}", "soil": "${soil}", "herds": "${watch}", "exit": "${exit}" } },
       "AnimalAnimation", "AnimalGait"
     ],
     "post": ["Terrain"]

@@ -26,7 +26,7 @@ TrainingEnv.exe -nographics -batchmode --mlagents-port <base+i> -logFile <run>/P
   directory (`GetModuleFileNameW`). The deployed layout is `TrainingEnv.exe` plus `resources/scenes`,
   `resources/prefabs` and `resources/agents` next to it.
 - **No config file.** It never constructs `Settings` with load or save, so N processes do not race on
-  `config.6.json` ([architecture.md](architecture.md#run-arguments)).
+  `config.7.json` ([architecture.md](architecture.md#run-arguments)).
 - Everything else uses the engine's own `key=value` (`scene=walker_train var.num_worlds=25
   threads=4`). Configs pass those through `env_args`.
 - The default scene is `walker_train`, so an unmodified config needs no extra arguments.

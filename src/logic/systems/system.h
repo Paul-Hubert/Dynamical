@@ -6,7 +6,9 @@
 #include <cstdint>
 #include <iostream>
 
-#include "extra/optick/optick.h"
+// SystemSet opens a zone named after the system around each of its calls ; DY_ZONE_N("...") inside a system
+// for the parts of it worth seeing apart
+#include "util/profile.h"
 
 namespace dy {
 

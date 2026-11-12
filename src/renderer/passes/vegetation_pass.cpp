@@ -82,7 +82,9 @@ VegetationPass::VegetationPass(Context& ctx, entt::registry& reg) : ctx(ctx), re
     samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
     if(ctx.device.sampler_anisotropy) {
         samplerInfo.anisotropyEnable = VK_TRUE;
-        samplerInfo.maxAnisotropy = 8.f;
+        auto* render_settings = reg.ctx().find<RenderSettings>();
+        samplerInfo.maxAnisotropy = std::clamp(render_settings ? (float) render_settings->textures.vegetation_anisotropy : 8.f,
+            1.f, ctx.device.physical.getProperties().limits.maxSamplerAnisotropy);
     }
     sampler = ctx.device->createSampler(samplerInfo);
     samplerInfo.maxLod = 5.f;
@@ -154,6 +156,7 @@ void VegetationPass::request(uint32_t index) {
     for(auto& [path, texture] : textures) loaded->insert(path);
 
     reg.ctx().get<tf::Executor>().silent_async([job, library, loaded]() {
+        DY_ZONE_N("Load plant species");
         try {
             job->def = library->loadSpecies(job->species);
             job->vertices = library->loadGeometry(job->def, job->indices);

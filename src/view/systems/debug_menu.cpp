@@ -13,6 +13,7 @@
 #include "view/spawn.h"
 #include "logic/components/vr.h"
 #include "logic/settings/settings.h"
+#include "logic/settings/graphics.h"
 #include "logic/terrain/chunk.h"
 #include "logic/animals/animal.h"
 #include "logic/animals/gait.h"
@@ -33,8 +34,6 @@ void DebugMenuSys::init() {
 
 void DebugMenuSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     auto& settings = reg.ctx().get<Settings>();
     auto& render = reg.ctx().get<RenderSettings>();
     auto& camera = reg.ctx().get<Camera>();
@@ -45,6 +44,22 @@ void DebugMenuSys::tick(double dt) {
         ImGui::Text("%.2f ms, %.0f fps", dt * 1000., 1. / dt);
         ImGui::Text("Camera %.1f %.1f %.1f", camera.position.x, camera.position.y, camera.position.z);
         ImGui::TextDisabled("WASD + Space/Ctrl to fly, right mouse to look, wheel for speed, Shift to sprint");
+
+        // The levels of resources/graphics.json. Ray tracing on or off and the anisotropy of the textures are
+        // read when the engine starts : graphics=<name>, or "graphics" in the config file, for those
+        if(auto* graphics = reg.ctx().find<Graphics>(); graphics && !graphics->presets.empty()) {
+            const char* current = graphics->current >= 0 ? graphics->presets[graphics->current].name.c_str() : "defaults";
+            if(ImGui::BeginCombo("Graphics", current)) {
+                for(int i = 0; i < (int) graphics->presets.size(); i++) {
+                    const GraphicsPreset& preset = graphics->presets[i];
+                    if(!ImGui::Selectable(preset.name.c_str(), i == graphics->current)) continue;
+                    graphics->current = i;
+                    applyGraphicsPreset(preset, render);
+                    settings.view_distance = preset.view_distance;
+                }
+                ImGui::EndCombo();
+            }
+        }
 
         if(ImGui::CollapsingHeader("Terrain", ImGuiTreeNodeFlags_DefaultOpen)) {
             size_t total = reg.view<ChunkC>().size();

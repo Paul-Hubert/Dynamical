@@ -75,7 +75,9 @@ AnimalPass::AnimalPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
     if(ctx.device.sampler_anisotropy) {
         samplerInfo.anisotropyEnable = VK_TRUE;
-        samplerInfo.maxAnisotropy = 8.f;
+        auto* render_settings = reg.ctx().find<RenderSettings>();
+        samplerInfo.maxAnisotropy = std::clamp(render_settings ? (float) render_settings->textures.animal_anisotropy : 8.f,
+            1.f, ctx.device.physical.getProperties().limits.maxSamplerAnisotropy);
     }
     sampler = ctx.device->createSampler(samplerInfo);
 
@@ -163,6 +165,7 @@ void AnimalPass::request(uint32_t index) {
     for(auto& [path, texture] : textures) loaded->insert(path);
 
     reg.ctx().get<tf::Executor>().silent_async([job, directory, loaded]() {
+        DY_ZONE_N("Load animal");
         try {
             job->vertices = AnimalLibrary::loadGeometry(directory, *job->def, job->indices);
 
@@ -487,6 +490,7 @@ void AnimalPass::update(uint32_t frame_index) {
 
         if(!casters.empty()) {
             vk::CommandBuffer command = ctx.compute.getCommandBuffer();
+            DY_GPU_ZONE(ctx.gpu_profile, command, "Skin animals for the rays");
             command.bindPipeline(vk::PipelineBindPoint::eCompute, skin_pipeline);
 
             SkinPC pc {};

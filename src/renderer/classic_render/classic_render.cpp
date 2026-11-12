@@ -124,7 +124,7 @@ void ClassicRender::logPassTimes() {
 
 bool ClassicRender::prepare(uint32_t frame_index) {
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     // The fence of this frame was waited for : what it timed last time is there
     if(times.pool) readPassTimes(frame_index);
@@ -136,7 +136,10 @@ bool ClassicRender::prepare(uint32_t frame_index) {
         return false;
     }
 
-    ctx.swap.acquire(per_frame[frame_index].acquireSemaphore);
+    {
+        DY_ZONE_N("Acquire the window's image");
+        ctx.swap.acquire(per_frame[frame_index].acquireSemaphore);
+    }
     acquired = true;
 
     return true;
@@ -168,70 +171,90 @@ void ClassicRender::updateView(uint32_t frame_index, float time) {
 
 void ClassicRender::record(uint32_t frame_index, const std::vector<ScenePass*>& passes) {
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     auto& f = per_frame[frame_index];
     auto command = f.commandBuffer;
+    zones.build(passes, "desktop");
 
     command.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
 
-    auto clearValues = std::vector<vk::ClearValue>{
-            vk::ClearValue(vk::ClearColorValue(std::array<float, 4> { 0.45f, 0.6f, 0.8f, 1.0f })),
-            vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0)) };
+    // What the profiler timed on the GPU in the frames before
+    ctx.gpu_profile.collect(command);
 
-    vk::Extent2D extent = ctx.swap.extent;
+    // Its zones end before the command buffer does
+    {
+        DY_GPU_ZONE(ctx.gpu_profile, command, "Desktop");
 
-    const uint32_t first_query = frame_index * (max_timed_passes + 1);
-    uint32_t timed = 0;
-    if(times.pool) command.resetQueryPool(times.pool, first_query, max_timed_passes + 1);
+        auto clearValues = std::vector<vk::ClearValue>{
+                vk::ClearValue(vk::ClearColorValue(std::array<float, 4> { 0.45f, 0.6f, 0.8f, 1.0f })),
+                vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0)) };
 
-    RenderView view { RenderTarget::Desktop, frame_index, 0, f.set, extent };
+        vk::Extent2D extent = ctx.swap.extent;
 
-    if(times.pool) command.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, times.pool, first_query);
+        const uint32_t first_query = frame_index * (max_timed_passes + 1);
+        uint32_t timed = 0;
+        if(times.pool) command.resetQueryPool(times.pool, first_query, max_timed_passes + 1);
 
-    auto stamp = [&](const char* name) {
-        if(times.pool && timed < max_timed_passes) {
-            command.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, times.pool, first_query + ++timed);
-            if(times.names.size() < timed) times.names.push_back(name);
-        }
-    };
-    auto draw = [&](bool overlay) {
-        for(ScenePass* pass : passes) {
-            if(pass->supports(RenderTarget::Desktop) && pass->overlay() == overlay) {
-                pass->record(command, view);
-                stamp(pass->name());
+        RenderView view { RenderTarget::Desktop, frame_index, 0, f.set, extent };
+
+        if(times.pool) command.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, times.pool, first_query);
+
+        auto stamp = [&](const char* name) {
+            if(times.pool && timed < max_timed_passes) {
+                command.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, times.pool, first_query + ++timed);
+                if(times.names.size() < timed) times.names.push_back(name);
             }
+        };
+        auto draw = [&](bool overlay) {
+            for(size_t i = 0; i < passes.size(); i++) {
+                ScenePass* pass = passes[i];
+                if(pass->supports(RenderTarget::Desktop) && pass->overlay() == overlay) {
+                    {
+                        DY_ZONE_DYNAMIC(zones.record[i].c_str());
+                        DY_GPU_ZONE_DYNAMIC(ctx.gpu_profile, command, zones.gpu[i].c_str());
+                        pass->record(command, view);
+                    }
+                    stamp(pass->name());
+                }
+            }
+        };
+
+        // With ray tracing the scene is drawn apart, the sun's light on its own, and brought together in the
+        // image of the window with how much of the sun each pixel sees
+        if(lit) {
+            lit->beginScene(command, 0);
+            draw(false);
+            lit->endScene(command);
+            {
+                DY_GPU_ZONE(ctx.gpu_profile, command, "Sun rays (desktop)");
+                lit->trace(command, 0, f.set);
+            }
+            stamp("Sun rays");
         }
-    };
 
-    // With ray tracing the scene is drawn apart, the sun's light on its own, and brought together in the
-    // image of the window with how much of the sun each pixel sees
-    if(lit) {
-        lit->beginScene(command, 0);
-        draw(false);
-        lit->endScene(command);
-        lit->trace(command, 0, f.set);
-        stamp("Sun rays");
+        command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.frames[ctx.swap.current].framebuffer, vk::Rect2D({}, extent), clearValues), vk::SubpassContents::eInline);
+
+        command.setViewport(0, vk::Viewport(0.f, 0.f, (float)extent.width, (float)extent.height, 0.f, 1.f));
+        command.setScissor(0, vk::Rect2D(vk::Offset2D(), extent));
+
+        if(lit) {
+            {
+                DY_GPU_ZONE(ctx.gpu_profile, command, "Composite (desktop)");
+                lit->composite(command, 0, f.set);
+            }
+            stamp("Composite");
+        } else {
+            draw(false);
+        }
+        draw(true);
+
+        if(times.pool) times.written[frame_index] = timed;
+
+        command.endRenderPass();
+
+        if(capture_requested) recordCapture(command);
     }
-
-    command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.frames[ctx.swap.current].framebuffer, vk::Rect2D({}, extent), clearValues), vk::SubpassContents::eInline);
-
-    command.setViewport(0, vk::Viewport(0.f, 0.f, (float)extent.width, (float)extent.height, 0.f, 1.f));
-    command.setScissor(0, vk::Rect2D(vk::Offset2D(), extent));
-
-    if(lit) {
-        lit->composite(command, 0, f.set);
-        stamp("Composite");
-    } else {
-        draw(false);
-    }
-    draw(true);
-
-    if(times.pool) times.written[frame_index] = timed;
-
-    command.endRenderPass();
-
-    if(capture_requested) recordCapture(command);
 
     command.end();
 
@@ -307,6 +330,9 @@ vk::Semaphore ClassicRender::getPresentSemaphore() {
 void ClassicRender::present() {
 
     if(!acquired) return;
+
+    // Waits for the monitor when the window is synchronised with it
+    DY_ZONE_N("Present");
 
     ctx.swap.present(getPresentSemaphore());
     acquired = false;

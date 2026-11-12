@@ -49,8 +49,6 @@ glm::vec3 WorldViewSys::gridOffset(uint32_t index, size_t count, float spacing) 
 
 void WorldViewSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     auto* worlds = reg.ctx().find<Worlds>();
     auto* models = reg.ctx().find<ModelManager>();
     if(!worlds || !models) return;

@@ -29,6 +29,8 @@ struct RenderSettings {
         int shadowed_torches = 2;           // a pixel
         int animals = 32;                   // with a shadow
 
+        bool operator==(const Lighting&) const = default;
+
         static Lighting of(LightingTier tier) {
             switch(tier) {
                 case LightingTier::Off: return { tier, 0.f, 0, 60.f, 0, 0 };
@@ -43,6 +45,25 @@ struct RenderSettings {
     bool far_plants_on_screen = true;   // and are drawn from it in place of their billboard
     int probe_rays_per_frame = 250000;     // measured : a million is 20 ms a frame in a forest on an RTX 5080
     int rays_per_probe = 48;
+
+    // Anisotropy of the samplers of each pass, no more than the GPU's : read when the passes are made
+    struct Textures {
+        int grass_anisotropy = 16;      // the baked rays of the grass, seen along the ground
+        int ground_anisotropy = 8;      // soil, rock and their relief
+        int vegetation_anisotropy = 8;
+        int animal_anisotropy = 8;
+
+        bool operator==(const Textures&) const = default;
+    } textures;
+
+    // What a frame may do of the work that comes with the world streaming in : less is a steadier frame and a later world
+    struct Streaming {
+        int chunk_meshes = 8;           // chunks the marching cubes mesh (TerrainSys::max_per_frame at most)
+        int ray_chunks = 8;             // chunks whose structure is built for the rays
+        int plant_volume_slices = 8;    // slices of the volume of a plant that are baked
+
+        bool operator==(const Streaming&) const = default;
+    } streaming;
 
     // Patches of mud, stones and sand in the ground, a map per chunk (SoilMaps, docs/ground.md) : no grass on them
     bool soil = true;

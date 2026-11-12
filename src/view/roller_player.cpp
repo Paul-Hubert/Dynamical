@@ -103,8 +103,6 @@ glm::vec3 RollerPlayerSys::desktopCommand() {
 
 void RollerPlayerSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     auto* worlds = reg.ctx().find<Worlds>();
     if(!worlds || world < 0 || world >= (int) worlds->size()) return;
     World& w = (*worlds)[world];

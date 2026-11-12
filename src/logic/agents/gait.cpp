@@ -318,8 +318,6 @@ void dy::footPose(const FootGeometry& foot, const Footprint& print, float pitch,
 
 void GaitBaseSys::tick(double h) {
 
-    OPTICK_EVENT();
-
     GaitRig g = gaitRig(reg);
     if(g.entity == entt::null) return;
     const RigModel& model = *g.rig->model;
@@ -552,8 +550,6 @@ void GaitBaseSys::tick(double h) {
 // GaitFootIK
 
 void GaitFootIKSys::tick(double h) {
-
-    OPTICK_EVENT();
 
     GaitRig g = gaitRig(reg);
     if(g.entity == entt::null || !g.state->started) return;
@@ -859,8 +855,6 @@ void GaitFootIKSys::tick(double h) {
 
 void GaitHandIKSys::tick(double h) {
 
-    OPTICK_EVENT();
-
     GaitRig g = gaitRig(reg);
     if(g.entity == entt::null || !g.state->started) return;
     const RigModel& model = *g.rig->model;
@@ -1131,8 +1125,6 @@ void GaitHandIKSys::tick(double h) {
 
 void GaitBalanceSys::tick(double h) {
 
-    OPTICK_EVENT();
-
     GaitRig g = gaitRig(reg);
     if(g.entity == entt::null || !g.state->feet_ready) return;
     const RigModel& model = *g.rig->model;
@@ -1372,8 +1364,6 @@ void GaitBalanceSys::tick(double h) {
 // GaitChecks
 
 void GaitChecksSys::tick(double h) {
-
-    OPTICK_EVENT();
 
     GaitRig g = gaitRig(reg);
     auto* bot = reg.ctx().find<HumanBot>();

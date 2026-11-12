@@ -68,7 +68,7 @@ and not others is not reproduced (recorded in [unity-analysis.md](unity-analysis
 
 - Match master: `PascalCase` types, `snake_case` members, systems end in `Sys`, plain-struct
   components, EnTT 3.16 ctx API (`reg.ctx().emplace/get/find`).
-- `OPTICK_EVENT()` at the top of every `tick`.
+- No profiler zone at the top of a `tick`: `SystemSet` opens one around every system, named as the scene names it. `DY_ZONE_N("...")` (`util/profile.h`, docs/profiling.md) for the parts of a system worth seeing apart.
 - Definitions loaded from disk (`BodyDef`, `PoseTrack`, `AgentParams`) are immutable after load and
   shared by `std::shared_ptr<const T>`. Mutable per-world state lives in that world's registry.
 - No `rand()` in sim code; use the world RNG.

@@ -11,6 +11,7 @@
 #include "logic/sandbox/sandbox.h"
 #include "process_control.h"
 #include "util/log.h"
+#include "util/profile_workers.h"
 
 using namespace dy;
 
@@ -39,7 +40,7 @@ int TrainHost::evalSandbox() {
     const auto& clock = runner.world(0).reg.ctx().get<WorldClock>();
     const int period = (int) clock.decision_period;
     const int64_t windows = (int64_t) std::llround(seconds / (clock.dt * period));
-    tf::Executor executor(std::max(1u, std::min((unsigned) runner.worldCount(), std::thread::hardware_concurrency() / 2)));
+    tf::Executor executor(std::max(1u, std::min((unsigned) runner.worldCount(), std::thread::hardware_concurrency() / 2)), profile::namedWorkers());
 
     // Ten times a second, the animals of world 0 from above: per frame a count, then per animal 12 floats
     // (group, species, dead, male, x, z, heading, energy, health, size, mode, where the head looks)

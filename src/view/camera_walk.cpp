@@ -20,6 +20,7 @@
 #include "logic/vegetation/vegetation.h"
 #include "util/log.h"
 #include "view/capture.h"
+#include "view/components/input.h"
 
 using namespace dy;
 
@@ -54,6 +55,7 @@ CameraWalkSys::CameraWalkSys(entt::registry& reg, const nlohmann::json& params) 
     open_lead = params.value("lead", open_lead);
     soil = params.value("soil", soil);
     herds = params.value("herds", herds);
+    exit_at_end = params.value("exit", exit_at_end);
     auto s = params.find("start");
     auto h = params.find("heading");
     if(s != params.end() && s->is_array() && s->size() == 2 && h != params.end() && h->is_number()) {
@@ -540,8 +542,6 @@ void CameraWalkSys::route() {
 
 void CameraWalkSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     auto& walk = reg.ctx().get<CameraWalk>();
     frames++;
 
@@ -551,8 +551,13 @@ void CameraWalkSys::tick(double dt) {
     if(!walk.started && frames > 4 && terrainReady(reg) && vegetationReady(reg) && (herds <= 0.f || animalsReady(reg)) && lightingReady(reg)) {
         auto unplanted = reg.view<ChunkVolume>(entt::exclude<ChunkForest, ChunkDestroying>);
         if(!reg.ctx().find<std::shared_ptr<ForestField>>() || unplanted.begin() == unplanted.end()) {
-            route();
+            {
+                DY_ZONE_N("Route the walk");
+                route();
+            }
             walk.started = true;
+            // What a profile of the walk is cut by (docs/profiling.md)
+            profile::message("CameraWalk : started");
         }
     }
     if(!walk.started || walk.finished || dt <= 0.) {
@@ -565,6 +570,9 @@ void CameraWalkSys::tick(double dt) {
         place();
         return;
     }
+
+    // The frames of the walk, apart from the ones that loaded the land
+    DY_FRAME_NAMED("Walk");
 
     const float h = (float) std::min(dt, 0.1);
     time += h;
@@ -602,7 +610,13 @@ void CameraWalkSys::tick(double dt) {
     climb += ((height - before) / std::max(glm::length(moved), 1e-4f) - climb) * (1.f - std::exp(-h / 1.2f));
 
     walk.progress = glm::dot(position - start, along(heading));
-    if(walk.progress >= distance || path_at + 2 >= path.size()) walk.finished = true;
+    if(walk.progress >= distance || path_at + 2 >= path.size()) {
+        walk.finished = true;
+        profile::message("CameraWalk : finished");
+        if(exit_at_end) {
+            if(auto* input = reg.ctx().find<Input>()) input->on.set(Input::EXIT, true);
+        }
+    }
 
     if(soil_field || herds > 0.f) look(h);
     place();

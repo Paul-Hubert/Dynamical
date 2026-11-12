@@ -167,8 +167,6 @@ void RigidBodySys::destroyHeightField(entt::registry& reg, entt::entity entity) 
 
 void RigidBodySys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     createGrounds();
 
     auto& bodies = world->bodies();
@@ -316,8 +314,6 @@ void TerrainCollidersSys::preinit() {
 
 void TerrainCollidersSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     auto& clock = fixedStepClock(reg);
     // Boxes asked for this frame (a player's legs)
     std::vector<Bounds> needs;
@@ -446,8 +442,6 @@ void PhysicsSys::preinit() {
 
 void PhysicsSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     auto& stats = physicsStats(reg);
     auto& clock = fixedStepClock(reg);
     auto& bodies = world->bodies();
@@ -457,12 +451,15 @@ void PhysicsSys::tick(double dt) {
     clock.accumulator += std::min(dt, 0.25);
 
     stats.steps_last_frame = steps;
+    DY_PLOT("Physics steps", (int64_t) steps);
 
     if(steps > 0) {
 
         auto start = clock::now();
 
         for(int s = 0; s < steps; s++) {
+
+            DY_ZONE_N("Physics step");
 
             // Kinematic bodies follow their Transform (VR hands), hidden ones (zero scale) stay put
             for(auto [entity, transform, body] : reg.view<Transform, RigidBody>().each()) {
@@ -473,10 +470,14 @@ void PhysicsSys::tick(double dt) {
             // What the host's systems do at the physics rate (a player's legs, the drives of its hands)
             auto* hooks = reg.ctx().find<FixedSteps>();
             if(hooks) {
+                DY_ZONE_N("Fixed steps before");
                 for(size_t i = 0; i < hooks->before.size(); i++) hooks->before[i].run(fixed_dt);
             }
 
-            world->step(fixed_dt);
+            {
+                DY_ZONE_N("Jolt update");
+                world->step(fixed_dt);
+            }
             clock.sim_time += fixed_dt;
 
             for(auto [entity, body, pose] : reg.view<RigidBody, PhysicsPose>().each()) {
@@ -491,6 +492,7 @@ void PhysicsSys::tick(double dt) {
             }
 
             if(hooks) {
+                DY_ZONE_N("Fixed steps after");
                 for(size_t i = 0; i < hooks->after.size(); i++) hooks->after[i].run(fixed_dt);
             }
 
@@ -520,6 +522,7 @@ void PhysicsSys::tick(double dt) {
 
     stats.bodies = world->system().GetNumBodies();
     stats.active_bodies = world->system().GetNumActiveBodies(JPH::EBodyType::RigidBody);
+    DY_PLOT("Active bodies", (int64_t) stats.active_bodies);
 
 }
 
@@ -533,8 +536,6 @@ void PhysicsStepSys::preinit() {
 
 void PhysicsStepSys::tick(double h) {
 
-    OPTICK_EVENT();
-
     auto& bodies = world->bodies();
     const int substeps = std::max(1, world->config().substeps);
     const float step = (float) (h / substeps);
@@ -545,6 +546,7 @@ void PhysicsStepSys::tick(double h) {
     }
 
     for(int s = 0; s < substeps; s++) {
+        DY_ZONE_N("Jolt update");
         world->step(step);
     }
 

@@ -8,6 +8,7 @@
 
 #include "mlagents/side_channels.h"
 #include "scene/world.h"
+#include "util/profile_workers.h"
 
 using namespace dy;
 namespace co = mlagents::co;
@@ -97,7 +98,7 @@ std::vector<std::string> WorldsEnvironment::behaviors(ScenarioRunner& runner) {
 }
 
 WorldsEnvironment::WorldsEnvironment(ScenarioRunner& runner, unsigned threads) : runner(runner) {
-    if(threads > 1) executor = std::make_unique<tf::Executor>(threads);
+    if(threads > 1) executor = std::make_unique<tf::Executor>(threads, profile::namedWorkers());
     period = runner.world(0).reg.ctx().get<WorldClock>().decision_period;
     // The agent of a world has its world's index; components come after
     next_id = (int32_t) runner.worldCount();
@@ -112,6 +113,8 @@ AgentIO* WorldsEnvironment::find(const Slot& slot) {
 }
 
 bool WorldsEnvironment::gather() {
+
+    DY_ZONE_N("Gather agents");
 
     auto add = [&](AgentIO& io, Slot slot) {
         auto& group = groups[io.behavior];
@@ -200,6 +203,8 @@ void WorldsEnvironment::reset() {
 
 bool WorldsEnvironment::step(const co::UnityRLInputProto& input, std::string& error) {
 
+    DY_ZONE_N("Environment step");
+
     if(!problem.empty()) {
         error = problem;
         return false;
@@ -271,6 +276,8 @@ bool WorldsEnvironment::step(const co::UnityRLInputProto& input, std::string& er
 }
 
 void WorldsEnvironment::write(co::UnityOutputProto& output) {
+
+    DY_ZONE_N("Write observations");
 
     auto* rl = output.mutable_rl_output();
     struct Sum { double total = 0.; int count = 0; int aggregation = 0; };

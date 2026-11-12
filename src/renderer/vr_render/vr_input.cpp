@@ -140,7 +140,7 @@ void VRActions::sync(XrTime time) {
         return;
     }
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     auto& input = reg.ctx().get<VRInput>();
 

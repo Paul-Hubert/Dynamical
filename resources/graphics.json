@@ -1,0 +1,97 @@
+// Graphics levels, from the cheapest (docs/graphics.md). graphics=<name> on the command line, or "graphics" in
+// config.7.json. "high" holds the defaults of the code (test GRAPHICS.2). A value left out is the default too.
+// ray_tracing and textures are read when the engine starts, the rest can change while it runs (debug menu)
+{
+    "presets": [
+        {
+            "name": "ultralow",
+            "view_distance": 384,
+            "ray_tracing": false,
+            "lighting": {
+                "desktop": { "traced_range": 0, "sun_rays": 0, "plant_geometry_range": 60, "shadowed_torches": 0, "animals": 0 },
+                "vr": { "traced_range": 0, "sun_rays": 0, "plant_geometry_range": 60, "shadowed_torches": 0, "animals": 0 },
+                "probe_rays_per_frame": 0,
+                "rays_per_probe": 16,
+                "far_plants_in_rays": false,
+                "far_plants_on_screen": false
+            },
+            "textures": { "grass_anisotropy": 2, "ground_anisotropy": 1, "vegetation_anisotropy": 1, "animal_anisotropy": 1 },
+            "ground": { "relief": 0 },
+            "grass": { "layers": 1, "shadow": 0, "see_through": 0 },
+            "vegetation": { "lod_bias": 0.5, "normal_maps": false, "subsurface": false },
+            "streaming": { "chunk_meshes_per_frame": 2, "ray_chunks_per_frame": 2, "plant_volume_slices_per_frame": 4 }
+        },
+        {
+            "name": "low",
+            "view_distance": 512,
+            "ray_tracing": true,
+            "lighting": {
+                "desktop": { "traced_range": 25, "sun_rays": 1, "plant_geometry_range": 60, "shadowed_torches": 1, "animals": 8 },
+                "vr": { "traced_range": 0, "sun_rays": 0, "plant_geometry_range": 60, "shadowed_torches": 0, "animals": 0 },
+                "probe_rays_per_frame": 60000,
+                "rays_per_probe": 24,
+                "far_plants_in_rays": true,
+                "far_plants_on_screen": false
+            },
+            "textures": { "grass_anisotropy": 4, "ground_anisotropy": 2, "vegetation_anisotropy": 2, "animal_anisotropy": 2 },
+            "ground": { "relief": 0 },
+            "grass": { "layers": 2, "shadow": 0, "see_through": 0 },
+            "vegetation": { "lod_bias": 1, "normal_maps": true, "subsurface": false },
+            "streaming": { "chunk_meshes_per_frame": 4, "ray_chunks_per_frame": 4, "plant_volume_slices_per_frame": 4 }
+        },
+        {
+            "name": "medium",
+            "view_distance": 640,
+            "ray_tracing": true,
+            "lighting": {
+                "desktop": { "traced_range": 60, "sun_rays": 1, "plant_geometry_range": 120, "shadowed_torches": 2, "animals": 32 },
+                "vr": { "traced_range": 25, "sun_rays": 1, "plant_geometry_range": 60, "shadowed_torches": 1, "animals": 8 },
+                "probe_rays_per_frame": 120000,
+                "rays_per_probe": 32,
+                "far_plants_in_rays": true,
+                "far_plants_on_screen": true
+            },
+            "textures": { "grass_anisotropy": 8, "ground_anisotropy": 4, "vegetation_anisotropy": 4, "animal_anisotropy": 4 },
+            "ground": { "relief": 1 },
+            "grass": { "layers": 3, "shadow": 0.6, "see_through": 1 },
+            "vegetation": { "lod_bias": 1.5, "normal_maps": true, "subsurface": true },
+            "streaming": { "chunk_meshes_per_frame": 6, "ray_chunks_per_frame": 6, "plant_volume_slices_per_frame": 8 }
+        },
+        {
+            "name": "high",
+            "view_distance": 768,
+            "ray_tracing": true,
+            "lighting": {
+                "desktop": { "traced_range": 150, "sun_rays": 2, "plant_geometry_range": 250, "shadowed_torches": 4, "animals": 128 },
+                "vr": { "traced_range": 60, "sun_rays": 1, "plant_geometry_range": 120, "shadowed_torches": 2, "animals": 32 },
+                "probe_rays_per_frame": 250000,
+                "rays_per_probe": 48,
+                "far_plants_in_rays": true,
+                "far_plants_on_screen": true
+            },
+            "textures": { "grass_anisotropy": 16, "ground_anisotropy": 8, "vegetation_anisotropy": 8, "animal_anisotropy": 8 },
+            "ground": { "relief": 1 },
+            "grass": { "layers": 4, "shadow": 0.6, "see_through": 1 },
+            "vegetation": { "lod_bias": 2, "normal_maps": true, "subsurface": true },
+            "streaming": { "chunk_meshes_per_frame": 8, "ray_chunks_per_frame": 8, "plant_volume_slices_per_frame": 8 }
+        },
+        {
+            "name": "ultrahigh",
+            "view_distance": 1024,
+            "ray_tracing": true,
+            "lighting": {
+                "desktop": { "traced_range": 250, "sun_rays": 4, "plant_geometry_range": 400, "shadowed_torches": 8, "animals": 256 },
+                "vr": { "traced_range": 150, "sun_rays": 2, "plant_geometry_range": 250, "shadowed_torches": 4, "animals": 128 },
+                "probe_rays_per_frame": 500000,
+                "rays_per_probe": 64,
+                "far_plants_in_rays": true,
+                "far_plants_on_screen": true
+            },
+            "textures": { "grass_anisotropy": 16, "ground_anisotropy": 16, "vegetation_anisotropy": 16, "animal_anisotropy": 16 },
+            "ground": { "relief": 1 },
+            "grass": { "layers": 4, "shadow": 0.6, "see_through": 1 },
+            "vegetation": { "lod_bias": 3, "normal_maps": true, "subsurface": true },
+            "streaming": { "chunk_meshes_per_frame": 8, "ray_chunks_per_frame": 16, "plant_volume_slices_per_frame": 16 }
+        }
+    ]
+}

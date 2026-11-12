@@ -14,6 +14,7 @@
 #include "renderer/util/vk_util.h"
 #include "logic/settings/settings.h"
 #include "scene/run_args.h"
+#include "util/profile.h"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
@@ -97,6 +98,15 @@ Device::Device(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
         auto* args = reg.ctx().find<RunArgs>();
         ray.detect(physical, ctx.instance.api_version, !args || args->ray_tracing);
         for(const char* extension : ray.extensions()) extensions.push_back(extension);
+    }
+
+    // The profiler ties the clock of the GPU to the one of the CPU with these (GpuProfile)
+    if(profile::active()) {
+        for(auto& available : physical.enumerateDeviceExtensionProperties()) {
+            if(strcmp(available.extensionName, VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME) != 0) continue;
+            extensions.push_back(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
+            calibrated_timestamps = true;
+        }
     }
 
     extensions = checkExtensions(extensions, physical.enumerateDeviceExtensionProperties());

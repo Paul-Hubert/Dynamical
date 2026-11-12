@@ -14,8 +14,6 @@ void WorldStepperSys::preinit() {
 
 void WorldStepperSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     auto& state = reg.ctx().get<WorldStepperState>();
     auto* worlds = reg.ctx().find<Worlds>();
     if(!worlds || worlds->size() == 0) return;

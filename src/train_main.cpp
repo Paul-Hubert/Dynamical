@@ -13,11 +13,12 @@
 #include "train/train_host.h"
 #include "util/log.h"
 #include "util/paths.h"
+#include "util/profile.h"
 
 using namespace dy;
 
 // dynamical_train (TrainingEnv.exe): headless, no Vulkan, SDL or OpenXR. It never changes the working directory
-// (the trainer passes relative output paths) and never touches config.6.json
+// (the trainer passes relative output paths) and never touches config.7.json
 int main(int argc, char** argv) {
 
     // stop-run's CTRL_C, and the log file the trainer greps, before any other output
@@ -34,6 +35,10 @@ int main(int argc, char** argv) {
     for(auto& error : run.errors) { dy::log(dy::error) << error << "\n"; ok = false; }
     if(!ok) return 1;
     const RunArgs& args = run.args;
+
+    // profile=true (docs/profiling.md). Stopped once the host and its workers are gone
+    if(args.profile) profile::start();
+    struct ProfileEnd { ~ProfileEnd() { profile::stop(); } } profile_end;
 
     JoltRuntime jolt;
     registerSimSystems();

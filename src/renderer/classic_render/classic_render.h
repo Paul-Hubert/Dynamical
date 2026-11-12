@@ -83,6 +83,8 @@ private:
     glm::vec3 previous_position = glm::vec3(0.f);
     bool have_previous = false;
 
+    PassZones zones;    // of the passes in the profiler
+
     VmaBuffer capture_buffer;
     bool capture_requested = false;
 

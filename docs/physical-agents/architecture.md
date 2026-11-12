@@ -4,7 +4,7 @@
 
 | Target | Kind | Links | Contents |
 |---|---|---|---|
-| `dynamical_sim` | static lib | EnTT, glm, cereal, nlohmann-json, Taskflow, FastNoise2, Jolt | `logic/` without the graphics and input files, `physics/`, `scene/`, `agent/`, `util/`, header-only `extra/optick`. **No Vulkan, SDL, OpenXR or ImGui headers** |
+| `dynamical_sim` | static lib | EnTT, glm, cereal, nlohmann-json, Taskflow, FastNoise2, Jolt | `logic/` without the graphics and input files, `physics/`, `scene/`, `agent/`, `util/`. Tracy's client (`lib/tracy`, `util/profile.h`) when `DYNAMICAL_PROFILE` is on. **No Vulkan, SDL, OpenXR or ImGui headers** |
 | `dynamical_mlagents` | static lib | `dynamical_sim`, gRPC, protobuf | Generated protos, gRPC client, side channels, `.demo` writer (from P3) |
 | `dynamical_onnx` | static lib | `dynamical_sim`, ONNX Runtime | `PolicyRunner`, `PolicySys`, `ModelWatcher` core (from P11) |
 | `dynamical` | exe (window) | `dynamical_sim`, `dynamical_onnx` (when built), Vulkan, SDL2, OpenXR, VMA, ImGui, ImPlot | Renderer, input, UI, panels, `WorldView`, view systems, capture. Rendered scenes |
@@ -21,7 +21,7 @@ Today `src/logic` mixes simulation with ImGui, SDL, Vulkan and the renderer. Wha
 
 | File (master) | Problem (evidence) | Goes to |
 |---|---|---|
-| `logic/systems/system.h` | includes `vulkan/vulkan.h` (`:8`) and `extra/optick/optick.h` (`:9`) | lib. Remove the Vulkan include. Optick stays header-only, with `USE_OPTICK` undefined; `optick_gpu.vulkan.cpp` is never compiled into the lib |
+| `logic/systems/system.h` | includes `vulkan/vulkan.h` (`:8`) and `extra/optick/optick.h` (`:9`) | lib. Remove the Vulkan include. (Optick has since been replaced by Tracy: `util/profile.h`, docs/profiling.md; its GPU side is in `renderer/context/gpu_profile.h`, outside the lib) |
 | `logic/game.cpp`, `game.h` | includes `renderer/renderer.h`, `renderer/terrain/terrain_sys.h` (`game.cpp:7-8`) | `dynamical` (`src/view/game.*`). `dynamical_train` has its own `TrainHost` loop |
 | `logic/components/input.h` | includes `<SDL.h>` (`:8`) | `dynamical` |
 | `logic/systems/input.*`, `ui.*`, `debug_menu.cpp` | SDL / ImGui | `dynamical` |
@@ -38,7 +38,7 @@ A CTest test `header_boundary` greps the library sources for `vulkan`, `SDL`, `i
 
 ## Run arguments
 
-`Settings` (`settings.cpp`) knows 9 keys, silently ignores the rest, and **writes `./config.6.json`
+`Settings` (`settings.cpp`) knows 9 keys, silently ignores the rest, and **writes `./config.7.json`
 on every start** (`settings.cpp:17,23`). N `TrainingEnv.exe` processes in one directory would race on
 that file. So:
 

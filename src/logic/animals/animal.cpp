@@ -424,8 +424,6 @@ void AnimalAnimationSys::preinit() {
 
 void AnimalAnimationSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     auto& library = animalLibrary(reg);
 
     struct Item {
@@ -452,6 +450,7 @@ void AnimalAnimationSys::tick(double dt) {
     }
 
     auto work = [&](size_t first, size_t last) {
+        DY_ZONE_N("Evaluate animal poses");
         std::vector<JointPose> scratch;
         for(size_t i = first; i < last; i++) {
             evaluate(*items[i].species, *items[i].animal, *items[i].pose, scratch);

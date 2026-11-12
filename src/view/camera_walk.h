@@ -43,6 +43,7 @@ struct CameraWalk {
 //          (docs/ground.md), against 1 for the forest; over 0 the camera looks down at them as it gets there),
 //          "herds" (0, metres : the line is picked for the herds whose home is this close to it, and the camera
 //          turns to the nearest one within that distance; Herds before this system in the scene)
+//          "exit" (false : the process ends with the walk : a profile of the walk, tools/profile_run.py)
 class CameraWalkSys : public System {
 public:
     CameraWalkSys(entt::registry& reg, const nlohmann::json& params);
@@ -84,6 +85,7 @@ private:
     float soil = 0.f;
     float herds = 0.f;
     bool has_line = false;
+    bool exit_at_end = false;
     glm::vec2 start = glm::vec2(0.f);
     float heading = 0.f;
 

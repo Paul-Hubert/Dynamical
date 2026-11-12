@@ -8,8 +8,8 @@
 
 #include "context/num_frames.h"
 
-#include "extra/optick/optick.h"
 #include "logic/settings/settings.h"
+#include "logic/settings/graphics.h"
 
 #include "renderer/model/model.h"
 #include "renderer/model/model_manager.h"
@@ -26,11 +26,15 @@
 #include "logic/components/render_settings.h"
 #include "scene/run_args.h"
 
+#include <string>
+
 using namespace dy;
 
 Renderer::Renderer(entt::registry& reg, const RendererDef& desc) : reg(reg),
 ctx(reg),
 per_frame(NUM_FRAMES) {
+
+    DY_ZONE();
 
     for(auto& f : per_frame) {
         f.fence = ctx.device->createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
@@ -40,6 +44,10 @@ per_frame(NUM_FRAMES) {
 
     reg.ctx().emplace<ModelManager>(reg);
     auto& render_settings = reg.ctx().emplace<RenderSettings>();
+    // The level of the graphics first (resources/graphics.json), then what the command line asks for
+    if(auto* graphics = reg.ctx().find<Graphics>(); graphics && graphics->current >= 0) {
+        applyGraphicsPreset(graphics->presets[graphics->current], render_settings);
+    }
     if(auto* args = reg.ctx().find<RunArgs>()) {
         const char* const tiers[] = { "off", "low", "medium", "high" };
         for(int tier = 0; tier < 4; tier++) {
@@ -47,24 +55,31 @@ per_frame(NUM_FRAMES) {
             for(auto& lighting : render_settings.lighting) lighting = RenderSettings::Lighting::of((RenderSettings::LightingTier) tier);
         }
         if(args->probe_rays >= 0) render_settings.probe_rays_per_frame = args->probe_rays;
-        render_settings.far_plants_in_rays = args->far_plants == "volumes" || args->far_plants == "rays";
-        render_settings.far_plants_on_screen = args->far_plants == "volumes" || args->far_plants == "screen";
+        if(!args->far_plants.empty()) {
+            render_settings.far_plants_in_rays = args->far_plants == "volumes" || args->far_plants == "rays";
+            render_settings.far_plants_on_screen = args->far_plants == "volumes" || args->far_plants == "screen";
+        }
     }
 
-    lights = std::make_unique<Lights>(ctx, reg);
-    if(ctx.device.ray.enabled()) {
-        ray_scene = std::make_unique<RayScene>(ctx, reg);
-        probe_volume = std::make_unique<ProbeVolume>(ctx, reg);
-        plant_volumes = std::make_unique<PlantVolumes>(ctx, reg);
+    {
+        DY_ZONE_N("create lighting and targets");
+        lights = std::make_unique<Lights>(ctx, reg);
+        if(ctx.device.ray.enabled()) {
+            ray_scene = std::make_unique<RayScene>(ctx, reg);
+            probe_volume = std::make_unique<ProbeVolume>(ctx, reg);
+            plant_volumes = std::make_unique<PlantVolumes>(ctx, reg);
+        }
+        tree_shade = std::make_unique<TreeShade>(ctx, reg);
+        soil_maps = std::make_unique<SoilMaps>(ctx, reg);
+        classic = std::make_unique<ClassicRender>(ctx, reg);
+        vr = std::make_unique<VRRender>(ctx, reg);
     }
-    tree_shade = std::make_unique<TreeShade>(ctx, reg);
-    soil_maps = std::make_unique<SoilMaps>(ctx, reg);
-    classic = std::make_unique<ClassicRender>(ctx, reg);
-    vr = std::make_unique<VRRender>(ctx, reg);
 
     // Draw order as listed (base: opaque terrain, grass shells on top of it, models, then the desktop UI), over the sky
     passes.push_back(std::make_unique<SkyPass>(ctx, reg));
     for(const std::string& name : desc.passes) {
+        const std::string zone = "create pass " + name;
+        DY_ZONE_DYNAMIC(zone.c_str());
         if(name == "terrain") passes.push_back(std::make_unique<TerrainPass>(ctx, reg));
         else if(name == "grass") passes.push_back(std::make_unique<GrassPass>(ctx, reg));
         else if(name == "vegetation") passes.push_back(std::make_unique<VegetationPass>(ctx, reg));
@@ -76,6 +91,9 @@ per_frame(NUM_FRAMES) {
 
     for(auto& pass : passes) {
         pass_list.push_back(pass.get());
+        update_zones.push_back(std::string("update ") + pass->name());
+        const std::string zone = std::string("create pipelines ") + pass->name();
+        DY_ZONE_DYNAMIC(zone.c_str());
         if(pass->supports(RenderTarget::Desktop)) {
             pass->createPipeline(RenderTarget::Desktop, pass->overlay() ? classic->getFinalRenderpass() : classic->getRenderpass());
         }
@@ -103,14 +121,15 @@ void Renderer::init() {
 
 void Renderer::prepare() {
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     ctx.frame_index = (ctx.frame_index + 1) % NUM_FRAMES;
 
     auto& f = per_frame[ctx.frame_index];
 
     {
-        OPTICK_EVENT("wait_fence");
+        // The frame that used these is not done : the GPU is the slower one, or the window waits for the monitor
+        DY_ZONE_N("Wait for the frame's fence");
         ctx.device->waitForFences({ f.fence }, VK_TRUE, std::numeric_limits<uint64_t>::max());
     }
 
@@ -122,7 +141,7 @@ void Renderer::prepare() {
 
 void Renderer::render() {
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     auto& f = per_frame[ctx.frame_index];
     uint32_t frame_index = ctx.frame_index;
@@ -132,21 +151,48 @@ void Renderer::render() {
     }
 
     ctx.transfer.check();
+    ctx.gpu_profile.beginFrame();
 
-    lights->update(frame_index, time);
-    tree_shade->update();
-    soil_maps->update();
-    for(ScenePass* pass : pass_list) {
-        pass->update(frame_index);
+    {
+        DY_ZONE_N("Update");
+
+        {
+            DY_ZONE_N("update lights");
+            lights->update(frame_index, time);
+        }
+        {
+            DY_ZONE_N("update tree shade");
+            tree_shade->update();
+        }
+        {
+            DY_ZONE_N("update soil maps");
+            soil_maps->update();
+        }
+        for(size_t i = 0; i < pass_list.size(); i++) {
+            DY_ZONE_DYNAMIC(update_zones[i].c_str());
+            pass_list[i]->update(frame_index);
+        }
+
+        // What the rays of this frame see : built in its compute commands
+        if(plant_volumes) {
+            DY_ZONE_N("prepare plant volumes");
+            plant_volumes->prepare();
+        }
+        if(ray_scene) {
+            DY_ZONE_N("update ray scene");
+            ray_scene->update();
+        }
+        // and what its probes trace of it
+        if(probe_volume) {
+            DY_ZONE_N("update probes");
+            probe_volume->update(time);
+        }
+        // and the volume of a species of plants, baked against it
+        if(plant_volumes) {
+            DY_ZONE_N("update plant volumes");
+            plant_volumes->update(probe_volume->viewSet());
+        }
     }
-
-    // What the rays of this frame see : built in its compute commands
-    if(plant_volumes) plant_volumes->prepare();
-    if(ray_scene) ray_scene->update();
-    // and what its probes trace of it
-    if(probe_volume) probe_volume->update(time);
-    // and the volume of a species of plants, baked against it
-    if(plant_volumes) plant_volumes->update(probe_volume->viewSet());
 
 
     // Transfer -> compute -> graphics, each stage waiting on the previous one if it had work
@@ -181,7 +227,7 @@ void Renderer::render() {
     }
 
     {
-        OPTICK_EVENT("record");
+        DY_ZONE_N("Record");
         tf::Executor& executor = reg.ctx().get<tf::Executor>();
         tf::Taskflow taskflow;
         if(do_classic) taskflow.emplace([&]() { classic->record(frame_index, pass_list); });
@@ -209,7 +255,7 @@ void Renderer::render() {
     ctx.device->resetFences({ f.fence });
 
     {
-        OPTICK_EVENT("submit");
+        DY_ZONE_N("Submit");
         ctx.device.graphics.submit({ vk::SubmitInfo(waits, stages, commands, signals) }, f.fence);
     }
 

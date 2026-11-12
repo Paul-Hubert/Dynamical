@@ -98,6 +98,8 @@ TerrainPass::TerrainPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg)
 
     // The ground is seen at grazing angles most of the time
     {
+        auto* render_settings = reg.ctx().find<RenderSettings>();
+        const float anisotropy = render_settings ? (float) render_settings->textures.ground_anisotropy : 8.f;
         vk::SamplerCreateInfo info(
             {}, vk::Filter::eLinear, vk::Filter::eLinear, vk::SamplerMipmapMode::eLinear,
             vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat,
@@ -105,7 +107,7 @@ TerrainPass::TerrainPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg)
         );
         if(ctx.device.sampler_anisotropy) {
             info.anisotropyEnable = VK_TRUE;
-            info.maxAnisotropy = std::min(8.f, ctx.device.physical.getProperties().limits.maxSamplerAnisotropy);
+            info.maxAnisotropy = std::clamp(anisotropy, 1.f, ctx.device.physical.getProperties().limits.maxSamplerAnisotropy);
         }
         groundSampler = ctx.device->createSampler(info);
     }
@@ -157,6 +159,7 @@ void TerrainPass::loadGround() {
         std::exception_ptr failed;
         std::mutex failed_mutex;
         auto decode = [&](TexturePixels& out, const std::string& path, bool srgb) {
+            DY_ZONE_N("Decode ground texture");
             try {
                 out = decodeTextureMips(path, srgb);
             } catch(...) {

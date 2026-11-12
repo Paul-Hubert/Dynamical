@@ -33,8 +33,6 @@ UISys::UISys(entt::registry& reg) : System(reg) {
 
 void UISys::tick(double dt) {
     
-    OPTICK_EVENT();
-    
     auto& input = reg.ctx().get<Input>();
     
     ImGuiIO& io = ImGui::GetIO();

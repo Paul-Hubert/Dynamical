@@ -5,6 +5,8 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace dy {
 
@@ -53,6 +55,23 @@ public:
 
 protected:
     std::array<vk::Pipeline, NUM_RENDER_TARGETS> pipelines {};
+};
+
+// The zones of the passes of one render target in the profiler (docs/profiling.md) : what recording a pass
+// takes on the CPU ("record terrain (desktop)") and what it draws takes on the GPU ("terrain (desktop)")
+struct PassZones {
+    std::vector<std::string> record;
+    std::vector<std::string> gpu;
+
+    void build(const std::vector<ScenePass*>& passes, const char* target) {
+        if(gpu.size() == passes.size()) return;
+        record.clear();
+        gpu.clear();
+        for(ScenePass* pass : passes) {
+            gpu.push_back(std::string(pass->name()) + " (" + target + ")");
+            record.push_back("record " + gpu.back());
+        }
+    }
 };
 
 }

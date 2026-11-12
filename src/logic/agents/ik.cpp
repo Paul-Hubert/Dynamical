@@ -219,8 +219,6 @@ IKSolve dy::solveChain(const RigModel& model, RigPose& pose, const std::vector<i
 
 void FabrikSys::tick(double h) {
 
-    OPTICK_EVENT();
-
     ensureRig(reg);
 
     std::map<entt::entity, std::vector<const IKTarget*>> wanted;
@@ -284,8 +282,6 @@ void FabrikSys::tick(double h) {
 }
 
 void RigPoseApplySys::tick(double h) {
-
-    OPTICK_EVENT();
 
     auto* bot = reg.ctx().find<HumanBot>();
     if(!bot || !bot->built) return;

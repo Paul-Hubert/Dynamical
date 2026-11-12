@@ -167,7 +167,7 @@ void VRRender::prepare(uint32_t frame_index) {
         return;
     }
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     pollEvents();
 
@@ -176,7 +176,8 @@ void VRRender::prepare(uint32_t frame_index) {
     }
 
     {
-        OPTICK_EVENT("wait_frame");
+        // The runtime holds the frame until the headset wants it
+        DY_ZONE_N("Wait for the headset's frame");
         frame_state = { XR_TYPE_FRAME_STATE };
         if(!xrCheckResult(xrWaitFrame(ctx.vr.session, nullptr, &frame_state), "xrWaitFrame")) {
             return;
@@ -200,7 +201,7 @@ void VRRender::acquire() {
 
     if(!active()) return;
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     for(uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
         auto handle = ctx.vr.swapchains[v].handle;
@@ -217,7 +218,7 @@ void VRRender::updateView(uint32_t frame_index, float time) {
 
     if(!active()) return;
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     // Located as late as possible for the freshest head pose
     uint32_t view_count = ctx.vr.num_views;
@@ -255,52 +256,69 @@ void VRRender::updateView(uint32_t frame_index, float time) {
 
 void VRRender::record(uint32_t frame_index, const std::vector<ScenePass*>& passes) {
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     auto& f = per_frame[frame_index];
     auto command = f.commandBuffer;
+    zones.build(passes, "headset");
 
     command.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
 
-    for(uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
-        auto& swapchain = ctx.vr.swapchains[v];
-        vk::Extent2D extent(swapchain.width, swapchain.height);
+    // What the profiler timed on the GPU in the frames before (when the window does not draw)
+    ctx.gpu_profile.collect(command);
 
-        auto clearValues = std::vector<vk::ClearValue>{
-                vk::ClearValue(vk::ClearColorValue(std::array<float, 4> { 0.45f, 0.6f, 0.8f, 1.0f })),
-                vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0)) };
+    // Its zones end before the command buffer does
+    {
+        DY_GPU_ZONE(ctx.gpu_profile, command, "Headset");
 
-        RenderView view { RenderTarget::VR, frame_index, v, f.eyes[v].set, extent };
+        for(uint32_t v = 0; v < ctx.vr.swapchains.size(); v++) {
+            // The passes are in it once per eye
+            DY_GPU_ZONE_DYNAMIC(ctx.gpu_profile, command, v == 0 ? "Headset eye 0" : "Headset eye 1");
 
-        auto draw = [&](bool overlay) {
-            for(ScenePass* pass : passes) {
-                if(pass->supports(RenderTarget::VR) && pass->overlay() == overlay) {
-                    pass->record(command, view);
+            auto& swapchain = ctx.vr.swapchains[v];
+            vk::Extent2D extent(swapchain.width, swapchain.height);
+
+            auto clearValues = std::vector<vk::ClearValue>{
+                    vk::ClearValue(vk::ClearColorValue(std::array<float, 4> { 0.45f, 0.6f, 0.8f, 1.0f })),
+                    vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0)) };
+
+            RenderView view { RenderTarget::VR, frame_index, v, f.eyes[v].set, extent };
+
+            auto draw = [&](bool overlay) {
+                for(size_t i = 0; i < passes.size(); i++) {
+                    ScenePass* pass = passes[i];
+                    if(pass->supports(RenderTarget::VR) && pass->overlay() == overlay) {
+                        DY_ZONE_DYNAMIC(zones.record[i].c_str());
+                        DY_GPU_ZONE_DYNAMIC(ctx.gpu_profile, command, zones.gpu[i].c_str());
+                        pass->record(command, view);
+                    }
                 }
+            };
+
+            // As the desktop target : with ray tracing the scene apart, then the sun's visibility of this eye
+            if(lit) {
+                lit->beginScene(command, v);
+                draw(false);
+                lit->endScene(command);
+                DY_GPU_ZONE(ctx.gpu_profile, command, "Sun rays (headset)");
+                lit->trace(command, v, f.eyes[v].set);
             }
-        };
 
-        // As the desktop target : with ray tracing the scene apart, then the sun's visibility of this eye
-        if(lit) {
-            lit->beginScene(command, v);
-            draw(false);
-            lit->endScene(command);
-            lit->trace(command, v, f.eyes[v].set);
+            command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.views[v].framebuffers[image_indices[v]], vk::Rect2D({}, extent), clearValues), vk::SubpassContents::eInline);
+
+            command.setViewport(0, vk::Viewport(0.f, 0.f, (float) extent.width, (float) extent.height, 0.f, 1.f));
+            command.setScissor(0, vk::Rect2D(vk::Offset2D(), extent));
+
+            if(lit) {
+                DY_GPU_ZONE(ctx.gpu_profile, command, "Composite (headset)");
+                lit->composite(command, v, f.eyes[v].set);
+            } else {
+                draw(false);
+            }
+            draw(true);
+
+            command.endRenderPass();
         }
-
-        command.beginRenderPass(vk::RenderPassBeginInfo(renderpass, renderpass.views[v].framebuffers[image_indices[v]], vk::Rect2D({}, extent), clearValues), vk::SubpassContents::eInline);
-
-        command.setViewport(0, vk::Viewport(0.f, 0.f, (float) extent.width, (float) extent.height, 0.f, 1.f));
-        command.setScissor(0, vk::Rect2D(vk::Offset2D(), extent));
-
-        if(lit) {
-            lit->composite(command, v, f.eyes[v].set);
-        } else {
-            draw(false);
-        }
-        draw(true);
-
-        command.endRenderPass();
     }
 
     command.end();
@@ -311,7 +329,7 @@ void VRRender::endFrame() {
 
     if(!frame_begun) return;
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     std::vector<XrCompositionLayerProjectionView> proj_views;
     XrCompositionLayerProjection layer_proj = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
@@ -348,6 +366,9 @@ void VRRender::endFrame() {
     }
 
     xrCheckResult(xrEndFrame(ctx.vr.session, &end_info), "xrEndFrame");
+
+    // The frames of the headset, next to the ones of the main loop
+    DY_FRAME_NAMED("Headset");
 
     frame_begun = false;
     should_render = false;

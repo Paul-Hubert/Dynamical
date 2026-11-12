@@ -14,13 +14,20 @@ std::vector<SystemSet::Entry>& SystemSet::entries(List list) {
 
 void SystemSet::add(List list, std::unique_ptr<System> system, Phase phase, std::string name) {
     if(name.empty()) name = system->name();
-    entries(list).push_back({ std::move(system), phase, std::move(name) });
+    Entry entry { std::move(system), phase, std::move(name) };
+    entry.preinit_zone = "preinit " + entry.name;
+    entry.init_zone = "init " + entry.name;
+    entry.finish_zone = "finish " + entry.name;
+    entries(list).push_back(std::move(entry));
 }
 
 void SystemSet::preinit() {
 
+    DY_ZONE();
+
     for(auto* list : { &pre_systems, &post_systems, &fixed_systems }) {
         for(Entry& e : *list) {
+            DY_ZONE_DYNAMIC(e.preinit_zone.c_str());
             e.system->preinit();
         }
     }
@@ -29,8 +36,11 @@ void SystemSet::preinit() {
 
 void SystemSet::init() {
 
+    DY_ZONE();
+
     for(auto* list : { &pre_systems, &post_systems, &fixed_systems }) {
         for(Entry& e : *list) {
+            DY_ZONE_DYNAMIC(e.init_zone.c_str());
             e.system->init();
         }
     }
@@ -39,9 +49,10 @@ void SystemSet::init() {
 
 void SystemSet::pre_tick(double dt) {
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     for(Entry& e : pre_systems) {
+        DY_ZONE_DYNAMIC(e.name.c_str());
         e.system->tick(dt);
     }
 
@@ -49,9 +60,10 @@ void SystemSet::pre_tick(double dt) {
 
 void SystemSet::post_tick(double dt) {
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     for(Entry& e : post_systems) {
+        DY_ZONE_DYNAMIC(e.name.c_str());
         e.system->tick(dt);
     }
 
@@ -59,7 +71,7 @@ void SystemSet::post_tick(double dt) {
 
 void SystemSet::fixed_tick(double h, bool act_tick, bool observe_tick) {
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     auto* parked = reg.ctx().find<Parked>();
     bool skip = parked && parked->value;
@@ -71,7 +83,9 @@ void SystemSet::fixed_tick(double h, bool act_tick, bool observe_tick) {
         case Phase::Act: run = !skip && act_tick; break;
         case Phase::Observe: run = observe_tick; break;
         }
-        if(run) e.system->tick(h);
+        if(!run) continue;
+        DY_ZONE_DYNAMIC(e.name.c_str());
+        e.system->tick(h);
     }
 
 }
@@ -79,15 +93,20 @@ void SystemSet::fixed_tick(double h, bool act_tick, bool observe_tick) {
 void SystemSet::fixed_observe_only() {
 
     for(Entry& e : fixed_systems) {
-        if(e.phase == Phase::Observe) e.system->tick(0.);
+        if(e.phase != Phase::Observe) continue;
+        DY_ZONE_DYNAMIC(e.name.c_str());
+        e.system->tick(0.);
     }
 
 }
 
 void SystemSet::finish() {
 
+    DY_ZONE();
+
     for(auto* list : { &pre_systems, &post_systems, &fixed_systems }) {
         for(Entry& e : *list) {
+            DY_ZONE_DYNAMIC(e.finish_zone.c_str());
             e.system->finish();
         }
     }

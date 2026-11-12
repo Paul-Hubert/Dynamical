@@ -5,6 +5,10 @@ ffmpeg (imageio-ffmpeg in build/venv) encodes an MP4.
 
     build/venv/Scripts/python tools/sandbox_view_video.py --models build/runs/sandbox_r1 [--watch wolf_2] [--seconds 30]
                                                           [--prefix Animal_] [--var NAME=VALUE ...] [--out FILE.mp4]
+    build/venv/Scripts/python tools/sandbox_view_video.py --models build/runs/scratch_r2 --tour [--stay 5] --seconds 90
+
+--tour: the camera goes round the animals, a wolf then a deer then a wolf: it flies to one, comes down into a close-up,
+turns round it for --stay seconds while following it, and leaves for the nearest one of the other species.
 
 --models: a folder with <behavior>.onnx or <behavior>/<behavior>-<step>.onnx for the behaviours it has (a run of
 tools/sandbox_round.py; for walkers alone, a folder of copies). The minds no model answers are the scripted ones.
@@ -33,7 +37,10 @@ def main():
     parser.add_argument("--models", default="", help="empty: zero actions for the walkers (they stand), the scripted minds")
     parser.add_argument("--prefix", default="")
     parser.add_argument("--watch", default="", help="the species the camera stays with (default: a predator)")
-    parser.add_argument("--distance", type=float, default=3.5, help="of the camera, in sizes of the animal")
+    parser.add_argument("--distance", type=float, help="of the camera, in sizes of the animal (default 3.5; 1.5 with --tour)")
+    parser.add_argument("--tour", action="store_true", help="from animal to animal, a close-up turning round each")
+    parser.add_argument("--stay", type=float, default=5., help="--tour: seconds with each animal")
+    parser.add_argument("--orbit", type=float, help="degrees a second round the animal (default 6; 30 with --tour)")
     parser.add_argument("--var", action="append", default=[], metavar="NAME=VALUE", help="a scene variable, repeatable")
     parser.add_argument("--seconds", type=float, default=30.)
     parser.add_argument("--skip", type=float, default=2., help="seconds simulated before the first frame")
@@ -44,7 +51,7 @@ def main():
     args = parser.parse_args()
 
     label = pathlib.Path(args.models).name if args.models else "standing"
-    out = pathlib.Path(args.out) if args.out else BUILD / "runs" / "sandbox_videos" / f"{label}_{args.watch or 'predator'}.mp4"
+    out = pathlib.Path(args.out) if args.out else BUILD / "runs" / "sandbox_videos" / f"{label}_{'tour' if args.tour else args.watch or 'predator'}.mp4"
     out = out.resolve()
     frames = out.with_suffix("")
     shutil.rmtree(frames, ignore_errors=True)
@@ -52,7 +59,9 @@ def main():
 
     count = int(args.seconds * args.fps)
     variables = {"num_worlds": "1", "models": str(pathlib.Path(args.models).resolve()) if args.models else "", "prefix": args.prefix,
-                 "watch": args.watch, "watch_distance": str(args.distance)}
+                 "watch": args.watch, "watch_distance": str(args.distance or (1.5 if args.tour else 3.5)),
+                 "watch_orbit": str(args.orbit or (30. if args.tour else 6.)), "tour": "true" if args.tour else "false",
+                 "watch_stay": str(args.stay), "watch_height": "1.3" if args.tour else "2.0"}
     variables |= dict(v.split("=", 1) for v in args.var)
     script = {"scene": "sandbox_view", "vars": variables, "hide_ui": True,
               "sequence": {"start": int(args.skip * 60), "count": count, "every": 60 // args.fps, "name": "frame"}}

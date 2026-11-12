@@ -35,6 +35,10 @@ public:
     static constexpr int default_view_distance = 768;
     int view_distance = default_view_distance;
 
+    // Level of resources/graphics.json (ultralow, low, medium, high, ultrahigh), which gives the view distance too
+    // unless view_distance= is on the command line. Empty : the defaults of the code (logic/settings/graphics.h)
+    std::string graphics = "high";
+
     // One kind of grass tile everywhere (GrassKind : meadow, clover, dandelion...) instead of the patches of the species. Not saved
     std::string grass_kind;
     // Times the depth of the relief of the soil (RenderSettings::relief) : 0 for the flat textures. Not saved
@@ -52,7 +56,8 @@ public:
             CEREAL_NVP(client_side),
             CEREAL_NVP(vr_mode),
             CEREAL_NVP(spectator_mode),
-            CEREAL_NVP(view_distance)
+            CEREAL_NVP(view_distance),
+            CEREAL_NVP(graphics)
         );
     }
 
@@ -62,7 +67,7 @@ private:
     #ifndef DYNAMICAL_CONFIG_DIR
         #define DYNAMICAL_CONFIG_DIR "./"
     #endif
-    #define DYNAMICAL_CONFIG_MAGIC "6"
+    #define DYNAMICAL_CONFIG_MAGIC "7"
     #define DYNAMICAL_CONFIG_FILE DYNAMICAL_CONFIG_DIR "config." DYNAMICAL_CONFIG_MAGIC ".json"
 };
 

@@ -38,8 +38,6 @@ void ChunkManagerSys::preinit() {
 
 void ChunkManagerSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     auto& map = reg.ctx().get<ChunkMap>();
     // Settings only exist in dynamical; headless runs stream chunks with the default distance
     auto* settings = reg.ctx().find<Settings>();
@@ -118,8 +116,6 @@ void ChunkGeneratorSys::collect() {
 
 void ChunkGeneratorSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     // Fixed-clock runs generate every pending chunk this frame, so what is loaded at frame N never depends on
     // worker timing
     auto* args = reg.ctx().find<RunArgs>();
@@ -156,12 +152,16 @@ void ChunkGeneratorSys::tick(double dt) {
         jobs.push_back(job);
 
         executor.silent_async([job, generator = generator]() {
+            DY_ZONE_N("Generate chunk");
             job->surface = generator->generate(job->pos, job->values, job->mean);
             job->done.store(true);
         });
     }
 
+    DY_PLOT("Chunk jobs", (int64_t) jobs.size());
+
     if(sync) {
+        DY_ZONE_N("Wait for the chunks");
         for(auto& job : jobs) {
             while(!job->done.load()) {
                 std::this_thread::yield();

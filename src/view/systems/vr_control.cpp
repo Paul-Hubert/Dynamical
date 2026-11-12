@@ -60,8 +60,6 @@ void VRControlSys::init() {
 
 void VRControlSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     auto* input = reg.ctx().find<VRInput>();
     if(!input || !input->session_running) return;
 

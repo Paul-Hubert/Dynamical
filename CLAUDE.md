@@ -13,7 +13,7 @@ The previous 2D tile map simulation (tile rendering, heightmap world, SPH partic
 Uses CMake with vcpkg for dependency management. Generator is Visual Studio 17 2022.
 
 ```bash
-git submodule update --init   # FastNoise2, VulkanMemoryAllocator, imgui, implot
+git submodule update --init   # FastNoise2, VulkanMemoryAllocator, imgui, implot, tracy
 
 # Configure (vcpkg toolchain is set via CMakePresets.json, needs VCPKG_ROOT)
 cmake --preset vcpkg
@@ -146,18 +146,26 @@ Entry point is `src/main.cpp` → `Game::start()`. The game loop runs: `renderer
 - **Riding** (`mount.{h,cpp}`, `logic/animals/steer.{h,cpp}`; scenes `player_horse`: forests, herds, horses at the spawn, and `player_deer`: the physical red deer with its policy on a flat ground; `third_person=<m>` puts the camera behind): `Mountables` gives the animals of the species listed a `Mountable` (saddle = top of the skin of the back between the hips, carried by its joint; a kinematic collider box while a `Rider` is within range), `Mounting` (jump against an animal gets on: legs limp, `AnimalSteer` on the animal; jump gets off), `MountSteering` (walk axis along the view's yaw = heading, walk or run speed), `RiderSeat` (the body is held over the saddle by a capped, eased spring force at the physics rate: no jump in its acceleration). `AnimalSteer` (heading, speed, run) is all the animal knows: `SteeredWalk` walks kinematic animals (`stepWalker`, idle / walk / run clip, `AnimalGait`), `HerdSys` lets go of a steered member and takes it back; `AnimalBotSteer` makes an `AnimalBotProxy` (Transform + `AnimalPose` from the ragdoll's segments) per world with an `AnimalBot` and turns the proxy's `AnimalSteer` into the bot's `WalkCommand` within its trained ranges. `AnimalSkin` marks an `Animal` that is only a ragdoll's drawn skin (`AnimalAgentView`). `MountSpawn`: animals standing at the spawn. `tools/ride_video.py --ride horse|deer`
 - Collision groups per player (`PlayerCollision`): body / hands / held bodies / the animal ridden. Tests `PLAYER.*` in `tests/unit/player.cpp` (flat ground, scripted input and tracking), `MOUNT.*` in `tests/unit/mount.cpp`, `HERD.2`. Not run in a headset, nor with a gamepad yet
 
+### Profiling (`src/util/profile.h`, `src/renderer/context/gpu_profile.*`, docs/profiling.md)
+- Tracy (`lib/tracy`, `-DDYNAMICAL_PROFILE=OFF` leaves it out), started by hand (`TRACY_MANUAL_LIFETIME`): `profile=true` on `dynamical` and `dynamical_train` calls `profile::start()` in main, events are kept from there until a Tracy profiler connects (this machine only, `TRACY_ONLY_LOCALHOST`). Without it no thread, no socket, a zone is one branch; the tests and the tools never start it
+- **CPU**: `SystemSet` opens a zone around every call of every system, named as the scene names it (`preinit <name>`, `init <name>`, `finish <name>` too); `DY_ZONE()`, `DY_ZONE_N("literal")`, `DY_ZONE_DYNAMIC(const char*)`, `DY_PLOT`, `DY_FRAME()` (end of the main loop; a `ScenarioRunner::step` without a window), `DY_FRAME_NAMED("Headset")`. Workers of an executor are named with `profile::namedWorkers()` (`util/profile_workers.h`)
+- **GPU**: `GpuProfile` (`Context::gpu_profile`) makes the Tracy Vulkan context (calibrated timestamps where the GPU has them, one context: the queues are the same one). `DY_GPU_ZONE(ctx.gpu_profile, command, "name")` in the compute commands (marching cubes, ray scene, probes, plant volumes, animal skinning) and in both targets' command buffers (`<pass> (desktop)`, `<pass> (headset)`, sun rays, composite; names from `PassZones`). A GPU zone ends before its command buffer does, and that buffer is submitted; `collect()` once a frame at the start of a target's buffer
+- `tools/profile_run.py --name <n> -- <engine arguments>`: runs with `profile=true`, records with `tracy-capture`, writes `build/profiles/<n>/` (`summary.txt`, `zones.csv`, `zones_self.csv`, `gpu.csv`, `frames.csv`, `trace.tracy`): the text to read when the question is where the time goes. Builds `tracy-capture` and `tracy-csvexport` in `build/tracy_tools` the first time. `gpu_times=true` (pass means in the log) is still there. Headset zones not run
+- The profile of reference is the walk: `--between "CameraWalk : started" "CameraWalk : finished" --frame-set Walk -- scene=tautavel_walk var.exit=true gpu_times=true ...` (docs/profiling.md). `CameraWalk` posts those two messages (`profile::message`), marks its frames (`Walk`) and ends the process with its `exit` parameter (scene variable `exit`); `--between` cuts the tables to what lies between two messages
+
 ### Configuration
-- Settings serialized to `./config.6.json` via Cereal (JSON), overridable with `key=value` arguments
+- Settings serialized to `./config.7.json` via Cereal (JSON), overridable with `key=value` arguments
+- **Graphics levels** (docs/graphics.md, `logic/settings/graphics.{h,cpp}`): `resources/graphics.json` holds `ultralow`, `low`, `medium`, `high`, `ultrahigh`, each a value for what a frame costs (view distance, ray tracing on or off, the lighting of each target, probe rays, far plants, anisotropy, relief, grass layers / shadows / see through, LOD bias, streaming budgets a frame). `graphics=<name>` or `"graphics"` in the config (`high`), the `Graphics` list of the debug menu while running (`ray_tracing` and `RenderSettings::textures` are read at the start); `Game` reads the file into the `Graphics` context variable, `Renderer` applies it to the `RenderSettings` before the command line's own keys. Captures and probes use the defaults of the code unless `graphics=` is given, and `high` repeats those defaults (tests `GRAPHICS.*` in `tests/unit/graphics.cpp`): a default changed in `RenderSettings` changes in `high` too. The other four levels are not measured
 
 ## Key Dependencies
 
 **vcpkg**: cereal, entt, glm, joltphysics, nlohmann-json, openxr-loader[vulkan], sdl2[vulkan], stb, taskflow, tinygltf (pinned to 3.0.0#1 in `overrides`: the 3.0.0#0 port hash no longer matches GitHub's tarball), vulkan
 
-**Git submodules** (`lib/`): FastNoise2, VulkanMemoryAllocator, ImGui, ImPlot
+**Git submodules** (`lib/`): FastNoise2, VulkanMemoryAllocator, ImGui, ImPlot, Tracy (v0.15.0)
 
 ## Code Conventions
 
 - C++20 standard
-- Optick profiler integration (`OPTICK_EVENT` macros) — currently disabled in main
+- Profiler zones: `DY_ZONE()`, `DY_ZONE_N("name")`, `DY_GPU_ZONE(ctx.gpu_profile, command, "name")` (see Profiling); a system needs none at the top of its `tick`, `SystemSet` opens it
 - `ThreadSafe<T>` wrapper in `src/util/util.h` for mutex-guarded shared state
 - Taskflow executor (context variable) for chunk generation and parallel command recording

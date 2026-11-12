@@ -1,5 +1,7 @@
 #include "terrain_colliders.h"
 
+#include "util/profile.h"
+
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
 
@@ -84,6 +86,8 @@ std::shared_ptr<TerrainColliders::Job> TerrainColliders::makeJob(glm::ivec3 cell
 }
 
 void TerrainColliders::run(Job& job, const MarchingCubes& mc, const TerrainGenerator& generator) {
+
+    DY_ZONE_N("Build collider cell");
 
     if(!job.empty) {
 

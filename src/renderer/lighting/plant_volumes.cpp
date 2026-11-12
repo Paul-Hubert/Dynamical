@@ -7,6 +7,7 @@
 #include "renderer/util/pipeline.h"
 
 #include "logic/components/lighting_stats.h"
+#include "logic/components/render_settings.h"
 #include "logic/vegetation/vegetation.h"
 
 #include "util/log.h"
@@ -172,8 +173,11 @@ void PlantVolumes::update(vk::DescriptorSet view_set) {
 
     Volume& volume = *baking;
     vk::CommandBuffer command = ctx.compute.getCommandBuffer();
+    DY_GPU_ZONE(ctx.gpu_profile, command, "Bake plant volume");
 
-    int slices = std::min(slices_a_frame, volume.size.z - volume.next_slice);
+    auto* render_settings = reg.ctx().find<RenderSettings>();
+    const int most = render_settings ? std::max(render_settings->streaming.plant_volume_slices, 1) : slices_a_frame;
+    int slices = std::min(most, volume.size.z - volume.next_slice);
 
     BakePC pc;
     pc.origin = glm::vec4(bake_origin, volume.bounds.voxel);

@@ -33,8 +33,6 @@ void PlayerControlSys::init() {
 
 void PlayerControlSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     auto& camera = reg.ctx().get<Camera>();
     auto& input = reg.ctx().get<Input>();
 

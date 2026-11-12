@@ -437,8 +437,6 @@ void ForestSys::scatter(entt::entity entity) {
 
 void ForestSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     if(!field || definition.layers.empty()) return;
 
     // Fixed-clock runs plant every chunk the frame it is generated, so a frame never depends on timing

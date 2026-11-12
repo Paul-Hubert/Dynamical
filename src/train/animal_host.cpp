@@ -14,6 +14,7 @@
 #endif
 #include "process_control.h"
 #include "util/log.h"
+#include "util/profile_workers.h"
 
 using namespace dy;
 
@@ -110,7 +111,7 @@ int TrainHost::evalAnimals() {
         runner.world(i).systems.fixed_observe_only();
     }
     int period = (int) runner.world(0).reg.ctx().get<WorldClock>().decision_period;
-    tf::Executor executor(std::max(1u, std::thread::hardware_concurrency() / 2));
+    tf::Executor executor(std::max(1u, std::thread::hardware_concurrency() / 2), profile::namedWorkers());
 
     // var.replay=<prefix>: the segments of world 0 at every decision, for `replay_seconds` (a film without the viewer):
     // <prefix>.replay.json and .bin (float32: per decision, per segment, position x y z and rotation x y z w)

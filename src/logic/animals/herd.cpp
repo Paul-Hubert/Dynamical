@@ -557,8 +557,6 @@ void HerdSys::updateMember(Herd& herd, Member& m, float dt) {
 
 void HerdSys::tick(double dt_seconds) {
 
-    OPTICK_EVENT();
-
     if(definition.kinds.empty() || !ground) return;
     const HerdParams& p = definition.params;
     const float dt = (float) std::min(dt_seconds, 0.1);

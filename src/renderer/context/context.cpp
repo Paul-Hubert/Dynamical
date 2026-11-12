@@ -4,9 +4,7 @@
 
 using namespace dy;
 
-Context::Context(entt::registry& reg) : vr(*this, reg), win(*this, reg), instance(*this, reg), device(*this, reg), transfer(*this, reg), compute(*this, reg), swap(*this, reg) {
-
-    //OPTICK_GPU_INIT_VULKAN(reinterpret_cast<VkDevice*> (&device.logical), reinterpret_cast<VkPhysicalDevice*> (&device.physical), reinterpret_cast<VkQueue*> (&device.graphics), &device.g_i, 1, nullptr);
+Context::Context(entt::registry& reg) : vr(*this, reg), win(*this, reg), instance(*this, reg), device(*this, reg), gpu_profile(*this, reg), transfer(*this, reg), compute(*this, reg), swap(*this, reg) {
 
     reg.ctx().emplace<Context*>(this);
 

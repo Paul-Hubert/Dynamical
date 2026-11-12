@@ -9,7 +9,8 @@
 #include <filesystem>
 #include <memory>
 #include <SDL.h>
-#include "extra/optick/optick.h"
+#include "scene/run_args.h"
+#include "util/profile.h"
 
 // Resources and the config file are loaded relative to the working directory. When the exe is
 // started from elsewhere (double clicked in build/Debug), move to the closest parent of the exe
@@ -38,7 +39,8 @@ static void find_resources() {
 
 int main(int argc, char **argv) {
 
-    //OPTICK_APP("People");
+    // profile=true : the profiler runs from here to the end, a Tracy profiler connects when it wants (docs/profiling.md)
+    if(dy::parseRunArgs(argc, argv).args.profile) dy::profile::start();
 
     find_resources();
 
@@ -54,6 +56,7 @@ int main(int argc, char **argv) {
         auto game = std::make_unique<dy::Game>(argc, argv);
         code = game->start();
     }
+    dy::profile::stop();
     return code;
 
 }

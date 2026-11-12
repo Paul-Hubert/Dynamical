@@ -5,6 +5,7 @@
 #include "windu.h"
 #include "instance.h"
 #include "device.h"
+#include "gpu_profile.h"
 #include "transfer.h"
 #include "compute.h"
 #include "swapchain.h"
@@ -31,6 +32,7 @@ public:
     Windu win;
     Instance instance;
     Device device;
+    GpuProfile gpu_profile;     // zones on the GPU in the profiler, with profile=true
     Transfer transfer;
     Compute compute;
     Swapchain swap;

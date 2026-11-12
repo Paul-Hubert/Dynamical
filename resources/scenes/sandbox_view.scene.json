@@ -41,6 +41,25 @@
       "type": "float",
       "default": 6.0,
       "description": "from the camera to the animal, in its sizes"
+    },
+    "watch_height": {
+      "type": "float",
+      "default": 2.0,
+      "description": "of the camera, in heights of the animal"
+    },
+    "watch_orbit": {
+      "type": "float",
+      "default": 6.0,
+      "description": "degrees a second the camera turns round the animal"
+    },
+    "tour": {
+      "type": "bool",
+      "default": false,
+      "description": "the camera goes from animal to animal, a wolf then a deer: watch_stay seconds round each"
+    },
+    "watch_stay": {
+      "type": "float",
+      "default": 5.0
     }
   },
   "renderer": {
@@ -61,7 +80,11 @@
         "name": "SandboxWatch",
         "params": {
           "species": "${watch}",
-          "distance": "${watch_distance}"
+          "distance": "${watch_distance}",
+          "height": "${watch_height}",
+          "orbit": "${watch_orbit}",
+          "tour": "${tour}",
+          "stay": "${watch_stay}"
         }
       }
     ],

@@ -103,8 +103,6 @@ void UIPass::createPipeline(RenderTarget target, vk::RenderPass renderpass) {
 
 void UIPass::update(uint32_t frame_index) {
 
-    OPTICK_EVENT();
-
     ImGui::Render();
 
     draw_data = ImGui::GetDrawData();

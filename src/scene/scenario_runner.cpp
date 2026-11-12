@@ -1,5 +1,7 @@
 #include "scenario_runner.h"
 
+#include "util/profile.h"
+
 using namespace dy;
 
 ScenarioRunner::ScenarioRunner(const std::string& scene, const std::vector<std::pair<std::string, std::string>>& vars,
@@ -25,6 +27,11 @@ void ScenarioRunner::restart(uint64_t base_seed) {
 }
 
 void ScenarioRunner::step(int64_t ticks, tf::Executor* executor) {
-    worlds.step(ticks, executor);
+    {
+        DY_ZONE_N("Step worlds");
+        worlds.step(ticks, executor);
+    }
     ticks_done += ticks;
+    // Without a window a frame of the profiler is one of these : a decision window of every world
+    DY_FRAME();
 }

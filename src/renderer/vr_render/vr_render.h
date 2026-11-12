@@ -80,6 +80,8 @@ private:
     };
     std::vector<per_frame> per_frame;
 
+    PassZones zones;    // of the passes in the profiler
+
     bool session_running = false;
     bool frame_begun = false;
     bool should_render = false;

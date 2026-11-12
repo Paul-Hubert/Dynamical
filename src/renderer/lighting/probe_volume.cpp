@@ -225,6 +225,8 @@ void ProbeVolume::uploadIndex() {
 // A brick for the nearest chunk that has none, and none for the chunks that are gone
 void ProbeVolume::syncBricks(glm::vec3 viewer) {
 
+    DY_ZONE();
+
     bool changed = false;
 
     for(auto& brick : brick_data) {
@@ -365,6 +367,7 @@ void ProbeVolume::update(float time) {
     if(brick_data.empty()) return;
 
     vk::CommandBuffer command = ctx.compute.getCommandBuffer();
+    DY_GPU_ZONE(ctx.gpu_profile, command, "Probes");
     command.bindPipeline(vk::PipelineBindPoint::eCompute, pipeline);
     command.bindDescriptorSets(vk::PipelineBindPoint::eCompute, layout, 0, { ring.view_set }, {});
     command.bindDescriptorSets(vk::PipelineBindPoint::eCompute, layout, 2, { ring.work_set }, {});

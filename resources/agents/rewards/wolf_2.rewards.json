@@ -1,8 +1,8 @@
 {
-  "round": 10,
-  "notes": "Round 9 (scratch_r2, 1.32M decisions): the hunt begins from nothing. Speed 0.25 to 0.80 of a walk speed, Attack mode 24% to 37%, wounds dealt 0.57 to 1.18 healths a summary, a kill in one summary of thirteen; the chase pays 0.0008 to 0.003 a decision. They still starve (98%, after 240 s) next to carcasses: six deer starve per summary and the wolves walk to them (scent 0.0035) but Feed mode went down (18% to 14%) and they feed 0.09% of the time. Halving gnaw in round 9 took away the step between reaching a carcass and eating it. Round 10: gnaw pays three times more but by how far the muzzle is brought down next to the carcass (as the deer's graze), not for standing there in Feed mode; the rest unchanged.",
+  "round": 11,
+  "notes": "Round 10 (scratch_r3, stopped at 780k of 1.33M decisions when Paul asked for the 80M walkers' last checkpoints under the minds): the hunt grows. Wounds dealt 0.63 to 3.8 healths a summary, kills 1 to 1.8 in the summaries that have some, speed 0.52 to 0.89 of a walk speed, Attack mode 40%. Eating begins: feeding 0.03% to 0.28% of the time, the eat term ten times up, gnaw paying for the first time. 95% still starve after 224 s. Round 11, first round of the line scratch80 (walkers from the 80M trainings at 65M, minds from scratch_r3): the meal pays half as much again, nothing else touched while eating is being found.",
   "terms": [
-    { "name": "eat",      "expr": "10 * energy_gain" },
+    { "name": "eat",      "expr": "15 * energy_gain" },
     { "name": "wound",    "expr": "8 * damage_dealt" },
     { "name": "kill",     "expr": "3 * kills" },
     { "name": "chase",    "expr": "0.25 * prey_closing * step(carcass_distance - 5)" },

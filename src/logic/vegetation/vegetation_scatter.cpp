@@ -199,8 +199,6 @@ void VegetationScatterSys::scatter(entt::entity entity) {
 
 void VegetationScatterSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     if(species.empty() || per_chunk <= 0) return;
 
     std::vector<entt::entity> pending;

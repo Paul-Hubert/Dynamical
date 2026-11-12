@@ -62,6 +62,7 @@ RunArgsResult dy::parseRunArgs(const std::vector<std::string>& args) {
         else if(key == "ticks") ok = parseInt(value, a.ticks) && a.ticks >= 0;
         else if(key == "episodes") ok = parseInt(value, a.episodes) && a.episodes >= 0;
         else if(key == "seed") ok = parseInt(value, a.seed) && a.seed >= 0;
+        else if(key == "profile") ok = parseBool(value, a.profile);
         else if(key == "capture") a.capture = value;
         else if(key == "capture_dir") a.capture_dir = value;
         else if(key == "fixed_frame_dt") ok = parseDouble(value, a.fixed_frame_dt) && a.fixed_frame_dt >= 0.;

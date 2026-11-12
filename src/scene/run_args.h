@@ -22,6 +22,10 @@ struct RunArgs {
     int episodes = 0;
     int64_t seed = 0;           // dynamical: the worlds' base seed (dynamical_train takes the trainer's)
 
+    // Starts the profiler (docs/profiling.md): events are kept from the start of the process until a Tracy
+    // profiler or tracy-capture connects, on this machine. Without it nothing is recorded
+    bool profile = false;
+
     // Capture
     std::string capture;                    // capture script (json)
     std::string capture_dir = "captures";   // where the PNGs go
@@ -44,8 +48,9 @@ struct RunArgs {
     // dynamical: rays the probes may cast a frame, -1 : the default of the RenderSettings
     int probe_rays = -1;
     // dynamical: what the plants far away are with ray tracing. volumes : their baked volume in the rays and on
-    // screen, rays : in the rays only (billboards on screen), screen : on screen only, none : as without ray tracing
-    std::string far_plants = "volumes";
+    // screen, rays : in the rays only (billboards on screen), screen : on screen only, none : as without ray tracing.
+    // Empty : what the RenderSettings say (volumes, unless the level of the graphics says otherwise)
+    std::string far_plants;
 
     // Probes
     std::string probe;                      // csv file

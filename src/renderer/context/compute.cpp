@@ -38,8 +38,8 @@ void Compute::prepare() {
 
 bool Compute::flush(std::vector<vk::Semaphore> waits, std::vector<vk::PipelineStageFlags> stages, std::vector<vk::Semaphore> signals) {
 
-    OPTICK_EVENT();
-    
+    DY_ZONE();
+
     if(!empty) {
 
         auto& f = per_frame[index];

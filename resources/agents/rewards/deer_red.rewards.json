@@ -1,10 +1,11 @@
 {
-  "round": 10,
-  "notes": "Round 9 (scratch_r2, 2.14M decisions): the deer did a little worse. In the last quarter 38% die of old age (65% at the end of round 8), 61% starve, 1% are killed; a life in the world 445 s (609 s); feeding 15% of the time, store 0.65. The wolves now run at them (fear -0.0013 a decision, twice round 8), and court and near, open from a store of 0.4, pay 0.0013 a decision between them against 0.002 for eating: a deer at half a store is paid to walk to another one. No pair side by side, no conception. Round 10: courting, standing near and pairing only pay over a store of 0.6, and hunger costs twice as much, so the store comes first.",
+  "round": 11,
+  "notes": "Round 10 (scratch_r3, stopped at 1.24M of 2M decisions when Paul asked for the 80M walkers' last checkpoints under the minds): with the store first again 69% die of old age, 30% starve, 2% are killed; a life in the world 531 s; feeding 16.5% of the time, store 0.71. Still no pair side by side. The deer that starve never ate (scratch_r2 in the engine: each dies 130 s after it came in): they are brought in on the border of the arena, on bare ground further from grass than the 10 m the mind sees, and nothing paid for the way to it. Round 11, first round of the line scratch80 (walkers from the 80M trainings at 65M, minds from scratch_r3): seek pays a hungry deer by the metre closed on the nearest grass (the new signal grass_closing); the rest unchanged.",
   "terms": [
     { "name": "eat",      "expr": "2 * energy_gain * step(0.85 - energy)" },
     { "name": "graze",    "expr": "0.004 * step(0.8 - energy) * mode_feed * step(grass_here - 0.1) * max(0, 1 - muzzle_height)" },
     { "name": "pasture",  "expr": "0.002 * step(0.8 - energy) * step(grass_near - 0.3)" },
+    { "name": "seek",     "expr": "0.05 * step(0.8 - energy) * grass_closing" },
     { "name": "hunger",   "expr": "-0.02 * max(0, 0.6 - energy)" },
     { "name": "hurt",     "expr": "-1 * damage_taken" },
     { "name": "fear",     "expr": "-0.02 * max(0, 1 - predator_distance / 15)" },

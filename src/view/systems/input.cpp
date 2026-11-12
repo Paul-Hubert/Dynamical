@@ -43,8 +43,6 @@ InputSys::InputSys(entt::registry& reg) : System(reg) {
 
 void InputSys::tick(double dt) {
 
-    OPTICK_EVENT();
-    
     Input& input = reg.ctx().get<Input>();
     
     input.leftClick = input.rightClick = input.middleClick = false;

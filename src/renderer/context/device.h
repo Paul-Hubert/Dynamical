@@ -43,6 +43,8 @@ public :
 
     RayContext ray;                     // acceleration structures and ray queries, where the GPU has them
 
+    bool calibrated_timestamps = false; // VK_EXT_calibrated_timestamps, asked for by the profiler (GpuProfile)
+
     
     vk::PhysicalDevice physical;
     vk::Device logical;

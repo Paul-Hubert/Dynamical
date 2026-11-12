@@ -17,6 +17,7 @@
 
 #include <chrono>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace dy {
@@ -58,6 +59,7 @@ private:
 
     std::vector<std::unique_ptr<ScenePass>> passes;
     std::vector<ScenePass*> pass_list;
+    std::vector<std::string> update_zones;      // the zone of each pass' update() in the profiler
 
     struct per_frame {
         vk::Fence fence;

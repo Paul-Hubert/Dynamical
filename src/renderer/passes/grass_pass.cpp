@@ -139,8 +139,11 @@ GrassPass::GrassPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
         0.f, VK_FALSE, 1.f, VK_FALSE, vk::CompareOp::eNever, 0.f, VK_LOD_CLAMP_NONE
     ));
 
-    // The baked rays are seen at grazing angles most of the time : trilinear, 16 times anisotropic
+    // The baked rays are seen at grazing angles most of the time : trilinear, 16 times anisotropic unless the
+    // level of the graphics says less (RenderSettings::textures)
     {
+        auto* render_settings = reg.ctx().find<RenderSettings>();
+        const float anisotropy = render_settings ? (float) render_settings->textures.grass_anisotropy : 16.f;
         vk::SamplerCreateInfo info(
             {}, vk::Filter::eLinear, vk::Filter::eLinear, vk::SamplerMipmapMode::eLinear,
             vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat,
@@ -148,7 +151,7 @@ GrassPass::GrassPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
         );
         if(ctx.device.sampler_anisotropy) {
             info.anisotropyEnable = VK_TRUE;
-            info.maxAnisotropy = std::min(16.f, ctx.device.physical.getProperties().limits.maxSamplerAnisotropy);
+            info.maxAnisotropy = std::clamp(anisotropy, 1.f, ctx.device.physical.getProperties().limits.maxSamplerAnisotropy);
         }
         raySampler = ctx.device->createSampler(info);
     }

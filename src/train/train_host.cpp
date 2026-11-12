@@ -30,6 +30,7 @@
 #include "worlds_env.h"
 #include "process_control.h"
 #include "util/log.h"
+#include "util/profile_workers.h"
 
 #include "dynamical_version.h"
 
@@ -267,7 +268,7 @@ int TrainHost::eval() {
         runner.world(i).systems.fixed_observe_only();
     }
     int period = (int) runner.world(0).reg.ctx().get<WorldClock>().decision_period;
-    tf::Executor executor(std::max(1u, std::thread::hardware_concurrency() / 2));
+    tf::Executor executor(std::max(1u, std::thread::hardware_concurrency() / 2), profile::namedWorkers());
 
     struct Sum { double ticks = 0, dead = 0, distance = 0, seconds = 0, head = 0; int n = 0; } sum;
     // var.replay=<prefix>: the first episode of world 0 as a pose track (playable in rig_anim, var.track=...)
@@ -418,7 +419,7 @@ int TrainHost::bench() {
     const unsigned threads = args.threads > 0 ? (unsigned) args.threads
         : (unsigned) std::max<size_t>(1, std::min<size_t>(worlds, std::thread::hardware_concurrency()));
 
-    tf::Executor executor(threads);
+    tf::Executor executor(threads, profile::namedWorkers());
     auto start = std::chrono::steady_clock::now();
     runner.step(ticks, &executor);
     double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
@@ -562,7 +563,11 @@ int TrainHost::serve(const std::function<std::unique_ptr<TrainerEnvironment>(int
 
         co::UnityOutputProto output;
         env->write(output);
-        status = client.exchange(output, input);
+        {
+            // Mostly the trainer's own time : its policy, and its updates
+            DY_ZONE_N("Trainer exchange");
+            status = client.exchange(output, input);
+        }
         if(status == mlagents::MlAgentsClient::Status::Stopped) return stopped();
         if(status == mlagents::MlAgentsClient::Status::Closed) {
             dy::log(dy::info) << "The trainer closed the connection: exiting\n";

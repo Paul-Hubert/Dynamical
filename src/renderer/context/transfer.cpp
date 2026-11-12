@@ -27,7 +27,7 @@ void Transfer::Upload::reset(Context& ctx, vk::CommandPool pool) {
 
 bool Transfer::flush(std::vector<vk::Semaphore> waits, std::vector<vk::PipelineStageFlags> stages, std::vector<vk::Semaphore> signals) {
 
-    OPTICK_EVENT();
+    DY_ZONE();
 
     check();
     

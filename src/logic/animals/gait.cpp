@@ -623,8 +623,6 @@ void AnimalGaitSys::init() {
 
 void AnimalGaitSys::tick(double dt_seconds) {
 
-    OPTICK_EVENT();
-
     auto& library = animalLibrary(reg);
     auto& models = reg.ctx().get<GaitModels>();
     const float dt = (float) std::min(dt_seconds, 0.1);

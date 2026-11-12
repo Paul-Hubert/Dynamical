@@ -6,6 +6,7 @@
 
 #include "logic/terrain/chunk.h"
 #include "logic/components/camera.h"
+#include "logic/components/render_settings.h"
 
 #include "util/util.h"
 #include "util/log.h"
@@ -209,8 +210,6 @@ uint32_t TerrainSys::allocateSlot() {
 
 void TerrainSys::tick(double dt) {
 
-    OPTICK_EVENT();
-
     Context& ctx = *reg.ctx().get<Context*>();
 
     frame_counter++;
@@ -267,11 +266,18 @@ void TerrainSys::tick(double dt) {
         return;
     }
 
-    size_t count = std::min<size_t>(todo.size(), max_per_frame);
+    // No more than the level of the graphics lets a frame mesh (RenderSettings::streaming)
+    auto* render_settings = reg.ctx().find<RenderSettings>();
+    const size_t most = render_settings ? (size_t) std::clamp(render_settings->streaming.chunk_meshes, 1, (int) max_per_frame) : max_per_frame;
+    size_t count = std::min<size_t>(todo.size(), most);
     std::partial_sort(todo.begin(), todo.begin() + count, todo.end());
     todo.resize(count);
 
+    DY_ZONE_N("Mesh chunks");
+    DY_PLOT("Chunks meshed", (int64_t) count);
+
     vk::CommandBuffer command = ctx.compute.getCommandBuffer();
+    DY_GPU_ZONE(ctx.gpu_profile, command, "Marching cubes");
     uint32_t ring = ctx.compute.ringIndex();
 
     struct Build {

@@ -202,7 +202,7 @@ deterministic.
 | T1.3 | Scene loader: 15 malformed fixtures (unknown system, bad type, missing variable, cyclic include, renderer in train…). Each fails with the expected file and JSON path | 15/15 |
 | T1.4 | Variable precedence: default < `var.x=` on the command line; typed substitution; resolved dump round trip | exact |
 | T1.5 | `base` resolves to master's system order, as **registry names** (pre: Input, UI, Time, PlayerControl, VRControl, DebugMenu, ChunkManager, ChunkGenerator, BoxRing, ModelLineup, BoxThrower, Physics; post: Terrain). The `SceneSys` replacements sit where `SceneSys` was | exact |
-| T1.7 | `dynamical_train` started from another directory with relative `-envParamsOut=x/y.txt` writes to `cwd/x/y.txt`; `config.6.json` is not created | exact |
+| T1.7 | `dynamical_train` started from another directory with relative `-envParamsOut=x/y.txt` writes to `cwd/x/y.txt`; `config.7.json` is not created | exact |
 | T1.6 | `SystemSet` fixed lane: `Act` runs only at k = 0 and `Observe` only at k = period − 1 over 10 windows | exact call log |
 | S1.1 | `base` probe against P0's `base_probe.csv` | max difference ≤ 1e-5 m |
 | V1.1 | `base_spawn`, `base_ring` against the P0 goldens | `imgdiff` thresholds, **no re-baseline allowed** |

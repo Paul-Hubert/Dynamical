@@ -17,8 +17,6 @@ void TimeSys::init() {
 
 void TimeSys::tick(double dt) {
     
-    OPTICK_EVENT();
-    
     auto& time = reg.ctx().get<Time>();
     
     auto& input = reg.ctx().get<Input>();

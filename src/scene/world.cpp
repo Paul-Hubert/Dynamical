@@ -141,10 +141,13 @@ World::~World() {
 }
 
 void World::preinit() {
+    DY_ZONE_N("World preinit");
     systems.preinit();
 }
 
 void World::init() {
+
+    DY_ZONE_N("World init");
 
     for(auto& e : entities) {
         entt::entity entity = reg.create();
@@ -162,6 +165,7 @@ void World::init() {
 }
 
 void World::tick() {
+    DY_ZONE_N("World tick");
     auto& clock = reg.ctx().get<WorldClock>();
     uint64_t k = clock.tick % clock.decision_period;
     systems.fixed_tick(clock.dt, k == 0, k == clock.decision_period - 1);
@@ -220,6 +224,8 @@ void Worlds::finish() {
 }
 
 void Worlds::step(int64_t ticks, tf::Executor* executor) {
+
+    DY_ZONE();
 
     auto run = [ticks](std::unique_ptr<World>& w) {
         for(int64_t t = 0; t < ticks; t++) w->tick();
