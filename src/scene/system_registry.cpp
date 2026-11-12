@@ -20,7 +20,9 @@
 #include "logic/systems/chunk_systems.h"
 #include "logic/animals/animal.h"
 #include "logic/animals/animal_agent.h"
+#include "logic/animals/steer.h"
 #include "logic/sandbox/sandbox.h"
+#include "logic/player/player.h"
 #include "logic/vegetation/forest.h"
 #include "logic/vegetation/vegetation_scatter.h"
 #include "physics/physics_sys.h"
@@ -67,6 +69,7 @@ void registerSimComponents() {
             f.read("restitution", b.restitution);
             f.read("angular_damping", b.angular_damping);
             f.read("mass", b.mass);
+            f.read("lock_rotation", b.lock_rotation);
             f.read("initial_velocity", b.initial_velocity);
             f.read("initial_angular_velocity", b.initial_angular_velocity);
             f.finish();
@@ -76,7 +79,7 @@ void registerSimComponents() {
             auto& b = reg.get<RigidBody>(e);
             return nlohmann::json { { "motion", motion_names[(int) b.motion] }, { "shape", shape_names[(int) b.shape] },
                 { "half_extent", toJson(b.half_extent) }, { "offset", toJson(b.offset) }, { "friction", b.friction },
-                { "restitution", b.restitution }, { "angular_damping", b.angular_damping }, { "mass", b.mass }, { "initial_velocity", toJson(b.initial_velocity) },
+                { "restitution", b.restitution }, { "angular_damping", b.angular_damping }, { "mass", b.mass }, { "lock_rotation", b.lock_rotation }, { "initial_velocity", toJson(b.initial_velocity) },
                 { "initial_angular_velocity", toJson(b.initial_angular_velocity) } };
         }
     });
@@ -189,6 +192,7 @@ void dy::registerSimSystems() {
         SystemScope::World });
 
     registerSimComponents();
+    registerPlayer();
     registerSky();
     registerSphereRoller();
     registerPursuit();
@@ -201,6 +205,7 @@ void dy::registerSimSystems() {
     registerForest();
     registerAnimals();
     registerAnimalAgents();
+    registerAnimalSteer();
     registerSandbox();
 
 }

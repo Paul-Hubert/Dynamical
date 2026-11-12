@@ -43,6 +43,13 @@ glm::vec4 sample(const std::vector<int8_t>& noise, glm::vec2 uv) {
     return glm::mix(glm::mix(texel(x0, y0), texel(x0 + 1, y0), tx), glm::mix(texel(x0, y0 + 1), texel(x0 + 1, y0 + 1), tx), ty);
 }
 
+// Part of the key of the maps : to change with anything that changes them for the same parameters
+constexpr uint32_t top_baker_version = 1;
+
+// The top of the plants is sampled every half cube of the terrain, this many samples around the chunk too :
+// a texel is the highest of those within `top_reach` of its vertex
+constexpr int top_reach = 1;
+
 }
 
 std::vector<int8_t> bakeSpeciesNoise(uint32_t seed) {
@@ -69,39 +76,72 @@ std::vector<int8_t> bakeSpeciesNoise(uint32_t seed) {
 
 }
 
-GrassSpecies grassSpeciesAt(const std::vector<int8_t>& noise, const GrassSpeciesParams& params, glm::vec2 world, float tallness) {
+GrassSpecies grassSpeciesAt(const std::vector<int8_t>& noise, const GrassSpeciesParams& params, glm::vec2 world, float amount, int forced) {
 
     GrassSpecies out;
+    const int layers = grass_species::layers;
+    if(forced >= 0) {
+        for(int rank = 0; rank < layers; rank++) out.kinds[rank] = static_cast<GrassKind>(std::min(forced, grass_kinds - 1));
+    }
+    // No patches : the meadow, as tall as the height map of the grass says (GrassHeightField)
     if(params.size <= 0.f) return out;
-    // Thousandths, as the shader gets it
-    const float overlap = std::floor(std::clamp(params.overlap, 0.f, 1.f) * 1000.f) / 1000.f;
-
-    // How much the place is for the tall kinds, -1 to 1 over the band
-    const float band = std::max(grass_species::band * overlap, 1e-3f);
-    // Gently over the middle of the band, where the noises still decide : the two groups blend like two kinds.
-    // For good on its sides
-    const float width = std::max(grass_species::margin * overlap, 1e-6f);
-    const float across = (tallness - params.low) / band;
-    const float tall = width * std::clamp(across, -0.5f, 0.5f) + 2.f * (std::clamp(across - 0.5f, 0.f, 0.5f) - std::clamp(-across - 0.5f, 0.f, 0.5f));
 
     glm::vec2 at = world / (params.size * grass_species::periods);
-    glm::vec4 read[3];
-    for(int i = 0; i < 3; i++) read[i] = sample(noise, at * grass_species::scales[i] + grass_species::shifts[i]);
+    glm::vec4 much[3], high[3];
+    for(int i = 0; i < 3; i++) {
+        much[i] = sample(noise, at * grass_species::scales[i] + grass_species::shifts[i]);
+        high[i] = sample(noise, at * grass_species::height_scales[i] + grass_species::height_shifts[i]);
+    }
+    // How tall a kind grows here, 0 its shortest to 1 its tallest
+    auto grown = [&](int k) { return std::clamp(0.5f + grass_species::height_contrast * high[k / 4][k % 4], 0.f, 1.f); };
+    amount = std::clamp(amount, 0.f, 1.f);
+    auto tall = [&](int k) { return 1.f - amount * (1.f - grown(k)); };
 
-    int kind[3] = {-1, -1, -1};
-    float best[3] = {-1e9f, -1e9f, -1e9f}, best_small = -1e9f, best_tall = -1e9f;
+    if(forced >= 0) {
+        const int k = static_cast<int>(out.kinds[0]);
+        for(int rank = 0; rank < layers; rank++) out.tall[rank] = tall(k);
+        out.canopy = grown(k);
+        return out;
+    }
+
+    // Thousandths, as the shader gets it
+    const float overlap = std::floor(std::clamp(params.overlap, 0.f, 1.f) * 1000.f) / 1000.f;
+    const float width = std::max(grass_species::margin * overlap, 1e-6f);
+
+    // How tall the tall kinds of the place grow : those whose noise is close to the best tall one's
+    float value[grass_kinds], best_tall = -1e9f;
     for(int k = 0; k < grass_kinds; k++) {
         const GrassKindInfo& info = grassKindInfo(static_cast<GrassKind>(k));
-        float value = read[k / 4][k % 4] + info.abundance + (info.small ? -tall : tall);
-        if(info.small) best_small = std::max(best_small, value);
-        else best_tall = std::max(best_tall, value);
-        for(int rank = 0; rank < 3; rank++) {
-            if(value <= best[rank]) continue;
-            for(int moved = 2; moved > rank; moved--) {
+        value[k] = much[k / 4][k % 4] + info.abundance;
+        if(!info.small) best_tall = std::max(best_tall, value[k]);
+    }
+    float canopy = 0.f, weights = 0.f;
+    for(int k = 0; k < grass_kinds; k++) {
+        if(grassKindInfo(static_cast<GrassKind>(k)).small) continue;
+        float weight = std::clamp(1.f + (value[k] - best_tall) / grass_species::canopy_width, 0.f, 1.f);
+        canopy += weight * grown(k);
+        weights += weight;
+    }
+    out.canopy = weights > 0.f ? canopy / weights : 0.5f;
+    // In their shade the small kinds have less of their noise, and more of it where the grass stays short
+    const float shade = params.shade * (1.f - 2.f * out.canopy);
+
+    // One more than the layers : the best of the kinds that are not one
+    int kind[grass_species::layers + 1];
+    float best[grass_species::layers + 1];
+    for(int rank = 0; rank <= layers; rank++) {
+        kind[rank] = -1;
+        best[rank] = -1e9f;
+    }
+    for(int k = 0; k < grass_kinds; k++) {
+        float v = value[k] + (grassKindInfo(static_cast<GrassKind>(k)).small ? shade : 0.f);
+        for(int rank = 0; rank <= layers; rank++) {
+            if(v <= best[rank]) continue;
+            for(int moved = layers; moved > rank; moved--) {
                 best[moved] = best[moved - 1];
                 kind[moved] = kind[moved - 1];
             }
-            best[rank] = value;
+            best[rank] = v;
             kind[rank] = k;
             break;
         }
@@ -110,19 +150,126 @@ GrassSpecies grassSpeciesAt(const std::vector<int8_t>& noise, const GrassSpecies
     // The first kind against the second, the others against the first : all of its plants half a blend
     // width inside its patch, none as far outside
     out.keep[0] = std::clamp(0.5f + (best[0] - best[1]) / width, 0.f, 1.f);
-    for(int rank = 1; rank < 3; rank++) {
-        out.keep[rank] = std::clamp(0.5f + (best[rank] - best[0]) / width, 0.f, 1.f);
-        // Where no other kind is close the layers are all of the first one, as dense
-        if(kind[rank] < 0 || out.keep[rank] <= 0.f) {
-            kind[rank] = kind[0];
-            out.keep[rank] = out.keep[0];
+    out.kinds[0] = static_cast<GrassKind>(kind[0]);
+    out.tall[0] = tall(kind[0]);
+    for(int rank = 1; rank < layers; rank++) {
+        const float against = 0.5f + (best[rank] - best[0]) / width;
+        // No plant left where the next kind takes its place among the layers
+        const float leaving = (best[rank] - best[layers]) / (grass_species::fade * width);
+        const float own = kind[rank] < 0 ? 0.f : std::clamp(std::min(against, leaving), 0.f, 1.f);
+        if(own > 0.f) {
+            out.kinds[rank] = static_cast<GrassKind>(kind[rank]);
+            out.keep[rank] = own;
+            // The last plants of a kind at the edge of its patch are small
+            out.tall[rank] = tall(kind[rank]) * glm::mix(grass_species::stunted, 1.f, glm::smoothstep(0.f, 0.5f, own));
+        } else {
+            // Where no other kind is close the layers are all of the first one : none of it where the kind of
+            // the layer has just gone, as dense as the first layer half a blend width further
+            out.kinds[rank] = out.kinds[0];
+            out.keep[rank] = out.keep[0] * std::clamp(-2.f * against, 0.f, 1.f);
+            out.tall[rank] = out.tall[0];
         }
     }
-    for(int rank = 0; rank < 3; rank++) out.kinds[rank] = static_cast<GrassKind>(kind[rank]);
-
-    out.under = grassKindInfo(out.kinds[0]).small ? 0.f : std::clamp(0.5f + (best_tall - best_small) / width, 0.f, 1.f);
     return out;
 
+}
+
+GrassTopField::GrassTopField(const GrassTopParams& params) : p(params), noise(bakeSpeciesNoise()), meadow(params.height_map) {
+
+    p.forced = std::min(p.forced, grass_kinds - 1);
+    if(p.forced >= 0 || p.species.size <= 0.f) {
+        highest = p.heights[std::max(p.forced, 0)];
+    } else {
+        highest = *std::max_element(p.heights.begin(), p.heights.end());
+    }
+    highest = std::max(highest, 1e-3f);
+
+}
+
+uint64_t grassTopKey(const GrassTopParams& p) {
+    uint64_t hash = 1469598103934665603ull;
+    auto add = [&](const void* data, size_t size) {
+        const uint8_t* bytes = static_cast<const uint8_t*>(data);
+        for(size_t i = 0; i < size; i++) {
+            hash = (hash ^ bytes[i]) * 1099511628211ull;
+        }
+    };
+    add(&top_baker_version, sizeof(top_baker_version));
+    add(&p.species.size, sizeof(float));
+    add(&p.species.overlap, sizeof(float));
+    add(&p.species.shade, sizeof(float));
+    add(&p.amount, sizeof(float));
+    add(&p.forced, sizeof(int));
+    add(p.heights.data(), sizeof(float) * p.heights.size());
+    // The height map of the meadow only counts without the species
+    if(p.species.size <= 0.f) {
+        const uint64_t height_key = grassHeightKey(p.height_map);
+        add(&height_key, sizeof(height_key));
+    }
+    return hash;
+}
+
+float GrassTopField::sample(glm::vec2 world) const {
+
+    if(p.species.size <= 0.f) {
+        return highest * (1.f - std::clamp(p.amount, 0.f, 1.f) * (1.f - meadow.sample(world.x, world.y)));
+    }
+    GrassSpecies here = grassSpeciesAt(noise, p.species, world, p.amount, p.forced);
+    float top = 0.f;
+    for(int rank = 0; rank < grass_species::layers; rank++) {
+        if(here.keep[rank] > 0.f) top = std::max(top, here.tall[rank] * p.heights[static_cast<int>(here.kinds[rank])]);
+    }
+    return top;
+
+}
+
+void GrassTopField::bake(glm::ivec2 chunk, uint8_t* texels) const {
+
+    const int size = grass_height::size;
+    // Rounded up : the shell is never under the plants
+    auto texel = [&](float top) { return (uint8_t) std::clamp(std::ceil(top / highest * 255.f - 1e-3f), 0.f, 255.f); };
+
+    // The meadow alone : its height map, which has nothing finer than the terrain vertices
+    if(p.species.size <= 0.f) {
+        meadow.bake(chunk, texels);
+        const float amount = std::clamp(p.amount, 0.f, 1.f);
+        for(size_t i = 0; i < grass_height::num_texels; i++) {
+            texels[i] = texel(highest * (1.f - amount * (1.f - (float) texels[i] / 255.f)));
+        }
+        return;
+    }
+
+    // Sampled at places that only depend on the world : neighbours get the same values on their shared edge
+    const int n = 2 * (size - 1) + 1 + 2 * top_reach;
+    const float step = 0.5f * chunk::cube_size;
+    std::vector<float> tops((size_t) n * n), rows((size_t) n * size);
+    for(int j = 0; j < n; j++) {
+        for(int i = 0; i < n; i++) {
+            glm::ivec2 half = 2 * chunk * (int) chunk::cubes + glm::ivec2(i, j) - top_reach;
+            tops[(size_t) j * n + i] = sample(glm::vec2(half) * step);
+        }
+    }
+    for(int j = 0; j < n; j++) {
+        for(int i = 0; i < size; i++) {
+            float top = 0.f;
+            for(int k = 0; k <= 2 * top_reach; k++) top = std::max(top, tops[(size_t) j * n + 2 * i + k]);
+            rows[(size_t) j * size + i] = top;
+        }
+    }
+    for(int j = 0; j < size; j++) {
+        for(int i = 0; i < size; i++) {
+            float top = 0.f;
+            for(int k = 0; k <= 2 * top_reach; k++) top = std::max(top, rows[(size_t) (2 * j + k) * size + i]);
+            texels[(size_t) j * size + i] = texel(top);
+        }
+    }
+
+}
+
+std::vector<uint8_t> GrassTopField::bake(glm::ivec2 chunk) const {
+    std::vector<uint8_t> texels(grass_height::num_texels);
+    bake(chunk, texels.data());
+    return texels;
 }
 
 }

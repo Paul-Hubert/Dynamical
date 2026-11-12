@@ -40,12 +40,14 @@ struct VRInput {
     struct Hand {
         VRPose pose;
         glm::vec3 linear_velocity = glm::vec3(0.f); // stage space, m/s
+        glm::vec3 angular_velocity = glm::vec3(0.f); // stage space, rad/s
         float trigger = 0.f;
         float grip = 0.f;
         glm::vec2 thumbstick = glm::vec2(0.f);
         bool trigger_pressed = false; // rising edge this frame
         bool primary = false;         // A (right) or X (left) on Touch, A on Index
         bool primary_pressed = false; // rising edge this frame
+        bool thumbstick_click = false;
     };
     Hand hands[2];
 

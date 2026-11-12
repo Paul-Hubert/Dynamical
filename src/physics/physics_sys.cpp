@@ -62,6 +62,17 @@ PhysicsStats& physicsStats(entt::registry& reg) {
 
 }
 
+void FixedSteps::remove(const void* owner) {
+    for(auto* list : { &before, &after }) {
+        list->erase(std::remove_if(list->begin(), list->end(), [owner](const Step& s) { return s.owner == owner; }), list->end());
+    }
+}
+
+FixedSteps& dy::fixedSteps(entt::registry& reg) {
+    if(auto* s = reg.ctx().find<FixedSteps>()) return *s;
+    return reg.ctx().emplace<FixedSteps>();
+}
+
 int FixedStepClock::stepsFor(double dt) const {
     return std::min((int) ((accumulator + std::min(dt, 0.25)) / fixed_dt), max_steps);
 }
@@ -200,6 +211,11 @@ void RigidBodySys::tick(double dt) {
         settings.mRestitution = body.restitution;
         settings.mAngularDamping = body.angular_damping;
         settings.mAllowSleeping = world->config().allow_sleeping;
+        // The entity of a body, for whoever meets it in a query (0: none)
+        settings.mUserData = (JPH::uint64) entt::to_integral(entity) + 1;
+        if(body.motion == RigidBody::Motion::Dynamic && body.lock_rotation) {
+            settings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX | JPH::EAllowedDOFs::TranslationY | JPH::EAllowedDOFs::TranslationZ;
+        }
         if(body.motion == RigidBody::Motion::Dynamic && body.mass > 0.f) {
             settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
             settings.mMassPropertiesOverride.mMass = body.mass;
@@ -303,6 +319,13 @@ void TerrainCollidersSys::tick(double dt) {
     OPTICK_EVENT();
 
     auto& clock = fixedStepClock(reg);
+    // Boxes asked for this frame (a player's legs)
+    std::vector<Bounds> needs;
+    if(auto* asked = reg.ctx().find<TerrainNeeds>()) {
+        for(auto& [min, max] : asked->boxes) needs.push_back(Bounds { min, max });
+        asked->boxes.clear();
+    }
+
     int steps = clock.stepsFor(dt);
     if(steps <= 0) return;
 
@@ -331,6 +354,8 @@ void TerrainCollidersSys::tick(double dt) {
         required.push_back(grow(bounds, velocity * frame_time, 1.f));
         if(!fixed_clock) prefetch.push_back(grow(bounds, velocity * lookahead, 4.f));
     }
+
+    required.insert(required.end(), needs.begin(), needs.end());
 
     terrain->update(required, prefetch, clock.sim_time);
 
@@ -445,6 +470,12 @@ void PhysicsSys::tick(double dt) {
                 bodies.MoveKinematic(bodyId(body), JPH::RVec3(toJolt(transform.position)), toJolt(glm::normalize(transform.rotation)), fixed_dt);
             }
 
+            // What the host's systems do at the physics rate (a player's legs, the drives of its hands)
+            auto* hooks = reg.ctx().find<FixedSteps>();
+            if(hooks) {
+                for(size_t i = 0; i < hooks->before.size(); i++) hooks->before[i].run(fixed_dt);
+            }
+
             world->step(fixed_dt);
             clock.sim_time += fixed_dt;
 
@@ -457,6 +488,10 @@ void PhysicsSys::tick(double dt) {
                 pose.prev_rotation = pose.rotation;
                 pose.position = toGlm(JPH::Vec3(position));
                 pose.rotation = toGlm(rotation);
+            }
+
+            if(hooks) {
+                for(size_t i = 0; i < hooks->after.size(); i++) hooks->after[i].run(fixed_dt);
             }
 
         }

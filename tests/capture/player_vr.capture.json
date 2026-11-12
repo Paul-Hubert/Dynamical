@@ -1,0 +1,10 @@
+{
+  "scene": "player_vr",
+  "input": [
+    { "frame": 20, "button": "left", "down": true, "mouse": [25, 20] },
+    { "frame": 22, "button": "left", "down": false, "mouse": [25, 20] }
+  ],
+  "shots": [
+    { "frame": 300, "name": "player_vr_rest", "camera": { "pos": [1.6, 60.1, 1.2], "look_at": [0, 59.0, -0.6] } }
+  ]
+}

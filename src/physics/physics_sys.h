@@ -7,7 +7,10 @@
 #include <glm/gtc/quaternion.hpp>
 #include <nlohmann/json.hpp>
 
+#include <functional>
 #include <memory>
+#include <utility>
+#include <vector>
 
 namespace dy {
 
@@ -34,6 +37,28 @@ struct FixedStepClock {
 
     // Steps the next Physics tick will take for a frame of dt
     int stepsFor(double dt) const;
+};
+
+// Context variable of base: what systems of the host do at the physics rate (forces, motor targets), called by
+// Physics around each of its fixed steps, in the order the systems registered (their order in the scene). A system
+// adds its step in preinit and takes it away in finish
+struct FixedSteps {
+    struct Step {
+        const void* owner;
+        std::function<void(float h)> run;
+    };
+    std::vector<Step> before;   // before each Jolt step
+    std::vector<Step> after;    // after it, the poses of the step read
+
+    void remove(const void* owner);
+};
+
+FixedSteps& fixedSteps(entt::registry& reg);
+
+// Context variable of base: boxes of the world that need their terrain colliders this frame without a dynamic
+// RigidBody in them (the ground under a player's legs). Filled every frame, emptied by TerrainColliders
+struct TerrainNeeds {
+    std::vector<std::pair<glm::vec3, glm::vec3>> boxes;     // min, max
 };
 
 // Creates the Jolt bodies of new RigidBody components (every tick), removes them with the component. Grounds and

@@ -21,6 +21,8 @@ std::unordered_map<SDL_Scancode, Input::Action> actionMap = {
     {SDL_SCANCODE_LCTRL, Input::DOWN},
     {SDL_SCANCODE_LSHIFT, Input::SPRINT},
     {SDL_SCANCODE_R, Input::VR_RIG},
+    {SDL_SCANCODE_E, Input::INTERACT},
+    {SDL_SCANCODE_LALT, Input::CURSOR},
     {SDL_SCANCODE_M, Input::MENU},
     {SDL_SCANCODE_K, Input::DEBUG},
     {SDL_SCANCODE_BACKSPACE, Input::BACKSPACE},

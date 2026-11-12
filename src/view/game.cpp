@@ -50,10 +50,11 @@ Game::Game(int argc, char** argv) {
     reg.ctx().emplace<RunArgs>(parsed.args);
 
     // Captures and probes: a 960 x 540 window, no headset. Not saved to the config file.
-    // With gpu_times the window keeps the size that was asked for: the passes are timed at that size
+    // With gpu_times the window keeps the size that was asked for: the passes are timed at that size.
+    // With capture_window too: the captures of a video are that large
     if(parsed.args.deterministic()) {
         auto& settings = reg.ctx().get<Settings>();
-        if(!parsed.args.gpu_times) {
+        if(!parsed.args.gpu_times && !parsed.args.capture_window) {
             settings.window_width = 960;
             settings.window_height = 540;
         }

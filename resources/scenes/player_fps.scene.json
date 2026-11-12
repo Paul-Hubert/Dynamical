@@ -1,0 +1,22 @@
+{
+  "format_version": 1,
+  "name": "player_fps",
+  "include": ["common/desktop.json"],
+  "variables": {
+    "props":      { "type": "int", "default": 8, "description": "boxes to pick up in front of the player" }
+  },
+
+  "renderer": { "passes": ["terrain", "grass", "model", "ui"], "vr": false },
+
+  "host": {
+    "pre": [
+      "Input", "UI", "Time", "PlayerControl", "DebugMenu",
+      { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator",
+      { "name": "PlayerSpawn", "params": { "kind": "fps", "position": [0, 0], "props": "${props}" } },
+      "MouseKeyboardInput", "ControllersInput", "LookTurn", "PlayerLegs", "Hold", "BodyDrives", "PlayerModels",
+      "RigidBody", "TerrainColliders", "Physics",
+      "PlayerViewpoint"
+    ],
+    "post": ["Terrain"]
+  }
+}

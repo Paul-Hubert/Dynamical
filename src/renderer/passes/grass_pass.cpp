@@ -40,7 +40,7 @@ struct GrassPC {
     float tile_size;
     float grass_height;
     float patch_size;
-    float patch_amount;
+    float map_top;              // what the height map holds at its highest, as a part of grass_height (GrassTopField::top)
     float noise_frequency;
     float noise_amplitude;
     float wind_strength;
@@ -49,7 +49,7 @@ struct GrassPC {
     int32_t layers;             // and how much the patches of the species overlap, in thousandths, over the low byte
     float layer_spread;
     float layer_patch;
-    float undergrowth;
+    float height_amount;        // how much shorter a kind is where its height noise is lowest
     float colour_variation;
     float dryness;
     float curve;
@@ -59,7 +59,7 @@ struct GrassPC {
     float azimuth_dither;
     float baked_colour;
     float species_size;
-    float species_low;
+    float species_shade;
 };
 
 namespace {
@@ -288,8 +288,8 @@ GrassPass::GrassPass(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
             vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)));
     }
 
-    // Height maps of the chunks : a layer each, filled as the chunks come (update). Texels are on the
-    // terrain vertices, the edges of a map are the edges of its chunk
+    // Height maps of the chunks, the top of their plants (GrassTopField) : a layer each, filled as the
+    // chunks come (update). Texels are on the terrain vertices, the edges of a map are the edges of its chunk
     {
         const uint32_t size = grass_height::size;
         const uint32_t layers = std::min<uint32_t>(TerrainSys::max_slots, ctx.device.physical.getProperties().limits.maxImageArrayLayers);
@@ -393,9 +393,16 @@ void GrassPass::update(uint32_t frame_index) {
     auto* buffers = reg.ctx().find<TerrainBuffers>();
     if(!settings || !buffers) return;
 
-    const uint64_t key = grassHeightKey(settings->grass_params.height_map);
-    if(!heightField || heightField->key() != key) {
-        heightField = std::make_unique<GrassHeightField>(settings->grass_params.height_map);
+    // The top of the plants : the kinds of each place and how tall they grow there, as the shader has them
+    GrassTopParams top;
+    top.species = settings->grass_params.species;
+    top.amount = settings->grass_params.patch_amount;
+    top.forced = rayLayout.forced_kind;
+    top.height_map = settings->grass_params.height_map;
+    for(int k = 0; k < grass_kinds; k++) top.heights[k] = rayLayout.heights[k];
+    const uint64_t key = grassTopKey(top);
+    if(!topField || topField->key() != key) {
+        topField = std::make_unique<GrassTopField>(top);
     }
 
     // A chunk gets its map with its mesh, before it is drawn. After a change of the parameters the maps
@@ -403,7 +410,7 @@ void GrassPass::update(uint32_t frame_index) {
     heightLayers.update(reg, buffers->vertices.size(), key, max_rebakes, [&](uint32_t layer, entt::entity chunk) {
         glm::ivec3 pos = reg.get<ChunkC>(chunk).pos;
         uint8_t texels[grass_height::num_texels];
-        heightField->bake(glm::ivec2(pos.x, pos.z), texels);
+        topField->bake(glm::ivec2(pos.x, pos.z), texels);
         ctx.transfer.updateImage(texels, sizeof(texels), heightImage->image,
             vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, layer, 1), vk::Offset3D(0, 0, 0),
             vk::Extent3D(grass_height::size, grass_height::size, 1), vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -418,21 +425,21 @@ void GrassPass::record(vk::CommandBuffer command, const RenderView& view) {
     auto* settings = creg.ctx().find<RenderSettings>();
     auto* buffers = creg.ctx().find<TerrainBuffers>();
     auto* soil = creg.ctx().find<SoilLayers>();
-    if(!buffers || !settings || !settings->grass) return;
+    if(!buffers || !settings || !settings->grass || !topField) return;
 
     auto& params = settings->grass_params;
     GrassPC pc {
         glm::vec4(params.base_normal, params.follow_terrain), glm::vec4(0.f),
         1.f / (float) chunk::cube_size,
         std::max(params.tile_size, 1e-3f), std::max(params.height, 1e-3f),
-        std::max(params.patch_size, 1e-3f), params.patch_amount,
+        std::max(params.patch_size, 1e-3f), topField->top(),
         params.noise_frequency, params.noise_amplitude,
         params.wind_strength, params.wind_speed,
-        params.top_start, std::clamp(params.layers, 1, 3) | (static_cast<int32_t>(std::clamp(params.species.overlap, 0.f, 1.f) * 1000.f) << 8),
-        params.layer_spread, params.layer_patch, params.undergrowth,
+        params.top_start, std::clamp(params.layers, 1, grass_species::layers) | (static_cast<int32_t>(std::clamp(params.species.overlap, 0.f, 1.f) * 1000.f) << 8),
+        params.layer_spread, params.layer_patch, std::clamp(params.patch_amount, 0.f, 1.f),
         params.colour_variation, params.dryness, params.curve,
         params.shadow, params.canopy, params.silhouette, params.azimuth_dither,
-        params.baked_colour, params.species.size, params.species.low
+        params.baked_colour, params.species.size, params.species.shade
     };
 
     const auto stages = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment;

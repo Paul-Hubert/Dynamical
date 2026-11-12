@@ -6,6 +6,7 @@
 #include "logic/grass/grass_height.h"
 #include "logic/grass/grass_species.h"
 #include "logic/grass/grass_textures.h"
+#include "logic/terrain/chunk.h"
 
 using namespace dy;
 
@@ -250,7 +251,7 @@ TEST_CASE("GRASS.12 the colour map holds what each ray met : green by the height
 
 }
 
-TEST_CASE("GRASS.13 every kind has its patches, they blend into each other, the small plants are where the grass is short") {
+TEST_CASE("GRASS.13 every kind has its patches and its heights from its own noises, the kinds blend, small plants thin under tall grass") {
 
     std::vector<int8_t> noise = bakeSpeciesNoise();
     REQUIRE(noise.size() == size_t(grass_species::size) * grass_species::size * 4);
@@ -263,40 +264,63 @@ TEST_CASE("GRASS.13 every kind has its patches, they blend into each other, the 
     }
     CHECK(jump < 40);
 
-    GrassSpeciesParams params, apart;
+    const int layers = grass_species::layers;
+    const float amount = 0.45f;
+    GrassSpeciesParams params, apart, unshaded;
     apart.overlap = 0.f;
-    GrassHeightField heights;
-    int seen[grass_kinds] = {}, changes = 0, places = 0, thinned = 0, two = 0, whole = 0, ties = 0;
+    unshaded.shade = 0.f;
+    int seen[grass_kinds] = {}, changes = 0, places = 0, thinned = 0, whole = 0, ties = 0;
+    int together[layers + 1] = {};
     float largest_step = 0.f, before_keep = 1.f;
     double steps = 0.;
     int step_count = 0, big_steps = 0;
+    // Small plants first : under tall grass and under short grass, with their shade and without
+    int small_under_tall = 0, small_under_short = 0, plain_under_tall = 0, plain_under_short = 0, under_tall = 0, under_short = 0;
+    float shortest[grass_kinds], tallest[grass_kinds];
+    std::fill(shortest, shortest + grass_kinds, 1.f);
+    std::fill(tallest, tallest + grass_kinds, 0.f);
     GrassKind before = GrassKind::Meadow;
     for(int z = 0; z < 300; z++) {
         for(int x = 0; x < 300; x++) {
             glm::vec2 world(x * 3.f - 450.f, z * 3.f - 450.f);
-            float tallness = heights.sample(world.x, world.y);
-            GrassSpecies here = grassSpeciesAt(noise, params, world, tallness);
-            const bool small = grassKindInfo(here.kinds[0]).small;
-            // Away from the band of heights where they trade places : small plants in the short grass only
-            if(std::abs(tallness - params.low) >= grass_species::band * params.overlap) {
-                REQUIRE(small == (tallness < params.low));
-                REQUIRE(grassKindInfo(here.kinds[1]).small == small);
-                REQUIRE(here.under == (small ? 0.f : 1.f));
-            }
+            GrassSpecies here = grassSpeciesAt(noise, params, world, amount);
+
             // The first kind keeps half of its plants at least, the second half at most, together all of a tile
             REQUIRE(here.keep[0] >= 0.5f);
             REQUIRE(here.keep[0] <= 1.f);
-            if(here.kinds[1] != here.kinds[0]) {
-                REQUIRE(here.keep[1] > 0.f);
-                REQUIRE(here.keep[1] <= 0.5f);
-                REQUIRE(here.keep[0] + here.keep[1] == doctest::Approx(1.f).epsilon(1e-3));
-                two++;
-            } else {
-                REQUIRE(here.keep[1] == here.keep[0]);
+            int kinds = 1;
+            for(int rank = 1; rank < layers; rank++) {
+                if(here.kinds[rank] != here.kinds[0]) {
+                    REQUIRE(here.keep[rank] > 0.f);
+                    REQUIRE(here.keep[rank] <= 0.5f);
+                    // In the order of their noises
+                    if(rank > 1 && here.kinds[rank - 1] != here.kinds[0]) REQUIRE(here.keep[rank] <= here.keep[rank - 1]);
+                    for(int other = 1; other < rank; other++) REQUIRE(here.kinds[other] != here.kinds[rank]);
+                    kinds++;
+                } else {
+                    // The first kind again, no denser than its first layer. No kind after a layer that had none
+                    REQUIRE(here.keep[rank] >= 0.f);
+                    REQUIRE(here.keep[rank] <= here.keep[0]);
+                    for(int after = rank + 1; after < layers; after++) REQUIRE(here.kinds[after] == here.kinds[0]);
+                }
             }
-            if(small) REQUIRE(here.under == 0.f);
+            if(kinds > 1) REQUIRE(here.keep[0] + here.keep[1] <= 1.001f);
+            together[kinds]++;
             thinned += here.keep[0] < 0.999f;
             whole += here.keep[0] >= 0.999f;
+
+            // As tall as its own noise says, between the shortest and the tallest of its kind
+            REQUIRE(here.canopy >= 0.f);
+            REQUIRE(here.canopy <= 1.f);
+            for(int rank = 0; rank < layers; rank++) {
+                // (the last plants of a kind at the edge of its patch are small)
+                REQUIRE(here.tall[rank] >= (1.f - amount) * (here.kinds[rank] == here.kinds[0] ? 1.f : grass_species::stunted) - 1e-5f);
+                REQUIRE(here.tall[rank] <= 1.f);
+                int k = int(here.kinds[rank]);
+                shortest[k] = std::min(shortest[k], here.tall[rank]);
+                tallest[k] = std::max(tallest[k], here.tall[rank]);
+                if(rank > 0 && here.kinds[rank] == here.kinds[0]) REQUIRE(here.tall[rank] == here.tall[0]);
+            }
 
             // No edge : along a row, where the first kind stays the same its plants come and go a few at a time
             if(x > 0 && here.kinds[0] == before) {
@@ -307,13 +331,25 @@ TEST_CASE("GRASS.13 every kind has its patches, they blend into each other, the 
             }
             before_keep = here.keep[0];
 
+            // The shade of the tall grass : the same place without it has the same tall grass over it
+            GrassSpecies plain = grassSpeciesAt(noise, unshaded, world, amount);
+            REQUIRE(plain.canopy == here.canopy);
+            if(here.canopy > 0.65f) {
+                under_tall++;
+                small_under_tall += grassKindInfo(here.kinds[0]).small;
+                plain_under_tall += grassKindInfo(plain.kinds[0]).small;
+            } else if(here.canopy < 0.35f) {
+                under_short++;
+                small_under_short += grassKindInfo(here.kinds[0]).small;
+                plain_under_short += grassKindInfo(plain.kinds[0]).small;
+            }
+
             // Without overlap : one kind at a place, all of its plants
-            GrassSpecies alone = grassSpeciesAt(noise, apart, world, tallness);
+            GrassSpecies alone = grassSpeciesAt(noise, apart, world, amount);
             // (but where two noises are the same to the byte)
             ties += alone.kinds[1] != alone.kinds[0];
-            if(std::abs(tallness - apart.low) > 0.002f) {
-                REQUIRE(grassKindInfo(alone.kinds[0]).small == (tallness < apart.low));
-            }
+            REQUIRE(alone.kinds[0] == here.kinds[0]);
+            if(alone.kinds[1] == alone.kinds[0]) REQUIRE(alone.keep[1] == alone.keep[0]);
 
             seen[int(here.kinds[0])]++;
             changes += x > 0 && here.kinds[0] != before;
@@ -321,37 +357,168 @@ TEST_CASE("GRASS.13 every kind has its patches, they blend into each other, the 
             places++;
         }
     }
-    // Each kind takes some of the land, in patches : neighbours 3 m apart are mostly of the same kind
+    // Each kind takes some of the land, in patches : neighbours 3 m apart are mostly of the same kind.
+    // Each grows short somewhere and tall elsewhere
     for(int k = 0; k < grass_kinds; k++) {
         CAPTURE(grassKindInfo(static_cast<GrassKind>(k)).name);
         CHECK(seen[k] > places / 200);
+        CHECK(shortest[k] < 1.f - 0.8f * amount);
+        CHECK(tallest[k] > 1.f - 0.2f * amount);
     }
     CHECK(changes < places / 4);
 
-    // Blended over a good part of the land, whole patches in between
-    INFO(two << " places of " << places << " with two kinds, " << thinned << " with a first kind thinned, " << whole
+    // Blended over a good part of the land, up to four kinds together, whole patches in between
+    INFO(together[1] << " places of " << places << " with one kind, " << together[2] << " with two, " << together[3] << " with three, " << together[4]
+        << " with four; " << thinned << " with a first kind thinned, " << whole
         << " whole; step of the first kind over 3 m : " << steps / step_count << " on average, " << largest_step << " at most, over a quarter at "
         << big_steps << " places of " << step_count);
-    CHECK(two > places / 5);
+    CHECK(places - together[1] > places / 5);
+    CHECK(together[3] > places / 50);
+    CHECK(together[4] > places / 500);
     CHECK(whole > places / 10);
-    // No edge : a quarter of a metre on, where the first kind is the same, about as many of its plants
-    float sharpest = 0.f;
+
+    // Small plants are first less often under tall grass than under short grass, and than without the shade;
+    // more often under short grass than without it. Never nowhere : some are first under tall grass
+    INFO("small plants first at " << small_under_tall << " of " << under_tall << " places under tall grass (" << plain_under_tall
+        << " without the shade), at " << small_under_short << " of " << under_short << " under short grass (" << plain_under_short << ")");
+    REQUIRE(under_tall > places / 50);
+    REQUIRE(under_short > places / 50);
+    CHECK(small_under_tall * 2 < plain_under_tall);
+    CHECK(small_under_short > plain_under_short + under_short / 10);
+    CHECK(double(small_under_tall) / under_tall < 0.5 * double(small_under_short) / under_short);
+    CHECK(small_under_tall > 0);
+
+    // No edge : a quarter of a metre on, where the first kind is the same, about as many of its plants,
+    // about as tall
+    float sharpest = 0.f, steepest = 0.f;
     for(int row = 0; row < 40; row++) {
         GrassSpecies last;
         for(int x = 0; x < 2000; x++) {
             glm::vec2 world(x * 0.25f - 250.f, row * 23.f - 450.f);
-            GrassSpecies here = grassSpeciesAt(noise, params, world, heights.sample(world.x, world.y));
-            if(x > 0 && here.kinds[0] == last.kinds[0]) sharpest = std::max(sharpest, std::abs(here.keep[0] - last.keep[0]));
+            GrassSpecies here = grassSpeciesAt(noise, params, world, amount);
+            if(x > 0 && here.kinds[0] == last.kinds[0]) {
+                sharpest = std::max(sharpest, std::abs(here.keep[0] - last.keep[0]));
+                steepest = std::max(steepest, std::abs(here.tall[0] - last.tall[0]));
+            }
             last = here;
         }
     }
-    INFO("sharpest step of the first kind over 0.25 m : " << sharpest);
+    INFO("sharpest step of the first kind over 0.25 m : " << sharpest << " of its plants, " << steepest << " of its height");
     CHECK(sharpest < 0.15f);
+    CHECK(steepest < 0.02f);
     CHECK(ties < places / 1000);
+
+    // One kind everywhere : all of its plants, as tall as its own noise says
+    GrassSpecies forced = grassSpeciesAt(noise, params, glm::vec2(12.f, 7.f), amount, int(GrassKind::Clover));
+    for(int rank = 0; rank < layers; rank++) {
+        CHECK(forced.kinds[rank] == GrassKind::Clover);
+        CHECK(forced.keep[rank] == 1.f);
+        CHECK(forced.tall[rank] == forced.tall[0]);
+    }
 
     // No patches : the meadow
     params.size = 0.f;
-    CHECK(grassSpeciesAt(noise, params, glm::vec2(12.f, 7.f), 0.f).kinds[0] == GrassKind::Meadow);
+    CHECK(grassSpeciesAt(noise, params, glm::vec2(12.f, 7.f), amount).kinds[0] == GrassKind::Meadow);
+    CHECK(grassSpeciesAt(noise, params, glm::vec2(12.f, 7.f), amount).tall[0] == 1.f);
+
+}
+
+TEST_CASE("GRASS.15 the shell of the grass is at the top of the plants of each place : never under them, low over the small ones") {
+
+    GrassTopParams params;
+    // Tall grasses, and small plants a fifth as high
+    for(int k = 0; k < grass_kinds; k++) params.heights[k] = grassKindInfo(static_cast<GrassKind>(k)).small ? 0.2f : 0.7f + 0.03f * k;
+    params.heights[0] = 1.f;
+    GrassTopField field(params);
+    CHECK(field.top() == 1.f);
+    CHECK(field.key() == GrassTopField(params).key());
+
+    const glm::ivec2 chunk(1, -2);
+    const glm::vec2 origin = glm::vec2(chunk) * (float) chunk::length;
+    std::vector<uint8_t> map = field.bake(chunk);
+    REQUIRE(map.size() == grass_height::num_texels);
+    CHECK(map == GrassTopField(params).bake(chunk));
+
+    // The plants of a place are what the species say, the tallest of them
+    std::vector<int8_t> noise = bakeSpeciesNoise();
+    Random random;
+    for(int i = 0; i < 200; i++) {
+        glm::vec2 world = origin + glm::vec2(random.next(), random.next()) * (float) chunk::length;
+        GrassSpecies here = grassSpeciesAt(noise, params.species, world, params.amount);
+        float top = 0.f;
+        for(int rank = 0; rank < grass_species::layers; rank++) top = std::max(top, here.tall[rank] * params.heights[int(here.kinds[rank])]);
+        REQUIRE(field.sample(world) == top);
+    }
+
+    // The shell goes straight between the vertices : over the plants of the chunk, not far over them, and the
+    // few that are over it are by little (they are drawn as tall as the shell)
+    double over = 0.;
+    float under = 0.f, lowest = 1.f, highest = 0.f;
+    int count = 0;
+    for(int i = 0; i < 20000; i++) {
+        glm::vec2 local = glm::vec2(random.next(), random.next()) * (float) chunk::length;
+        float shell = sampleGrassHeightMap(map.data(), local) * field.top();
+        float plants = field.sample(origin + local);
+        under = std::max(under, plants - shell);
+        over += shell - plants;
+        lowest = std::min(lowest, shell);
+        highest = std::max(highest, shell);
+        count++;
+    }
+    INFO("the shell is " << over / count << " over the plants on average, " << under << " under them at worst; from " << lowest << " to " << highest);
+    CHECK(under < 0.08f);
+    CHECK(over / count < 0.12);
+    // Low over the small plants where they grow alone, high over tall grass
+    CHECK(lowest < 0.25f);
+    CHECK(highest > 0.85f);
+
+    // The same on the edge two chunks share
+    std::vector<uint8_t> east = field.bake(chunk + glm::ivec2(1, 0)), south = field.bake(chunk + glm::ivec2(0, 1));
+    const int size = grass_height::size;
+    for(int i = 0; i < size; i++) {
+        REQUIRE(map[(size_t) i * size + size - 1] == east[(size_t) i * size]);
+        REQUIRE(map[(size_t) (size - 1) * size + i] == south[i]);
+    }
+
+    // Other plants, another map
+    GrassTopParams other = params;
+    other.species.shade = 0.f;
+    CHECK(grassTopKey(other) != grassTopKey(params));
+    other = params;
+    other.amount = 0.2f;
+    CHECK(grassTopKey(other) != grassTopKey(params));
+    CHECK(GrassTopField(other).bake(chunk) != map);
+
+    // One kind everywhere : the shell at its height, as its noise says
+    GrassTopParams clover = params;
+    clover.forced = int(GrassKind::Clover);
+    GrassTopField clover_field(clover);
+    CHECK(clover_field.top() == doctest::Approx(0.2f));
+    CHECK(grassTopKey(clover) != grassTopKey(params));
+    for(int i = 0; i < 50; i++) {
+        glm::vec2 world = origin + glm::vec2(random.next(), random.next()) * (float) chunk::length;
+        float top = clover_field.sample(world);
+        REQUIRE(top >= 0.2f * (1.f - clover.amount) - 1e-5f);     // all of its plants : none is small
+        REQUIRE(top <= 0.2f);
+    }
+
+    // Without the species : the meadow, as tall as its height map
+    GrassTopParams meadow = params;
+    meadow.species.size = 0.f;
+    GrassTopField meadow_field(meadow);
+    std::vector<uint8_t> meadow_map = meadow_field.bake(chunk);
+    std::vector<uint8_t> heights = GrassHeightField(meadow.height_map).bake(chunk);
+    for(size_t i = 0; i < grass_height::num_texels; i += 97) {
+        float expected = 1.f - meadow.amount * (1.f - heights[i] / 255.f);
+        REQUIRE(std::abs(meadow_map[i] / 255.f - expected) < 1.5f / 255.f);
+    }
+    // The height map only counts there
+    GrassTopParams waved = meadow;
+    waved.height_map.wavelength = 50.f;
+    CHECK(grassTopKey(waved) != grassTopKey(meadow));
+    waved = params;
+    waved.height_map.wavelength = 50.f;
+    CHECK(grassTopKey(waved) == grassTopKey(params));
 
 }
 

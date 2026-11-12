@@ -1,0 +1,41 @@
+{
+  "format_version": 1,
+  "name": "player_horse",
+  "include": ["common/desktop.json"],
+  "variables": {
+    "mount":       { "type": "string", "default": "horse", "description": "the species that can be ridden: the ones standing at the spawn, and those of the herds" },
+    "mounts":      { "type": "int",    "default": 3,   "description": "animals of it standing at the spawn" },
+    "props":       { "type": "int",    "default": 0,   "description": "boxes to pick up in front of the player" },
+    "third_person": { "type": "float", "default": 0,   "description": "metres : the camera this far behind the player's eyes, 0 at them" },
+    "forest":      { "type": "string", "default": "forest/tautavel.forest.json", "description": "stands, layers and species (docs/forest.md)" },
+    "forest_seed": { "type": "int",    "default": 1,   "description": "places the forests and their plants" },
+    "patch_size":  { "type": "float",  "default": 320, "description": "metres : size of the forests and of the open land between them" },
+    "coverage":    { "type": "float",  "default": 0.5, "description": "part of the gentle land under forest" },
+    "max_slope":   { "type": "float",  "default": 24,  "description": "degrees : slope of the land no forest grows on" },
+    "herds":       { "type": "string", "default": "herds/tautavel.herds.json", "description": "kinds of herds and their animals (docs/animals.md)" },
+    "herd_seed":   { "type": "int",    "default": 1,   "description": "places the herds" },
+    "herd_cell":   { "type": "float",  "default": 170, "description": "metres : one herd at most per cell of this size" },
+    "herd_density": { "type": "float", "default": 0.75, "description": "part of the cells that have a herd" }
+  },
+
+  "renderer": { "passes": ["terrain", "grass", "vegetation", "animals", "model", "ui"], "vr": false },
+
+  "host": {
+    "pre": [
+      "Input", "UI", "Time", "PlayerControl", "DebugMenu",
+      { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator",
+      { "name": "Forest", "params": { "definition": "${forest}", "seed": "${forest_seed}", "patch_size": "${patch_size}", "coverage": "${coverage}", "max_slope": "${max_slope}" } },
+      { "name": "Herds", "params": { "definition": "${herds}", "seed": "${herd_seed}", "cell": "${herd_cell}", "density": "${herd_density}" } },
+      { "name": "PlayerSpawn", "params": { "kind": "fps", "position": [0, 0], "props": "${props}", "third_person": "${third_person}" } },
+      { "name": "MountSpawn", "params": { "species": "${mount}", "count": "${mounts}", "position": [-3, -5], "spacing": 3 } },
+      "MouseKeyboardInput", "ControllersInput", "LookTurn",
+      "Mounting", "MountSteering", "SteeredWalk",
+      "AnimalAnimation", "AnimalGait",
+      { "name": "Mountables", "params": { "species": "${mount}" } },
+      "PlayerLegs", "RiderSeat", "Hold", "BodyDrives", "PlayerModels",
+      "RigidBody", "TerrainColliders", "Physics",
+      "PlayerViewpoint"
+    ],
+    "post": ["Terrain"]
+  }
+}

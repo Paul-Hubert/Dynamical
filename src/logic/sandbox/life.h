@@ -115,6 +115,9 @@ public:
     // Height now and full height at a point, m (0 outside the arena and on bare ground)
     float height(float x, float z) const;
     float full(float x, float z) const;
+    // m from the point to the nearest cell whose grass stands over `over` (to its centre; 0 in such a cell), looked
+    // for within `radius`; < 0 when there is none
+    float nearest(float x, float z, float over, float radius) const;
     // Eats up to `amount` m of height from the cell of the point; what was eaten
     float eat(float x, float z, float amount);
     void grow(float seconds);

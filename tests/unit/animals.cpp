@@ -11,7 +11,9 @@
 
 #include "logic/animals/animal.h"
 #include "logic/animals/herd.h"
+#include "logic/animals/steer.h"
 #include "logic/components/transform.h"
+#include "logic/player/mount.h"
 
 using namespace dy;
 
@@ -285,6 +287,92 @@ TEST_CASE("HERD.1 herds are the same for a seed, stand on the ground, walk no fa
     bool same = a.size() == c.size();
     for(size_t i = 0; same && i < a.size(); i++) same = glm::distance(a[i], c[i]) < 1e-3f;
     CHECK_FALSE(same);
+
+}
+
+TEST_CASE("HERD.2 a herd lets go of an animal that is steered, takes it back when it is not, and leaves it behind when the herd goes") {
+
+    const nlohmann::json definition = {
+        { "cell", 60 }, { "density", 1.0 }, { "radius", 100 }, { "range", 40 }, { "graze", { 1, 2 } },
+        { "herds", { { { "name", "worms" }, { "count", { 5, 8 } }, { "spacing", 3 }, { "members", { { "worm", 1 } } } } } } };
+
+    entt::registry reg;
+    auto& library = reg.ctx().emplace<AnimalLibrary>();
+    REQUIRE(library.load(writeLibrary("animals_steer")));
+    HerdSys herds(reg, { { "definition", definition }, { "seed", 3 }, { "centre", { 0, 0 } } });
+    SteeredWalkSys steered(reg, nlohmann::json::object());
+    AnimalAnimationSys animation(reg);
+    MountablesSys mountables(reg, { { "species", { "worm" } } });
+    herds.preinit();
+    steered.preinit();
+    animation.preinit();
+    mountables.preinit();
+    herds.init();
+    steered.init();
+    auto frames = [&](int n) {
+        for(int i = 0; i < n; i++) {
+            herds.tick(1. / 60.);
+            steered.tick(1. / 60.);
+            animation.tick(1. / 60.);
+            mountables.tick(1. / 60.);
+        }
+    };
+    frames(60);
+
+    auto members = reg.view<HerdAnimal>();
+    REQUIRE(members.begin() != members.end());
+    const entt::entity one = *members.begin();
+
+    // Animals of the species asked for can be ridden: a saddle on their skin, the speeds of their clips
+    REQUIRE(reg.all_of<Mountable>(one));
+    {
+        const auto& mountable = reg.get<Mountable>(one);
+        MESSAGE("saddle " << mountable.saddle.x << " " << mountable.saddle.y << " " << mountable.saddle.z << ", joint " << mountable.joint
+            << ", walks " << mountable.walk_speed << " m/s, runs " << mountable.run_speed);
+        CHECK(mountable.walk_speed == doctest::Approx(2.f));
+        CHECK(mountable.run_speed > mountable.walk_speed);
+        CHECK((mountable.collider == entt::null));      // nobody around to bump into it
+        // On the joint that carries it, the saddle is where it is in the model
+        glm::vec3 seat = saddleOf(reg, one);
+        const auto& transform = reg.get<Transform>(one);
+        glm::vec3 fixed = transform.position + transform.rotation * (mountable.saddle * transform.scale);
+        CHECK(glm::distance(seat, fixed) < 0.5f);
+    }
+
+    // Steered toward +x: it goes there, whatever its herd does
+    const glm::vec3 from = reg.get<Transform>(one).position;
+    auto& steer = reg.emplace<AnimalSteer>(one);
+    steer.yaw = glm::radians(-90.f);
+    steer.speed = 0.8f;
+    frames(600);
+    glm::vec3 to = reg.get<Transform>(one).position;
+    MESSAGE("steered from " << from.x << " " << from.z << " to " << to.x << " " << to.z);
+    CHECK(to.x - from.x > 6.f);
+    CHECK(std::abs(headingOf(reg.get<Transform>(one).rotation) - glm::radians(-90.f)) < glm::radians(3.f));
+    CHECK(reg.all_of<SteeredWalk>(one));
+    CHECK(reg.get<HerdAnimal>(one).speed == 0.f);
+    CHECK(reg.get<Animal>(one).clip == 0);      // its walk
+
+    // Let go: it halts, then its herd has it walk again
+    reg.remove<AnimalSteer>(one);
+    frames(300);
+    CHECK(!reg.all_of<SteeredWalk>(one));
+    const glm::vec3 halted = reg.get<Transform>(one).position;
+    bool walked = false;
+    for(int i = 0; i < 1200; i++) {
+        frames(1);
+        walked = walked || reg.get<HerdAnimal>(one).moving;
+    }
+    CHECK(walked);
+    CHECK(glm::distance(reg.get<Transform>(one).position, halted) > 2.f);
+
+    // Its herd goes while someone has it: it stays, nobody's
+    reg.emplace<AnimalSteer>(one);
+    herds.finish();
+    CHECK(reg.valid(one));
+    CHECK(!reg.all_of<HerdAnimal>(one));
+    CHECK(reg.view<HerdAnimal>().empty());
+    mountables.finish();
 
 }
 

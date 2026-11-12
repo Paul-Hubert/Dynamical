@@ -33,6 +33,10 @@ struct RunArgs {
     // 300 frames. The window presents without waiting for the monitor
     bool gpu_times = false;
 
+    // dynamical: captures are as large as the window that was asked for (window_width, window_height : the
+    // videos), instead of the 960 x 540 of the goldens
+    bool capture_window = false;
+
     // dynamical: false draws without the ray traced lighting on a GPU that has it (docs/lighting.md)
     bool ray_tracing = true;
     // dynamical: the tier of the ray traced lighting of both targets (off, low, medium, high), empty : the defaults

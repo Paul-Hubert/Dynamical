@@ -223,9 +223,11 @@ def main():
                 action["checkpoint_interval"] = min(action["checkpoint_interval"], steps)
                 if args.minds_from and not from_previous:
                     checkpoint = results / args.minds_from / f"Action_{s}" / "checkpoint.pt"
-                    if not checkpoint.exists():
-                        sys.exit(f"no mind checkpoint {checkpoint}")
-                    action["init_path"] = checkpoint.as_posix()
+                    if checkpoint.exists():
+                        action["init_path"] = checkpoint.as_posix()
+                    else:
+                        # A species that run did not have (men, in a round of deer and wolves): from scratch
+                        tw.log(out, f"no mind of {s} in {args.minds_from}: it starts from scratch")
                 behaviors[f"Action_{s}"] = action
                 if args.puppet:
                     continue

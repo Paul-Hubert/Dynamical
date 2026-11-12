@@ -1,0 +1,31 @@
+{
+  "scene": "player_deer",
+  "hide_ui": true,
+  "vars": { "third_person": 4 },
+  "input": [
+    { "frame": 110, "motion": [145, 0] },
+    { "frame": 121, "key": "W", "down": true },
+    { "frame": 240, "key": "W", "down": false },
+    { "frame": 250, "key": "Space", "down": true },
+    { "frame": 252, "key": "Space", "down": false },
+    { "frame": 351, "key": "W", "down": true },
+    { "frame": 520, "motion": [-420, 60] },
+    { "frame": 741, "key": "W", "down": false },
+    { "frame": 741, "key": "A", "down": true },
+    { "frame": 921, "key": "Left Shift", "down": true },
+    { "frame": 1221, "key": "A", "down": false },
+    { "frame": 1221, "key": "Left Shift", "down": false },
+    { "frame": 1400, "key": "Space", "down": true },
+    { "frame": 1402, "key": "Space", "down": false }
+  ],
+  "shots": [
+    { "frame": 120, "name": "player_deer_spawn" },
+    { "frame": 248, "name": "player_deer_touch" },
+    { "frame": 350, "name": "player_deer_mounted" },
+    { "frame": 740, "name": "player_deer_walk" },
+    { "frame": 920, "name": "player_deer_walk_side" },
+    { "frame": 1220, "name": "player_deer_run_side" },
+    { "frame": 1398, "name": "player_deer_halt" },
+    { "frame": 1500, "name": "player_deer_off" }
+  ]
+}

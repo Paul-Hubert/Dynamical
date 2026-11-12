@@ -284,7 +284,7 @@ const std::vector<std::string>& dy::sandboxSignalNames() {
         "energy", "health", "age", "adult", "male", "pregnant", "energy_gain", "energy_spent", "damage_taken", "damage_dealt", "kills", "births", "falls",
         "speed", "mode_move", "mode_feed", "mode_attack", "mode_mate", "mode_rest", "feeding", "grass_here", "muzzle_height", "predator_distance",
         "prey_distance", "mate_distance", "carcass_distance", "herd_distance", "herd_count", "since_fed", "dt", "grass_near", "conceptions", "lived",
-        "predator_closing", "prey_closing", "mate_closing", "carcass_closing", "mating" };
+        "predator_closing", "prey_closing", "mate_closing", "carcass_closing", "mating", "grass_distance", "grass_closing" };
     return names;
 }
 
@@ -467,10 +467,15 @@ void dy::sandboxSignals(entt::registry& reg, entt::entity e, float seconds, floa
     out[S::conceptions] = (float) a.window.conceptions;
     out[S::lived] = a.lived;
     out[S::mating] = std::min(a.mating / std::max(species.life.mate_time * scale, 1e-3f), 1.f);
-    const float now[4] = { predator, prey, mate, carcass };
-    for(int k = 0; k < 4; k++) {
+    // Grass worth grazing: over 0.1 m, as the deer's reward files have it
+    float grass = sb.grass.nearest(here.x, here.z, 0.1f, 40.f);
+    if(grass < 0.f) grass = far_away;
+    out[S::grass_distance] = grass;
+    const float now[5] = { predator, prey, mate, carcass, grass };
+    const int closing[5] = { S::predator_closing, S::prey_closing, S::mate_closing, S::carcass_closing, S::grass_closing };
+    for(int k = 0; k < 5; k++) {
         const bool has = now[k] < far_away;
-        out[S::predator_closing + k] = has && a.nearest[k] >= 0.f ? std::clamp(a.nearest[k] - now[k], -3.f, 3.f) : 0.f;
+        out[closing[k]] = has && a.nearest[k] >= 0.f ? std::clamp(a.nearest[k] - now[k], -3.f, 3.f) : 0.f;
         a.nearest[k] = has ? now[k] : -1.f;
     }
 

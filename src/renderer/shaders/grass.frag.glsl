@@ -19,12 +19,14 @@
 // middle too : what the lookup gets wrong is shared between the top and the bottom of the grass instead of
 // growing all the way down.
 //
-// The grass is several layers : the same tile turned, shifted, scaled and bent differently (docs/grass/plan.md).
+// The grass is several layers : the same tile turned, shifted, scaled and bent differently (docs/grass/plan.md),
+// each of the kind of plant that grows there, as tall as that kind is there (species, docs/grass/15-species.md).
 
 layout(location = 0) in vec3 v_position;
 layout(location = 1) in vec3 v_normal;
 layout(location = 2) in float v_height;     // of the grass here : the shell is that much above the ground
 layout(location = 3) in vec3 v_curve;       // how the ground bends : second derivatives of its height, xx, xz, zz
+layout(location = 4) in float v_cover;      // 1 where the grass grows whole, less where the slope or the soil ends it
 
 // The hit is never in front of the shell : keeps the early depth test
 layout(depth_greater) out float gl_FragDepth;
@@ -36,16 +38,16 @@ layout(push_constant) uniform Args {
     float tile_size;
     float grass_height;
     float patch_size;
-    float patch_amount;
+    float map_top;          // of the height map (grass.vert.glsl)
     float noise_frequency;
     float noise_amplitude;
     float wind_strength;
     float wind_speed;
     float top_start;
-    int layer_bits;         // tall layers in the low byte, how much the patches of the species overlap over it (thousandths)
+    int layer_bits;         // layers in the low byte, how much the patches of the species overlap over it (thousandths)
     float layer_spread;
     float layer_patch;
-    float undergrowth;
+    float height_amount;    // how much shorter a kind is where its height noise is lowest
     float colour_variation;
     float dryness;
     float curve;
@@ -55,7 +57,7 @@ layout(push_constant) uniform Args {
     float azimuth_dither;
     float baked_colour;
     float species_size;
-    float species_low;
+    float species_shade;
 };
 
 layout(set = 1, binding = 0) uniform sampler2DArray u_oblique;
@@ -70,10 +72,13 @@ layout(set = 1, binding = 9) uniform sampler2DArray u_top_colour;
 layout(set = 1, binding = 10) uniform sampler2D u_species;
 
 // How much the patches of the kinds of plants overlap, 0 to 1 (GrassSpeciesParams::overlap) : the kinds within
-// species_margin of the best noise grow together, small and tall plants over species_band of the heights
+// species_margin of the best noise grow together (logic/grass/grass_species.h has the same constants)
 #define species_overlap (float(layer_bits >> 8) / 1000.0)
 const float species_margin = 1.0;
-const float species_band = 0.45;
+const float species_canopy_width = 0.5;
+const float species_height_contrast = 0.7;
+const float species_stunted = 0.15;
+const float species_fade = 0.25;
 
 // The view, the lights, the shade of the plants (treeShade), outColor
 #include "include/scene.glsl"
@@ -126,7 +131,7 @@ layout(constant_id = 32) const float kind_abundance_6 = 0.0;
 layout(constant_id = 33) const float kind_abundance_7 = 0.0;
 layout(constant_id = 34) const float kind_abundance_8 = 0.0;
 layout(constant_id = 35) const float kind_abundance_9 = 0.0;
-layout(constant_id = 36) const int small_mask = 0;      // a bit per kind : small plants, where the grass is short
+layout(constant_id = 36) const int small_mask = 0;      // a bit per kind : small plants, fewer in the shade of tall grass
 layout(constant_id = 37) const int forced_kind = -1;    // that kind everywhere
 
 float kindTile(int kind) {
@@ -150,13 +155,13 @@ int ray_kind = 0;
 const int elevations = 4;
 const float elevation_step = pi / 8.0;
 
-// Up to three tall layers, and the undergrowth in the last place : short and dense.
+// Up to four layers, the kinds that grow at the place from the one there is most of.
 // Tiles of different sizes only repeat together very far
 // Mips are means of blades : thin ones fade before they are too small to see. Sharper, a little aliased
 const float mip_bias = -0.8;
 
 const int max_layers = 4;
-const float layer_scales[max_layers] = float[](1.0, 1.37, 1.73, 0.55);
+const float layer_scales[max_layers] = float[](1.0, 1.37, 1.73, 1.19);
 const float warp_frequencies[max_layers] = float[](1.0, 1.37, 0.73, 1.61);
 
 
@@ -179,9 +184,19 @@ vec2 soilWarp(vec2 ground) {
 // it follows the triangles (the grass of a hillside ended on polygons 4 m wide). A noise of a few metres
 // winds the line, and the blades go one by one over it, as they do into a patch of soil. The same in
 // terrain.frag.glsl
+float slopeWinding(vec2 ground) {
+    return 0.1 * (0.6 * shadeNoise(ground * 0.19 + 7.3) + 0.4 * shadeNoise(ground * 0.61 + 41.9) - 0.5);
+}
+
 float slopeGrass(vec2 ground, float up) {
-    float winding = 0.6 * shadeNoise(ground * 0.19 + 7.3) + 0.4 * shadeNoise(ground * 0.61 + 41.9) - 0.5;
-    return smoothstep(0.71, 0.8, up + 0.1 * winding);
+    return smoothstep(0.71, 0.8, up + slopeWinding(ground));
+}
+
+// How tall the grass grows on a slope : whole on level ground, shorter as the ground gets steeper, a
+// quarter where the last blades are. Per pixel, on the same wound normal : the shell (grass.vert.glsl,
+// the same curve) lowers with it and stays a little over it
+float slopeTall(float up) {
+    return mix(0.25, 1.0, smoothstep(0.74, 0.88, up));
 }
 
 // Mud, stones and sand at a point of the ground of this chunk, from its soil map. a : height of the grass
@@ -359,68 +374,107 @@ float sunShadow(vec2 point, float height, vec2 heading, float reach, float lod) 
 
 }
 
-// Which kinds of plants grow at a root, and how many of each (logic/grass/grass_species.h, grassSpeciesAt).
-// Each kind has its own noise in octaves, a channel of a texture that repeats, read at three scales. The
-// three kinds whose noises are the highest are the tall layers. Patches have no edge : a kind is as dense
-// as its noise is over the next one's, from every plant of its tile half a blend width inside its patch to
-// none as far outside (keep : the part of the plants that stay, the first ones of their tile's order, which
+// Which kinds of plants grow at a root, how many of each and how tall (logic/grass/grass_species.h,
+// grassSpeciesAt). Each kind has two noises in octaves, channels of a texture that repeats, read at three
+// scales each : how much of it there is, and how tall it grows.
+// The four kinds whose first noises are the highest are the layers. Patches have no edge : a kind is as dense
+// as its noise is close to the best one's, from every plant of its tile half a blend width inside its patch
+// to none as far outside (keep : the part of the plants that stay, the first ones of their tile's order, which
 // are spread evenly). Where two patches meet each has half of its plants.
-// Small kinds grow where the grass is short (tallness : 0 its shortest, 1 its tallest), tall ones where it
-// is not : the height of the grass adds to the noise of ones and takes from the others' over a band
-// around species_low, they blend like any two kinds.
-// under : part of the short meadow grass that stays under the tall kinds, none under the small plants
-void species(vec2 root, float tallness, out ivec3 kind, out vec3 keep, out float under) {
-    if(forced_kind >= 0 || species_size <= 0.0) {
-        kind = ivec3(max(forced_kind, 0));
-        keep = vec3(1.0);
-        under = ((small_mask >> kind.x) & 1) != 0 ? 0.0 : 1.0;
+// tall : height of each layer as a part of its kind's, from the second noise of the kind; the last plants of
+// a kind at the edge of its patch are small.
+// Small kinds have less of their noise where the tall kinds of the place grow tall (their shade), more where
+// they stay short : never none, a small kind whose noise is high enough grows under tall grass.
+// The shell is at the top of the tallest of those kinds : GrassTopField bakes the same choice in the height
+// map of the chunk
+float speciesGrown(vec4 high[3], int k) {
+    return clamp(0.5 + species_height_contrast * high[k / 4][k % 4], 0.0, 1.0);
+}
+
+void species(vec2 root, out ivec4 kind, out vec4 keep, out vec4 tall) {
+    kind = ivec4(max(forced_kind, 0));
+    keep = vec4(1.0);
+    tall = vec4(1.0);
+    // No patches : the meadow, as tall as the shell
+    if(species_size <= 0.0) {
         return;
     }
-    // How much the place is for the tall kinds, -1 to 1 over the band
-    float band = max(species_band * species_overlap, 1e-3);
-    // Gently over the middle of the band, where the noises still decide : the two groups blend like two kinds.
-    // For good on its sides
-    float width = max(species_margin * species_overlap, 1e-6);
-    float across = (tallness - species_low) / band;
-    float tall = width * clamp(across, -0.5, 0.5) + 2.0 * (clamp(across - 0.5, 0.0, 0.5) - clamp(-across - 0.5, 0.0, 0.5));
-
     vec2 at = root / (species_size * 4.0);
-    vec4 read[3] = vec4[](
+    vec4 high[3] = vec4[](
+        textureLod(u_species, at * 0.53 + vec2(0.43, 0.19), 0.0),
+        textureLod(u_species, at * 0.61 + vec2(0.77, 0.52), 0.0),
+        textureLod(u_species, at * 0.47 + vec2(0.11, 0.83), 0.0));
+    if(forced_kind >= 0) {
+        tall = vec4(1.0 - height_amount * (1.0 - speciesGrown(high, forced_kind)));
+        return;
+    }
+    vec4 much[3] = vec4[](
         textureLod(u_species, at, 0.0),
         textureLod(u_species, at * 1.37 + vec2(0.31, 0.67), 0.0),
         textureLod(u_species, at * 0.73 + vec2(0.59, 0.13), 0.0));
-    kind = ivec3(-1);
-    vec3 best = vec3(-1e9);
-    float best_small = -1e9, best_tall = -1e9;
+
+    // How tall the tall kinds of the place grow : those whose noise is close to the best tall one's
+    float value[kinds];
+    float best_tall = -1e9;
     for(int k = 0; k < kinds; k++) {
-        bool small = ((small_mask >> k) & 1) != 0;
-        float value = read[k / 4][k % 4] + kindAbundance(k) + (small ? -tall : tall);
-        if(small) best_small = max(best_small, value);
-        else best_tall = max(best_tall, value);
-        if(value > best.x) {
-            best = vec3(value, best.xy);
-            kind = ivec3(k, kind.xy);
-        } else if(value > best.y) {
-            best.yz = vec2(value, best.y);
-            kind.yz = ivec2(k, kind.y);
-        } else if(value > best.z) {
-            best.z = value;
-            kind.z = k;
+        value[k] = much[k / 4][k % 4] + kindAbundance(k);
+        if(((small_mask >> k) & 1) == 0) best_tall = max(best_tall, value[k]);
+    }
+    float canopy = 0.0, weights = 0.0;
+    for(int k = 0; k < kinds; k++) {
+        if(((small_mask >> k) & 1) != 0) continue;
+        float weight = clamp(1.0 + (value[k] - best_tall) / species_canopy_width, 0.0, 1.0);
+        canopy += weight * speciesGrown(high, k);
+        weights += weight;
+    }
+    float shade = species_shade * (1.0 - 2.0 * (weights > 0.0 ? canopy / weights : 0.5));
+
+    kind = ivec4(-1);
+    vec4 best = vec4(-1e9);
+    float fifth = -1e9;     // the best of the kinds that are not a layer
+    for(int k = 0; k < kinds; k++) {
+        float v = value[k] + (((small_mask >> k) & 1) != 0 ? shade : 0.0);
+        if(v > best.x) {
+            fifth = best.w;
+            best = vec4(v, best.xyz);
+            kind = ivec4(k, kind.xyz);
+        } else if(v > best.y) {
+            fifth = best.w;
+            best.yzw = vec3(v, best.yz);
+            kind.yzw = ivec3(k, kind.yz);
+        } else if(v > best.z) {
+            fifth = best.w;
+            best.zw = vec2(v, best.z);
+            kind.zw = ivec2(k, kind.z);
+        } else if(v > best.w) {
+            fifth = best.w;
+            best.w = v;
+            kind.w = k;
+        } else {
+            fifth = max(fifth, v);
         }
     }
     // The first kind against the second, the others against the first
-    keep = clamp(0.5 + vec3(best.x - best.y, best.y - best.x, best.z - best.x) / width, 0.0, 1.0);
-    // Where no other kind is close the layers are all of the first one, as dense
-    if(kind.y < 0 || keep.y <= 0.0) {
-        kind.y = kind.x;
-        keep.y = keep.x;
+    float width = max(species_margin * species_overlap, 1e-6);
+    keep.x = clamp(0.5 + (best.x - best.y) / width, 0.0, 1.0);
+    tall.x = 1.0 - height_amount * (1.0 - speciesGrown(high, kind.x));
+    for(int rank = 1; rank < 4; rank++) {
+        float against = 0.5 + (best[rank] - best.x) / width;
+        // No plant left where the next kind takes its place among the layers
+        float leaving = (best[rank] - fifth) / (species_fade * width);
+        float own = kind[rank] < 0 ? 0.0 : clamp(min(against, leaving), 0.0, 1.0);
+        if(own > 0.0) {
+            keep[rank] = own;
+            // The last plants of a kind at the edge of its patch are small
+            tall[rank] = (1.0 - height_amount * (1.0 - speciesGrown(high, kind[rank]))) * mix(species_stunted, 1.0, smoothstep(0.0, 0.5, own));
+        } else {
+            // Where no other kind is close the layers are all of the first one : none of it where the kind of
+            // the layer has just gone, as dense as the first layer half a blend width further
+            kind[rank] = kind.x;
+            keep[rank] = keep.x * clamp(-2.0 * against, 0.0, 1.0);
+            tall[rank] = tall.x;
+        }
     }
-    if(kind.z < 0 || keep.z <= 0.0) {
-        kind.z = kind.x;
-        keep.z = keep.x;
-    }
-    bool first_small = ((small_mask >> kind.x) & 1) != 0;
-    under = first_small ? 0.0 : clamp(0.5 + (best_tall - best_small) / width, 0.0, 1.0);
 }
 
 // Id of the plant a layer met (hitTexel) : its rank in the order of its tile, 0 the first plant to 1 the last
@@ -507,46 +561,39 @@ void main() {
     vec3 hit_noise = vec3(0);
     float hit_tile = tile_size;
     float hit_layer_height = v_height;
-    bool hit_undergrowth = false;
     int hit_kind = 0;
+    float tallest = 0.0;        // of the layers of the place
 
-    // The plants of the place : small ones where the grass is short, in patches of each kind
-    ivec3 kinds_here;
-    vec3 kinds_keep;
-    float under_keep;
-    // The height of the grass is the same along straight lines between the vertices of the terrain : a noise
-    // of a few metres winds the line where small and tall plants meet
-    float tallness = (v_height / grass_height - (1.0 - patch_amount)) / max(patch_amount, 1e-3)
-        + 0.25 * textureLod(u_noise, patch_root / 37.0 + vec2(0.71, 0.29), 0.0).y;
-    species(patch_root, tallness, kinds_here, kinds_keep, under_keep);
+    // The plants of the place : the kinds there is most of, how many of each and how tall
+    ivec4 kinds_here;
+    vec4 kinds_keep, kinds_tall;
+    species(patch_root, kinds_here, kinds_keep, kinds_tall);
     bool hit_bare = false;      // the plant that was met is not there : the ground of its layer
-    int layers = layer_bits & 255;
 
-    int count = layers + (undergrowth > 0.0 ? 1 : 0);
+    // Shorter on the slopes, every kind alike
+    float slope_tall = slopeTall(ground_normal.y + slopeWinding(patch_root));
+
+    int count = clamp(layer_bits & 255, 1, max_layers);
     for(int n = 0; n < count; n++) {
 
-        bool is_undergrowth = n == layers;
-        int i = is_undergrowth ? max_layers - 1 : n;
-        // The undergrowth is short meadow grass under the tall kinds, nothing under the small plants.
+        int i = n;
         // keep : the part of the plants of the layer that are there (species)
-        float keep = is_undergrowth ? under_keep : kinds_keep[min(n, 2)];
+        float keep = kinds_keep[n];
         if(keep <= 0.0) {
             continue;
         }
-        int kind = is_undergrowth ? max(forced_kind, 0) : kinds_here[min(n, 2)];
-        float tile = tile_size * kindTile(kind) * mix(1.0, layer_scales[i], is_undergrowth ? 1.0 : layer_spread);
-        // No taller than the kind is, nor than the grass of the place
-        float kind_top = min(grass_height * kindHeight(kind), v_height);
+        int kind = kinds_here[n];
+        float tile = tile_size * kindTile(kind) * mix(1.0, layer_scales[i], layer_spread);
+        // As tall as the kind grows here, no taller than the shell (which the slopes and the soil lower)
+        float kind_top = min(grass_height * kindHeight(kind) * kinds_tall[n] * slope_tall, v_height);
         // Each layer has its own patches, three in patch_size, under the height map of the shell
         // (grass.vert.glsl) : where one is short the others show
         float patch_noise = textureLod(u_noise, patch_root / (patch_size * 10.0 / 3.0) + vec2(0.17, 0.59) * float(i + 1), 0.0)[i % 3];
         float layer_height = kind_top * (1.0 - layer_patch * clamp(0.5 + 1.5 * patch_noise, 0.0, 1.0));
-        if(is_undergrowth) {
-            layer_height = kind_top * undergrowth * (1.0 - 0.5 * layer_patch * clamp(0.5 + 1.5 * patch_noise, 0.0, 1.0));
-        }
         if(layer_height < 0.02 * grass_height) {
             continue;
         }
+        tallest = max(tallest, layer_height);
         ray_kind = kind;
 
         // A ray that would cross more than max_reach tiles of the layer is looked up as if it went down
@@ -638,7 +685,6 @@ void main() {
             hit_noise = noise;
             hit_tile = tile;
             hit_layer_height = layer_height;
-            hit_undergrowth = is_undergrowth;
             hit_bare = bare;
             hit_kind = kind;
         }
@@ -701,8 +747,9 @@ void main() {
     // follows roughly, the terrain would show in the hollows)
     hit_height = max(hit_height, 0.12 * v_height);
 
-    // Where the grass ends its top is the shell : nothing to see through next to the rock
-    hit_height = mix(v_height, hit_height, smoothstep(0.0, 0.6, v_height / grass_height));
+    // Where the grass ends its top is a surface : nothing to see through next to the rock. The top of the
+    // plants of the place, which is under the shell on the slopes
+    hit_height = mix(min(max(tallest, hit_height), v_height), hit_height, smoothstep(0.0, 0.3, v_cover));
 
     // Tile space to world : x and z of the tile on the ground, y along the blades
     vec3 axis_x = vec3(hit_tile, -hit_tile * ground_normal.x / ground_normal.y, 0);
@@ -754,9 +801,9 @@ void main() {
         occlusion = mix(occlusion, mix(0.3, 1.0, exp(-3.0 * under)) * mix(0.6, 1.0, baked), canopy);
     }
 
-    // The undergrowth is under the tall layers too
-    if(hit_undergrowth) {
-        occlusion *= mix(0.75, 1.0, hit_layer_height / v_height);
+    // Short plants are under the tall ones of the place too
+    if(tallest > 0.0) {
+        occlusion *= mix(0.75, 1.0, hit_layer_height / tallest);
     }
     // Under the plants (the shell is close enough to the ground)
     float shade = treeShade(v_position, 0.0);

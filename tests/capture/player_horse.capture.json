@@ -1,0 +1,32 @@
+{
+  "scene": "player_horse",
+  "hide_ui": true,
+  "vars": { "third_person": 5 },
+  "input": [
+    { "frame": 901, "key": "W", "down": true },
+    { "frame": 1070, "key": "W", "down": false },
+    { "frame": 1080, "key": "Space", "down": true },
+    { "frame": 1082, "key": "Space", "down": false },
+    { "frame": 1161, "key": "W", "down": true },
+    { "frame": 1200, "motion": [-420, 60] },
+    { "frame": 1441, "key": "W", "down": false },
+    { "frame": 1441, "key": "A", "down": true },
+    { "frame": 1681, "key": "Left Shift", "down": true },
+    { "frame": 1981, "key": "A", "down": false },
+    { "frame": 1981, "key": "Left Shift", "down": false },
+    { "frame": 2160, "key": "Space", "down": true },
+    { "frame": 2162, "key": "Space", "down": false }
+  ],
+  "shots": [
+    { "frame": 900, "name": "player_horse_spawn" },
+    { "frame": 1078, "name": "player_horse_touch" },
+    { "frame": 1160, "name": "player_horse_mounted" },
+    { "frame": 1440, "name": "player_horse_walk" },
+    { "frame": 1680, "name": "player_horse_walk_side" },
+    { "frame": 1900, "name": "player_horse_run_side" },
+    { "frame": 1907, "name": "player_horse_run_side2" },
+    { "frame": 1980, "name": "player_horse_run_side3" },
+    { "frame": 2158, "name": "player_horse_halt" },
+    { "frame": 2260, "name": "player_horse_off" }
+  ]
+}

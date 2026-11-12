@@ -64,19 +64,18 @@ struct RenderSettings {
         glm::vec3 base_normal = glm::vec3(0.f, 1.f, 0.f);  // direction the blades grow in, before the wind
         float follow_terrain = 0.3f;    // how much they lean with the terrain normal
         float tile_size = 1.f;          // world size of the baked tile
-        float height = 1.f;             // of the tallest blades, where the height map is at its highest
-        GrassHeightParams height_map;   // octaves of Perlin noise baked in a map per chunk : where the grass is tall (docs/grass/11-height-map.md)
-        float patch_amount = 0.45f;     // how much shorter the grass is where the height map is lowest
+        float height = 1.f;             // of the tallest blades of the meadow where it grows tallest; the other kinds by their own height (GrassModel::height)
+        GrassHeightParams height_map;   // without the species (species.size 0) : octaves of Perlin noise, where the meadow is tall (docs/grass/11-height-map.md)
+        float patch_amount = 0.45f;     // how much shorter a kind of plant is where its height noise is lowest
         float patch_size = 14.f;        // metres : three height patches of each layer in that (docs/grass/03-patches.md)
         float noise_frequency = 0.03f;  // in tiles : each layer bends its tiling with its own noise
         float noise_amplitude = 0.15f;
         float wind_strength = 0.12f;    // lean of the blades in the gusts
         float wind_speed = 1.f;
         float top_start = 0.f;          // part of the way from 67.5 degrees to the vertical where the top down rays blend in
-        int layers = 2;                 // tall layers : the same tile turned, shifted and scaled, the closest hit wins
+        int layers = 4;                 // kinds that grow together at a place, from the one there is most of (the first kind again where it is alone), the closest hit wins
         float layer_spread = 1.f;       // 0 : every layer has the same tile size
         float layer_patch = 0.35f;      // height patches of each layer
-        float undergrowth = 0.45f;      // height of the short dense layer under the tall ones, 0 : none
         float colour_variation = 0.5f;  // brightness and hue from blade to blade
         float dryness = 0.25f;          // part of the blades that are dry, in patches
         float curve = 0.7f;             // part of the wind that bends the blades instead of leaning them
@@ -85,7 +84,7 @@ struct RenderSettings {
         float silhouette = 1.f;         // seen through where the ground falls away under the ray (crests, edges) : 0 never, more : deeper
         float azimuth_dither = 0.5f;    // towards one baked azimuth and elevation per pixel instead of two blended (1 : grainy)
         float baked_colour = 1.f;       // colours from the colour map of the rays (flowers, seeds), 0 : green by the height alone
-        GrassSpeciesParams species;     // which kind of plant grows where, in patches (docs/grass/15-species.md)
+        GrassSpeciesParams species;     // which kinds of plants grow where, how many and how tall, from their noises (docs/grass/15-species.md)
     } grass_params;
 };
 

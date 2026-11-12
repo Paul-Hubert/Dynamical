@@ -32,6 +32,8 @@ public:
         DOWN,
         SPRINT,
         VR_RIG,
+        INTERACT,
+        CURSOR,
         END_ENUM,
     };
 

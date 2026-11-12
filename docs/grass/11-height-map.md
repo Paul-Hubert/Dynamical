@@ -1,5 +1,7 @@
 # 11. A height map per chunk
 
+> Since [15-species.md](15-species.md) the map of a chunk holds the top of the plants of each place (`GrassTopField`: every kind as tall as its own noise says, the tallest of those that grow there). The noise below is the height of the meadow when the species are off (`species.size` 0), and the grass of the sandbox.
+
 **Goal.** The field patches of [step 3](03-patches.md) came from the 512 texel noise texture, one feature every `patch_size` (14 m) and the same field again every 140 m. The height of the grass is now a property of the world: octaves of Perlin noise at a low frequency, baked once per chunk in a 2D map.
 
 ## Design

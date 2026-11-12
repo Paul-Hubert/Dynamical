@@ -51,6 +51,7 @@ VRActions::VRActions(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
     makeAction(XR_ACTION_TYPE_FLOAT_INPUT, "grip", "Grip", gripAction);
     makeAction(XR_ACTION_TYPE_VECTOR2F_INPUT, "thumbstick", "Thumbstick", thumbstickAction);
     makeAction(XR_ACTION_TYPE_BOOLEAN_INPUT, "primary", "Primary Button", primaryAction);
+    makeAction(XR_ACTION_TYPE_BOOLEAN_INPUT, "thumbstick_click", "Thumbstick Click", stickClickAction);
 
     // Primary button: X (left) and A (right) on Touch, A on both Index controllers
     suggest("/interaction_profiles/oculus/touch_controller", {
@@ -64,6 +65,8 @@ VRActions::VRActions(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
         {thumbstickAction, "/user/hand/right/input/thumbstick"},
         {primaryAction, "/user/hand/left/input/x/click"},
         {primaryAction, "/user/hand/right/input/a/click"},
+        {stickClickAction, "/user/hand/left/input/thumbstick/click"},
+        {stickClickAction, "/user/hand/right/input/thumbstick/click"},
     });
 
     suggest("/interaction_profiles/valve/index_controller", {
@@ -77,6 +80,8 @@ VRActions::VRActions(Context& ctx, entt::registry& reg) : ctx(ctx), reg(reg) {
         {thumbstickAction, "/user/hand/right/input/thumbstick"},
         {primaryAction, "/user/hand/left/input/a/click"},
         {primaryAction, "/user/hand/right/input/a/click"},
+        {stickClickAction, "/user/hand/left/input/thumbstick/click"},
+        {stickClickAction, "/user/hand/right/input/thumbstick/click"},
     });
 
     suggest("/interaction_profiles/khr/simple_controller", {
@@ -192,6 +197,11 @@ void VRActions::sync(XrTime time) {
         hand.primary = primary_state.isActive && primary_state.currentState;
         hand.primary_pressed = !was_down && hand.primary;
 
+        XrActionStateBoolean click_state { XR_TYPE_ACTION_STATE_BOOLEAN };
+        get_info.action = stickClickAction;
+        xrCheckResult(xrGetActionStateBoolean(ctx.vr.session, &get_info, &click_state));
+        hand.thumbstick_click = click_state.isActive && click_state.currentState;
+
         XrSpaceVelocity velocity { XR_TYPE_SPACE_VELOCITY };
         XrSpaceLocation location { XR_TYPE_SPACE_LOCATION };
         location.next = &velocity;
@@ -199,6 +209,8 @@ void VRActions::sync(XrTime time) {
             hand.pose = toPose(location);
             hand.linear_velocity = (velocity.velocityFlags & XR_SPACE_VELOCITY_LINEAR_VALID_BIT)
                 ? glm::vec3(velocity.linearVelocity.x, velocity.linearVelocity.y, velocity.linearVelocity.z) : glm::vec3(0.f);
+            hand.angular_velocity = (velocity.velocityFlags & XR_SPACE_VELOCITY_ANGULAR_VALID_BIT)
+                ? glm::vec3(velocity.angularVelocity.x, velocity.angularVelocity.y, velocity.angularVelocity.z) : glm::vec3(0.f);
         } else {
             hand.pose.valid = false;
         }

@@ -28,6 +28,7 @@ public:
     float restitution = 0.1f;
     float angular_damping = 0.05f;             // Jolt's default
     float mass = 0.f;                          // kg, inertia scaled to it; 0: Jolt's density of 1000 kg/m³
+    bool lock_rotation = false;                // translation only (a player body: Unity's frozen rotation)
 
     glm::vec3 initial_velocity = glm::vec3(0.f);
     glm::vec3 initial_angular_velocity = glm::vec3(0.f);

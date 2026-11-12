@@ -15,7 +15,8 @@ open land through a forest and out, around the trees) frame by frame through a c
 --seed places the forests and their plants (the scene's forest_seed), so it also picks the walk. The seed, the
 distance and the speed are the scene's own when they are not given; the walk lasts distance / speed seconds. The
 simulation runs at 60 Hz with a fixed frame clock, so the video plays in real time whatever the render speed; the
-first frame waits for the terrain, the plants and the animals to be loaded. Captures are 960 x 540.
+first frame waits for the terrain, the plants and the animals to be loaded. Frames are --width x --height
+(1280 x 720; --width 1920 --height 1080 --fps 60 --crf 18 for a full HD video).
 --preview N renders N frames spread over the walk and no MP4.
 --arg passes an argument on to the engine (--arg ray_tracing=false --arg lighting=off : the reference of the goldens),
 --cwd runs it in another folder than build/ (a copy of the executable and of resources/, when other sessions build).
@@ -81,8 +82,8 @@ def main():
     print(f"rendering {count} frames of {args.scene} (seed {seed})", flush=True)
     start = time.monotonic()
     proc = subprocess.run([args.exe, f"capture={frames / 'capture.json'}", f"capture_dir={frames}", "fullscreen=false",
-                           f"window_width={args.width}", f"window_height={args.height}", "vr_mode=0"] + args.arg,
-                          cwd=args.cwd, capture_output=True, text=True, timeout=7200)
+                           f"window_width={args.width}", f"window_height={args.height}", "capture_window=true", "vr_mode=0"] + args.arg,
+                          cwd=args.cwd, capture_output=True, text=True, timeout=6 * 3600)
     (frames / "dynamical.log").write_text(proc.stdout + proc.stderr)
     rendered = sorted(frames.glob("frame_*.png"))
     print(f"exit {proc.returncode}, {len(rendered)} frames in {time.monotonic() - start:.0f} s", flush=True)

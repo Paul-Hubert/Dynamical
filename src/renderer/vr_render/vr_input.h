@@ -31,6 +31,7 @@ private:
     XrAction gripAction = XR_NULL_HANDLE;
     XrAction thumbstickAction = XR_NULL_HANDLE;
     XrAction primaryAction = XR_NULL_HANDLE;
+    XrAction stickClickAction = XR_NULL_HANDLE;
     XrPath handPaths[2] = {};
     XrSpace handSpaces[2] = {};
     XrSpace viewSpace = XR_NULL_HANDLE;

@@ -6,6 +6,7 @@
 #include <stdexcept>
 
 #include "logic/agents/ground_field.h"
+#include "logic/animals/steer.h"
 #include "logic/components/camera.h"
 #include "logic/components/transform.h"
 #include "logic/terrain/marching_cubes.h"
@@ -149,6 +150,8 @@ void HerdSys::preinit() {
     reg.storage<Animal>();
     reg.storage<AnimalPose>();
     reg.storage<HerdAnimal>();
+    reg.storage<AnimalSteer>();
+    reg.storage<SteeredWalk>();
     reg.storage<AnimalGait>();
     reg.storage<Transform>();
     reg.storage<Plant>();
@@ -334,7 +337,10 @@ void HerdSys::spawn(Herd& herd) {
 
 void HerdSys::despawn(Herd& herd) {
     for(auto& member : herd.members) {
-        if(reg.valid(member.entity)) reg.destroy(member.entity);
+        if(!reg.valid(member.entity)) continue;
+        // An animal someone steers (a rider took it away) outlives its herd, on its own
+        if(reg.any_of<AnimalSteer, SteeredWalk>(member.entity)) reg.remove<HerdAnimal>(member.entity);
+        else reg.destroy(member.entity);
     }
 }
 
@@ -359,7 +365,11 @@ void HerdSys::updateHerd(Herd& herd, float dt) {
     if(herd.travelling) {
         // The herd waits for those behind
         float behind = 0.f;
-        for(auto& member : herd.members) behind += glm::distance(member.position, herd.centre + member.spot);
+        for(auto& member : herd.members) {
+            // Not for one that a rider took away
+            if(reg.valid(member.entity) && reg.any_of<AnimalSteer, SteeredWalk>(member.entity)) continue;
+            behind += glm::distance(member.position, herd.centre + member.spot);
+        }
         behind /= (float) herd.members.size();
         float speed = herd.speed * (behind > 1.5f * herd.extent + 3.f ? 0.25f : 1.f);
 
@@ -402,6 +412,25 @@ void HerdSys::updateHerd(Herd& herd, float dt) {
 void HerdSys::updateMember(Herd& herd, Member& m, float dt) {
 
     if(!reg.valid(m.entity)) return;
+
+    // Steered by someone else (AnimalSteer: a rider): the herd lets go, and knows where the animal is for when it
+    // comes back, and for the others to keep off it
+    if(reg.any_of<AnimalSteer, SteeredWalk>(m.entity)) {
+        const auto& transform = reg.get<Transform>(m.entity);
+        m.position = glm::vec2(transform.position.x, transform.position.z);
+        m.height = transform.position.y;
+        m.yaw = headingOf(transform.rotation);
+        m.pitch = 0.f;
+        m.speed = 0.f;
+        m.moving = false;
+        m.timer = 0.f;
+        m.placed = true;
+        auto& tag = reg.get<HerdAnimal>(m.entity);
+        tag.moving = false;
+        tag.speed = 0.f;
+        return;
+    }
+
     const HerdKind& kind = definition.kinds[herd.kind];
     const AnimalSpecies& species = *m.species;
     auto& animal = reg.get<Animal>(m.entity);

@@ -1,0 +1,40 @@
+{
+  "format_version": 1,
+  "name": "player_deer",
+  "include": ["common/desktop.json", "common/animal_world.json"],
+  "variables": {
+    "body":   { "type": "string", "default": "runs/animal_deer_red_gaits_20m_env/resources/animals/bodies/deer_red.body.json", "description": "the body its policy was trained with (the run's frozen one)" },
+    "params": { "type": "string", "default": "runs/animal_deer_red_gaits_20m_env/resources/agents/params/animal_gaits.params.json" },
+    "ranges": { "type": "string", "default": "runs/animal_deer_red_gaits_20m_env/resources/agents/ranges/gaits_basic.json", "description": "the orders it was trained with: what a rider can ask" },
+    "model":  { "type": "string", "default": "runs/animal_deer_red_gaits_20m/Animal_deer_red.onnx", "description": "its walker's policy; empty: zero actions, it stands" },
+    "mount":  { "type": "string", "default": "deer_red", "description": "the species of the body" },
+    "free":   { "type": "string", "default": "stand", "description": "without a rider: stand, or wander (the orders drawn as in training)" },
+    "view":   { "type": "bool",   "default": true },
+    "third_person": { "type": "float", "default": 0, "description": "m: the camera this far behind the player's eyes, 0 at them" },
+    "marks":  { "type": "float",  "default": 1.0, "description": "m: a chequer of this size on the ground around the animal" }
+  },
+
+  "renderer": { "passes": ["animals", "model", "ui"], "vr": false },
+
+  "host": {
+    "pre": [
+      "Input", "UI", "PlayerControl", "DebugMenu",
+      { "name": "ModelWatcher", "params": { "model": "${model}" } },
+      "WorldStepper",
+      { "name": "AnimalAgentView", "params": { "camera": false, "marks": "${marks}" } },
+      { "name": "AnimalBotSteer", "params": { "free": "${free}" } },
+      { "name": "PlayerSpawn", "params": { "kind": "fps", "position": [2.5, 1.5], "yaw": 1.03, "props": 0, "ground": true, "third_person": "${third_person}" } },
+      "MouseKeyboardInput", "ControllersInput", "LookTurn",
+      "Mounting", "MountSteering",
+      { "name": "Mountables", "params": { "species": "${mount}" } },
+      "PlayerLegs", "RiderSeat", "Hold", "BodyDrives", "PlayerModels",
+      "RigidBody", "Physics",
+      "PlayerViewpoint"
+    ],
+    "post": [ { "name": "WorldView", "params": { "worlds": "all", "spacing": 0.0 } } ]
+  },
+
+  "worlds": [
+    { "template": "animal_world", "count": 1, "systems": { "replace": { "TrainerActions@act": "Policy@act" } } }
+  ]
+}

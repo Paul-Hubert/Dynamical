@@ -19,6 +19,7 @@
 #include "view/walker_view.h"
 #include "view/gait_view.h"
 #include "view/animal_view.h"
+#include "view/player_input.h"
 
 using namespace dy;
 
@@ -50,6 +51,9 @@ void dy::registerViewSystems() {
     registerSystem("AnimalAgentView", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<AnimalAgentViewSys>(reg, params); }, SystemScope::Host, true });
     registerSystem("WalkerView", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<WalkerViewSys>(reg, params); }, SystemScope::Host, true });
     registerSystem("GaitView", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<GaitViewSys>(reg, params); }, SystemScope::Host, true });
+    registerSystem("MouseKeyboardInput", systemInfo<MouseKeyboardInputSys>(SystemScope::Host, true));
+    registerSystem("ControllersInput", systemInfo<ControllersInputSys>(SystemScope::Host, true));
+    registerSystem("PlayerModels", systemInfo<PlayerModelsSys>(SystemScope::Host, true));
     registerSystem("WorldView", { [](entt::registry& reg, const nlohmann::json& params) { return std::make_unique<WorldViewSys>(reg, params); },
         SystemScope::Host, true });
 

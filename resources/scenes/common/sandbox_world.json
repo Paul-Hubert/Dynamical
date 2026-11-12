@@ -23,7 +23,7 @@
         "PhysicsStep", "SandboxLife", "SandboxObserve@observe"
       ],
       "entities": [
-        { "prefab": "ground_flat", "Ground": { "size": [400, 10, 400] } }
+        { "prefab": "ground_flat_wide" }
       ]
     }
   }

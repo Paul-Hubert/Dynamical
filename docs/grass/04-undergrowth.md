@@ -1,5 +1,7 @@
 # 4. Undergrowth layer
 
+> Gone since [15-species.md](15-species.md): the layers are the four kinds of plants there is most of at a place, the small kinds are what grows under the tall ones.
+
 **Goal.** Between the tall tufts the pixel falls to a flat dark ground. A short, dense layer fills it: depth between the blades, and no ground from above.
 
 ## Design

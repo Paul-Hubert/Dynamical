@@ -289,7 +289,8 @@ dense arena, `life_dense.params.json`: 120 m, 8 wolves):
 | 4: eating pays only under 0.85 of a store; courting, chasing and fleeing pay by the metre closed (`mate_closing`, `prey_closing`, `predator_closing`) (1.5M) | feeding 73% to 28% of the time with the store still at 0.92; Mate mode 2% to 16%; the court term starts to pay; no pair side by side, no conception | nothing: chase, strike and gnaw pay zero, all starve |
 | 5: courting and chasing paid twice as much; the buffer marks possible mates; the dense arena (1.7M and 1M) | half of their deaths are now kills, half old age, hunger 1%; a life lasts 630 s; pairs begin to form (near and pair pay), no conception | **the wolves hunt**: Attack mode 23% to 41%, speed 0.42 to 0.72 walk speeds, wounds dealt six times up, kills 1.2 to 2.1 per 20k decisions; return 3 to 26. They do not eat what they kill: 96% starve |
 | 6: the meal paid more (Feed mode on a carcass, closing on it, eating); fear and pairing paid twice as much (2.2M and 1.3M) | **the deer learn the wolves**: four in five deaths were kills at the start of the round, none at its end; 98% die of old age after 790 s; no conception | kills 6.4 per 20k decisions at the start, 1.4 at the end as the deer keep away; Feed mode 23% to 31%, feeding 1% to 2% of the time; 96% starve; return 29 to 54 |
-| 7: a pair needs 2 s within two lengths (not 3 s within one and a half) and is paid as its time together builds (`mating`); eating pays the wolves by what is eaten | ROUND7_DEER | ROUND7_WOLF |
+| 7: a pair needs 2 s within two lengths (not 3 s within one and a half) and is paid as its time together builds (`mating`); eating pays the wolves by what is eaten (2.2M and 1.3M) | **the first conceptions and births by learned minds** (two of each, early), then none: the return went from 4 to 99 on the together term alone. Hovering just short of a conception paid more than conceiving, which switches the term off. 99% die of old age | live longer (243 s to 351 s; one in twenty reaches old age, 86% starve), feed 2% of the time, kill 1.5 deer per 20k decisions |
+| 8: together pays twenty times less; conceiving and carrying pay more than a pair that waits (2.3M and 1.3M) | the hovering stopped (together and pair pay 0.001 to 0.002) and births go on through the round, a few: one life in fifty leaves a young; 88% die of old age, a life lasts 730 s; return -3 to 35 | 85% starve, 3% reach old age; feeding 0.5% to 2.7% of the time; kills 1.1 to 1.8 per 20k decisions; no conception |
 
 What the rounds taught about writing the terms: a term has to be worth something next to a death of -1 (round 1);
 a term that pays for where the animal is gets collected where it stands (the court of round 3, the hunt of round
@@ -297,16 +298,54 @@ a term that pays for where the animal is gets collected where it stands (the cou
 happen (the dense arena of round 5). Round 1 also showed the trainer needed a smaller buffer: with 20480 it updated
 the minds 24 times in 500k decisions.
 
-**Rounds of the sandbox itself** (four behaviours: walkers from their 20M runs, minds from `puppets_r5`, the dense
-arena, `walkerShare` 0.1; `sandbox_r1_*.mp4`):
+**Rounds of the sandbox itself, first line** (`sandbox_r1` to `r3`; four behaviours: walkers from their 20M runs,
+minds from `puppets_r5`, the dense arena, `walkerShare` 0.1; `sandbox_r1_*.mp4`, `sandbox_r2_*.mp4`). Superseded: Paul
+asked on 2026-11-11 for the minds to start from scratch on the pretrained walkers (next paragraph).
 
 | Round | Deer | Wolves | Walkers |
 |---|---|---|---|
 | 1 (420k decisions of the deer's minds, 2.6M steps of their walkers, 35 min) | graze with their own necks: feeding 18% of the time, the grass goes down; a life in the world 100 s to 320 s; all still starve; return -2.6 to 2.0 | wound and kill with their heads: 2.4 healths of wounds and one kill per summary; a life 66 s to 190 s; 92% starve; return 4 to 27 | learn the speed ceiling: 1.0 to 0.86 (deer) and 1.85 to 1.1 (wolf) of the speed asked; episodes ended by a fall 43% to 3% and 45% to 8%; head 13 degrees off |
-| 2 (from round 1, round 7's reward files) | ROUND2_DEER | ROUND2_WOLF | ROUND2_WALKERS |
+| 2 (from round 1, round 7's reward files; 720k decisions, 4.4M walker steps, 62 min) | **the ragdoll deer live**: 99% die of old age (all starved at the start of the round), a life in the world 130 s to 650 s, feeding 20% of the time, store 0.73; return -1.7 to 17 | begin to eat what they kill with their own muzzles (feeding 0.1% to 2.9% of the time, Feed mode 23% to 39%); a life 150 s to 290 s; all still starve; one or two kills per summary; return 8 to 50 | episodes ended by a fall 29% to 1.4% (deer) and 47% to 0.9% (wolf); 0.93 and 0.99 of the speed asked; returns 453 to 604 and 436 to 523 |
+| 3 (from round 2, round 8's reward files; stopped at 480k of 700k decisions when the line below replaced it) | feeding 18% to 20% of the time | feeding 0% to 1.5% | returns 469 to 632 and 510 to 584 |
 
-In the engine (`sandbox_eval`, round 1's four models, 6 minutes): 22 blows land, nobody is killed, a deer lasts
-230 s.
+In the engine (`sandbox_eval`, the round's four models, sampled): round 1, 6 minutes: 22 blows land, nobody is
+killed, a deer lasts 230 s. Round 2, 10 minutes: 11 of the 12 deer are alive at the end (one starved; one fall
+between them in ten minutes), no deer is killed (10 blows), 12 wolves starve. `sandbox_r2_*.mp4`.
+
+**The line of record** (`scratch_r1` onwards; Paul, 2026-11-11: "pretrain the physics controllers for both animals
+for 20M then continue from there for action agent from scratch"): the walkers start from their 20M runs
+(`orders_deer_red_sandbox`, `orders_wolf_2_sandbox`) and keep learning, the minds start from nothing: no puppet round
+behind them. `tools/sandbox_round.py --name scratch --round 1 --steps 1500000 --life agents/params/life_dense.params.json`,
+round 8's reward files. Those walkers were trained before the speed ceiling was added to their reward: they learn it
+in the sandbox (one round sufficed in the first line).
+
+**Walkers to replace them** (Paul, 2026-11-11: "pretrain the controllers for 80M for future replacement"):
+`orders80_deer_red_sandbox` and `orders80_wolf_2_sandbox`, the same training as the 20M ones with the reward as it
+now is (the speed ceiling from the start), 80M steps each, started 2026-11-11 22:53, about 8 hours at 2700 steps a
+second each. A round takes them with `tools/sandbox_round.py --walkers orders80` (round 1 of a new name: a round
+that continues another keeps that one's walkers).
+
+| Round | Deer | Wolves | Walkers |
+|---|---|---|---|
+| 1 (minds from nothing, round 8's reward files; 1.58M decisions of the deer's minds, 9.6M steps of their walkers, 2 h 40 min next to the two 80M trainings) | **learn to live from nothing**: 65% of those that die in the last quarter of the round die of old age (the first quarter says nothing: no life is long enough yet to end that way); a life in the world 143 s to 609 s; feeding 8% to 16% of the time, store 0.46 to 0.70; they hardly move (0.17 of a walk speed), no pair forms, no conception; return -1.9 to 10.8 | no hunt: all starve after 260 s, modes at a fifth each, wounds dealt 0.42 to 0.09 a summary, nothing eaten; paid for where they stand (`close` 0.0022 a decision against 0.0005 for the chase); return 0.7 to 4.1 | episodes ended by a fall 14% to 2.7% (deer) and 33% to 0.5% (wolf); 0.92 and 0.96 of the speed asked (1.04 and 1.20 at the start: the ceiling is learned); head 11 and 8 degrees off; returns 210 to 442 and 205 to 422 |
+| 2 (from round 1, round 9's reward files: the wolves' `close` only within 6 m, their chase by the metre 2.5 times more, wound, kill and meal more; the deer's courting by the metre twice as much; 2.14M decisions, 12.9M walker steps, 3 h) | a little worse: 38% die of old age, 61% starve, 1% are killed; a life in the world 445 s; feeding 15% of the time, store 0.65; no pair side by side, no conception; return 6.0 | **the hunt begins from nothing**: speed 0.25 to 0.80 of a walk speed, Attack mode 24% to 37%, wounds dealt 0.57 to 1.18 healths a summary, a kill in one summary of thirteen; they walk to carcasses and do not eat (feeding 0.09% of the time, Feed mode 18% to 14%); 98% starve after 240 s; return 4.7 to 7.6 | episodes ended by a fall 1.6% for both; 0.98 and 1.01 of the speed asked; head 9.7 and 7.8 degrees off; returns 446 to 514 and 426 to 550 |
+| 3 (from round 2, round 10's reward files: the wolves' `gnaw` pays by how far the muzzle comes down by a carcass; the deer's courting, nearness and pairing only over a store of 0.6, hunger twice as costly; 2M decisions, started 2026-11-12 03:42) | SCRATCH3_DEER | SCRATCH3_WOLF | SCRATCH3_WALKERS |
+
+In the engine (`sandbox_eval`, round 1's four models, sampled, 10 minutes): 10 deer alive at the end, 6 starved (of
+16 with those brought in), 2 falls between them; 13 wolves starve, 4 blows, no kill. `scratch_r1_*.mp4`. Round 2: 44 blows, no kill, 14 wolves starve; 14 deer starve, each about 130 s after it came in, while the herd keeps its ten. `scratch_r2_*.mp4`.
+
+**Why deer still starve.** A store of 0.76 lasts 130 s: the deer that die never ate. Animals are brought in on the border of the arena; with grass on 55% of it in patches of 60 m, many land on bare ground further from grass than the 10 m of the mind's grass rings, and no term paid for going to it (`pasture` pays once within 3 m). Two signals were added for round 4, `grass_distance` (m to the nearest grass over 0.1 m within 40 m) and `grass_closing` (m closed on it over the decision, as the other closings), `GrassField::nearest`, `LIFE.3`.
+
+Against the first line: minds that had three million decisions as puppets behind them wounded and killed from the
+first round on ragdolls; from nothing the wolves' minds find no hunt in a million decisions, while grazing, which
+needs no other animal, is found in one round either way.
+
+**The man's walker with orders** (`orders_homo_heidelbergensis_walking_sandbox`, 20M steps, the solver at 40 and 8
+steps): it walks, which the library's men did not at 2M without orders: 0.95 m/s, 0.81 of the speed asked, the head
+within 7.5 degrees of where it is asked, standing in Mate mode paid 0.27 of 0.4. It falls in 42% of its 33 s
+episodes (sampled) and does not bring its head down to feed (a man does not graze: feeding on a carcass needs the
+muzzle within reach of it, not on the ground). A first round with men (`hunters_r1`, six behaviours) started and
+ran: stopped after 4 minutes with the first line.
 
 ## Milestones
 
@@ -317,17 +356,16 @@ In the engine (`sandbox_eval`, round 1's four models, 6 minutes): 22 blows land,
 | M3 | Walker with orders; the deer's and the wolf's walkers alone, from standing to 2.6 walk speeds | Built and trained (20M each). They lower the head to feed, throw it to attack, point it within 10 degrees; they do not stand still and learned the speed ceiling only in the sandbox |
 | M4 | Rules of life; scripted minds | Built. `LIFE.*`, `SANDBOX.3` to `.10` |
 | M5 | Minds: senses, reward files and their evaluator, `sandbox_train`, `tools/sandbox_round.py` | Built. `EXPR.*`, `SANDBOX.8`, `MA.5` |
-| M6 | Rounds: reward files rewritten from each round's summary | Seven rounds on puppets, two of the sandbox itself. Learned: grazing, hunting, fleeing (puppets); grazing and wounding with the ragdolls. Not learned: eating a kill, mating. No birth yet anywhere but with the scripted minds |
+| M6 | Rounds: reward files rewritten from each round's summary | Eight rounds on puppets, two and a half of the sandbox with minds from puppets, then the line of record with minds from scratch. Learned on puppets: grazing, hunting, fleeing, and a few births (one life in fifty). Learned by the ragdolls: grazing to old age, wounding, the first meals on a kill. Not learned: wolves that live off what they kill |
 | M7 | Inference: `Policies`, `sandbox_eval`, `sandbox_view`, videos from above and in the viewer | Built. `AP.*`; a round's four models run in the engine. Not in `forest_herds` (its herds are skinned meshes on a terrain: the sandbox is flat and drawn as shapes) |
-| M8 | Men as hunters: a third species with a spear in the forearm | Built (`life_hunters.params.json`, `SANDBOX.10`, scripted on puppets). Its walker with orders is training (`orders_homo_heidelbergensis_walking_sandbox`); no round with men yet |
+| M8 | Men as hunters: a third species with a spear in the forearm | Built (`life_hunters.params.json`, `SANDBOX.10`, scripted on puppets). Its walker with orders is trained (20M: it walks, falls in 42% of its episodes). A round of six behaviours starts and runs; none run to its end |
 | later | The terrain; trees and what they hide; the other herd kinds; `lifeScale` raised as lives get longer; the skinned meshes on the ragdolls | |
 
 ## Risks, as they stand
 
-- **Births.** The objective's +1 has not been earned once by a learned policy. On puppets the deer survive to old age
-  and the wolves hunt, but no pair has stood together long enough; round 7 pays the time together as it builds.
-  If that fails the next lever is the rule itself (a shorter time, a longer reach) or a mind that keeps a mode for
-  more than a decision.
+- **Births.** Rare: on puppets one deer's life in fifty leaves a young after eight rounds, the wolves none; the
+  ragdolls none. A reward that pays the way to a conception is collected for itself the moment it is worth more
+  than the conception (round 7): every such term has to be checked against what it leads to.
 - **Wolves do not eat.** They make carcasses and starve next to them. Feeding needs Feed mode, the trunk slow and the
   muzzle within reach of a body of the carcass; the puppets' wolves do it 2% of the time.
 - **The ragdolls starve.** In the sandbox itself a deer lasts 320 s and a wolf 190 s after one round: they graze and

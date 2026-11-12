@@ -15,7 +15,7 @@
 namespace dy {
 
 class Context;
-class GrassHeightField;
+class GrassTopField;
 
 // Grass without blade geometry : the terrain chunks are drawn again as a shell at the top of the grass,
 // and each pixel looks its view ray up in rays baked against a grass model (logic/grass/grass_bake.h)
@@ -62,7 +62,7 @@ private:
         float low_from = 1.f, low_to = 0.5f;    // of the lowest rays (GrassRaycast)
         float tiles[10] = {}, heights[10] = {}; // metres each kind of tile was modelled at (GrassModel)
         float abundance[10] = {};               // GrassKindInfo
-        int32_t small_mask = 0;                 // a bit per kind : small plants
+        int32_t small_mask = 0;                 // a bit per kind : small plants, fewer in the shade of tall grass
         int32_t forced_kind = -1;               // grass_kind=... : that kind everywhere
     } rayLayout;
 
@@ -73,9 +73,9 @@ private:
     std::shared_ptr<VmaImage> speciesImage;
     vk::ImageView speciesView;
 
-    // Height of the grass over each chunk (logic/grass/grass_height.h) : one layer of a 2D array per
+    // Top of the plants over each chunk (logic/grass/grass_species.h) : one layer of a 2D array per
     // chunk, baked when the chunk gets its mesh and again when the parameters change
-    std::unique_ptr<GrassHeightField> heightField;
+    std::unique_ptr<GrassTopField> topField;
     vk::Sampler heightSampler;
     std::shared_ptr<VmaImage> heightImage;
     vk::ImageView heightView;

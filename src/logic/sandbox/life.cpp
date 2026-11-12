@@ -160,6 +160,33 @@ float GrassField::full(float x, float z) const {
     return i < 0 ? 0.f : tall[(size_t) i];
 }
 
+float GrassField::nearest(float x, float z, float over, float radius) const {
+    if(side == 0) return -1.f;
+    const int cx = (int) std::floor((x + arena) / p.cell), cz = (int) std::floor((z + arena) / p.cell);
+    const int reach = (int) std::ceil(radius / p.cell);
+    float best = radius;
+    bool found = false;
+    // Rings of cells around the point's own; a ring further than the best so far has nothing nearer
+    for(int ring = 0; ring <= reach && (float) (ring - 1) * p.cell <= best; ring++) {
+        for(int dz = -ring; dz <= ring; dz++) {
+            const int step = std::abs(dz) == ring ? 1 : 2 * ring;
+            for(int dx = -ring; dx <= ring; dx += std::max(step, 1)) {
+                const int ix = cx + dx, iz = cz + dz;
+                if(ix < 0 || iz < 0 || ix >= side || iz >= side) continue;
+                if(now[(size_t) (iz * side + ix)] <= over) continue;
+                if(ring == 0) return 0.f;
+                const float px = ((float) ix + 0.5f) * p.cell - arena, pz = ((float) iz + 0.5f) * p.cell - arena;
+                const float d = std::sqrt((px - x) * (px - x) + (pz - z) * (pz - z));
+                if(d <= best) {
+                    best = d;
+                    found = true;
+                }
+            }
+        }
+    }
+    return found ? best : -1.f;
+}
+
 float GrassField::eat(float x, float z, float amount) {
     int i = index(x, z);
     if(i < 0 || amount <= 0.f) return 0.f;

@@ -1,0 +1,26 @@
+{
+  "scene": "player_fps",
+  "input": [
+    { "frame": 10, "key": "Left Alt", "down": true },
+    { "frame": 11, "key": "Left Alt", "down": false },
+    { "frame": 20, "button": "left", "down": true, "mouse": [25, 20] },
+    { "frame": 22, "button": "left", "down": false, "mouse": [25, 20] },
+    { "frame": 30, "key": "Left Alt", "down": true },
+    { "frame": 31, "key": "Left Alt", "down": false },
+    { "frame": 301, "motion": [0, 400] },
+    { "frame": 330, "key": "E", "down": true },
+    { "frame": 332, "key": "E", "down": false },
+    { "frame": 340, "motion": [0, -330] },
+    { "frame": 421, "motion": [-300, 0] },
+    { "frame": 422, "key": "W", "down": true },
+    { "frame": 470, "key": "W", "down": false },
+    { "frame": 501, "button": "left", "down": true },
+    { "frame": 503, "button": "left", "down": false }
+  ],
+  "shots": [
+    { "frame": 300, "name": "player_fps_spawn" },
+    { "frame": 420, "name": "player_fps_held" },
+    { "frame": 500, "name": "player_fps_carried" },
+    { "frame": 530, "name": "player_fps_thrown" }
+  ]
+}

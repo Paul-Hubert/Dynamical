@@ -9,6 +9,7 @@
 #include "logic/agents/agent_io.h"
 #include "logic/animals/animal.h"
 #include "logic/animals/animal_agent.h"
+#include "logic/animals/steer.h"
 #include "logic/components/camera.h"
 #include "logic/components/frame_clock.h"
 #include "logic/components/transform.h"
@@ -69,6 +70,7 @@ void AnimalAgentViewSys::tick(double dt) {
             animal.species = (uint32_t) index;
             reg.emplace<Animal>(s.entity, animal);
             reg.emplace<AnimalPose>(s.entity);
+            reg.emplace<AnimalSkin>(s.entity);
         }
         // The joints from the segments, about the trunk
         const glm::vec3 offset = WorldViewSys::gridOffset((uint32_t) w, worlds->size(), spacing);

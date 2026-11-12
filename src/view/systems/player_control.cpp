@@ -8,6 +8,7 @@
 #include "logic/components/camera.h"
 #include "view/components/input.h"
 #include "logic/components/vr.h"
+#include "logic/player/player.h"
 #include "logic/terrain/terrain_generator.h"
 
 #include <imgui/imgui.h>
@@ -36,6 +37,9 @@ void PlayerControlSys::tick(double dt) {
 
     auto& camera = reg.ctx().get<Camera>();
     auto& input = reg.ctx().get<Input>();
+
+    // A physical player owns the desktop camera and the mouse (docs/players.md)
+    if(!reg.view<DesktopView>().empty()) return;
 
     // Look around while the right mouse button is held
     bool looking = input.rightDown;

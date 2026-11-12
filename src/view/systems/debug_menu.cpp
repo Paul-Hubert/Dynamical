@@ -146,15 +146,15 @@ void DebugMenuSys::tick(double dt) {
             auto& grass = render.grass_params;
             ImGui::SliderFloat("Tile size", &grass.tile_size, 0.1f, 4.f);
             ImGui::SliderFloat("Height", &grass.height, 0.01f, 3.f);
-            ImGui::SliderInt("Layers", &grass.layers, 1, 3);
+            ImGui::SliderInt("Layers", &grass.layers, 1, 4);
             ImGui::SliderFloat("Layer spread", &grass.layer_spread, 0.f, 1.f);
-            ImGui::SliderFloat("Undergrowth", &grass.undergrowth, 0.f, 1.f);
-            // The height map of each chunk : baked again when these change
+            // The height map of each chunk : baked again when these and the species change. The first four
+            // only count without the species
             ImGui::SliderFloat("Height map wavelength", &grass.height_map.wavelength, 16.f, 400.f, "%.0f m", ImGuiSliderFlags_Logarithmic);
             ImGui::SliderInt("Height map octaves", &grass.height_map.octaves, 1, 6);
             ImGui::SliderFloat("Height map gain", &grass.height_map.gain, 0.f, 1.f);
             ImGui::SliderFloat("Height map contrast", &grass.height_map.contrast, 0.f, 4.f);
-            ImGui::SliderFloat("Height map amount", &grass.patch_amount, 0.f, 0.9f);
+            ImGui::SliderFloat("Height noise amount", &grass.patch_amount, 0.f, 0.9f);
             ImGui::SliderFloat("Layer patch size", &grass.patch_size, 4.f, 60.f);
             ImGui::SliderFloat("Layer patches", &grass.layer_patch, 0.f, 1.f);
             ImGui::SliderFloat3("Base normal", &grass.base_normal[0], -1.f, 1.f);
@@ -166,7 +166,7 @@ void DebugMenuSys::tick(double dt) {
             ImGui::SliderFloat("Dryness", &grass.dryness, 0.f, 1.f);
             ImGui::SliderFloat("Baked colour", &grass.baked_colour, 0.f, 1.f);
             ImGui::SliderFloat("Species patch size", &grass.species.size, 0.f, 120.f, "%.0f m");
-            ImGui::SliderFloat("Small plants under", &grass.species.low, 0.f, 1.f);
+            ImGui::SliderFloat("Shade on small plants", &grass.species.shade, 0.f, 1.5f);
             ImGui::SliderFloat("Species overlap", &grass.species.overlap, 0.f, 1.f);
             ImGui::SliderFloat("Shadow", &grass.shadow, 0.f, 1.f);
             ImGui::SliderFloat("Canopy", &grass.canopy, 0.f, 1.f);

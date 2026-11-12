@@ -357,7 +357,8 @@ run in a line reach the edge. The 2 falls in 512 episodes of the first evaluatio
 that edge: on a ground of 1200 m, same policy, same draws, **0 of 512**. The animal worlds now use
 `ground_flat_wide`; this run trained on the small one (a few episodes in a thousand ended there), and the numbers
 below are on the wide one (a copy of the run's frozen engine with that one file changed). `animal_orders_world.json`
-(the orders of the sandbox, up to 2.6 walks) still uses the small ground: not mine to change.
+(the orders of the sandbox, up to 2.6 walks) and `sandbox_world.json` (400 m under an arena of 200 m) were moved to
+the wide ground afterwards, on the user's word; walkers trained with orders before that met the edge of the small one.
 
 **The run.** `animal_deer_red_gaits_20m`, 20M steps in 7472 s, **2680 steps/s**, beside `puppets_r1` of another
 session and this session's builds. Exit 0, no restart. The demonstration: 18000 decisions in 60 walks (2895 standing,

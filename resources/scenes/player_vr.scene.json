@@ -1,0 +1,22 @@
+{
+  "format_version": 1,
+  "name": "player_vr",
+  "include": ["common/desktop.json"],
+  "variables": {
+    "props": { "type": "int", "default": 8, "description": "boxes to grab in front of the player" }
+  },
+
+  "renderer": { "passes": ["terrain", "grass", "model", "ui"], "vr": true },
+
+  "host": {
+    "pre": [
+      "Input", "UI", "Time", "PlayerControl", "DebugMenu",
+      { "name": "Sky", "params": { "time": "${time}", "day_length": "${day_length}" } }, "ChunkManager", "ChunkGenerator",
+      { "name": "PlayerSpawn", "params": { "kind": "vr", "position": [0, 0], "props": "${props}" } },
+      "VRPlayerInput", "VRBody", "PlayerLegs", "VRHands", "Grab", "BodyDrives", "PlayerModels",
+      "RigidBody", "TerrainColliders", "Physics",
+      "PlayerViewpoint"
+    ],
+    "post": ["Terrain"]
+  }
+}

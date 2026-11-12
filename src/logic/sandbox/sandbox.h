@@ -48,6 +48,8 @@ namespace SandboxSignal {
         // was none at its start or at its end
         predator_closing, prey_closing, mate_closing, carcass_closing,
         mating,                                         // how far the pair is to a conception: 0 to 1 of the time it takes together
+        grass_distance,                                 // m to the nearest grass worth grazing within 40 m (0 in it), 1000 without
+        grass_closing,                                  // as the other closings, on that grass
         count
     };
 }
@@ -140,7 +142,7 @@ struct SandboxAnimal {
         int modes[animal_modes] = {};
         glm::vec3 from = glm::vec3(0.f);
     } window;
-    float nearest[4] = { -1.f, -1.f, -1.f, -1.f };  // predator, prey, mate, carcass at the mind's last decision; < 0: none
+    float nearest[5] = { -1.f, -1.f, -1.f, -1.f, -1.f };    // predator, prey, mate, carcass, grass at the mind's last decision; < 0: none
     float objective = 0.f;              // births and its death, to pay with the mind's next decision
     float lifetime_reward = 0.f;
 };

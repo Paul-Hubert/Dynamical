@@ -198,11 +198,27 @@ TEST_CASE("LIFE.3 the grass: patches over about its cover, eaten down to the stu
     CHECK(full >= p.shortest);
     CHECK(full <= p.tallest);
     CHECK(grass.eat(bare.x, bare.y, 1.f) == 0.f);
+    // The nearest grass: none to go to from a cell that has some, the nearest cell's centre from a bare one
+    CHECK(grass.nearest(with.x + 0.5f, with.y + 0.5f, 0.1f, 40.f) == 0.f);
+    {
+        const glm::vec2 from = bare + glm::vec2(0.3f, 0.6f);
+        float nearest = 1e9f;
+        for(float x = -99.5f; x < 100.f; x += 1.f) {
+            for(float z = -99.5f; z < 100.f; z += 1.f) {
+                if(grass.height(x, z) > 0.1f) nearest = std::min(nearest, glm::length(glm::vec2(x, z) - from));
+            }
+        }
+        REQUIRE(nearest < 40.f);
+        CHECK(nearest > 0.f);
+        CHECK(grass.nearest(from.x, from.y, 0.1f, 40.f) == doctest::Approx(nearest));
+        CHECK(grass.nearest(from.x, from.y, 0.1f, 0.5f * nearest) < 0.f);
+    }
     CHECK(grass.eat(with.x, with.y, 0.1f) == doctest::Approx(0.1f));
     CHECK(grass.height(with.x, with.y) == doctest::Approx(full - 0.1f));
     // Never under the stubble
     CHECK(grass.eat(with.x, with.y, 5.f) == doctest::Approx(full - 0.1f - p.stubble));
     CHECK(grass.height(with.x, with.y) == doctest::Approx(p.stubble));
+    CHECK(grass.nearest(with.x + 0.5f, with.y + 0.5f, 0.1f, 40.f) != 0.f);     // grazed down: no longer grass to go to
     CHECK(grass.eat(with.x, with.y, 5.f) < 1e-6f);
     CHECK(grass.standing() < 1.f);
     // Half its regrow time later it is half way back, then full and no more
