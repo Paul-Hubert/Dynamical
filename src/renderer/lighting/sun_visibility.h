@@ -64,6 +64,7 @@ private:
     struct Eye {
         vk::Extent2D extent;
         Target colour, sun, depth;
+        vk::ImageView depth_read;                       // the depth without the stencil, for the shaders
         Target rays;                                    // what the rays of this frame found
         std::array<Target, 2> visibility;               // this frame's and the one before, in turn
         vk::Framebuffer scene, trace;

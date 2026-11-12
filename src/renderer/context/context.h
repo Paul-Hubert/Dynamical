@@ -76,6 +76,16 @@ public:
     // tracing the colour and the light of the sun apart (SunVisibility)
     uint32_t sceneAttachments() { return device.ray.enabled() ? 2 : 1; }
 
+    // The depth of those render passes, with a stencil where the GPU has one : the grass marks there where
+    // its shell is seen from behind (GrassPass, docs/grass/13-see-through.md)
+    vk::Format sceneDepthFormat();
+    bool sceneStencil() { return (depthAspects(sceneDepthFormat()) & vk::ImageAspectFlagBits::eStencil) != vk::ImageAspectFlags(); }
+    // What a view of such an image holds as an attachment. To read its depth in a shader : eDepth alone
+    static vk::ImageAspectFlags depthAspects(vk::Format format) {
+        bool stencil = format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint || format == vk::Format::eD16UnormS8Uint;
+        return stencil ? vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil : vk::ImageAspectFlagBits::eDepth;
+    }
+
     // Sizes of a descriptor pool that holds `sets` sets of view_layout
     std::vector<vk::DescriptorPoolSize> viewPoolSizes(uint32_t sets) const;
 
@@ -86,6 +96,8 @@ public:
     uint32_t frame_index = 0;
 
 private:
+    vk::Format scene_depth_format = vk::Format::eUndefined;
+
     // Textures of the rays each set already has
     std::unordered_map<VkDescriptorSet, size_t> ray_textures_written;
     std::unordered_map<VkDescriptorSet, size_t> probe_pages_written;

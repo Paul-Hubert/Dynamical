@@ -43,11 +43,15 @@ vk::Pipeline dy::createGraphicsPipeline(Device& device, const GraphicsPipelineDe
         desc.alpha_blend,
         vk::BlendFactor::eSrcAlpha, vk::BlendFactor::eOneMinusSrcAlpha, vk::BlendOp::eAdd,
         vk::BlendFactor::eOne, vk::BlendFactor::eOneMinusSrcAlpha, vk::BlendOp::eAdd,
-        vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
+        desc.color_write ? vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA
+            : vk::ColorComponentFlags());
     std::vector<vk::PipelineColorBlendAttachmentState> blendAttachments(desc.color_attachments, blendAttachment);
     auto colorBlending = vk::PipelineColorBlendStateCreateInfo({}, VK_FALSE, vk::LogicOp::eCopy, blendAttachments);
 
-    auto depthStencil = vk::PipelineDepthStencilStateCreateInfo({}, desc.depth_test, desc.depth_write, vk::CompareOp::eLessOrEqual);
+    vk::StencilOpState stencil(vk::StencilOp::eKeep, desc.stencil_pass, vk::StencilOp::eKeep, desc.stencil_compare,
+        0xFF, desc.stencil_pass == vk::StencilOp::eKeep ? 0 : 0xFF, desc.stencil_reference);
+    auto depthStencil = vk::PipelineDepthStencilStateCreateInfo({}, desc.depth_test, desc.depth_write, vk::CompareOp::eLessOrEqual,
+        VK_FALSE, desc.stencil_test, stencil, stencil);
 
     auto dynamicStates = std::vector { vk::DynamicState::eViewport, vk::DynamicState::eScissor };
     auto dynamicState = vk::PipelineDynamicStateCreateInfo({}, dynamicStates);

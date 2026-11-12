@@ -6,10 +6,8 @@ using namespace dy;
 
 ClRenderpass::ClRenderpass(Context& ctx) : frames(ctx.swap.num_frames), ctx(ctx) {
     
-    depthFormat = ctx.swap.findSupportedFormat(
-        {vk::Format::eD32Sfloat, vk::Format::eD16Unorm},
-        vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment // | vk::FormatFeatureFlagBits::eTransferSrc
-    );
+    // With a stencil where the GPU has one (Context::sceneDepthFormat)
+    depthFormat = ctx.sceneDepthFormat();
 
     std::vector<vk::AttachmentDescription> attachments {
             vk::AttachmentDescription({}, vk::Format(ctx.swap.format), vk::SampleCountFlagBits::e1,
@@ -19,7 +17,7 @@ ClRenderpass::ClRenderpass(Context& ctx) : frames(ctx.swap.num_frames), ctx(ctx)
             ),
             vk::AttachmentDescription({}, depthFormat, vk::SampleCountFlagBits::e1,
                                       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
-                                      vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
+                                      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
                                       vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal
             )
     };
@@ -59,7 +57,7 @@ ClRenderpass::ClRenderpass(Context& ctx) : frames(ctx.swap.num_frames), ctx(ctx)
         f.depthView = ctx.device->createImageView(
                 vk::ImageViewCreateInfo({}, f.depthImage, vk::ImageViewType::e2D, depthFormat,
                                         vk::ComponentMapping(),
-                                        vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1)));
+                                        vk::ImageSubresourceRange(Context::depthAspects(depthFormat), 0, 1, 0, 1)));
 
         auto image_views = std::vector<vk::ImageView>{ctx.swap.imageViews[i], f.depthView};
 

@@ -74,7 +74,14 @@ void main() {
     // asked for (the grass, whose hits may be under the ground; the facets of the ground)
     float lift = (1.0 - texelFetch(u_color, pixel, 0).a) * 2.0;
     float bias = 0.02 + 0.0008 * far;
-    vec3 origin = position + sun_direction * bias + to_eye / far * (0.3 * bias) + vec3(0.0, lift, 0.0);
+    // How far the pixel is is not known that well. The depth holds near / distance, which the vertex
+    // shaders get as the difference of two sums of products of world coordinates : in floats, with the
+    // near plane at 0.1 m, 1 km from the origin of the world, the distance is off by up to 4 mm a metre
+    // (15 cm at 40 m), another way every frame. A point found under the ground has the ground between
+    // it and the sun : bare ground went dark for a frame, a triangle at a time (sand, rock faces). The
+    // ray starts nearer the eye by more than that
+    float slack = 4e-6 * (length(viewpos.xyz) + far) * far;
+    vec3 origin = position + sun_direction * bias + to_eye / far * (0.3 * bias + slack) + vec3(0.0, lift, 0.0);
 
     // Points of the disc of the light, others every frame
     vec3 side = normalize(cross(sun_direction, abs(sun_direction.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));

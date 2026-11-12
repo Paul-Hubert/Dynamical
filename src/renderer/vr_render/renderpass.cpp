@@ -12,10 +12,8 @@ VRRenderpass::VRRenderpass(Context& ctx) : ctx(ctx) {
 
     views.resize(ctx.vr.swapchains.size());
 
-    depthFormat = ctx.swap.findSupportedFormat(
-        {vk::Format::eD32Sfloat, vk::Format::eD16Unorm},
-        vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment
-    );
+    // With a stencil where the GPU has one (Context::sceneDepthFormat)
+    depthFormat = ctx.sceneDepthFormat();
 
     // OpenXR requires the swapchain images to be left in COLOR_ATTACHMENT_OPTIMAL
     std::vector<vk::AttachmentDescription> attachments {
@@ -26,7 +24,7 @@ VRRenderpass::VRRenderpass(Context& ctx) : ctx(ctx) {
             ),
             vk::AttachmentDescription({}, depthFormat, vk::SampleCountFlagBits::e1,
                                       vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
-                                      vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare,
+                                      vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare,
                                       vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal
             )
     };
@@ -72,7 +70,7 @@ VRRenderpass::VRRenderpass(Context& ctx) : ctx(ctx) {
             view.depthViews[i] = ctx.device->createImageView(
                     vk::ImageViewCreateInfo({}, view.depthImages[i].image, vk::ImageViewType::e2D, depthFormat,
                                             vk::ComponentMapping(),
-                                            vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1)));
+                                            vk::ImageSubresourceRange(Context::depthAspects(depthFormat), 0, 1, 0, 1)));
 
             auto image_views = std::vector<vk::ImageView>{swapchain.images[i].view, view.depthViews[i]};
 

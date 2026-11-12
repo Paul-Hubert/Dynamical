@@ -58,6 +58,15 @@ vec2 soilWarp(vec2 ground) {
     return 4.4 * large + 2.2 * middle + 0.7 * small;
 }
 
+// How much of the grass grows on a slope, by how far up its normal points : all of it on level ground, none
+// where it gets steep (earth, then rock). The normal goes straight from a vertex of the terrain to the
+// next : a threshold on it follows the triangles, and the earth of a hillside showed as polygons 4 m
+// wide. A noise of a few metres winds the line. The same in grass.frag.glsl, which thins the blades by it
+float slopeGrass(vec2 ground, float up) {
+    float winding = 0.6 * shadeNoise(ground * 0.19 + 7.3) + 0.4 * shadeNoise(ground * 0.61 + 41.9) - 0.5;
+    return smoothstep(0.71, 0.8, up + 0.1 * winding);
+}
+
 // Mud, stones and sand at a point of the ground of this chunk, from its soil map. a : height of the grass
 vec4 soilAt(vec2 ground, float layer, float texels_per_metre) {
     vec2 texel = (ground - chunk.xy) * texels_per_metre + soil_border + 0.5;
@@ -339,20 +348,46 @@ void main() {
     // the terrain steps back by the height of the grass and lets them through. None of that on the soil
     // The relief is under the plane : what stands on the ground hides it by that much
     gl_FragDepth = gl_FragCoord.z;
+    float pushed = 0.0;     // metres along the view
     if(s_sunk > 0.0) {
-        vec4 clip = viewproj * vec4(v_position + view * (s_sunk / max(-view.y, 0.05)), 1.0);
-        gl_FragDepth = clamp(max(clip.z / clip.w, gl_FragDepth), 0.0, 1.0);
+        pushed = s_sunk / max(-view.y, 0.05);
     }
     if(under_grass > 0.0) {
-        float covered = smoothstep(0.76, 0.88, normal.y);
-        float under = 1.0 - 0.8 * covered * grassy * (1.0 - 0.7 * s_bare);
+        float covered = slopeGrass(ground, normal.y);
+        // Far away the grass ends on one line (grass.frag.glsl, blades are not told apart) : no half
+        // shade past it
+        covered = mix(covered, smoothstep(0.45, 0.55, covered), smoothstep(10.0, 40.0, far));
+        float grass_over = covered * grassy * (1.0 - 0.7 * s_bare);
+        float under = 1.0 - 0.8 * grass_over;
         unlit *= under;
         sunlit *= under;
-        float behind = under_grass * covered * grass_tall * smoothstep(0.0, 0.15, grassy);
-        vec4 clip = viewproj * vec4(v_position + view * behind, 1.0);
+        // Seen from above, that is the ground between the blades. Seen along the ground it is not : a
+        // ray only gets under whole grass without meeting a blade where it came in under the edge of the
+        // shell (the lower edge of the grass of a hillside seen from below, grass thinned out in front
+        // of thicker grass), and would have met the blades from the side. The ground is drawn as them :
+        // the green of the grass half way up, in its own shade
+        float along = grass_over * (1.0 - smoothstep(0.25, 0.6, -dot(view, normal)));
+        if(along > 0.0) {
+            const vec3 grass_side = vec3(0.13, 0.27, 0.065);
+            unlit = mix(unlit, grass_side * 0.8 * ambientLight(v_position, normal, shade), along);
+            sunlit = mix(sunlit, grass_side * 0.8 * light_color.rgb * max(dot(normal, sun_direction), 0.0), along);
+        }
+        pushed = max(pushed, under_grass * covered * grass_tall * smoothstep(0.0, 0.15, grassy));
+    }
+    if(pushed > 0.0) {
+        vec4 clip = viewproj * vec4(v_position + view * pushed, 1.0);
         gl_FragDepth = clamp(max(clip.z / clip.w, gl_FragDepth), 0.0, 1.0);
     }
 
-    writeLit(unlit, sunlit, shade, v_position, liftAlpha(terminatorLift(position_dx, position_dy, normal, 4.0)));
+    // The ray to the sun starts where the depth says the pixel is : pushed back, that is under the
+    // ground, which then hides the sun from itself (the stones were black between their tops, the ground
+    // seen through the grass was black). It starts as far over that point as the push went under the
+    // triangle that is drawn, and a little more : the point is as far to the side as it was pushed,
+    // where the next triangle may be higher
+    vec3 flat_normal = cross(position_dx, position_dy);
+    flat_normal *= sign(flat_normal.y) / max(length(flat_normal), 1e-12);
+    float under_ground = pushed * max(-dot(view, flat_normal), 0.0) / max(flat_normal.y, 0.2);
+
+    writeLit(unlit, sunlit, shade, v_position, liftAlpha(terminatorLift(position_dx, position_dy, normal, 4.0) + under_ground + 0.25 * pushed));
 
 }

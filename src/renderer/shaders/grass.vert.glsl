@@ -45,8 +45,11 @@ void main() {
 
     vec3 normal = decodeNormal(a_normal);
 
-    // Only on flat ground, slopes keep the rock of the terrain pass : the grass gets shorter towards them
-    v_height = grass_height * smoothstep(0.68, 0.86, normal.y);
+    // Only on flat ground, slopes keep the rock of the terrain pass : the shell comes down to the ground
+    // there. Only where the blades have thinned out already (slopeGrass in grass.frag.glsl) : the height
+    // goes straight from a vertex to the next, and grass that gets shorter over a whole hillside showed
+    // the triangles of the terrain, each with its own shade
+    v_height = grass_height * smoothstep(0.66, 0.76, normal.y);
 
     // Taller and shorter grass, from the height map of the chunk.
     // Here and not per pixel : the shell stays at the top of the grass

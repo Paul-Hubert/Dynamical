@@ -174,6 +174,16 @@ vec2 soilWarp(vec2 ground) {
     return 4.4 * large + 2.2 * middle + 0.7 * small;
 }
 
+// How much of the grass grows on a slope, by how far up its normal points : all of it on level ground, none
+// where it gets steep. The normal goes straight from a vertex of the terrain to the next : a threshold on
+// it follows the triangles (the grass of a hillside ended on polygons 4 m wide). A noise of a few metres
+// winds the line, and the blades go one by one over it, as they do into a patch of soil. The same in
+// terrain.frag.glsl
+float slopeGrass(vec2 ground, float up) {
+    float winding = 0.6 * shadeNoise(ground * 0.19 + 7.3) + 0.4 * shadeNoise(ground * 0.61 + 41.9) - 0.5;
+    return smoothstep(0.71, 0.8, up + 0.1 * winding);
+}
+
 // Mud, stones and sand at a point of the ground of this chunk, from its soil map. a : height of the grass
 vec4 soilAt(vec2 ground, float layer, float texels_per_metre) {
     vec2 texel = (ground - chunk.xy) * texels_per_metre + soil_border + 0.5;
@@ -430,10 +440,10 @@ float hitPlant(vec2 tile_middle, vec2 heading, vec2 dx, vec2 dy, float push, flo
 
 void main() {
 
-    // No grass on the slopes : the shell comes down to the ground there (grass.vert.glsl), and the edge
-    // follows the normal like the rock of the terrain pass does
+    // No grass on the slopes : the shell comes down to the ground there (grass.vert.glsl), and the blades
+    // thin out to none where the ground gets steep (slopeGrass, further down)
     vec3 ground_normal = normalize(v_normal);
-    if(v_height < 0.03 * grass_height || ground_normal.y < 0.74) {
+    if(v_height < 0.03 * grass_height || slopeGrass(v_position.xz, ground_normal.y) <= 0.0) {
         discard;
     }
 
@@ -642,12 +652,20 @@ void main() {
     // falling : how much the ground bends down along the view, from the second derivatives of the
     // terrain density (marchingcubes.comp.glsl). Flat ground and hollows cut nothing : the ray does
     // meet grass further on. silhouette : more than 1 cuts higher than that (the real ray stays long
-    // near its deepest point, and would meet more grass than the straight ray of the lookup : less than 1)
+    // near its deepest point, and would meet more grass than the straight ray of the lookup : less than 1).
+    // The bend is only known around the pixel : whether the ray does come out is not for this shader to
+    // say. GrassPass gives a silhouette only to the pixels where the back of the shell is in front of
+    // the ground, which is where it does; the others are drawn whole (docs/grass/13-see-through.md)
     float flat_length = length(view.xz);
     float falling = -(v_curve.x * view_flat.x * view_flat.x + 2.0 * v_curve.y * view_flat.x * view_flat.y + v_curve.z * view_flat.y * view_flat.y);
     if(silhouette > 0.0 && falling > 1e-5) {
         float deepest = sink * sink / (2.0 * falling * max(flat_length * flat_length, 1e-4));
-        if(v_height - hit_height > deepest / silhouette) {
+        // The real ray stays long around its deepest point : it meets as much grass as the straight ray
+        // of the lookup does `longer` times deeper (blades get thinner towards their tips). What the
+        // lookup met on the ground of the tile is never there : the ray does not get down to it
+        float longer = clamp(sqrt(16.0 / 3.0 * hit_fall / max(sink, 1e-4)), 1.0, 8.0);
+        bool on_ground = deepest < v_height && (hit_distance >= 1e30 || hit_bare || hit_part < 0.06);
+        if(on_ground || v_height - hit_height > deepest * longer / silhouette) {
             discard;
         }
     }
@@ -667,15 +685,16 @@ void main() {
     // Patches of soil (terrain.frag.glsl) : no blade is rooted in one. Over the edge the blades go one
     // by one, by their id : tufts further and further apart, then the soil. Far away blades are not
     // told apart : one line
-    float soil_grass = 1.0;
+    // The same where the ground gets steep, by the slope where the blade is rooted
+    float rooted = hit_part * hit_layer_height;
+    vec2 hit_root = v_position.xz + view.xz * ((v_height - rooted) / hit_fall) - rooted * (lean + bend * hit_part);
+    float soil_grass = slopeGrass(hit_root, ground_normal.y);
     if(chunk.w >= 0.0) {
-        float rooted = hit_part * hit_layer_height;
-        vec2 hit_root = v_position.xz + view.xz * ((v_height - rooted) / hit_fall) - rooted * (lean + bend * hit_part);
         vec3 soil = soilAt(hit_root + soilWarp(hit_root), chunk.w, map_scale).rgb;
-        soil_grass = 1.0 - smoothstep(0.4, 0.6, max(soil.r, max(soil.g, soil.b)));
-        if(soil_grass < 1.0 && mix(hit_id, 0.5, smoothstep(1.0, 3.0, hit_lod)) >= soil_grass) {
-            discard;
-        }
+        soil_grass = min(soil_grass, 1.0 - smoothstep(0.4, 0.6, max(soil.r, max(soil.g, soil.b))));
+    }
+    if(soil_grass < 1.0 && mix(hit_id, 0.5, smoothstep(1.0, 3.0, hit_lod)) >= soil_grass) {
+        discard;
     }
 
     // Between the blades : dark ground, kept over the terrain (which the flat ground of the tile only

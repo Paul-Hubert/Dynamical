@@ -5,7 +5,8 @@ open land through a forest and out, around the trees) frame by frame through a c
 
     build/venv/Scripts/python tools/forest_video.py [--scene forest_walk] [--seed 1] [--distance 280] [--speed 4]
                                                     [--fps 30] [--crf 26] [--var NAME=VALUE] [--preview N]
-                                                    [--exe build/RelWithDebInfo/dynamical.exe]
+                                                    [--exe build/RelWithDebInfo/dynamical.exe] [--cwd build]
+                                                    [--arg KEY=VALUE]
                                                     [--out build/artifacts/forest_video/NAME.mp4]
 
     # the walk over the soil patches, past the herds and through a forest (docs/tautavel-walk.md)
@@ -16,6 +17,8 @@ distance and the speed are the scene's own when they are not given; the walk las
 simulation runs at 60 Hz with a fixed frame clock, so the video plays in real time whatever the render speed; the
 first frame waits for the terrain, the plants and the animals to be loaded. Captures are 960 x 540.
 --preview N renders N frames spread over the walk and no MP4.
+--arg passes an argument on to the engine (--arg ray_tracing=false --arg lighting=off : the reference of the goldens),
+--cwd runs it in another folder than build/ (a copy of the executable and of resources/, when other sessions build).
 """
 
 import argparse
@@ -45,6 +48,8 @@ def main():
     parser.add_argument("--var", action="append", default=[], metavar="NAME=VALUE", help="a scene variable, repeatable")
     parser.add_argument("--crf", type=int, default=26, help="x264 quality, lower is better and larger (grass does not compress)")
     parser.add_argument("--exe", default=str(EXE), help="the engine (a copy of it, when the build directory is being built in)")
+    parser.add_argument("--cwd", default=str(BUILD), help="the folder the engine runs in : its resources/ are the ones read")
+    parser.add_argument("--arg", action="append", default=[], metavar="KEY=VALUE", help="an argument of the engine, repeatable")
     parser.add_argument("--out")
     parser.add_argument("--keep-frames", action="store_true")
     parser.add_argument("--preview", type=int, default=0, metavar="N", help="N frames spread over the walk, no MP4 : to choose a seed")
@@ -76,8 +81,8 @@ def main():
     print(f"rendering {count} frames of {args.scene} (seed {seed})", flush=True)
     start = time.monotonic()
     proc = subprocess.run([args.exe, f"capture={frames / 'capture.json'}", f"capture_dir={frames}", "fullscreen=false",
-                           f"window_width={args.width}", f"window_height={args.height}", "vr_mode=0"],
-                          cwd=BUILD, capture_output=True, text=True, timeout=7200)
+                           f"window_width={args.width}", f"window_height={args.height}", "vr_mode=0"] + args.arg,
+                          cwd=args.cwd, capture_output=True, text=True, timeout=7200)
     (frames / "dynamical.log").write_text(proc.stdout + proc.stderr)
     rendered = sorted(frames.glob("frame_*.png"))
     print(f"exit {proc.returncode}, {len(rendered)} frames in {time.monotonic() - start:.0f} s", flush=True)

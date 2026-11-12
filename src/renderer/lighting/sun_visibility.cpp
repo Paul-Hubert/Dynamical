@@ -38,7 +38,8 @@ SunVisibility::SunVisibility(Context& ctx, entt::registry& reg, RenderTarget tar
 
     Device& device = ctx.device;
 
-    depth_format = vk::Format::eD32Sfloat;
+    // With a stencil where the GPU has one, for the scene passes (Context::sceneDepthFormat)
+    depth_format = ctx.sceneDepthFormat();
 
     // The pass of the scene : colour, sun and depth, all read afterwards
     {
@@ -48,7 +49,7 @@ SunVisibility::SunVisibility(Context& ctx, entt::registry& reg, RenderTarget tar
             vk::AttachmentDescription({}, sun_format, vk::SampleCountFlagBits::e1, vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
                 vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined, vk::ImageLayout::eShaderReadOnlyOptimal),
             vk::AttachmentDescription({}, depth_format, vk::SampleCountFlagBits::e1, vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eStore,
-                vk::AttachmentLoadOp::eDontCare, vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilReadOnlyOptimal),
+                vk::AttachmentLoadOp::eClear, vk::AttachmentStoreOp::eDontCare, vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilReadOnlyOptimal),
         };
         std::vector<vk::AttachmentReference> colours {
             vk::AttachmentReference(0, vk::ImageLayout::eColorAttachmentOptimal),
@@ -133,7 +134,10 @@ SunVisibility::SunVisibility(Context& ctx, entt::registry& reg, RenderTarget tar
         eye.extent = extents[e];
         eye.colour = makeTarget(eye.extent, colour_format, vk::ImageUsageFlagBits::eColorAttachment, vk::ImageAspectFlagBits::eColor);
         eye.sun = makeTarget(eye.extent, sun_format, vk::ImageUsageFlagBits::eColorAttachment, vk::ImageAspectFlagBits::eColor);
-        eye.depth = makeTarget(eye.extent, depth_format, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::ImageAspectFlagBits::eDepth);
+        eye.depth = makeTarget(eye.extent, depth_format, vk::ImageUsageFlagBits::eDepthStencilAttachment, Context::depthAspects(depth_format));
+        // The shaders read the depth alone
+        eye.depth_read = device->createImageView(vk::ImageViewCreateInfo({}, eye.depth.image.image, vk::ImageViewType::e2D, depth_format,
+            vk::ComponentMapping(), vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1)));
 
         auto scene_views = std::vector { eye.colour.view, eye.sun.view, eye.depth.view };
         eye.scene = device->createFramebuffer(vk::FramebufferCreateInfo({}, scene_pass, scene_views, eye.extent.width, eye.extent.height, 1));
@@ -151,7 +155,7 @@ SunVisibility::SunVisibility(Context& ctx, entt::registry& reg, RenderTarget tar
                     VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, eye.visibility[i].image.image, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)));
         }
 
-        auto depth = vk::DescriptorImageInfo(nearest, eye.depth.view, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
+        auto depth = vk::DescriptorImageInfo(nearest, eye.depth_read, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
         auto colour = vk::DescriptorImageInfo(nearest, eye.colour.view, vk::ImageLayout::eShaderReadOnlyOptimal);
         auto sun = vk::DescriptorImageInfo(nearest, eye.sun.view, vk::ImageLayout::eShaderReadOnlyOptimal);
         auto rays = vk::DescriptorImageInfo(nearest, eye.rays.view, vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -250,6 +254,7 @@ SunVisibility::~SunVisibility() {
         device->destroy(eye.rays.view);
         device->destroy(eye.colour.view);
         device->destroy(eye.sun.view);
+        device->destroy(eye.depth_read);
         device->destroy(eye.depth.view);
         for(auto& visibility : eye.visibility) device->destroy(visibility.view);
     }

@@ -38,6 +38,13 @@ private:
     vk::DescriptorSet descSet;
     vk::PipelineLayout layout;
 
+    // Blades are seen through where the view ray comes out of the grass again, over a crest : where the
+    // shell is seen from behind in front of the ground (docs/grass/13-see-through.md). With a stencil
+    // (Context::sceneStencil) the shell is drawn three times : its back faces mark those pixels (backs),
+    // its front faces are drawn whole on the others (pipelines) and seen through on these (cuts).
+    // Without one, whole everywhere
+    std::array<vk::Pipeline, NUM_RENDER_TARGETS> backs {}, cuts {};
+
     vk::Sampler sampler;
     vk::Sampler raySampler;     // trilinear and anisotropic, for the baked rays
 

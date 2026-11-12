@@ -31,6 +31,14 @@ struct GraphicsPipelineDesc {
     bool depth_write = true;
     bool alpha_blend = false;
     uint32_t color_attachments = 1;     // of the subpass, all blended the same way
+    bool color_write = true;            // false : the depth and the stencil only
+
+    // The stencil of the scene passes (where Context::sceneStencil()) : the test against the reference, and
+    // what a fragment that passes it and the depth test leaves there
+    bool stencil_test = false;
+    vk::CompareOp stencil_compare = vk::CompareOp::eAlways;
+    vk::StencilOp stencil_pass = vk::StencilOp::eKeep;
+    uint32_t stencil_reference = 0;
 };
 
 vk::ShaderModule loadShader(Device& device, const char* path);

@@ -545,8 +545,10 @@ void CameraWalkSys::tick(double dt) {
     auto& walk = reg.ctx().get<CameraWalk>();
     frames++;
 
-    // The plants are counted by the renderer, a frame late; a Forest plants a few chunks a frame
-    if(!walk.started && frames > 4 && terrainReady(reg) && vegetationReady(reg) && (herds <= 0.f || animalsReady(reg))) {
+    // The plants are counted by the renderer, a frame late; a Forest plants a few chunks a frame.
+    // The lighting has settled too, as a capture waits for it : the first frame of a video is the first
+    // step of the walk, and frame n of two renders is the same view
+    if(!walk.started && frames > 4 && terrainReady(reg) && vegetationReady(reg) && (herds <= 0.f || animalsReady(reg)) && lightingReady(reg)) {
         auto unplanted = reg.view<ChunkVolume>(entt::exclude<ChunkForest, ChunkDestroying>);
         if(!reg.ctx().find<std::shared_ptr<ForestField>>() || unplanted.begin() == unplanted.end()) {
             route();

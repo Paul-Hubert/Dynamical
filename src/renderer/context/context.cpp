@@ -40,6 +40,20 @@ Context::Context(entt::registry& reg) : vr(*this, reg), win(*this, reg), instanc
 
 }
 
+vk::Format Context::sceneDepthFormat() {
+    if(scene_depth_format == vk::Format::eUndefined) {
+        // Read by the rays of the sun too (SunVisibility)
+        auto features = vk::FormatFeatureFlagBits::eDepthStencilAttachment | vk::FormatFeatureFlagBits::eSampledImage;
+        try {
+            scene_depth_format = swap.findSupportedFormat({ vk::Format::eD32SfloatS8Uint, vk::Format::eD32Sfloat }, vk::ImageTiling::eOptimal, features);
+        } catch(const std::exception&) {
+            scene_depth_format = swap.findSupportedFormat({ vk::Format::eD32Sfloat, vk::Format::eD16Unorm }, vk::ImageTiling::eOptimal,
+                vk::FormatFeatureFlagBits::eDepthStencilAttachment);
+        }
+    }
+    return scene_depth_format;
+}
+
 std::vector<vk::DescriptorPoolSize> Context::viewPoolSizes(uint32_t sets) const {
     std::vector<vk::DescriptorPoolSize> sizes {
         vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, sets * 2),

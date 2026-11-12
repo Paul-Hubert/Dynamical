@@ -67,7 +67,9 @@ A texel every 4 m gives patches with straight edges. Three things on top of the 
    vertex). Over the edge itself (0.8 m to each side) `grass.frag.glsl` finds where the blade it met is rooted,
    reads the bent map there and drops the blade if its id is over what is left of the grass: tufts further and
    further apart, drier, then none. Far away, where blades are not told apart, one line. The terrain is dark
-   under the grass and steps back behind it (`under_grass`) by the same amounts.
+   under the grass and steps back behind it (`under_grass`) by the same amounts. The same on the slopes,
+   where the grass stops by the normal of the ground (`slopeGrass`, docs/grass.md). Seen along the ground,
+   the ground under whole grass is drawn as grass seen from the side (docs/grass/13-see-through.md).
 
 ## The textures
 

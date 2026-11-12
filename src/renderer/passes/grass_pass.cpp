@@ -362,7 +362,28 @@ void GrassPass::createPipeline(RenderTarget target, vk::RenderPass renderpass) {
     auto specialization = vk::SpecializationInfo(38, entries, sizeof(RayLayout), &rayLayout);
     desc.fragment_specialization = &specialization;
 
+    if(!ctx.sceneStencil()) {
+        pipelines[index(target)] = createGraphicsPipeline(ctx.device, desc);
+        return;
+    }
+
+    // The front faces : whole where the stencil is 0, seen through where the back faces marked it
+    desc.stencil_test = true;
+    desc.stencil_compare = vk::CompareOp::eEqual;
+    desc.stencil_reference = 0;
     pipelines[index(target)] = createGraphicsPipeline(ctx.device, desc);
+    desc.stencil_reference = 1;
+    cuts[index(target)] = createGraphicsPipeline(ctx.device, desc);
+
+    // The back faces, where they are in front of the ground : nothing drawn but the mark
+    desc.fragment_shader = "./resources/shaders/grass_back.frag.glsl.spv";
+    desc.fragment_specialization = nullptr;
+    desc.cull = vk::CullModeFlagBits::eFront;
+    desc.depth_write = false;
+    desc.color_write = false;
+    desc.stencil_compare = vk::CompareOp::eAlways;
+    desc.stencil_pass = vk::StencilOp::eReplace;
+    backs[index(target)] = createGraphicsPipeline(ctx.device, desc);
 
 }
 
@@ -414,32 +435,50 @@ void GrassPass::record(vk::CommandBuffer command, const RenderView& view) {
         params.baked_colour, params.species.size, params.species.low
     };
 
-    command.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines[index(view.target)]);
-    command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, 0, {view.view_set, descSet}, {});
-    command.pushConstants(layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, sizeof(GrassPC), &pc);
-
     const auto stages = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment;
+    command.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layout, 0, {view.view_set, descSet}, {});
 
-    for(auto [entity, position, gpu] : creg.view<const ChunkC, const ChunkGPU, const ChunkReady>().each()) {
+    // The shell of every chunk with one pipeline. silhouette : how much the blades are seen through
+    auto draw = [&](vk::Pipeline pipeline, float silhouette) {
+        pc.silhouette = silhouette;
+        command.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+        command.pushConstants(layout, stages, 0, sizeof(GrassPC), &pc);
 
-        // No grass without the height map of the chunk (update gave it one, unless the layers ran out)
-        int32_t height_layer = heightLayers.layer(gpu.slot, entity);
-        if(height_layer < 0) continue;
+        for(auto [entity, position, gpu] : creg.view<const ChunkC, const ChunkGPU, const ChunkReady>().each()) {
 
-        // Its soil map says where there is none (SoilMaps)
-        glm::vec3 origin = position.origin();
-        glm::vec4 where(origin.x, origin.z, (float) height_layer, soil ? (float) soil->layer(gpu.slot, entity) : -1.f);
-        command.pushConstants(layout, stages, offsetof(GrassPC, chunk), sizeof(glm::vec4), &where);
+            // No grass without the height map of the chunk (update gave it one, unless the layers ran out)
+            int32_t height_layer = heightLayers.layer(gpu.slot, entity);
+            if(height_layer < 0) continue;
 
-        command.bindVertexBuffers(0, {buffers->vertices[gpu.slot]}, {0});
-        command.drawIndirect(buffers->indirect, gpu.slot * buffers->indirect_stride, 1, 0);
-    }
+            // Its soil map says where there is none (SoilMaps)
+            glm::vec3 origin = position.origin();
+            glm::vec4 where(origin.x, origin.z, (float) height_layer, soil ? (float) soil->layer(gpu.slot, entity) : -1.f);
+            command.pushConstants(layout, stages, offsetof(GrassPC, chunk), sizeof(glm::vec4), &where);
+
+            command.bindVertexBuffers(0, {buffers->vertices[gpu.slot]}, {0});
+            command.drawIndirect(buffers->indirect, gpu.slot * buffers->indirect_stride, 1, 0);
+        }
+    };
+
+    // Seen through only where the ray comes out of the grass again : where the back of the shell is in
+    // front of the ground, which its back faces mark in the stencil first. A ray that ends on the ground
+    // stays in the grass all the way (cutting it there showed the dark ground under the crests)
+    const bool see_through = params.silhouette > 0.f && cuts[index(view.target)];
+    if(see_through) draw(backs[index(view.target)], 0.f);
+    draw(pipelines[index(view.target)], 0.f);
+    if(see_through) draw(cuts[index(view.target)], params.silhouette);
 
 }
 
 GrassPass::~GrassPass() {
 
     for(auto pipeline : pipelines) {
+        if(pipeline) ctx.device->destroy(pipeline);
+    }
+    for(auto pipeline : backs) {
+        if(pipeline) ctx.device->destroy(pipeline);
+    }
+    for(auto pipeline : cuts) {
         if(pipeline) ctx.device->destroy(pipeline);
     }
     ctx.device->destroy(layout);

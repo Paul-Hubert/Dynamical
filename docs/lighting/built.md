@@ -80,7 +80,14 @@ targets     scene passes -> colour, sun, depth; sun rays; resolve; composite + U
 - **Sun's visibility**: three passes per eye. `colour` is RGBA16F and its alpha says how far over the pixel the
   ray starts (`liftAlpha`): 0.3 m for the grass, whose hits may be under the ground, and for the ground what
   clears the next facet where a 4 m facet turns away from a low sun under normals that still face it
-  (`terminatorLift`). No blue noise texture: a hash per pixel and frame. The history is refused on its distance
+  (`terminatorLift`), and by how far under the ground its depth was pushed back (the relief of the mud, the
+  stones and the sand, the ground under the grass: the ray started under the triangle, which hid the sun
+  from itself; the stones were black between their tops). The ray also starts nearer the eye by 4 mm per
+  metre of distance and per kilometre from the origin of the world: the depth holds near / distance, which
+  comes out of the vertex shaders as the difference of two sums of products of world coordinates, and in
+  floats, with the near plane at 0.1 m, the distance found again from it is off by that much, another way
+  every frame. Bare ground went dark a triangle at a time, for a frame (sand, rock faces). Drawing relative
+  to the eye would take the error away at its source; not done. No blue noise texture: a hash per pixel and frame. The history is refused on its distance
   to the eye of the frame before, kept in the alpha of the visibility, and held within 1.5 standard deviations
   of the 5 x 5 rays around.
 - **The boxes of the far plants are left out of the per pixel sun rays** unless the sun is under 15°: they are
