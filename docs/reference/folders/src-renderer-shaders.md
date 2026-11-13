@@ -20,14 +20,14 @@ shader ends with `writeLit(unlit, sunlit, shade, position, alpha)`.
 | `grass` | [`grass.vert.glsl`](../../../src/renderer/shaders/grass.vert.glsl) | the shell at the top of the plants: height map layer of the chunk, slope and soil lowering, `v_cover` |
 | `grass` | [`grass.frag.glsl`](../../../src/renderer/shaders/grass.frag.glsl) | the view ray looked up in the baked rays (oblique 2D arrays, top rays), species layers, baked colour, see-through on crests, blades dropped near soil patches |
 | `grass` | [`grass_back.frag.glsl`](../../../src/renderer/shaders/grass_back.frag.glsl) | back faces of the shell: marks the stencil where the shell is seen from behind, in front of the ground |
-| `vegetation` | [`vegetation.vert.glsl`](../../../src/renderer/shaders/vegetation.vert.glsl) | SpeedTree geometry of the library, instanced, no wind |
+| `vegetation` | [`vegetation.vert.glsl`](../../../src/renderer/shaders/vegetation.vert.glsl) | SpeedTree geometry of the library, a plant per draw (push constants), no wind |
 | `vegetation` | [`vegetation.frag.glsl`](../../../src/renderer/shaders/vegetation.frag.glsl) | alpha test, normal map, baked occlusion, subsurface, tree shade |
 | `vegetation` (ray tracing) | [`vegetation_volume.vert.glsl`](../../../src/renderer/shaders/vegetation_volume.vert.glsl) | the box of a far plant, twelve triangles without a vertex buffer |
 | `vegetation` (ray tracing) | [`vegetation_volume.rt.frag.glsl`](../../../src/renderer/shaders/vegetation_volume.rt.frag.glsl) | a far plant marched through the baked volume of its species, in place of its billboard |
 | `animals` | [`animal.vert.glsl`](../../../src/renderer/shaders/animal.vert.glsl) | skinned meshes, four joints a vertex, matrices of the frame from a storage buffer (set 2) |
 | `animals` | [`animal.frag.glsl`](../../../src/renderer/shaders/animal.frag.glsl) | the view, the lights, the tree shade, as the vegetation |
 | `animals` (ray tracing) | [`animal_skin.rt.comp.glsl`](../../../src/renderer/shaders/animal_skin.rt.comp.glsl) | skins an animal near the viewers into the buffer its acceleration structure is built from |
-| `model` | [`model.vert.glsl`](../../../src/renderer/shaders/model.vert.glsl) | `ModelVertex` (position, normal, uv), per-instance model matrix |
+| `model` | [`model.vert.glsl`](../../../src/renderer/shaders/model.vert.glsl) | `ModelVertex` (position, normal, uv), model matrix pushed per instance |
 | `model` | [`model.frag.glsl`](../../../src/renderer/shaders/model.frag.glsl) | base colour texture of the material (white when untextured), lit |
 | `ui` | [`uirender.vert.glsl`](../../../src/renderer/shaders/uirender.vert.glsl) | ImGui vertices, scale and translate push constants |
 | `ui` | [`uirender.frag.glsl`](../../../src/renderer/shaders/uirender.frag.glsl) | vertex colour x font / image texture |
