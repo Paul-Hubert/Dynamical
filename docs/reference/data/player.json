@@ -1,0 +1,2258 @@
+{
+  "systems": [
+    {
+      "name": "PlayerSpawn",
+      "class": "PlayerSpawnSys",
+      "file": "src/logic/player/player_body.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Makes one FPS or VR player on the ground at a position, and a row of boxes (Prop) in front of it; optionally a flat Ground.",
+      "access": [
+        {
+          "name": "Ground",
+          "kind": "component",
+          "access": "write+create",
+          "where": "preinit",
+          "effect": "with `ground: true`: a new entity with a 1200 x 10 x 1200 m Ground (top at y = 0), before RigidBody's init makes the grounds"
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "`std::shared_ptr<TerrainGenerator>`: `surfaceHeight` gives the ground under the player and the boxes; 0 without one"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makeFPSPlayer, makeVRPlayer)",
+          "effect": "the player at its eyes, the hands, the boxes"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makeFPSPlayer, makeVRPlayer)",
+          "effect": "the player's 70 kg capsule (lock_rotation), the 1.5 kg hand boxes, the boxes"
+        },
+        {
+          "name": "MouseKeyboardInput",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makeFPSPlayer)",
+          "effect": "the FPS player's keyboard and mouse"
+        },
+        {
+          "name": "ControllersInput",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makeFPSPlayer)",
+          "effect": "the FPS player's gamepad"
+        },
+        {
+          "name": "VRPlayerInput",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makeVRPlayer)",
+          "effect": "the VR player's controllers"
+        },
+        {
+          "name": "PlayerView",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makers)",
+          "effect": "yaw set to the spawn's"
+        },
+        {
+          "name": "PlayerLegs",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makers)",
+          "effect": "default legs"
+        },
+        {
+          "name": "LookTurn",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makeFPSPlayer)",
+          "effect": "the view axis turns the FPS player's view"
+        },
+        {
+          "name": "DesktopView",
+          "kind": "tag",
+          "access": "write+create",
+          "where": "init (makeFPSPlayer)",
+          "effect": "the desktop camera follows the FPS player"
+        },
+        {
+          "name": "ThirdPerson",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init",
+          "effect": "with `third_person` > 0 on the FPS player: the camera that far behind"
+        },
+        {
+          "name": "Holder",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makeFPSPlayer)",
+          "effect": "the FPS player's pick up"
+        },
+        {
+          "name": "Rider",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makeFPSPlayer)",
+          "effect": "the FPS player can ride"
+        },
+        {
+          "name": "VRTracking",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makeVRPlayer)",
+          "effect": "empty tracking of the VR player"
+        },
+        {
+          "name": "VRBody",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makeVRPlayer)",
+          "effect": "play area yaw = spawn yaw, head at 1.8 m, its two hand entities"
+        },
+        {
+          "name": "Hand",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makeVRPlayer)",
+          "effect": "two hand entities, left and right, with their rest pose"
+        },
+        {
+          "name": "BodyDrive",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makeVRPlayer)",
+          "effect": "each hand driven to its rest pose, anchored on the player"
+        },
+        {
+          "name": "Grabber",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (makeVRPlayer)",
+          "effect": "each hand grabs"
+        },
+        {
+          "name": "Prop",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init",
+          "effect": "`props` boxes, coloured (the fourth of each four grey and heavy)"
+        }
+      ],
+      "side_effects": [
+        "Creates entities: the player (and its two hands for VR) and `props` box entities in init; one Ground entity in preinit with `ground: true`.",
+        "No physics bodies itself: RigidBody (a later system) makes the Jolt bodies of the RigidBody components it adds."
+      ]
+    },
+    {
+      "name": "VRPlayerInput",
+      "class": "VRPlayerInputSys",
+      "file": "src/logic/player/vr_player.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Copies the headset state (VRInput context) into the VRTracking and VRPlayerInput of every VR player.",
+      "access": [
+        {
+          "name": "VRInput",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "session state, head pose, controller poses, velocities, grip, trigger, sticks and buttons; nothing done without it"
+        },
+        {
+          "name": "VRBody",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "view filter: only VR players"
+        },
+        {
+          "name": "VRTracking",
+          "kind": "component",
+          "access": "write",
+          "where": "tick",
+          "effect": "focused, head, both hands' pose, velocities, grip, trigger overwritten"
+        },
+        {
+          "name": "VRPlayerInput",
+          "kind": "component",
+          "access": "write",
+          "where": "tick",
+          "effect": "focused, sticks, left stick click, right A, triggers overwritten; `last_action` set to the play time when a control is used"
+        }
+      ],
+      "side_effects": [
+        "None beyond the components (keeps its own play time, summed dt, for `last_action`)."
+      ]
+    },
+    {
+      "name": "LookTurn",
+      "class": "LookTurnSys",
+      "file": "src/logic/player/player_body.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Turns the PlayerView of players with a LookTurn by their input's view axis (a mouse by its motion, a stick at a rate).",
+      "access": [
+        {
+          "name": "ScriptedInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "answers for the player when present (tests, scripts)"
+        },
+        {
+          "name": "MouseKeyboardInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "ControllersInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "VRPlayerInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "LookTurn",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "`stick_speed`, and the filter of the players turned"
+        },
+        {
+          "name": "PlayerView",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "yaw decreased by the axis' x, pitch increased by its y, clamped to +-1.55 rad"
+        }
+      ],
+      "side_effects": [
+        "None."
+      ]
+    },
+    {
+      "name": "VRBody",
+      "class": "VRBodySys",
+      "file": "src/logic/player/vr_player.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "The VR player's body follows the head in the room, the play area turns around it, the legs hold the head's height, poses are held without focus.",
+      "access": [
+        {
+          "name": "ScriptedInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "answers for the player when present (tests, scripts)"
+        },
+        {
+          "name": "MouseKeyboardInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "ControllersInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "VRPlayerInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, tick",
+          "effect": "the player's Jolt body is moved by the head's motion (`SetPosition`, activates it)"
+        },
+        {
+          "name": "VRBody",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "focus state machine (pose_hold, was_focused, seen_focus, refocus_frame), last head position, tracked, yaw turned by the view axis"
+        },
+        {
+          "name": "VRTracking",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "focused, head pose"
+        },
+        {
+          "name": "PlayerView",
+          "kind": "component",
+          "access": "write",
+          "where": "tick",
+          "effect": "yaw and pitch from the head's forward turned by the play area"
+        },
+        {
+          "name": "PlayerLegs",
+          "kind": "component",
+          "access": "write",
+          "where": "tick",
+          "effect": "`height` = max(standing_height + head.y - 1.8, 0.3)"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "position moved by the head's motion in the room (turned by the play area)"
+        },
+        {
+          "name": "PhysicsPose",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "when present: both interpolated positions moved by the same delta"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (helper playerBodyId)",
+          "effect": "the Jolt body id of the player"
+        }
+      ],
+      "side_effects": [
+        "Teleports the player's Jolt body by the head's motion each frame (`BodyInterface::SetPosition`, activated)."
+      ]
+    },
+    {
+      "name": "PlayerLegs",
+      "class": "PlayerLegsSys",
+      "file": "src/logic/player/player_body.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Unity's GenericPlayer legs: at the physics rate, a ray down stands the body at its height, a force walks it along the view, a force jumps it.",
+      "access": [
+        {
+          "name": "ScriptedInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "answers for the player when present (tests, scripts)"
+        },
+        {
+          "name": "MouseKeyboardInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "ControllersInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "VRPlayerInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, step",
+          "effect": "ray casts under the eyes, forces on the player's body, collision group of the body"
+        },
+        {
+          "name": "FixedSteps",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, finish",
+          "effect": "adds its step to `before` in preinit (created when missing), removes it in finish"
+        },
+        {
+          "name": "TerrainNeeds",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "tick",
+          "effect": "created when missing; appends a box per player from 1.5 m around the eyes down to height + reach + 1.5 m below, so TerrainColliders meshes the ground under the legs"
+        },
+        {
+          "name": "PlayerLegs",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick, step",
+          "effect": "tuning and `limp` / `jump_locked` read; standing, walking, ground_distance, ground, ground_velocity, applied_force, group written; jump_locked cleared when jump is let go"
+        },
+        {
+          "name": "PlayerView",
+          "kind": "component",
+          "access": "read",
+          "where": "step",
+          "effect": "yaw: the heading of the walk"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "eyes position for the terrain box"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "step (helpers playerBodyId, bodyEntity)",
+          "effect": "the player's body id; the entity of the body stood on"
+        },
+        {
+          "name": "PlayerCollision",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "step (helpers playerCollision, setPlayerGroup)",
+          "effect": "created when missing; `next_group` taken for a player without a group, its body put in sub group `body`; the filter excludes the player's own bodies from the ground ray"
+        }
+      ],
+      "side_effects": [
+        "At each 60 Hz physics step (FixedSteps.before): a narrow phase ray cast per player, `AddForce` of the stand, walk and jump forces, `ActivateBody`.",
+        "Sets the collision group of the player's body once (`SetCollisionGroup`)."
+      ]
+    },
+    {
+      "name": "VRHands",
+      "class": "VRHandsSys",
+      "file": "src/logic/player/vr_player.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "At the physics rate: the controller poses (trusted ones) to each hand's BodyDrive target, the failsafe teleport, the legs' forces carried to the hands.",
+      "access": [
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, step",
+          "effect": "hand bodies teleported by the failsafe, forces added, collision group set"
+        },
+        {
+          "name": "FixedSteps",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, finish",
+          "effect": "adds its step to `before` in preinit (created when missing), removes it in finish"
+        },
+        {
+          "name": "Hand",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "step",
+          "effect": "player, side, failsafe, rest read; the last trusted controller state (tracked, position from the head, rotation, velocities, grip, trigger) written; teleports counted"
+        },
+        {
+          "name": "BodyDrive",
+          "kind": "component",
+          "access": "write",
+          "where": "step",
+          "effect": "anchor = the player; position, rotation, velocity, angular_velocity = the controller from the head turned by the play area (or the rest pose)"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "step",
+          "effect": "view filter only"
+        },
+        {
+          "name": "VRBody",
+          "kind": "component",
+          "access": "read",
+          "where": "step",
+          "effect": "of the hand's player: pose_hold, head, play area rotation"
+        },
+        {
+          "name": "VRTracking",
+          "kind": "component",
+          "access": "read",
+          "where": "step",
+          "effect": "of the hand's player: focused, the controller's pose, velocities, grip, trigger"
+        },
+        {
+          "name": "PlayerLegs",
+          "kind": "component",
+          "access": "read",
+          "where": "step",
+          "effect": "of the hand's player: group, applied_force"
+        },
+        {
+          "name": "PhysicsPose",
+          "kind": "component",
+          "access": "write",
+          "where": "step",
+          "effect": "when the failsafe teleports a hand: both poses set to the target"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "step (helper playerBodyId)",
+          "effect": "the body ids of the hand and of its player"
+        },
+        {
+          "name": "PlayerCollision",
+          "kind": "context",
+          "access": "read+create",
+          "where": "step (helper setPlayerGroup)",
+          "effect": "the filter: a hand without group goes into the player's group, sub group left_hand or right_hand"
+        }
+      ],
+      "side_effects": [
+        "At each physics step: `SetPositionAndRotation` + `SetLinearAndAngularVelocity` of a hand more than `failsafe` from its target; `AddForce` of its share (by mass) of the legs' force.",
+        "Sets the collision group of each hand body once."
+      ]
+    },
+    {
+      "name": "Grab",
+      "class": "GrabSys",
+      "file": "src/logic/player/grab.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Unity's Grabber and Thrower: while a hand's grip is held, a fixed constraint locks it to what it touches; let go, a body leaves with the controller's velocity.",
+      "access": [
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, step",
+          "effect": "contact queries of the hand's shape, fixed constraints added / removed, velocities of thrown bodies, collision groups"
+        },
+        {
+          "name": "FixedSteps",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, finish",
+          "effect": "adds its step to `before` in preinit (created when missing), removes it in finish"
+        },
+        {
+          "name": "Hand",
+          "kind": "component",
+          "access": "read",
+          "where": "step, release, regroup",
+          "effect": "grip, side, player, teleports, velocity (thrown with it)"
+        },
+        {
+          "name": "Grabber",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "step, grab, release, signal on_destroy<RigidBody>",
+          "effect": "thresholds read; grabbing, grabbed, object written"
+        },
+        {
+          "name": "Grabbed",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "grab (get_or_emplace), release (remove), regroup, step",
+          "effect": "on a dynamic entity held: the hand of each side; removed when no hand holds it"
+        },
+        {
+          "name": "Held",
+          "kind": "component",
+          "access": "read",
+          "where": "step",
+          "effect": "a body still held by a Holder keeps its collision group"
+        },
+        {
+          "name": "Ungrabbable",
+          "kind": "tag",
+          "access": "read",
+          "where": "grab",
+          "effect": "such entities are skipped"
+        },
+        {
+          "name": "PlayerLegs",
+          "kind": "component",
+          "access": "read",
+          "where": "grab, regroup (helper groupOf)",
+          "effect": "the player's collision group; no grab before the legs gave one"
+        },
+        {
+          "name": "VRBody",
+          "kind": "component",
+          "access": "read",
+          "where": "release",
+          "effect": "play area rotation: the controller's velocity in world space for a throw"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "step, grab, release (helpers playerBodyId, bodyEntity); signal on_destroy<RigidBody>",
+          "effect": "body ids, the entity of a touched body; a body destroyed drops the grips on it"
+        },
+        {
+          "name": "PlayerCollision",
+          "kind": "context",
+          "access": "read+create",
+          "where": "grab, regroup (helpers playerCollision, setPlayerGroup, clearPlayerGroup)",
+          "effect": "the filter of what may be grabbed; held bodies go into sub group held_left / held_right / held_both, cleared `collision_delay` s after they are let go"
+        }
+      ],
+      "side_effects": [
+        "Connects `on_destroy<RigidBody>` in preinit (disconnected in finish): the grips of a destroyed hand or object are taken off without a throw.",
+        "At each physics step: `CollideShape` of the hand's shape (max separation `touch`), `FixedConstraint` (priority 1000, 40 velocity / 8 position steps) added at the deepest contact; removed on release, teleport, finish.",
+        "On a throw: `SetLinearAndAngularVelocity` of the released body.",
+        "Sets and clears collision groups of grabbed bodies."
+      ]
+    },
+    {
+      "name": "Hold",
+      "class": "HoldSys",
+      "file": "src/logic/player/grab.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "The FPS player's hold: interact picks up the dynamic body looked at onto a BodyDrive in front of the eyes, interact drops it, primary throws it, the wheel moves it.",
+      "access": [
+        {
+          "name": "ScriptedInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "answers for the player when present (tests, scripts)"
+        },
+        {
+          "name": "MouseKeyboardInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "ControllersInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "VRPlayerInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, tick, step",
+          "effect": "ray cast from the eyes, velocities of dropped / thrown bodies, collision groups"
+        },
+        {
+          "name": "FixedSteps",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, finish",
+          "effect": "adds its step to `before` in preinit (created when missing), removes it in finish"
+        },
+        {
+          "name": "Holder",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick, step, pick, drop",
+          "effect": "tuning read; distance changed by the wheel; held, held_rotation, was_interact, was_primary written"
+        },
+        {
+          "name": "PlayerView",
+          "kind": "component",
+          "access": "read",
+          "where": "tick, step, pick",
+          "effect": "forward and rotation: the ray, the throw, the drive's target"
+        },
+        {
+          "name": "BodyDrive",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "pick (emplace), step, drop (remove)",
+          "effect": "made on what is picked up (anchor the player, max_force / max_torque of the Holder); its target set every step; `driven` and `error` read to drop what is stuck"
+        },
+        {
+          "name": "Held",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "pick (emplace), drop (remove), tick, step",
+          "effect": "on the held body: `by` the player"
+        },
+        {
+          "name": "Ungrabbable",
+          "kind": "tag",
+          "access": "read",
+          "where": "pick",
+          "effect": "not picked up"
+        },
+        {
+          "name": "Grabbed",
+          "kind": "component",
+          "access": "read",
+          "where": "pick",
+          "effect": "what a hand holds is not picked up"
+        },
+        {
+          "name": "PlayerLegs",
+          "kind": "component",
+          "access": "read",
+          "where": "pick (helper groupOf)",
+          "effect": "the player's collision group"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "tick, step, pick (helpers playerBodyId, bodyEntity)",
+          "effect": "body ids; the held entity must still have one"
+        },
+        {
+          "name": "PlayerCollision",
+          "kind": "context",
+          "access": "read+create",
+          "where": "pick, drop (helpers playerCollision, setPlayerGroup, clearPlayerGroup)",
+          "effect": "the ray ignores the player's bodies; the held body goes into sub group held_body, cleared when dropped"
+        }
+      ],
+      "side_effects": [
+        "Narrow phase ray cast of `reach` along the view on a press of interact.",
+        "Sets the collision group of the held body; clears it and, on a throw, sets its linear velocity when it is dropped.",
+        "Adds and removes BodyDrive components (BodyDrives makes the constraint)."
+      ]
+    },
+    {
+      "name": "BodyDrives",
+      "class": "BodyDrivesSys",
+      "file": "src/logic/player/body_drive.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Owns one Jolt SixDOFConstraint with force-limited velocity motors per BodyDrive, between its anchor (or the world) and the driven body, and sets the motor targets each physics step.",
+      "access": [
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, step, finish, signal handlers",
+          "effect": "constraints added / removed, motor targets, bodies activated"
+        },
+        {
+          "name": "FixedSteps",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, finish",
+          "effect": "adds its step to `before` in preinit (created when missing), removes it in finish"
+        },
+        {
+          "name": "BodyDrive",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "step, drop; signal on_destroy<BodyDrive>",
+          "effect": "target, gains, limits, anchor, rotate read; error, angular_error, driven written (driven false when the motor is dropped)"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "step (helper playerBodyId); signal on_destroy<RigidBody>",
+          "effect": "the body ids of the driven body and the anchor, its motion (only dynamic bodies are driven); a destroyed body drops its motor and those anchored on it"
+        }
+      ],
+      "side_effects": [
+        "Connects `on_destroy<BodyDrive>` and `on_destroy<RigidBody>` in preinit, disconnects them in finish.",
+        "Creates a `SixDOFConstraint` (all axes free, motors in velocity mode) per ready drive, `AddConstraint`; `RemoveConstraint` when the drive, its body or its anchor goes, the anchor or `rotate` changes, or in finish.",
+        "Every physics step: force / torque limits and target velocities of the motors, `ActivateBody` of the body and its anchor."
+      ]
+    },
+    {
+      "name": "PlayerViewpoint",
+      "class": "PlayerViewpointSys",
+      "file": "src/logic/player/player_body.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "After Physics: the desktop Camera at the eyes of the DesktopView player (or behind it), the VR play area (VRRig) under the VRBody player's head.",
+      "access": [
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "write+create",
+          "where": "preinit, tick",
+          "effect": "created when missing; position, yaw, pitch from the DesktopView player"
+        },
+        {
+          "name": "VRRig",
+          "kind": "context",
+          "access": "write",
+          "where": "tick",
+          "effect": "when present: yaw, position (so the head lands on the body), stick_locomotion = false"
+        },
+        {
+          "name": "DesktopView",
+          "kind": "tag",
+          "access": "read",
+          "where": "tick",
+          "effect": "the player the camera follows"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "the eyes"
+        },
+        {
+          "name": "PlayerView",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "yaw, pitch, forward"
+        },
+        {
+          "name": "ThirdPerson",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "distance and height of the camera behind the eyes"
+        },
+        {
+          "name": "VRBody",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "play area yaw and the last head position"
+        },
+        {
+          "name": "VRTracking",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "view filter only"
+        }
+      ],
+      "side_effects": [
+        "None beyond the context variables."
+      ]
+    },
+    {
+      "name": "Mountables",
+      "class": "MountablesSys",
+      "file": "src/logic/player/mount.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Gives the animals of the listed species a Mountable measured on their skin (saddle, its joint, trunk box, speeds), and a kinematic collider body while a Rider is within range.",
+      "access": [
+        {
+          "name": "AnimalLibrary",
+          "kind": "context",
+          "access": "read+create",
+          "where": "tick (helper animalLibrary), shape",
+          "effect": "loaded from resources/animals on first use when missing; entries, species (loaded on first use) and their geometry"
+        },
+        {
+          "name": "Animal",
+          "kind": "component",
+          "access": "read",
+          "where": "preinit (storage), tick",
+          "effect": "species of the kinematic animals"
+        },
+        {
+          "name": "AnimalSkin",
+          "kind": "component",
+          "access": "read",
+          "where": "preinit (storage), tick",
+          "effect": "excluded: the drawn skin of a ragdoll is not ridden"
+        },
+        {
+          "name": "AnimalBotProxy",
+          "kind": "component",
+          "access": "read",
+          "where": "preinit (storage), tick",
+          "effect": "species and the walk / top speeds of a physical animal's policy"
+        },
+        {
+          "name": "AnimalPose",
+          "kind": "component",
+          "access": "read",
+          "where": "preinit (storage), tick",
+          "effect": "a proxy without one has its saddle on the Transform"
+        },
+        {
+          "name": "Mountable",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick; signal on_destroy<Mountable>",
+          "effect": "emplaced from the species' shape; `rider` read, `collider` written; a destroyed Mountable destroys its collider entity"
+        },
+        {
+          "name": "MountCollider",
+          "kind": "component",
+          "access": "write+create",
+          "where": "preinit (storage), tick",
+          "effect": "on the collider entity: the animal it stands for"
+        },
+        {
+          "name": "Ungrabbable",
+          "kind": "tag",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "on the collider entity"
+        },
+        {
+          "name": "Rider",
+          "kind": "component",
+          "access": "read",
+          "where": "preinit (storage), tick",
+          "effect": "the players whose distance makes colliders"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "preinit (storage), tick",
+          "effect": "riders' and animals' read; the collider's created and set to the trunk box every frame"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "on the collider entity: kinematic box of the trunk times the animal's scale, friction 0.4"
+        }
+      ],
+      "side_effects": [
+        "Connects `on_destroy<Mountable>` in preinit (disconnected in finish).",
+        "Reads the species' skin geometry (`resources/animals/species/<id>.bin`) once per species, runs `analyseGait` on its walk clip.",
+        "Creates a collider entity per Mountable within `range` of a Rider (or ridden) and destroys it when none is.",
+        "Logs once per species: `Mountables : <id>, saddle <h> m up on <joint>, walks <v> m/s, runs <v> m/s` (info), or a warning when the geometry cannot be read."
+      ]
+    },
+    {
+      "name": "Mounting",
+      "class": "MountingSys",
+      "file": "src/logic/player/mount.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "A press of jump gets a Rider on the Mountable its body touches (legs limp, AnimalSteer on the animal) or off the one it rides; off too when the animal is gone or the seat is lost.",
+      "access": [
+        {
+          "name": "ScriptedInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "answers for the player when present (tests, scripts)"
+        },
+        {
+          "name": "MouseKeyboardInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "ControllersInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "VRPlayerInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, tick",
+          "effect": "contact queries of the player's capsule, collision groups, the hop's velocity"
+        },
+        {
+          "name": "Rider",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick, mount, dismount",
+          "effect": "reach, seat, lost, hop, blend read; mount, was_jump, blend, seat_known, left, left_timer written"
+        },
+        {
+          "name": "PlayerLegs",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick, mount, dismount",
+          "effect": "group read; limp and jump_locked set on getting on and off"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick, mount, dismount (and helper saddleOf)",
+          "effect": "the player's eyes, the animal's heading and saddle"
+        },
+        {
+          "name": "Mountable",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "preinit (storage), tick, touched, mount, dismount",
+          "effect": "`rider` set and cleared; collider read; saddle via saddleOf"
+        },
+        {
+          "name": "MountCollider",
+          "kind": "component",
+          "access": "read",
+          "where": "preinit (storage), touched",
+          "effect": "the animal of a touched collider body"
+        },
+        {
+          "name": "AnimalSteer",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "preinit (storage), mount (emplace_or_replace), dismount (remove)",
+          "effect": "set, not read (the schema has no write+create+destroy): emplaced or replaced on the animal with its current heading and speed 0; removed when the rider gets off"
+        },
+        {
+          "name": "AnimalPose",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (helper saddleOf)",
+          "effect": "the joint that carries the saddle"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "touched, mount, dismount, tick (helpers playerBodyId, bodyEntity)",
+          "effect": "the player's and the collider's body ids, the entity of a touched body"
+        },
+        {
+          "name": "PlayerCollision",
+          "kind": "context",
+          "access": "read+create",
+          "where": "touched, mount, tick (helpers playerCollision, setPlayerGroup, clearPlayerGroup)",
+          "effect": "the touch query ignores the player's bodies; the ridden collider goes into sub group `mount`, cleared 0.6 s after getting off"
+        }
+      ],
+      "side_effects": [
+        "`CollideShape` of the player's capsule, at its place and 0.6 m lower, with max separation `reach`, on a press of jump when not riding.",
+        "Sets the collision group of the ridden animal's collider; clears it 0.6 s after getting off.",
+        "On a jump off: `SetLinearVelocity` of the player (the saddle's velocity plus `hop` m/s to the animal's left and 1 m/s up)."
+      ]
+    },
+    {
+      "name": "MountSteering",
+      "class": "MountSteeringSys",
+      "file": "src/logic/player/mount.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "A riding player's walk axis turned by its view's yaw is the heading asked of the animal, its length the speed (walk, or run with the run button).",
+      "access": [
+        {
+          "name": "ScriptedInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "answers for the player when present (tests, scripts)"
+        },
+        {
+          "name": "MouseKeyboardInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "ControllersInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "VRPlayerInput",
+          "kind": "component",
+          "access": "read",
+          "where": "helper playerInput",
+          "effect": "a device of the player: the active one used last answers"
+        },
+        {
+          "name": "Rider",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "the animal ridden"
+        },
+        {
+          "name": "PlayerView",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "yaw: the frame of the walk axis"
+        },
+        {
+          "name": "AnimalSteer",
+          "kind": "component",
+          "access": "write",
+          "where": "tick",
+          "effect": "of the animal: yaw, speed, run (speed 0 and heading kept when the axis is under 0.1)"
+        },
+        {
+          "name": "Mountable",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "walk_speed, run_speed"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "the animal's scale (speeds are the animal's own)"
+        }
+      ],
+      "side_effects": [
+        "None."
+      ]
+    },
+    {
+      "name": "RiderSeat",
+      "class": "RiderSeatSys",
+      "file": "src/logic/player/mount.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Holds a riding player's body over the saddle with a capped spring-damper force that comes in over Rider::settle, at the physics rate.",
+      "access": [
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, step",
+          "effect": "gravity read, forces on the rider's body"
+        },
+        {
+          "name": "FixedSteps",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, finish",
+          "effect": "adds its step to `before` in preinit (created when missing), removes it in finish"
+        },
+        {
+          "name": "Rider",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick, step",
+          "effect": "seat_position, seat_velocity (smoothed), seat_known written each frame; blend raised each step; seat, stiffness, max_acceleration, settle read"
+        },
+        {
+          "name": "Mountable",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (and helper saddleOf)",
+          "effect": "the saddle"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (helper saddleOf)",
+          "effect": "the animal's pose"
+        },
+        {
+          "name": "AnimalPose",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (helper saddleOf)",
+          "effect": "world matrix of the joint that carries the saddle"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "step (helper playerBodyId)",
+          "effect": "the rider's body id"
+        }
+      ],
+      "side_effects": [
+        "At each physics step: `AddForce` on the rider's body ((pull - gravity) x mass) and `ActivateBody`."
+      ]
+    },
+    {
+      "name": "MountSpawn",
+      "class": "MountSpawnSys",
+      "file": "src/logic/player/mount.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Puts a few animals of one library species standing in a row on the ground, to be ridden.",
+      "access": [
+        {
+          "name": "AnimalLibrary",
+          "kind": "context",
+          "access": "read+create",
+          "where": "init (helper animalLibrary)",
+          "effect": "loaded when missing; the species (loaded on first use) and its idle / walk clips, bounds"
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "`std::shared_ptr<TerrainGenerator>`: a TerrainField for the ground when there is no GroundField"
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "`std::shared_ptr<GroundField>`: the ground the animals stand on, when present"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "write+create",
+          "where": "preinit (storage), init",
+          "effect": "each animal at its place, turned by yaw +- 25 degrees"
+        },
+        {
+          "name": "Animal",
+          "kind": "component",
+          "access": "write+create",
+          "where": "preinit (storage), init",
+          "effect": "species, the idle clip (else walk), times staggered by 0.7 s"
+        },
+        {
+          "name": "AnimalGait",
+          "kind": "component",
+          "access": "write+create",
+          "where": "preinit (storage), init",
+          "effect": "default: the procedural walk once steered"
+        },
+        {
+          "name": "AnimalPose",
+          "kind": "component",
+          "access": "read",
+          "where": "preinit (storage only)",
+          "effect": "its pool is made so that later views over it exist; not otherwise touched"
+        }
+      ],
+      "side_effects": [
+        "Creates `count` animal entities in init.",
+        "Logs a warning `MountSpawn : no animal <species> in the library` and makes nothing when the species is missing.",
+        "Without a GroundField but with a terrain, builds a TerrainField (with its own MarchingCubes) for the ground heights."
+      ]
+    }
+  ],
+  "components": [
+    {
+      "name": "PlayerView",
+      "kind": "component",
+      "file": "src/logic/player/player.h",
+      "summary": "Where a player looks, world space; the walk follows its yaw.",
+      "json": null,
+      "fields": [
+        {
+          "name": "yaw",
+          "type": "float",
+          "desc": "rad about +Y; 0 looks toward -Z, as the Camera"
+        },
+        {
+          "name": "pitch",
+          "type": "float",
+          "desc": "rad, up positive (LookTurn clamps it to +-1.55)"
+        }
+      ],
+      "notes": "rotation() = yaw about Y then pitch about X; forward() = rotation() x (0, 0, -1). Written by LookTurn (FPS) or VRBody (VR), read by the legs, the hold, the riding and PlayerViewpoint."
+    },
+    {
+      "name": "LookTurn",
+      "kind": "component",
+      "file": "src/logic/player/player.h",
+      "summary": "The input's view axis turns this player's PlayerView (Unity's LookTurn).",
+      "json": null,
+      "fields": [
+        {
+          "name": "stick_speed",
+          "type": "float",
+          "desc": "rad/s at full stick deflection (3); a mouse turns by its own radians"
+        }
+      ],
+      "notes": "On FPS players (makeFPSPlayer)."
+    },
+    {
+      "name": "DesktopView",
+      "kind": "tag",
+      "file": "src/logic/player/player.h",
+      "summary": "The desktop camera sits at this player's eyes.",
+      "json": null,
+      "fields": [],
+      "notes": "Read by PlayerViewpoint; the viewer's MouseKeyboardInput and ControllersInput systems feed the DesktopView player, and PlayerControl does nothing while an entity has one."
+    },
+    {
+      "name": "ThirdPerson",
+      "kind": "component",
+      "file": "src/logic/player/player.h",
+      "summary": "With DesktopView: the camera behind and above the eyes.",
+      "json": null,
+      "fields": [
+        {
+          "name": "distance",
+          "type": "float",
+          "desc": "m back along the view (4)"
+        },
+        {
+          "name": "height",
+          "type": "float",
+          "desc": "part of the distance above the eyes (0.25)"
+        }
+      ],
+      "notes": "Added by PlayerSpawn when `third_person` > 0."
+    },
+    {
+      "name": "PlayerLegs",
+      "kind": "component",
+      "file": "src/logic/player/player.h",
+      "summary": "Unity's GenericPlayer legs: the body floats at `height` over the ground, walks and jumps with forces.",
+      "json": null,
+      "fields": [
+        {
+          "name": "height",
+          "type": "float",
+          "desc": "eyes over the ground, m (1.8; VRBody sets it from the head)"
+        },
+        {
+          "name": "leg_force",
+          "type": "float",
+          "desc": "cap of the stand and jump gain x speed error (1000)"
+        },
+        {
+          "name": "stand_force",
+          "type": "float",
+          "desc": "stand gain (1000)"
+        },
+        {
+          "name": "stand_speed",
+          "type": "float",
+          "desc": "m/s asked per half metre under the height (0.5)"
+        },
+        {
+          "name": "jump_force",
+          "type": "float",
+          "desc": "jump gain (500)"
+        },
+        {
+          "name": "jump_speed",
+          "type": "float",
+          "desc": "m/s (5)"
+        },
+        {
+          "name": "walk_force",
+          "type": "float",
+          "desc": "walk gain (500)"
+        },
+        {
+          "name": "walk_speed",
+          "type": "float",
+          "desc": "m/s (2)"
+        },
+        {
+          "name": "sprint_speed",
+          "type": "float",
+          "desc": "m/s with the run button (4)"
+        },
+        {
+          "name": "air_walk",
+          "type": "float",
+          "desc": "part of the walk force left off the ground (0)"
+        },
+        {
+          "name": "reach",
+          "type": "float",
+          "desc": "m under the feet the ground is looked for (0.2)"
+        },
+        {
+          "name": "limp",
+          "type": "bool",
+          "desc": "no stand, walk or jump (set while riding)"
+        },
+        {
+          "name": "jump_locked",
+          "type": "bool",
+          "desc": "the jump press did something else: no jump until the button is let go"
+        },
+        {
+          "name": "standing",
+          "type": "bool",
+          "desc": "written: the ray found ground"
+        },
+        {
+          "name": "walking",
+          "type": "bool",
+          "desc": "written: standing and asked to move"
+        },
+        {
+          "name": "ground_distance",
+          "type": "float",
+          "desc": "written: eyes to the ground, when standing"
+        },
+        {
+          "name": "ground",
+          "type": "entt::entity",
+          "desc": "written: the entity stood on, null when it is no RigidBody entity"
+        },
+        {
+          "name": "ground_velocity",
+          "type": "glm::vec3",
+          "desc": "written: velocity of the ground point when it is not static"
+        },
+        {
+          "name": "applied_force",
+          "type": "glm::vec3",
+          "desc": "written: this step's leg forces (N), carried to the hands by VRHands"
+        },
+        {
+          "name": "group",
+          "type": "uint32_t",
+          "desc": "written: the player's collision group in PlayerCollision, 0 before the first step with a body"
+        }
+      ],
+      "notes": "Needs a dynamic RigidBody with lock_rotation whose Transform is the eyes, an input component and a PlayerView. Forces are Unity's: (gain x speed error) x mass / 10. `group` is the key every other player system uses to find the player's bodies."
+    },
+    {
+      "name": "BodyDrive",
+      "kind": "component",
+      "file": "src/logic/player/player.h",
+      "summary": "A rigid body driven to a pose relative to another body (or the world) by force-limited velocity motors.",
+      "json": null,
+      "fields": [
+        {
+          "name": "anchor",
+          "type": "entt::entity",
+          "desc": "the body pushed against; null: the world"
+        },
+        {
+          "name": "position",
+          "type": "glm::vec3",
+          "desc": "target of the centre of mass, from the anchor's origin, in its frame"
+        },
+        {
+          "name": "rotation",
+          "type": "glm::quat",
+          "desc": "target rotation, in the anchor's frame"
+        },
+        {
+          "name": "velocity",
+          "type": "glm::vec3",
+          "desc": "feed forward, anchor frame, relative to it"
+        },
+        {
+          "name": "angular_velocity",
+          "type": "glm::vec3",
+          "desc": "feed forward, anchor frame"
+        },
+        {
+          "name": "gain",
+          "type": "float",
+          "desc": "part of the position error closed per step (0.607)"
+        },
+        {
+          "name": "angular_gain",
+          "type": "float",
+          "desc": "part of the angle error closed per step (0.183)"
+        },
+        {
+          "name": "max_force",
+          "type": "float",
+          "desc": "N per axis (10000)"
+        },
+        {
+          "name": "max_torque",
+          "type": "float",
+          "desc": "N m per axis (10000)"
+        },
+        {
+          "name": "rotate",
+          "type": "bool",
+          "desc": "false: only the position is driven"
+        },
+        {
+          "name": "error",
+          "type": "glm::vec3",
+          "desc": "written: target - centre of mass, world"
+        },
+        {
+          "name": "angular_error",
+          "type": "float",
+          "desc": "written: rad"
+        },
+        {
+          "name": "driven",
+          "type": "bool",
+          "desc": "written: the motor exists"
+        }
+      ],
+      "notes": "Needs a dynamic RigidBody. The motor asks feed forward x max(1 - |error|, 0) + gain x error / step. Owned by BodyDrives; written by VRHands (hands) and Hold (held body, which also adds and removes it)."
+    },
+    {
+      "name": "VRTracking",
+      "kind": "component",
+      "file": "src/logic/player/player.h",
+      "summary": "Head and hands of a headset in stage space, written by VRPlayerInput from VRInput or by a test.",
+      "json": null,
+      "fields": [
+        {
+          "name": "focused",
+          "type": "bool",
+          "desc": "a running, focused session: poses can be trusted"
+        },
+        {
+          "name": "head",
+          "type": "VRPose",
+          "desc": "head pose (valid, position, rotation)"
+        },
+        {
+          "name": "hands",
+          "type": "VRTracking::Hand[2]",
+          "desc": "per side (VRInput::left / right): pose, velocity, angular_velocity (stage space), grip, trigger"
+        }
+      ],
+      "notes": "On VR players. The nested VRTracking::Hand is a plain struct of this component, not a component."
+    },
+    {
+      "name": "VRBody",
+      "kind": "component",
+      "file": "src/logic/player/player.h",
+      "summary": "Unity's VRPlayer: the body follows the head in the room, the view axis turns the play area, poses are held without focus.",
+      "json": null,
+      "fields": [
+        {
+          "name": "yaw",
+          "type": "float",
+          "desc": "of the play area, rad"
+        },
+        {
+          "name": "turn_speed",
+          "type": "float",
+          "desc": "rad/s at full deflection (pi)"
+        },
+        {
+          "name": "standing_height",
+          "type": "float",
+          "desc": "legs height when the head is 1.8 m over the stage floor (1.8)"
+        },
+        {
+          "name": "hands",
+          "type": "entt::entity[2]",
+          "desc": "the hand entities"
+        },
+        {
+          "name": "head",
+          "type": "glm::vec3",
+          "desc": "written: the last trusted head position, stage space"
+        },
+        {
+          "name": "tracked",
+          "type": "bool",
+          "desc": "written: the head has been read once"
+        },
+        {
+          "name": "pose_hold",
+          "type": "bool",
+          "desc": "written: poses are held this frame"
+        },
+        {
+          "name": "was_focused",
+          "type": "bool",
+          "desc": "written: focus of the last frame"
+        },
+        {
+          "name": "seen_focus",
+          "type": "bool",
+          "desc": "written: focus has been seen once"
+        },
+        {
+          "name": "refocus_frame",
+          "type": "int",
+          "desc": "written: 0 not re-basing; 1, 2, 3 frames since the focus came back"
+        }
+      ],
+      "notes": "Needs PlayerLegs, an input component, PlayerView and VRTracking. rotation() = yaw about Y."
+    },
+    {
+      "name": "Hand",
+      "kind": "component",
+      "file": "src/logic/player/player.h",
+      "summary": "Unity's Hand: a rigid body that follows a controller through a BodyDrive anchored on its player.",
+      "json": null,
+      "fields": [
+        {
+          "name": "player",
+          "type": "entt::entity",
+          "desc": "the player"
+        },
+        {
+          "name": "side",
+          "type": "int",
+          "desc": "VRInput::left (0) or right (1)"
+        },
+        {
+          "name": "failsafe",
+          "type": "float",
+          "desc": "m from its target beyond which it is put there (1)"
+        },
+        {
+          "name": "rest",
+          "type": "glm::vec3",
+          "desc": "pose before the controller is tracked, from the head, body frame"
+        },
+        {
+          "name": "tracked",
+          "type": "bool",
+          "desc": "the controller was trusted once"
+        },
+        {
+          "name": "position",
+          "type": "glm::vec3",
+          "desc": "last trusted controller position from the head, stage axes"
+        },
+        {
+          "name": "rotation",
+          "type": "glm::quat",
+          "desc": "last trusted controller rotation, stage axes"
+        },
+        {
+          "name": "velocity",
+          "type": "glm::vec3",
+          "desc": "last trusted controller velocity"
+        },
+        {
+          "name": "angular_velocity",
+          "type": "glm::vec3",
+          "desc": "last trusted angular velocity"
+        },
+        {
+          "name": "grip",
+          "type": "float",
+          "desc": "0..1"
+        },
+        {
+          "name": "trigger",
+          "type": "float",
+          "desc": "0..1"
+        },
+        {
+          "name": "teleports",
+          "type": "int",
+          "desc": "times the failsafe put it back (Grab lets go when it changes)"
+        }
+      ],
+      "notes": "Its own entity with a dynamic RigidBody (1.5 kg box), a BodyDrive and a Grabber (makeVRPlayer). Written by VRHands."
+    },
+    {
+      "name": "Grabber",
+      "kind": "component",
+      "file": "src/logic/player/player.h",
+      "summary": "Unity's Grabber and Thrower on a hand: locks onto what it touches while the grip is held, throws on release.",
+      "json": null,
+      "fields": [
+        {
+          "name": "grip_threshold",
+          "type": "float",
+          "desc": "grip over which it grabs (0.5)"
+        },
+        {
+          "name": "touch",
+          "type": "float",
+          "desc": "m that counts as touching (0.02)"
+        },
+        {
+          "name": "velocity_multiplier",
+          "type": "float",
+          "desc": "on the throw velocity (1)"
+        },
+        {
+          "name": "angular_velocity_multiplier",
+          "type": "float",
+          "desc": "on the kept angular velocity (1)"
+        },
+        {
+          "name": "collision_delay",
+          "type": "float",
+          "desc": "s before the hand and what it let go collide again (0.1)"
+        },
+        {
+          "name": "grabbing",
+          "type": "bool",
+          "desc": "written: the grip is held"
+        },
+        {
+          "name": "grabbed",
+          "type": "bool",
+          "desc": "written: something is locked"
+        },
+        {
+          "name": "object",
+          "type": "entt::entity",
+          "desc": "written: the entity held; null with `grabbed`: the world or a body that is no entity"
+        }
+      ],
+      "notes": "Written by Grab."
+    },
+    {
+      "name": "Grabbed",
+      "kind": "component",
+      "file": "src/logic/player/player.h",
+      "summary": "On a dynamic entity a hand holds: the hand of each side.",
+      "json": null,
+      "fields": [
+        {
+          "name": "hands",
+          "type": "entt::entity[2]",
+          "desc": "hand entity per side, null when that side does not hold it"
+        }
+      ],
+      "notes": "Added by Grab when a hand locks a dynamic entity, removed when no hand holds it. Hold does not pick up a Grabbed body."
+    },
+    {
+      "name": "Ungrabbable",
+      "kind": "tag",
+      "file": "src/logic/player/player.h",
+      "summary": "Nothing grabs or picks up this entity.",
+      "json": null,
+      "fields": [],
+      "notes": "Read by Grab and Hold; Mountables puts it on the animals' collider entities."
+    },
+    {
+      "name": "Holder",
+      "kind": "component",
+      "file": "src/logic/player/player.h",
+      "summary": "The FPS player's hold: picks up the dynamic body looked at and holds it in front of the eyes on a BodyDrive.",
+      "json": null,
+      "fields": [
+        {
+          "name": "reach",
+          "type": "float",
+          "desc": "m, to pick up (3)"
+        },
+        {
+          "name": "distance",
+          "type": "float",
+          "desc": "m in front of the eyes (1.2; the wheel changes it)"
+        },
+        {
+          "name": "min_distance",
+          "type": "float",
+          "desc": "m (0.6)"
+        },
+        {
+          "name": "max_distance",
+          "type": "float",
+          "desc": "m (2.5)"
+        },
+        {
+          "name": "wheel_step",
+          "type": "float",
+          "desc": "m per notch (0.15)"
+        },
+        {
+          "name": "max_force",
+          "type": "float",
+          "desc": "N per axis of the drive (1500): heavier stays on the ground"
+        },
+        {
+          "name": "max_torque",
+          "type": "float",
+          "desc": "N m per axis (300)"
+        },
+        {
+          "name": "throw_speed",
+          "type": "float",
+          "desc": "m/s (8)"
+        },
+        {
+          "name": "break_distance",
+          "type": "float",
+          "desc": "m off its place: dropped (1.5)"
+        },
+        {
+          "name": "held",
+          "type": "entt::entity",
+          "desc": "written: the body held"
+        },
+        {
+          "name": "held_rotation",
+          "type": "glm::quat",
+          "desc": "written: of the body in the view's frame"
+        },
+        {
+          "name": "was_interact",
+          "type": "bool",
+          "desc": "written: interact as last seen"
+        },
+        {
+          "name": "was_primary",
+          "type": "bool",
+          "desc": "written: primary as last seen"
+        }
+      ],
+      "notes": "Needs an input component and a PlayerView. Written by Hold."
+    },
+    {
+      "name": "Held",
+      "kind": "component",
+      "file": "src/logic/player/player.h",
+      "summary": "On what a Holder holds.",
+      "json": null,
+      "fields": [
+        {
+          "name": "by",
+          "type": "entt::entity",
+          "desc": "the holding player"
+        }
+      ],
+      "notes": "Added and removed by Hold with the body's BodyDrive; Grab keeps the collision group of a Held body."
+    },
+    {
+      "name": "Prop",
+      "kind": "component",
+      "file": "src/logic/player/player.h",
+      "summary": "A box to grab made by PlayerSpawn; the viewer gives it a model (PlayerModels).",
+      "json": null,
+      "fields": [
+        {
+          "name": "color",
+          "type": "glm::vec4",
+          "desc": "RGBA of its model"
+        }
+      ],
+      "notes": "With a Transform (scale = size) and a dynamic box RigidBody."
+    },
+    {
+      "name": "PlayerCollision",
+      "kind": "context",
+      "file": "src/logic/player/player_systems.h",
+      "summary": "The Jolt group filter of every player, and the next free group.",
+      "json": null,
+      "fields": [
+        {
+          "name": "filter",
+          "type": "JPH::Ref<JPH::GroupFilterTable>",
+          "desc": "sub groups PlayerGroups::{body, left_hand, right_hand, held_left, held_right, held_both, held_body, mount}; body/hands, hand/what it holds, body/held_body, body and hands/mount do not collide"
+        },
+        {
+          "name": "next_group",
+          "type": "uint32_t",
+          "desc": "next group id given to a player (from 1)"
+        }
+      ],
+      "notes": "Created on first use by playerCollision() (PlayerLegs, VRHands, Grab, Hold, Mounting)."
+    },
+    {
+      "name": "MouseKeyboardInput",
+      "kind": "component",
+      "file": "src/logic/player/generic_input.h",
+      "summary": "Unity's KeyboardPlayerInput: physical WASD keys, space, shift, E, and the mouse.",
+      "json": null,
+      "fields": [
+        {
+          "name": "keys",
+          "type": "std::bitset<key_count>",
+          "desc": "W, A, S, D, Space, LeftShift, E (by place on a QWERTY keyboard)"
+        },
+        {
+          "name": "mouse",
+          "type": "glm::vec2",
+          "desc": "counts moved this frame, x right, y down"
+        },
+        {
+          "name": "left",
+          "type": "bool",
+          "desc": "left button"
+        },
+        {
+          "name": "right",
+          "type": "bool",
+          "desc": "right button"
+        },
+        {
+          "name": "wheel",
+          "type": "float",
+          "desc": "notches this frame"
+        },
+        {
+          "name": "captured",
+          "type": "bool",
+          "desc": "the mouse is the player's, not the menus'"
+        },
+        {
+          "name": "sensitivity",
+          "type": "float",
+          "desc": "rad per count (0.0025)"
+        },
+        {
+          "name": "last_action",
+          "type": "double",
+          "desc": "(GenericPlayerInput) s of play of the last use"
+        }
+      ],
+      "notes": "A GenericPlayerInput: movement WASD normalised, view = mouse x sensitivity (a delta), jump space, run shift, interact E, primary/secondary the buttons, control the wheel; always active. Written by the viewer's MouseKeyboardInput system for the DesktopView player."
+    },
+    {
+      "name": "ControllersInput",
+      "kind": "component",
+      "file": "src/logic/player/generic_input.h",
+      "summary": "Unity's MultiControllerInput: a gamepad.",
+      "json": null,
+      "fields": [
+        {
+          "name": "connected",
+          "type": "bool",
+          "desc": "a gamepad is there"
+        },
+        {
+          "name": "left_stick",
+          "type": "glm::vec2",
+          "desc": "x right, y forward"
+        },
+        {
+          "name": "right_stick",
+          "type": "glm::vec2",
+          "desc": "x right, y up"
+        },
+        {
+          "name": "left_trigger",
+          "type": "float",
+          "desc": "0..1"
+        },
+        {
+          "name": "right_trigger",
+          "type": "float",
+          "desc": "0..1"
+        },
+        {
+          "name": "a",
+          "type": "bool",
+          "desc": "A"
+        },
+        {
+          "name": "x",
+          "type": "bool",
+          "desc": "X"
+        },
+        {
+          "name": "left_shoulder",
+          "type": "bool",
+          "desc": "left shoulder"
+        },
+        {
+          "name": "dpad",
+          "type": "float",
+          "desc": "+1 the frame up is pressed, -1 down"
+        },
+        {
+          "name": "deadzone",
+          "type": "float",
+          "desc": "stick dead zone (0.2)"
+        },
+        {
+          "name": "last_action",
+          "type": "double",
+          "desc": "(GenericPlayerInput) s of play of the last use"
+        }
+      ],
+      "notes": "Left stick walks, right looks (rate), A jumps, right trigger primary, left secondary, X interacts, left shoulder runs, d-pad control; active when connected. Written by the viewer's ControllersInput system."
+    },
+    {
+      "name": "VRPlayerInput",
+      "kind": "component",
+      "file": "src/logic/player/generic_input.h",
+      "summary": "Unity's VRPlayerInput: a headset's controllers as a GenericPlayerInput.",
+      "json": null,
+      "fields": [
+        {
+          "name": "focused",
+          "type": "bool",
+          "desc": "a running, focused session"
+        },
+        {
+          "name": "left_stick",
+          "type": "glm::vec2",
+          "desc": "left thumbstick"
+        },
+        {
+          "name": "right_stick",
+          "type": "glm::vec2",
+          "desc": "right thumbstick"
+        },
+        {
+          "name": "left_stick_click",
+          "type": "bool",
+          "desc": "left thumbstick click"
+        },
+        {
+          "name": "right_primary",
+          "type": "bool",
+          "desc": "A on the right controller"
+        },
+        {
+          "name": "left_trigger",
+          "type": "float",
+          "desc": "0..1"
+        },
+        {
+          "name": "right_trigger",
+          "type": "float",
+          "desc": "0..1"
+        },
+        {
+          "name": "last_action",
+          "type": "double",
+          "desc": "(GenericPlayerInput) s of play of the last use"
+        }
+      ],
+      "notes": "Movement: left stick normalised past half its travel; view: right stick past half (a rate); jump left click, run right A, primary left trigger, secondary right trigger, control right stick y, no interact; active when focused. Written by the VRPlayerInput system."
+    },
+    {
+      "name": "ScriptedInput",
+      "kind": "component",
+      "file": "src/logic/player/generic_input.h",
+      "summary": "Plain input values written by a test or a script; a player with one listens to nothing else.",
+      "json": null,
+      "fields": [
+        {
+          "name": "move",
+          "type": "glm::vec2",
+          "desc": "movement axis"
+        },
+        {
+          "name": "view",
+          "type": "glm::vec2",
+          "desc": "view axis"
+        },
+        {
+          "name": "view_is_delta",
+          "type": "bool",
+          "desc": "view is radians this frame, not a rate"
+        },
+        {
+          "name": "jump",
+          "type": "bool",
+          "desc": ""
+        },
+        {
+          "name": "run",
+          "type": "bool",
+          "desc": ""
+        },
+        {
+          "name": "primary",
+          "type": "bool",
+          "desc": ""
+        },
+        {
+          "name": "secondary",
+          "type": "bool",
+          "desc": ""
+        },
+        {
+          "name": "interact",
+          "type": "bool",
+          "desc": ""
+        },
+        {
+          "name": "control",
+          "type": "float",
+          "desc": "control axis (wheel notches)"
+        },
+        {
+          "name": "last_action",
+          "type": "double",
+          "desc": "(GenericPlayerInput) unused"
+        }
+      ],
+      "notes": "Always active; playerInput() returns it before any device."
+    },
+    {
+      "name": "Mountable",
+      "kind": "component",
+      "file": "src/logic/player/mount.h",
+      "summary": "An animal that can be ridden: where the rider sits, its trunk box, the speeds a rider asks.",
+      "json": null,
+      "fields": [
+        {
+          "name": "saddle",
+          "type": "glm::vec3",
+          "desc": "top of the back where the rider sits, Transform frame, model units"
+        },
+        {
+          "name": "joint",
+          "type": "int",
+          "desc": "joint of its AnimalPose that carries the saddle; -1: the Transform"
+        },
+        {
+          "name": "joint_local",
+          "type": "glm::vec3",
+          "desc": "the saddle in that joint's frame"
+        },
+        {
+          "name": "centre",
+          "type": "glm::vec3",
+          "desc": "centre of the trunk box, Transform frame"
+        },
+        {
+          "name": "half_extent",
+          "type": "glm::vec3",
+          "desc": "half size of the trunk box"
+        },
+        {
+          "name": "walk_speed",
+          "type": "float",
+          "desc": "m/s a rider asks (1.5), in the animal's own units"
+        },
+        {
+          "name": "run_speed",
+          "type": "float",
+          "desc": "m/s with the run button (5)"
+        },
+        {
+          "name": "rider",
+          "type": "entt::entity",
+          "desc": "written: the player riding it"
+        },
+        {
+          "name": "collider",
+          "type": "entt::entity",
+          "desc": "written: the entity of its kinematic body while a rider is around"
+        }
+      ],
+      "notes": "Added by Mountables (or by hand: tests). Destroying it destroys its collider entity (Mountables' signal). saddleOf() gives the saddle in world space."
+    },
+    {
+      "name": "MountCollider",
+      "kind": "component",
+      "file": "src/logic/player/mount.h",
+      "summary": "On the entity that holds the kinematic body of a Mountable.",
+      "json": null,
+      "fields": [
+        {
+          "name": "mount",
+          "type": "entt::entity",
+          "desc": "the animal"
+        }
+      ],
+      "notes": "Made and destroyed by Mountables with a Transform, an Ungrabbable and a kinematic box RigidBody; read by Mounting to find the animal a player touches."
+    },
+    {
+      "name": "Rider",
+      "kind": "component",
+      "file": "src/logic/player/mount.h",
+      "summary": "A player that rides: gets on the animal it touches with a jump, steers it, sits on it.",
+      "json": null,
+      "fields": [
+        {
+          "name": "reach",
+          "type": "float",
+          "desc": "m from the body to the animal to get on (0.3)"
+        },
+        {
+          "name": "seat",
+          "type": "float",
+          "desc": "m from the saddle up to the eyes (0.9)"
+        },
+        {
+          "name": "stiffness",
+          "type": "float",
+          "desc": "1/s of the seat's spring (9)"
+        },
+        {
+          "name": "max_acceleration",
+          "type": "float",
+          "desc": "m/s^2 the seat gives at most (40)"
+        },
+        {
+          "name": "settle",
+          "type": "float",
+          "desc": "s over which the seat's pull comes in (0.5)"
+        },
+        {
+          "name": "lost",
+          "type": "float",
+          "desc": "m from the seat: fallen off (2)"
+        },
+        {
+          "name": "hop",
+          "type": "float",
+          "desc": "m/s to the side when getting off (1.8)"
+        },
+        {
+          "name": "mount",
+          "type": "entt::entity",
+          "desc": "written: the animal ridden"
+        },
+        {
+          "name": "was_jump",
+          "type": "bool",
+          "desc": "written: jump as last seen"
+        },
+        {
+          "name": "blend",
+          "type": "float",
+          "desc": "written: 0 getting on, 1 seated"
+        },
+        {
+          "name": "seat_position",
+          "type": "glm::vec3",
+          "desc": "written: the saddle this frame, world"
+        },
+        {
+          "name": "seat_velocity",
+          "type": "glm::vec3",
+          "desc": "written: the saddle's velocity, smoothed"
+        },
+        {
+          "name": "seat_known",
+          "type": "bool",
+          "desc": "written: seat_position is valid"
+        },
+        {
+          "name": "left",
+          "type": "entt::entity",
+          "desc": "written: collider of the animal just left, not collided with yet"
+        },
+        {
+          "name": "left_timer",
+          "type": "float",
+          "desc": "written: s before it is"
+        }
+      ],
+      "notes": "On FPS players (makeFPSPlayer), with PlayerLegs, an input component and a PlayerView. Written by Mounting and RiderSeat, read by MountSteering and Mountables."
+    }
+  ]
+}

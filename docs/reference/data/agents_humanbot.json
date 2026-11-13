@@ -1,0 +1,1015 @@
+{
+  "systems": [
+    {
+      "name": "AgentFactory",
+      "class": "AgentFactorySys",
+      "file": "src/logic/agents/humanbot.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Makes the HumanBot walker of a world: loads its body and params files, builds the Jolt ragdoll, configures the world's AgentIO and starts the first episode.",
+      "access": [
+        {
+          "name": "AgentIO",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit (create), init, reset",
+          "effect": "Created in preinit, configured (behaviour, 276 observations, 120 actions, stacking sensor name), cleared and given DeVita's stats at the reset."
+        },
+        {
+          "name": "HumanBotSpawn",
+          "kind": "component",
+          "access": "read",
+          "where": "init",
+          "effect": "The body and params files and the modes of the walker, from the first entity that has one."
+        },
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "write+create",
+          "where": "init; finish (readwrite)",
+          "effect": "Emplaced with the walker's whole state; its bodies and constraints removed at finish."
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "The world's std::shared_ptr<GroundField>, kept in HumanBot::ground."
+        },
+        {
+          "name": "WalkRoutes",
+          "kind": "component",
+          "access": "read",
+          "where": "init",
+          "effect": "Copied from the spawn entity into HumanBot::routes."
+        },
+        {
+          "name": "TerrainColliders",
+          "kind": "context",
+          "access": "read",
+          "where": "init (contains)",
+          "effect": "A mesh ground: LinearCast segments and TerrainUsers."
+        },
+        {
+          "name": "TerrainUsers",
+          "kind": "context",
+          "access": "write",
+          "where": "init",
+          "effect": "The segment bodies, for WorldTerrain to build colliders around."
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "init, reset, finish",
+          "effect": "Bodies and swing-twist constraints created, placed, removed."
+        },
+        {
+          "name": "AgentEnvParams",
+          "kind": "context",
+          "access": "read",
+          "where": "init, reset (applyEnvParams, applySlope)",
+          "effect": "The trainer's environment parameters over the params file."
+        },
+        {
+          "name": "WorldRng",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "reset",
+          "effect": "Draws the target speed, the spawn point, the target, the yaw, the initial tumble and the slope sign."
+        },
+        {
+          "name": "Ground",
+          "kind": "component",
+          "access": "read",
+          "where": "reset (applySlope)",
+          "effect": "The flat ground boxes whose static Jolt bodies are tilted for the episode."
+        },
+        {
+          "name": "Parked",
+          "kind": "context",
+          "access": "write",
+          "where": "reset",
+          "effect": "Unparks the world at the episode start."
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (draw)",
+          "effect": "On the drawn shape entities."
+        },
+        {
+          "name": "WorldShape",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (draw)",
+          "effect": "One entity per shape of every segment, for WorldView."
+        },
+        {
+          "name": "ModelRef",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (draw)",
+          "effect": "No model, a colour per segment for the drawn shape."
+        }
+      ],
+      "side_effects": [
+        "Reads resources/<body> and resources/<params> and hashes them (SHA-256); throws AssetError on a malformed file.",
+        "Creates 16 Jolt bodies and, for a dynamic walker, 15 swing-twist constraints with motors; removes them at finish.",
+        "Moves the static Ground bodies at every episode start (slope) and sets the segments' poses, velocities and mass properties.",
+        "Creates the drawn shape entities when draw is set; they live as long as the world.",
+        "Logs errors without a HumanBotSpawn entity or with WalkRoutes but no ground field, a warning when no spawn point is found in the slope band."
+      ]
+    },
+    {
+      "name": "DriveTargets",
+      "class": "DriveTargetsSys",
+      "file": "src/logic/agents/humanbot.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Act phase of the walker: the window's action as the gains, torque limits, target orientations and target angular velocities of the joint motors.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "Params, body and constraints read; target_clamps, decisions and window_ticks written."
+        },
+        {
+          "name": "AgentIO",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "The action of the window (8 floats per joint)."
+        }
+      ],
+      "side_effects": [
+        "Changes the motor settings and targets of the walker's 15 Jolt SwingTwistConstraints."
+      ]
+    },
+    {
+      "name": "Disturbances",
+      "class": "DisturbancesSys",
+      "file": "src/logic/agents/humanbot.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Random pushes on the walker while randomising with pushing on: an impulse and an angular impulse on one segment, push_chance per tick.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "Params and bodies."
+        },
+        {
+          "name": "WorldRng",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "The chance, the segment, the force and the torque."
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "AddImpulse and AddAngularImpulse on the segment's body."
+        }
+      ],
+      "side_effects": [
+        "Impulses on a Jolt body of the walker."
+      ]
+    },
+    {
+      "name": "BodySync",
+      "class": "BodySyncSys",
+      "file": "src/logic/agents/humanbot.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "After the physics step: the segments' world state, the joint anchors' finite-difference velocities, the tick counters and the drawn shapes' poses.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "state, tick and window_ticks written."
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (readState)",
+          "effect": "Positions, rotations and velocities of the segment bodies."
+        },
+        {
+          "name": "WorldShape",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (draw)",
+          "effect": "Segment and local pose of each drawn shape."
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "write",
+          "where": "tick (draw)",
+          "effect": "The drawn shape's world pose."
+        },
+        {
+          "name": "PhysicsPose",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick (draw)",
+          "effect": "Previous and current pose for the viewer's interpolation, added on first use."
+        }
+      ],
+      "side_effects": [
+        "Adds PhysicsPose to the drawn shape entities."
+      ]
+    },
+    {
+      "name": "Task",
+      "class": "HumanBotTaskSys",
+      "file": "src/logic/agents/humanbot.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Unity's ArcUpdate: every arcFrames a new target (a direction in the slope band on a terrain) and, out of the continuous speed mode, a new target speed.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "arc_ticks, target, target_speed, route_lost and the eval legs."
+        },
+        {
+          "name": "WorldClock",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (arcTicks)",
+          "effect": "dt to convert 60 Hz frames to the world's rate."
+        },
+        {
+          "name": "WorldRng",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick (placeTarget, drawSpeed, drawDirection)",
+          "effect": "Target, direction and speed draws."
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "Termination",
+      "class": "TerminationSys",
+      "file": "src/logic/agents/humanbot.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Ends a walker episode: killed after a fall (head too low), truncated at the time limit, the end of a recording or with no route left; a kill parks the world.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "dying, dying_ticks, killed, truncated and the eval legs."
+        },
+        {
+          "name": "WorldClock",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (episodeTicks)",
+          "effect": "The time limit at the world's rate."
+        },
+        {
+          "name": "Parked",
+          "kind": "context",
+          "access": "write",
+          "where": "tick (kill)",
+          "effect": "Parks the world until the end of the decision window."
+        }
+      ],
+      "side_effects": [
+        "Parking skips PhysicsStep and the other non-observe systems of the world until the observe phase."
+      ]
+    },
+    {
+      "name": "Rewards",
+      "class": "RewardsSys",
+      "file": "src/logic/agents/humanbot.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Observe phase: carries out a pending or requested reset, else the window's reward (root speed, life, win, death, energy) and the training stats.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick, reset",
+          "effect": "State and snapshot read; maxima, dying, smoothed energy speed, window sums of the books, cumulative_reward written; the whole episode state at a reset."
+        },
+        {
+          "name": "AgentIO",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick, reset",
+          "effect": "reset_requested cleared, action read, stats and reward written."
+        },
+        {
+          "name": "WorldClock",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "dt for the length of the window."
+        },
+        {
+          "name": "AgentEnvParams",
+          "kind": "context",
+          "access": "read",
+          "where": "reset (applyEnvParams, applySlope)",
+          "effect": "The trainer's environment parameters over the params file, and the slope keys."
+        },
+        {
+          "name": "WorldRng",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "reset",
+          "effect": "Draws the target speed, the spawn point, the target, the yaw, the initial tumble and the slope sign."
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "reset",
+          "effect": "Places the segment bodies, changes their mass properties and resets the constraints' warm start."
+        },
+        {
+          "name": "Ground",
+          "kind": "component",
+          "access": "read",
+          "where": "reset (applySlope)",
+          "effect": "The flat ground boxes whose static Jolt bodies are tilted for the episode."
+        },
+        {
+          "name": "Parked",
+          "kind": "context",
+          "access": "write",
+          "where": "reset",
+          "effect": "Unparks the world at every episode start."
+        }
+      ],
+      "side_effects": [
+        "At a reset: the walker's and the Ground boxes' Jolt bodies are moved and mass properties changed; logs a warning when no spawn point is found in the slope band."
+      ]
+    },
+    {
+      "name": "Observation",
+      "class": "ObservationSys",
+      "file": "src/logic/agents/humanbot.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Observe phase: the decision snapshot (command of the coming window) and the observation, two stacked heidelbot_notoes_2 frames of 138 floats.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "State read; snapshot and previous_frame written."
+        },
+        {
+          "name": "AgentIO",
+          "kind": "context",
+          "access": "write",
+          "where": "tick",
+          "effect": "observation (276 floats)."
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "Episode",
+      "class": "EpisodeSys",
+      "file": "src/logic/agents/humanbot.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Observe phase: done and truncated for the host; at the end of an episode a pending reset and the world parked.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "fresh cleared, killed and truncated read, pending_reset set."
+        },
+        {
+          "name": "AgentIO",
+          "kind": "context",
+          "access": "write",
+          "where": "tick",
+          "effect": "done and truncated."
+        },
+        {
+          "name": "Parked",
+          "kind": "context",
+          "access": "write",
+          "where": "tick",
+          "effect": "Parks the world at the end of an episode."
+        }
+      ],
+      "side_effects": [
+        "Parking skips PhysicsStep and the every-tick systems of the world for one decision window."
+      ]
+    },
+    {
+      "name": "TrackActions",
+      "class": "TrackActionsSys",
+      "file": "src/logic/agents/humanbot.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Plays baked pose tracks on the kinematic walker: MoveKinematic toward each frame in turn (the track demo recorder).",
+      "access": [
+        {
+          "name": "PoseTrackPlayer",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "init (data), tick (frame)",
+          "effect": "Loads the track, advances the frame."
+        },
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "read",
+          "where": "init (find), tick",
+          "effect": "Body name to check the track against, segment bodies."
+        },
+        {
+          "name": "WorldClock",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "The world's dt against the track's."
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "init, tick",
+          "effect": "SetPositionAndRotation at frame 0 and on teleports, MoveKinematic otherwise."
+        }
+      ],
+      "side_effects": [
+        "Reads resources/<track>.track.json and its .track.bin; throws AssetError for another body or another dt.",
+        "Moves the kinematic Jolt bodies of the walker."
+      ]
+    },
+    {
+      "name": "Energy",
+      "class": "EnergySys",
+      "file": "src/logic/agents/humanbot_energy.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Energy books of the step: whole-body energy, each joint motor's exact work from Jolt's motor impulses, contact impulses from the momentum balance, residual.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "State, params, body and constraints read; books written."
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "Gravity of the world's config."
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "DeVitaStepStat",
+      "class": "DeVitaStepStatSys",
+      "file": "src/logic/agents/humanbot_energy.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "DeVita's protocol: sagittal work of hip, knee and ankle over each stance of a foot, split by sign, and the step count (energy reward on or eval).",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "books, state and target read; devita written."
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "EnergyFormulas",
+      "class": "EnergyFormulasSys",
+      "file": "src/logic/agents/humanbot_formulas.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Eval only: the Lagrangian, recursive Newton-Euler and motor work formulas of a long rollout with their checks against Jolt, into FormulaBooks totals.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "State, constraints and books.tick_torque_variation read; formulas written."
+        },
+        {
+          "name": "ContactRecorderHandle",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "tick",
+          "effect": "The contact impulse listener, created on first use; its reports read and cleared every tick."
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "SetContactImpulseListener once; gravity."
+        }
+      ],
+      "side_effects": [
+        "Installs a contact impulse listener on the world's Jolt PhysicsSystem (never removed)."
+      ]
+    }
+  ],
+  "components": [
+    {
+      "name": "AgentIO",
+      "kind": "component",
+      "file": "src/logic/agents/agent_io.h",
+      "summary": "An agent as the training host sees it: behaviour, actions in, observations, sensors, reward, done and stats out.",
+      "json": null,
+      "fields": [
+        {
+          "name": "behavior",
+          "type": "std::string",
+          "desc": "Behaviour name (one brain per behaviour)."
+        },
+        {
+          "name": "observation_size",
+          "type": "int",
+          "desc": "Floats of the vector observation."
+        },
+        {
+          "name": "action_size",
+          "type": "int",
+          "desc": "Continuous actions."
+        },
+        {
+          "name": "sensor_name",
+          "type": "std::string",
+          "desc": "Name of the vector sensor sent to the trainer (VectorSensor_size<n>, or the walker's stacking sensor)."
+        },
+        {
+          "name": "branches",
+          "type": "std::vector<int>",
+          "desc": "Sizes of the discrete action branches."
+        },
+        {
+          "name": "action",
+          "type": "std::vector<float>",
+          "desc": "Host to world: the decision of the coming window (zeros when none)."
+        },
+        {
+          "name": "discrete",
+          "type": "std::vector<int>",
+          "desc": "Host to world: one choice per branch."
+        },
+        {
+          "name": "reset_requested",
+          "type": "bool",
+          "desc": "Host to world: start a new episode at the next Observe phase (RESET)."
+        },
+        {
+          "name": "observation",
+          "type": "std::vector<float>",
+          "desc": "World to host, written at the Observe phase."
+        },
+        {
+          "name": "sensors",
+          "type": "std::vector<AgentSensor>",
+          "desc": "Further observations (vectors, or buffers of rows with a count), sent after the vector one."
+        },
+        {
+          "name": "reward",
+          "type": "float",
+          "desc": "Reward of the window that ended (since the last decision for a component)."
+        },
+        {
+          "name": "done",
+          "type": "bool",
+          "desc": "The episode ended with this observation."
+        },
+        {
+          "name": "truncated",
+          "type": "bool",
+          "desc": "... by a limit (time, bounds), not a terminal state."
+        },
+        {
+          "name": "recordable",
+          "type": "bool",
+          "desc": "false: the observation belongs to no episode (a demo's warm-up), recorders skip it."
+        },
+        {
+          "name": "stats",
+          "type": "std::vector<AgentStat>",
+          "desc": "This window's stats (key, value, aggregation 0 average / 1 recent / 2 sum / 3 histogram), averaged over agents by the host."
+        },
+        {
+          "name": "requested",
+          "type": "bool",
+          "desc": "Components only: the agent asks for a decision with this observation; cleared by the host when it sends it."
+        },
+        {
+          "name": "id",
+          "type": "int",
+          "desc": "Given by the host, unique in the run; kept by an entity over its episodes."
+        }
+      ],
+      "notes": "Two uses: the one agent of a world as a world context variable (agentIO(reg) creates it; HumanBot, sphere roller, animal walkers), or a component on every agent entity (sandbox, pursuit), next to the AgentsReset context flag. configure(), addBranch(), addVector(), addBuffer() set it up. Read and written by the training host (src/train/worlds_env.cpp, train_host.cpp) and the policies of src/onnx/ between decision windows."
+    },
+    {
+      "name": "AgentsReset",
+      "kind": "context",
+      "file": "src/logic/agents/agent_io.h",
+      "summary": "World context flag of worlds whose agents are components: the host's RESET for every agent at the next Observe phase.",
+      "json": null,
+      "fields": [
+        {
+          "name": "requested",
+          "type": "bool",
+          "desc": "Set by the host, cleared by the agents' systems when they start every agent again."
+        }
+      ],
+      "notes": "Created by the agents' systems in preinit (sandbox, pursuit): its presence tells the host the world has agents before any entity exists."
+    },
+    {
+      "name": "AgentEnvParams",
+      "kind": "context",
+      "file": "src/logic/agents/agent_env_params.h",
+      "summary": "The trainer's resolved environment parameters, read by a world's agents at each episode start.",
+      "json": null,
+      "fields": [
+        {
+          "name": "values",
+          "type": "std::map<std::string, float>",
+          "desc": "Parameter name to value; has() and get(name, fallback) read it."
+        }
+      ],
+      "notes": "Written by the training host between decision windows (src/train/train_host.cpp); absent outside training, where agents keep their params file. Read by the walker's reset (applyEnvParams, applySlope), the animals and the sandbox."
+    },
+    {
+      "name": "HumanBot",
+      "kind": "context",
+      "file": "src/logic/agents/humanbot.h",
+      "summary": "The HumanBot walker of a world: its files, Jolt bodies and constraints, segment state, command, episode counters and energy books.",
+      "json": null,
+      "fields": [
+        {
+          "name": "body",
+          "type": "std::shared_ptr<const BodyDef>",
+          "desc": "The body file (segments, joints, shapes), immutable."
+        },
+        {
+          "name": "base_params",
+          "type": "std::shared_ptr<const AgentParams>",
+          "desc": "The params file as loaded."
+        },
+        {
+          "name": "params",
+          "type": "AgentParams",
+          "desc": "base_params with the env params on top, refreshed each episode."
+        },
+        {
+          "name": "kinematic, recording, draw, view, view_truncate",
+          "type": "bool",
+          "desc": "Modes copied from HumanBotSpawn."
+        },
+        {
+          "name": "view_speed",
+          "type": "float",
+          "desc": "Command speed in view mode (1.36 m/s)."
+        },
+        {
+          "name": "recording_ticks",
+          "type": "int",
+          "desc": "Episode length while recording (1000)."
+        },
+        {
+          "name": "built",
+          "type": "bool",
+          "desc": "The ragdoll exists."
+        },
+        {
+          "name": "bodies",
+          "type": "std::vector<JPH::BodyID>",
+          "desc": "One Jolt body per segment."
+        },
+        {
+          "name": "constraints",
+          "type": "std::vector<JPH::Ref<JPH::SwingTwistConstraint>>",
+          "desc": "One per joint, empty when kinematic."
+        },
+        {
+          "name": "frame1, frame2",
+          "type": "std::vector<glm::quat>",
+          "desc": "Constraint space (X twist, Y plane, Z normal) to parent and child body rotation."
+        },
+        {
+          "name": "built_mass",
+          "type": "float",
+          "desc": "Total mass the bodies were last given."
+        },
+        {
+          "name": "state",
+          "type": "RagdollState",
+          "desc": "World position, rotation, linear and angular velocity of the 16 segments, previous anchors and anchor velocities of the 15 joints."
+        },
+        {
+          "name": "est0",
+          "type": "float",
+          "desc": "Head over the lower foot at the spawn pose (height reference)."
+        },
+        {
+          "name": "target",
+          "type": "glm::vec3",
+          "desc": "Where the walker is sent."
+        },
+        {
+          "name": "target_speed",
+          "type": "float",
+          "desc": "Commanded speed, m/s."
+        },
+        {
+          "name": "continuous_speed_mode",
+          "type": "bool",
+          "desc": "Speed drawn once per episode from [targetSpeedMin, targetSpeedMax]."
+        },
+        {
+          "name": "snapshot",
+          "type": "DecisionSnapshot",
+          "desc": "Spine, target velocity and speed the last observation carried: what the window is rewarded against."
+        },
+        {
+          "name": "previous_frame",
+          "type": "std::array<float, 138>",
+          "desc": "The older half of the observation stack."
+        },
+        {
+          "name": "tick, decisions, window_ticks, arc_ticks, dying_ticks",
+          "type": "int",
+          "desc": "Ticks of the episode, decisions, ticks of the window, ticks since the last target, ticks spent dying."
+        },
+        {
+          "name": "dying, killed, truncated, pending_reset, fresh",
+          "type": "bool",
+          "desc": "Episode flags; fresh: first window of an episode."
+        },
+        {
+          "name": "cumulative_reward",
+          "type": "double",
+          "desc": "Reward of the episode so far."
+        },
+        {
+          "name": "target_clamps",
+          "type": "uint64_t",
+          "desc": "Target orientations Jolt clamped to the cone."
+        },
+        {
+          "name": "books",
+          "type": "EnergyBooks",
+          "desc": "Per-tick and per-window energy books (Energy): joint works and torques, contact impulses, energy, residuals, torque variation."
+        },
+        {
+          "name": "devita",
+          "type": "DeVitaBooks",
+          "desc": "DeVita's stance windows of the two feet, step count (strikes), episode sums and run totals."
+        },
+        {
+          "name": "formulas",
+          "type": "FormulaBooks",
+          "desc": "Previous state, stance windows and FormulaTotals of EnergyFormulas."
+        },
+        {
+          "name": "left_hip, left_knee, left_ankle, right_hip, right_knee, right_ankle",
+          "type": "int",
+          "desc": "Joint indices of the legs."
+        },
+        {
+          "name": "head_max_speed, head_max_error, head_max_height, head_min_height, root_max_speed, root_max_error, root_max_distance",
+          "type": "float",
+          "desc": "Unity's normaliser maxima and extremes, for the same stat names."
+        },
+        {
+          "name": "slope_angle",
+          "type": "float",
+          "desc": "Default slope of the ground, degrees (0)."
+        },
+        {
+          "name": "slope_applied",
+          "type": "float",
+          "desc": "This episode's slope, degrees."
+        },
+        {
+          "name": "energy_speed, energy_speed_valid",
+          "type": "float, bool",
+          "desc": "Smoothed speed toward the target of the energy reward."
+        },
+        {
+          "name": "ground",
+          "type": "std::shared_ptr<GroundField>",
+          "desc": "The world's ground field when it has one: heights are measured from it."
+        },
+        {
+          "name": "routes",
+          "type": "std::optional<WalkRoutes>",
+          "desc": "Set: episodes spawn and head where the ground stays in the slope band."
+        },
+        {
+          "name": "origin",
+          "type": "glm::vec3",
+          "desc": "This episode's spawn point on the ground."
+        },
+        {
+          "name": "spawn_spine",
+          "type": "glm::vec3",
+          "desc": "The spine at the start of the episode."
+        },
+        {
+          "name": "route_lost",
+          "type": "bool",
+          "desc": "No direction in the band from where the walker stands: the episode is truncated."
+        },
+        {
+          "name": "spawn_tries",
+          "type": "int",
+          "desc": "Points drawn for this episode's spawn."
+        },
+        {
+          "name": "legs, leg_open",
+          "type": "std::vector<WalkLeg>, bool",
+          "desc": "Eval only: the stretches walked toward each target (from, to, direction, ticks, strikes, fell)."
+        }
+      ],
+      "notes": "Created by AgentFactory (init) from the HumanBotSpawn entity; its bodies are removed at AgentFactory's finish. resetHumanBot() starts every episode (AgentFactory init, Rewards). Methods groundUnder(p), currentHeight(), isDying(). Read outside the systems by the eval host (src/train/train_host.cpp: summary, replays, legs), the walker viewer, rigEntity / RigPoseApply / GaitChecks of the kinematic walk."
+    },
+    {
+      "name": "HumanBotSpawn",
+      "kind": "component",
+      "file": "src/logic/agents/humanbot.h",
+      "summary": "The scene entity asking for the world's HumanBot walker: its body and params files and modes.",
+      "json": "HumanBotSpawn",
+      "fields": [
+        {
+          "name": "body",
+          "type": "std::string",
+          "desc": "Body file under resources/ (required)."
+        },
+        {
+          "name": "params",
+          "type": "std::string",
+          "desc": "Params file under resources/ (required)."
+        },
+        {
+          "name": "kinematic",
+          "type": "bool",
+          "desc": "JSON motion: \"dynamic\" (default) or \"kinematic\" (rig_anim, demo recorders)."
+        },
+        {
+          "name": "recording",
+          "type": "bool",
+          "desc": "Unity's recording: header x, z zeroed, no randomisation or death."
+        },
+        {
+          "name": "draw",
+          "type": "bool",
+          "desc": "WorldShape entities for WorldView."
+        },
+        {
+          "name": "view",
+          "type": "bool",
+          "desc": "walker_view: no randomisation, a fixed command."
+        },
+        {
+          "name": "view_truncate",
+          "type": "bool",
+          "desc": "... with episodes truncated as in training (eval)."
+        },
+        {
+          "name": "view_speed",
+          "type": "float",
+          "desc": "Command speed in view mode, 1.36."
+        },
+        {
+          "name": "max_recording_ticks",
+          "type": "int",
+          "desc": "Episode length while recording, 1000."
+        }
+      ],
+      "notes": "Read once by AgentFactory (the first entity that has one). The same entity carries WalkRoutes, PoseTrackPlayer, and for the kinematic walk Rig, RigPose, GaitCommand, GaitParams."
+    },
+    {
+      "name": "WorldShape",
+      "kind": "component",
+      "file": "src/logic/agents/humanbot.h",
+      "summary": "One shape of a world body drawn by WorldView; its Transform and PhysicsPose follow a segment.",
+      "json": null,
+      "fields": [
+        {
+          "name": "type",
+          "type": "WorldShape::Type (Box, Sphere, Capsule)",
+          "desc": "Kind of shape."
+        },
+        {
+          "name": "half_extent",
+          "type": "glm::vec3",
+          "desc": "As RigidBody::half_extent (capsule: radius, half height, radius)."
+        },
+        {
+          "name": "segment",
+          "type": "int",
+          "desc": "Segment of the ragdoll it is attached to."
+        },
+        {
+          "name": "local_position",
+          "type": "glm::vec3",
+          "desc": "Pose in the segment's frame."
+        },
+        {
+          "name": "local_rotation",
+          "type": "glm::quat",
+          "desc": "Rotation in the segment's frame."
+        }
+      ],
+      "notes": "Created with Transform and ModelRef by AgentFactory when HumanBotSpawn::draw is set (also by the animal agents and the sandbox); moved every tick by BodySync (AnimalSync for animals). Drawn by src/view/world_view.cpp."
+    },
+    {
+      "name": "PoseTrackPlayer",
+      "kind": "component",
+      "file": "src/logic/agents/humanbot.h",
+      "summary": "Kinematic playback of a baked pose track on the walker's bodies.",
+      "json": "PoseTrackPlayer",
+      "fields": [
+        {
+          "name": "track",
+          "type": "std::string",
+          "desc": "Track file under resources/ (.track.json, with its .track.bin), required."
+        },
+        {
+          "name": "loop",
+          "type": "bool",
+          "desc": "Wrap to frame 0 at the end (teleporting), else hold the last frame."
+        },
+        {
+          "name": "teleport",
+          "type": "bool",
+          "desc": "SetPositionAndRotation every frame instead of MoveKinematic."
+        },
+        {
+          "name": "playing",
+          "type": "bool",
+          "desc": "Not in JSON; true."
+        },
+        {
+          "name": "frame",
+          "type": "int",
+          "desc": "Current frame."
+        },
+        {
+          "name": "data",
+          "type": "std::shared_ptr<const PoseTrack>",
+          "desc": "The loaded track (TrackActions init)."
+        }
+      ],
+      "notes": "On the HumanBotSpawn entity of rig_world (kinematic, recording). TrackActions checks the track's body and dt."
+    },
+    {
+      "name": "ContactRecorderHandle",
+      "kind": "context",
+      "file": "src/logic/agents/humanbot_formulas.cpp",
+      "summary": "Holds the Jolt contact impulse listener of EnergyFormulas and the reports of the step.",
+      "json": null,
+      "fields": [
+        {
+          "name": "recorder",
+          "type": "std::shared_ptr<ContactRecorder>",
+          "desc": "A JPH::ContactImpulseListener (patched Jolt) whose reports vector gathers every OnContactSolved of the step."
+        }
+      ],
+      "notes": "Private to humanbot_formulas.cpp (anonymous namespace). Created by EnergyFormulas on its first eval tick, set as the world's contact impulse listener and never removed; the reports are cleared every tick."
+    }
+  ]
+}
