@@ -1,0 +1,659 @@
+{
+  "systems": [
+    {
+      "name": "Renderer",
+      "class": "Renderer",
+      "file": "src/renderer/renderer.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "Owns the Vulkan context, the desktop and headset targets, the shared lighting / shade / soil state and the scene passes; runs the frame (prepare, updates, transfer -> compute -> graphics, parallel recording, present).",
+      "access": [
+        {
+          "name": "ModelManager",
+          "kind": "context",
+          "access": "write+create",
+          "where": "constructor",
+          "effect": "Emplaced so that systems can load glTF models from their constructors and init."
+        },
+        {
+          "name": "ModelManager",
+          "kind": "context",
+          "access": "destroy",
+          "where": "finish",
+          "effect": "Erased before the device goes."
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "write+create",
+          "where": "constructor",
+          "effect": "Emplaced, then the graphics level (applyGraphicsPreset) and the command line's lighting tier, probe rays and far plants written in."
+        },
+        {
+          "name": "Graphics",
+          "kind": "context",
+          "access": "read",
+          "where": "constructor",
+          "effect": "current and presets: the level of resources/graphics.json to apply."
+        },
+        {
+          "name": "RunArgs",
+          "kind": "context",
+          "access": "read",
+          "where": "constructor, render",
+          "effect": "lighting, probe_rays, far_plants; deterministic() picks the time of the frame."
+        },
+        {
+          "name": "FrameClock",
+          "kind": "context",
+          "access": "read",
+          "where": "render",
+          "effect": "time of the frame in deterministic runs (captures, probes)."
+        },
+        {
+          "name": "Executor",
+          "kind": "context",
+          "access": "read",
+          "where": "render",
+          "effect": "The tf::Executor the desktop and headset command buffers are recorded on, in parallel."
+        },
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "destroy",
+          "where": "finish",
+          "effect": "reg.clear<ModelC>(): the meshes' GPU buffers go before the device."
+        }
+      ],
+      "side_effects": [
+        "Creates the window, OpenXR session, Vulkan device and swapchain through Context.",
+        "Makes Lights, RayScene, ProbeVolume, PlantVolumes (with ray tracing), TreeShade, SoilMaps, ClassicRender, VRRender and the passes (SkyPass first, then the scene's renderer.passes).",
+        "GPU: per-frame fences and semaphores; one transfer, one compute and one graphics submission a frame; waits on the frame fence in prepare and on device idle in init and finish.",
+        "Threads: records both targets concurrently on the taskflow executor.",
+        "Log: 'Renderer : unknown pass <name>' (error).",
+        "Profiler zones: create lighting and targets, create pass / pipelines <name>, update <pass>, Update, Record, Submit."
+      ]
+    },
+    {
+      "name": "Context",
+      "class": "Context",
+      "file": "src/renderer/context/context.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "The Vulkan and OpenXR context (VRContext, Windu, Instance, Device, GpuProfile, Transfer, Compute, Swapchain) and the view set layout; puts Context* in the registry context.",
+      "access": [
+        {
+          "name": "Context",
+          "kind": "context",
+          "access": "write+create",
+          "where": "constructor",
+          "effect": "Context* to itself, for code that only has the registry (Terrain, ModelManager, loadGLTF, Input)."
+        },
+        {
+          "name": "Settings",
+          "kind": "context",
+          "access": "read",
+          "where": "constructor (VRContext, Windu)",
+          "effect": "vr_mode; window_width, window_height, fullscreen."
+        },
+        {
+          "name": "RunArgs",
+          "kind": "context",
+          "access": "read",
+          "where": "constructor (Windu, Device, Swapchain)",
+          "effect": "window_hidden, ray_tracing, gpu_times."
+        }
+      ],
+      "side_effects": [
+        "Creates the SDL window (SDL_Quit in its destructor), Vulkan instance, device, queues, VMA allocator, swapchain, OpenXR instance, session, reference space and eye swapchains.",
+        "Log: GPU name, ray tracing support, VR enabled or disabled with its reason, OpenXR and Vulkan validation messages.",
+        "The Context* context variable is never erased."
+      ]
+    },
+    {
+      "name": "ClassicRender",
+      "class": "ClassicRender",
+      "file": "src/renderer/classic_render/classic_render.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "The desktop render target: swapchain render pass, per-frame command buffer and ViewUBO from the Camera, recording of the passes (through SunVisibility with ray tracing), present, captures, gpu_times.",
+      "access": [
+        {
+          "name": "RunArgs",
+          "kind": "context",
+          "access": "read",
+          "where": "constructor",
+          "effect": "gpu_times: the timestamp query pool of the pass timings."
+        },
+        {
+          "name": "Input",
+          "kind": "context",
+          "access": "read",
+          "where": "prepare",
+          "effect": "window_showing: nothing is acquired or drawn for a minimized window."
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "read",
+          "where": "updateView",
+          "effect": "Position, view and projection of the desktop ViewUBO."
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "updateView (treeShadeView, lightingView)",
+          "effect": "tree_shade strength and the desktop lighting tier into the ViewUBO."
+        }
+      ],
+      "side_effects": [
+        "GPU: command and descriptor pools, mapped uniform buffers, semaphores, query pool, capture buffer; records the desktop command buffer; acquires and presents swapchain images.",
+        "Log: gpu_times warnings and pass times every 300 frames and at each capture.",
+        "Profiler: CPU and GPU zones per pass (<pass> (desktop)), Sun rays / Composite (desktop)."
+      ]
+    },
+    {
+      "name": "VRRender",
+      "class": "VRRender",
+      "file": "src/renderer/vr_render/vr_render.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "The headset render target drawn alongside the desktop: OpenXR session events and frame loop, per-eye ViewUBO from the located views and the VRRig, recording per eye.",
+      "access": [
+        {
+          "name": "VRRig",
+          "kind": "context",
+          "access": "read+create",
+          "where": "constructor (emplace), updateView",
+          "effect": "The stage's position and yaw in the world: world pose of each eye."
+        },
+        {
+          "name": "VRInput",
+          "kind": "context",
+          "access": "write",
+          "where": "prepare (pollEvents)",
+          "effect": "focused and session_running from the session state."
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "updateView (treeShadeView, lightingView)",
+          "effect": "tree_shade strength and the VR lighting tier into the eyes' ViewUBO."
+        }
+      ],
+      "side_effects": [
+        "Makes VRActions (which emplaces VRInput) even without a headset.",
+        "OpenXR: session begin / end / exit, xrWaitFrame (blocks), xrBeginFrame, xrEndFrame, eye swapchain images, view location.",
+        "GPU: per-frame and per-eye uniform buffers and descriptor sets, the headset command buffer.",
+        "Log: VR session started / stopped / lost, runtime shutting down.",
+        "Profiler: DY_FRAME_NAMED(\"Headset\"), zones per pass and eye."
+      ]
+    },
+    {
+      "name": "VRActions",
+      "class": "VRActions",
+      "file": "src/renderer/vr_render/vr_input.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "OpenXR actions of the controllers (pose, trigger, grip, thumbstick, primary, stick click) and the head pose, written into the VRInput context variable once a frame.",
+      "access": [
+        {
+          "name": "VRInput",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "constructor (emplace, enabled), sync",
+          "effect": "Head and hand poses, velocities, buttons and sticks; the previous trigger and primary give the rising edges, focused gates the hands."
+        }
+      ],
+      "side_effects": [
+        "OpenXR: action set, actions, suggested bindings (Touch, Index, simple controller), action and view spaces, xrSyncActions and state queries every frame.",
+        "Log: failed OpenXR calls (xrCheckResult)."
+      ]
+    },
+    {
+      "name": "ModelManager",
+      "class": "ModelManager",
+      "file": "src/renderer/model/model_manager.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "Context variable that loads glTF files once (loadGLTF) or uploads meshes built in code, and hands out the entity holding their ModelC.",
+      "access": [
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "write+create",
+          "where": "load, add",
+          "effect": "The mesh of a file or a key, on an entity it creates."
+        },
+        {
+          "name": "Context",
+          "kind": "context",
+          "access": "read",
+          "where": "load (loadGLTF), add",
+          "effect": "Context*: the transfer queue that uploads vertex, index and texture data."
+        }
+      ],
+      "side_effects": [
+        "Entities: one per model file or key; a failed load leaves an empty entity behind.",
+        "Files: reads .gltf / .glb files and their buffers and images (tinygltf).",
+        "GPU: vertex, index and texture uploads through Transfer.",
+        "Log: glTF warnings, 'Loaded <path> : ...' (info), 'Could not load model <path> : ...' (error)."
+      ]
+    },
+    {
+      "name": "TreeShade",
+      "class": "TreeShade",
+      "file": "src/renderer/tree_shade.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "Crown shadows of the plants (two soft discs each) on a 2048 m wrapping R8 map moved by the Sky's light; binding 1 of the view set; treeShadeView() fills ViewUBO::tree_shade.",
+      "access": [
+        {
+          "name": "Plant",
+          "kind": "component",
+          "access": "read",
+          "where": "constructor, on_construct / on_destroy handlers",
+          "effect": "Which plants cast a shade and their species."
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "constructor (storage), onPlant",
+          "effect": "Root position and scale of a plant."
+        },
+        {
+          "name": "Sky",
+          "kind": "context",
+          "access": "read",
+          "where": "constructor, update (followLight)",
+          "effect": "Direction of the light that casts the shadows."
+        },
+        {
+          "name": "VegetationLibrary",
+          "kind": "context",
+          "access": "read",
+          "where": "onPlant",
+          "effect": "Height and radius of the species."
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "treeShadeView",
+          "effect": "tree_shade: the strength put in the ViewUBO."
+        }
+      ],
+      "side_effects": [
+        "Signals: connects on_construct<Plant> and on_destroy<Plant> (disconnected in the destructor).",
+        "GPU: uploads a new 2048x2048 R8 image through Transfer whenever a plant came or went or the light moved (1 degree, 10 with ray tracing); old ones kept for the frames in flight; sets Context::tree_shade_view and tree_shade_sampler."
+      ]
+    },
+    {
+      "name": "SoilMaps",
+      "class": "SoilMaps",
+      "file": "src/renderer/terrain/soil_maps.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "Bakes the soil map of each chunk (SoilField, 67x67 RGBA8) into a layer of a 2D array image when it gets its mesh or the parameters change; binding 2 of the view set; the SoilLayers context variable.",
+      "access": [
+        {
+          "name": "SoilLayers",
+          "kind": "context",
+          "access": "readwrite+create+destroy",
+          "where": "constructor (emplace), update, destructor (erase)",
+          "effect": "Layer of each chunk's soil map; enabled from RenderSettings::soil."
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "soil and soil_params (the key of the maps)."
+        },
+        {
+          "name": "TerrainBuffers",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Number of chunk slots; absent until the Terrain system's init."
+        },
+        {
+          "name": "ChunkC",
+          "kind": "component",
+          "access": "read",
+          "where": "update (bake callback)",
+          "effect": "Chunk coordinates of the map to bake."
+        },
+        {
+          "name": "ChunkGPU",
+          "kind": "component",
+          "access": "read",
+          "where": "update (ChunkLayers::update)",
+          "effect": "Mesh slot of the chunk."
+        },
+        {
+          "name": "ChunkReady",
+          "kind": "tag",
+          "access": "read",
+          "where": "update (ChunkLayers::update)",
+          "effect": "Only chunks with a drawable mesh get a map."
+        }
+      ],
+      "side_effects": [
+        "GPU: one RGBA8 2D array image of up to 2048 layers (about 37 MB), a layer upload (Transfer::updateImage) per chunk baked; sets Context::soil_view and soil_sampler.",
+        "CPU: SoilField::bake on the main thread, at most 16 re-bakes a frame after a parameter change."
+      ]
+    },
+    {
+      "name": "ChunkLayers",
+      "class": "ChunkLayers",
+      "file": "src/renderer/terrain/chunk_layers.h",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "Allocates the layers of a 2D array image to chunk slots (soil maps, grass height maps): given when a chunk gets its mesh, retired NUM_FRAMES + 1 frames after it is gone or re-baked.",
+      "access": [
+        {
+          "name": "ChunkGPU",
+          "kind": "component",
+          "access": "read",
+          "where": "update",
+          "effect": "Mesh slot a map record belongs to."
+        },
+        {
+          "name": "ChunkReady",
+          "kind": "tag",
+          "access": "read",
+          "where": "update",
+          "effect": "Only chunks with a drawable mesh get a layer."
+        }
+      ],
+      "side_effects": [
+        "None of its own: the bake callback of its owner (SoilMaps, GrassPass) bakes and uploads."
+      ]
+    }
+  ],
+  "components": [
+    {
+      "name": "Context",
+      "kind": "context",
+      "file": "src/renderer/context/context.h",
+      "summary": "The Vulkan / OpenXR context of the renderer, reachable from the registry as Context*.",
+      "json": null,
+      "fields": [
+        {
+          "name": "vr",
+          "type": "VRContext",
+          "desc": "OpenXR instance, session, reference space, eye swapchains; enabled() false without a headset"
+        },
+        {
+          "name": "win",
+          "type": "Windu",
+          "desc": "SDL2 window and its Vulkan surface"
+        },
+        {
+          "name": "instance",
+          "type": "Instance",
+          "desc": "Vulkan instance (1.2 where available, else 1.1)"
+        },
+        {
+          "name": "device",
+          "type": "Device",
+          "desc": "physical and logical device, queues (graphics, compute, transfer, indices g_i, c_i, t_i), VMA allocator, ray (RayContext)"
+        },
+        {
+          "name": "gpu_profile",
+          "type": "GpuProfile",
+          "desc": "Tracy Vulkan context, zones on the GPU with profile=true"
+        },
+        {
+          "name": "transfer",
+          "type": "Transfer",
+          "desc": "staging uploads, flushed once a frame"
+        },
+        {
+          "name": "compute",
+          "type": "Compute",
+          "desc": "ring of compute command buffers recorded during the tick"
+        },
+        {
+          "name": "swap",
+          "type": "Swapchain",
+          "desc": "desktop swapchain: format, extent, images, current image, readable"
+        },
+        {
+          "name": "view_layout",
+          "type": "vk::DescriptorSetLayout",
+          "desc": "layout of set 0 of every scene pipeline (bindings 0 to 3, 4 to 12 with ray tracing)"
+        },
+        {
+          "name": "tree_shade_view",
+          "type": "vk::ImageView",
+          "desc": "current map of TreeShade (binding 1)"
+        },
+        {
+          "name": "tree_shade_sampler",
+          "type": "vk::Sampler",
+          "desc": "linear, repeat"
+        },
+        {
+          "name": "soil_view",
+          "type": "vk::ImageView",
+          "desc": "2D array of the soil maps (SoilMaps, binding 2)"
+        },
+        {
+          "name": "soil_sampler",
+          "type": "vk::Sampler",
+          "desc": "linear, clamp to edge"
+        },
+        {
+          "name": "lights_buffers",
+          "type": "std::array<vk::Buffer, NUM_FRAMES>",
+          "desc": "LightsUBO of each frame (Lights, binding 3)"
+        },
+        {
+          "name": "tlas",
+          "type": "vk::AccelerationStructureKHR",
+          "desc": "top level structure of the frame (RayScene, binding 4)"
+        },
+        {
+          "name": "ray_geometries",
+          "type": "vk::Buffer",
+          "desc": "geometry table of RayScene (binding 5)"
+        },
+        {
+          "name": "ray_textures",
+          "type": "const std::vector<vk::DescriptorImageInfo>*",
+          "desc": "textures the rays alpha test against (RayMeshes, binding 6, up to 512)"
+        },
+        {
+          "name": "probe_index_view",
+          "type": "vk::ImageView",
+          "desc": "table of the probe brick of each chunk (ProbeVolume, binding 7)"
+        },
+        {
+          "name": "probe_index_sampler",
+          "type": "vk::Sampler",
+          "desc": "sampler of the probe index"
+        },
+        {
+          "name": "probe_light",
+          "type": "const std::vector<vk::DescriptorImageInfo>*",
+          "desc": "three light textures per probe page (binding 8, up to 16 pages)"
+        },
+        {
+          "name": "probe_direct",
+          "type": "const std::vector<vk::DescriptorImageInfo>*",
+          "desc": "sun and sky texture per probe page (binding 9)"
+        },
+        {
+          "name": "plant_volumes",
+          "type": "const std::array<std::vector<vk::DescriptorImageInfo>, 3>*",
+          "desc": "density, colour and normal volumes of the species (PlantVolumes, bindings 10 to 12, up to 128)"
+        },
+        {
+          "name": "frame_index",
+          "type": "uint32_t",
+          "desc": "frame in flight being prepared, 0 .. NUM_FRAMES - 1 (Renderer::prepare)"
+        }
+      ],
+      "notes": "Held in the registry context as a raw pointer (reg.ctx().get<Context*>()), emplaced by the Context constructor (a member of Renderer, made before any system) and never erased: it dangles after the renderer is destroyed. Only in the viewer (dynamical)."
+    },
+    {
+      "name": "ModelManager",
+      "kind": "context",
+      "file": "src/renderer/model/model_manager.h",
+      "summary": "Cache of glTF models and code-built meshes: path or key to the entity holding its ModelC.",
+      "json": null,
+      "fields": [
+        {
+          "name": "reg",
+          "type": "entt::registry&",
+          "desc": "the registry the model entities are made in (private)"
+        },
+        {
+          "name": "models",
+          "type": "std::unordered_map<std::string, entt::entity>",
+          "desc": "path or key to the entity holding its ModelC (private)"
+        }
+      ],
+      "notes": "Emplaced by the Renderer's constructor, erased by Renderer::finish after the ModelC storage is cleared. Methods: load(path), get(path), add(key, MeshData). Main thread only."
+    },
+    {
+      "name": "ModelC",
+      "kind": "component",
+      "file": "src/renderer/model/model.h",
+      "summary": "GPU mesh of a loaded glTF file (node transforms baked in) or of a code-built mesh, on its own entity; instances point at it with ModelRenderable.",
+      "json": null,
+      "fields": [
+        {
+          "name": "vertices",
+          "type": "std::shared_ptr<VmaBuffer>",
+          "desc": "ModelVertex buffer (position, normal, uv), with ray build usage when ray tracing is on"
+        },
+        {
+          "name": "indices",
+          "type": "std::shared_ptr<VmaBuffer>",
+          "desc": "uint32 index buffer"
+        },
+        {
+          "name": "parts",
+          "type": "std::vector<ModelC::Part>",
+          "desc": "first_index, index_count and material of each primitive"
+        },
+        {
+          "name": "materials",
+          "type": "std::vector<ModelC::Material>",
+          "desc": "base_color (vec4), image (shared_ptr<VmaImage>, null: white), set (set 1 of the model pipeline, filled by ModelPass); the last one is the default material"
+        },
+        {
+          "name": "min",
+          "type": "glm::vec3",
+          "desc": "lower corner of the bounds, model space"
+        },
+        {
+          "name": "max",
+          "type": "glm::vec3",
+          "desc": "upper corner of the bounds, model space"
+        },
+        {
+          "name": "ray_mesh",
+          "type": "int32_t",
+          "desc": "index in RayMeshes given by ModelPass with ray tracing, -1 otherwise"
+        }
+      ],
+      "notes": "Created by ModelManager::load / add on an entity of its own, one per file or key, never per instance. Renderer::finish clears the storage (GPU buffers must go before the device). Read by ModelPass and RayScene."
+    },
+    {
+      "name": "ChunkGPU",
+      "kind": "component",
+      "file": "src/renderer/terrain/terrain_sys.h",
+      "summary": "The GPU mesh slot of a chunk: its vertex buffer and indirect draw command in TerrainBuffers.",
+      "json": null,
+      "fields": [
+        {
+          "name": "slot",
+          "type": "uint32_t",
+          "desc": "index of the slot (0 .. 2047): TerrainBuffers::vertices[slot], indirect command at slot x indirect_stride"
+        }
+      ],
+      "notes": "Emplaced or replaced by the Terrain system when it records the marching cubes of the chunk (the previous slot freed NUM_FRAMES + 1 frames later); cleared in its destructor. Read by the terrain and grass passes, RayScene and ChunkLayers."
+    },
+    {
+      "name": "ChunkReady",
+      "kind": "tag",
+      "file": "src/renderer/terrain/terrain_sys.h",
+      "summary": "The chunk's mesh was computed in a submitted compute batch and can be drawn.",
+      "json": null,
+      "fields": [],
+      "notes": "Emplaced by the Terrain system with ChunkGPU (the graphics submission of the frame waits on its compute), cleared in its destructor; storage created in its init so the passes can view it from worker threads. Read by the terrain and grass passes, RayScene, ChunkLayers and the debug menu."
+    },
+    {
+      "name": "ChunkTriangles",
+      "kind": "component",
+      "file": "src/renderer/terrain/terrain_sys.h",
+      "summary": "Triangle count of the chunk's mesh, read back from the GPU a few frames after it was built (ray tracing only).",
+      "json": null,
+      "fields": [
+        {
+          "name": "count",
+          "type": "uint32_t",
+          "desc": "triangles of the mesh (vertexCount / 3 of its indirect command)"
+        },
+        {
+          "name": "slot",
+          "type": "uint32_t",
+          "desc": "slot of the mesh that was counted"
+        }
+      ],
+      "notes": "Written by the Terrain system NUM_FRAMES frames after the meshing frame, only with ray tracing and only if the chunk still has that slot; removed when the chunk is meshed again. Read by RayScene to build the chunk's acceleration structure."
+    },
+    {
+      "name": "TerrainBuffers",
+      "kind": "context",
+      "file": "src/renderer/terrain/terrain_sys.h",
+      "summary": "The GPU buffers of the terrain meshes, read by the terrain and grass passes, RayScene and SoilMaps.",
+      "json": null,
+      "fields": [
+        {
+          "name": "indirect",
+          "type": "vk::Buffer",
+          "desc": "one vk::DrawIndirectCommand per slot (vertex count written by marchingcubes.comp.glsl)"
+        },
+        {
+          "name": "indirect_stride",
+          "type": "vk::DeviceSize",
+          "desc": "bytes between two commands (aligned to minStorageBufferOffsetAlignment, at least 16)"
+        },
+        {
+          "name": "vertices",
+          "type": "std::vector<vk::Buffer>",
+          "desc": "vertex buffer (TerrainVertex, 2^15 triangles) of each slot allocated so far"
+        }
+      ],
+      "notes": "Emplaced by the Terrain system's init, vertices grown as slots are allocated, erased in its destructor. Its absence means no terrain (SoilMaps and the passes do nothing)."
+    },
+    {
+      "name": "SoilLayers",
+      "kind": "context",
+      "file": "src/renderer/terrain/soil_maps.h",
+      "summary": "Where the passes find the layer of the soil map of a chunk while they record.",
+      "json": null,
+      "fields": [
+        {
+          "name": "chunks",
+          "type": "ChunkLayers",
+          "desc": "layer of each chunk slot's map in the soil 2D array"
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "desc": "RenderSettings::soil; false: layer() returns -1"
+        }
+      ],
+      "notes": "Emplaced by SoilMaps' constructor (always, with the renderer), updated by SoilMaps::update on the main thread, erased in its destructor. layer(slot, chunk) is read by the terrain and grass passes while they record."
+    }
+  ]
+}

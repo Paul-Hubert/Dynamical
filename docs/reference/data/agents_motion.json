@@ -1,0 +1,2634 @@
+{
+  "systems": [
+    {
+      "name": "SphereControl",
+      "class": "SphereControlSys",
+      "file": "src/logic/agents/sphere_roller.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Configures the sphere roller's agent, starts episodes and applies the action as a torque in the goal frame of the observation it answered.",
+      "access": [
+        {
+          "name": "SphereAgent",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "init, tick, resetSphereEpisode",
+          "effect": "task settings read; episode state reset and the held torque written from the action"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "write",
+          "where": "resetSphereEpisode",
+          "effect": "the spawn position and identity rotation"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "init, tick, resetSphereEpisode",
+          "effect": "the Jolt body id and the radius (half_extent.x)"
+        },
+        {
+          "name": "PhysicsPose",
+          "kind": "component",
+          "access": "write",
+          "where": "resetSphereEpisode",
+          "effect": "both interpolation poses set to the spawn, when present"
+        },
+        {
+          "name": "AgentIO",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, init, tick, resetSphereEpisode",
+          "effect": "created in preinit, configured in init (16 observations, 3 actions), action read, cleared at a reset"
+        },
+        {
+          "name": "WorldClock",
+          "kind": "context",
+          "access": "read",
+          "where": "tick, resetSphereEpisode",
+          "effect": "window boundaries; simulation time for the colliders"
+        },
+        {
+          "name": "WorldRng",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "resetSphereEpisode",
+          "effect": "spawn point and first target drawn"
+        },
+        {
+          "name": "WorldInfo",
+          "kind": "context",
+          "access": "read",
+          "where": "resetSphereEpisode",
+          "effect": "world index times spawn_spacing is the spawn centre (optional)"
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick, resetSphereEpisode",
+          "effect": "AddTorque every tick; ground ray cast and teleport of the body at a reset"
+        },
+        {
+          "name": "TerrainColliders",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "resetSphereEpisode",
+          "effect": "require() builds the colliders of the spawn column (optional, std::shared_ptr)"
+        },
+        {
+          "name": "Parked",
+          "kind": "context",
+          "access": "write",
+          "where": "resetSphereEpisode",
+          "effect": "un-parks the world at a new episode (when present)"
+        }
+      ],
+      "side_effects": [
+        "Adds a torque to the sphere's Jolt body every tick the held torque is not zero.",
+        "At a reset teleports the Jolt body and builds the marching cubes colliders around the spawn point synchronously.",
+        "Logs an error in init when the world does not hold exactly one SphereAgent + Transform + RigidBody entity."
+      ]
+    },
+    {
+      "name": "SphereTask",
+      "class": "SphereTaskSys",
+      "file": "src/logic/agents/sphere_roller.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Every tick after the physics step: rates the sphere's velocity against the observed target, drifts the live target, ends the episode off the field.",
+      "access": [
+        {
+          "name": "SphereAgent",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "reward and error sums, target drift toward its goal, goal draws, end flags"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "the sphere's position for the bounds, the fall and the home radius"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "the Jolt body id"
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "the body's linear velocity"
+        },
+        {
+          "name": "WorldRng",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick (drawGoal)",
+          "effect": "goal heading, speed and interval drawn"
+        },
+        {
+          "name": "Parked",
+          "kind": "context",
+          "access": "write",
+          "where": "tick",
+          "effect": "parks the world when the sphere leaves the field or falls (when present)"
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "SphereObserve",
+      "class": "SphereObserveSys",
+      "file": "src/logic/agents/sphere_roller.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Observe phase of the sphere roller: the window's reward and end, the trainer's RESET, and the 16 float observation of the live target.",
+      "access": [
+        {
+          "name": "SphereAgent",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick, resetSphereEpisode",
+          "effect": "window sums read and cleared, decisions counted, end, decision target and heading stored"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick, resetSphereEpisode",
+          "effect": "position read for the probes; written at a RESET"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "tick, resetSphereEpisode",
+          "effect": "the Jolt body id and the radius"
+        },
+        {
+          "name": "PhysicsPose",
+          "kind": "component",
+          "access": "write",
+          "where": "resetSphereEpisode",
+          "effect": "set to the spawn at a RESET (when present)"
+        },
+        {
+          "name": "AgentIO",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick, resetSphereEpisode",
+          "effect": "reset_requested cleared; reward, done, truncated, stats and observation written"
+        },
+        {
+          "name": "WorldRng",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick, resetSphereEpisode",
+          "effect": "staggered start of the episode; spawn and first target at a RESET"
+        },
+        {
+          "name": "WorldClock",
+          "kind": "context",
+          "access": "read",
+          "where": "resetSphereEpisode",
+          "effect": "simulation time for the colliders"
+        },
+        {
+          "name": "WorldInfo",
+          "kind": "context",
+          "access": "read",
+          "where": "resetSphereEpisode",
+          "effect": "spawn centre (optional)"
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick, resetSphereEpisode",
+          "effect": "velocities and ground ray casts read; body teleported at a RESET"
+        },
+        {
+          "name": "TerrainColliders",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "resetSphereEpisode",
+          "effect": "colliders of the spawn column at a RESET (optional)"
+        },
+        {
+          "name": "Parked",
+          "kind": "context",
+          "access": "write",
+          "where": "tick, resetSphereEpisode",
+          "effect": "un-parks the world at the end of an episode (when present)"
+        }
+      ],
+      "side_effects": [
+        "Three downward ray casts against the world's static bodies per window.",
+        "At a trainer RESET, teleports the Jolt body and builds the spawn column's colliders."
+      ]
+    },
+    {
+      "name": "TrainerActions",
+      "class": "TrainerActionsSys",
+      "file": "src/logic/agents/sphere_roller.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "The action slot of training templates: does nothing (the training host writes the actions); scenes replace it with Policy or SphereHeuristic.",
+      "access": [],
+      "side_effects": []
+    },
+    {
+      "name": "SphereHeuristic",
+      "class": "SphereHeuristicSys",
+      "file": "src/logic/agents/sphere_roller.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Proportional controller writing the sphere roller's action from its last observation, for comparison with a policy.",
+      "access": [
+        {
+          "name": "AgentIO",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "observation read (16 floats), action written; not created"
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "Pursuit",
+      "class": "PursuitSys",
+      "file": "src/logic/agents/pursuit.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Chasers and runners as agent components on a square field without physics: births, deaths, actions, moves and catches.",
+      "access": [
+        {
+          "name": "PursuitField",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, tick",
+          "effect": "emplaced with the parameters; catches and births counted"
+        },
+        {
+          "name": "AgentsReset",
+          "kind": "context",
+          "access": "write+create",
+          "where": "preinit",
+          "effect": "created when missing, so that the host sees an agent world"
+        },
+        {
+          "name": "PursuitDot",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "init (populate), tick",
+          "effect": "the dots' state; a runner that ended is destroyed and another born"
+        },
+        {
+          "name": "AgentIO",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "init (populate), tick",
+          "effect": "one agent per dot (Chaser / Runner, buffer Others, one branch); actions read; a chaser's cleared for its new episode"
+        },
+        {
+          "name": "WorldClock",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "window boundaries"
+        },
+        {
+          "name": "WorldRng",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "init, tick",
+          "effect": "places, yaws and phases of the dots"
+        }
+      ],
+      "side_effects": [
+        "Entity creation and destruction: every runner's end destroys its entity and creates a new one (a new agent id)."
+      ]
+    },
+    {
+      "name": "PursuitObserve",
+      "class": "PursuitObserveSys",
+      "file": "src/logic/agents/pursuit.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Observe phase of the pursuit fixture: rewards, ends, observations and decision requests of the dots that are due.",
+      "access": [
+        {
+          "name": "PursuitField",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "parameters read; windows counted"
+        },
+        {
+          "name": "AgentsReset",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "the trainer's RESET read and cleared"
+        },
+        {
+          "name": "PursuitDot",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "tick, populate on RESET",
+          "effect": "rewards collected, decisions, fresh, ended, nearest; every dot made again on a RESET"
+        },
+        {
+          "name": "AgentIO",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "tick, populate on RESET",
+          "effect": "reward, done, truncated, stats, observation, Others buffer, requested"
+        },
+        {
+          "name": "WorldRng",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "populate on RESET",
+          "effect": "places of the new dots"
+        }
+      ],
+      "side_effects": [
+        "On a trainer RESET every dot entity is destroyed and new ones are created."
+      ]
+    },
+    {
+      "name": "GroundPlane",
+      "class": "GroundPlaneSys",
+      "file": "src/logic/agents/ground_field.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Makes a plane tilted by pitch and roll the world's GroundField, the ground of the kinematic walk.",
+      "access": [
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "write+create",
+          "where": "preinit",
+          "effect": "insert_or_assign of std::shared_ptr<GroundField> with a PlaneField(pitch, roll)"
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "GroundTerrain",
+      "class": "GroundTerrainSys",
+      "file": "src/logic/agents/ground_field.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Makes the marching cubes terrain (TerrainField on the world's TerrainGenerator) the world's GroundField.",
+      "access": [
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read+create",
+          "where": "preinit",
+          "effect": "the world's generator reused (WorldTerrain), or created with seed (std::shared_ptr)"
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "write+create",
+          "where": "preinit",
+          "effect": "insert_or_assign of std::shared_ptr<GroundField> with a TerrainField"
+        }
+      ],
+      "side_effects": [
+        "Later queries of the field (by other systems) sample and mesh blocks of 4^3 cubes on the CPU and cache up to 4096 of them."
+      ]
+    },
+    {
+      "name": "GaitRoutes",
+      "class": "GaitRoutesSys",
+      "file": "src/logic/agents/walk_routes.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Recording episodes of the kinematic walk: a fresh route in the slope band each episode, a warm-up, then recordable decisions.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick, start, ensureRig",
+          "effect": "built read; previous_frame zeroed at the first recorded decision, state.history_valid cleared at a new route"
+        },
+        {
+          "name": "HumanBotSpawn",
+          "kind": "component",
+          "access": "read",
+          "where": "ensureRig",
+          "effect": "the first entity with it is the rig entity"
+        },
+        {
+          "name": "Rig",
+          "kind": "component",
+          "access": "write+create",
+          "where": "ensureRig",
+          "effect": "created with the bot's body on the first call"
+        },
+        {
+          "name": "RigPose",
+          "kind": "component",
+          "access": "write+create",
+          "where": "ensureRig",
+          "effect": "the spawn pose, on the first call"
+        },
+        {
+          "name": "GaitRoute",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick, start",
+          "effect": "the route and its timing"
+        },
+        {
+          "name": "WalkRoutes",
+          "kind": "component",
+          "access": "read",
+          "where": "start",
+          "effect": "the slope band and spawn area (defaults without one)"
+        },
+        {
+          "name": "GaitCommand",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "start",
+          "effect": "speed read for the path length; start and heading written"
+        },
+        {
+          "name": "GaitState",
+          "kind": "component",
+          "access": "write+create",
+          "where": "start",
+          "effect": "replaced by a fresh state: the gait starts over standing"
+        },
+        {
+          "name": "IKChain",
+          "kind": "component",
+          "access": "destroy",
+          "where": "start",
+          "effect": "the legs' chain entities of the old gait destroyed"
+        },
+        {
+          "name": "IKTarget",
+          "kind": "component",
+          "access": "destroy",
+          "where": "start",
+          "effect": "the legs' target entities destroyed"
+        },
+        {
+          "name": "BalanceState",
+          "kind": "component",
+          "access": "destroy",
+          "where": "start",
+          "effect": "removed from the rig entity"
+        },
+        {
+          "name": "GaitReport",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "start",
+          "effect": "is_planted and settle_time cleared (when present)"
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read+create",
+          "where": "start",
+          "effect": "routes drawn on it (groundField makes a level plane when missing)"
+        },
+        {
+          "name": "AgentIO",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "tick",
+          "effect": "recordable, done and truncated set every tick"
+        },
+        {
+          "name": "WorldClock",
+          "kind": "context",
+          "access": "read",
+          "where": "tick, start",
+          "effect": "ticks, decision period, dt"
+        },
+        {
+          "name": "WorldRng",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "start",
+          "effect": "jitter, spawn points and directions"
+        }
+      ],
+      "side_effects": [
+        "Destroys the old legs' IK chain and target entities at each new route (the arms' ones, if any, are left behind).",
+        "Logs a warning when no route in the slope band is found."
+      ]
+    },
+    {
+      "name": "Fabrik",
+      "class": "FabrikSys",
+      "file": "src/logic/agents/ik.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Solves every IKChain that has enabled IKTargets (priority, weights, limits, yield) and writes the joint angles into the rig's RigPose.",
+      "access": [
+        {
+          "name": "IKTarget",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "the goals of each chain"
+        },
+        {
+          "name": "IKChain",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "joints, rest pole, limits and yield read; the solve's results written"
+        },
+        {
+          "name": "Rig",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick, ensureRig",
+          "effect": "the rig model of the chain's rig; created by ensureRig on first use"
+        },
+        {
+          "name": "RigPose",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick, ensureRig",
+          "effect": "the chains' joints solved in place; created at the spawn pose by ensureRig"
+        },
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "read",
+          "where": "ensureRig",
+          "effect": "its body file builds the rig model"
+        },
+        {
+          "name": "HumanBotSpawn",
+          "kind": "component",
+          "access": "read",
+          "where": "ensureRig",
+          "effect": "the first entity with it is the rig entity"
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "RigPoseApply",
+      "class": "RigPoseApplySys",
+      "file": "src/logic/agents/ik.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Forward kinematics of every RigPose onto the HumanBot's kinematic Jolt bodies (MoveKinematic, or a teleport).",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "built, kinematic and the Jolt body ids"
+        },
+        {
+          "name": "Rig",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "the rig model for forward kinematics"
+        },
+        {
+          "name": "RigPose",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "the pose applied; teleport cleared"
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "MoveKinematic or SetPositionAndRotation of every body"
+        }
+      ],
+      "side_effects": [
+        "Moves or teleports every kinematic Jolt body of the bot each tick.",
+        "Logs an error once per process when the bot is not kinematic."
+      ]
+    },
+    {
+      "name": "GaitBase",
+      "class": "GaitBaseSys",
+      "file": "src/logic/agents/gait.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Clock and base animation of the kinematic walk: follows the command, advances the phase and the reference point, writes pelvis, trunk, head and arms.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "read",
+          "where": "ensureRig",
+          "effect": "its body file builds the rig model"
+        },
+        {
+          "name": "HumanBotSpawn",
+          "kind": "component",
+          "access": "read",
+          "where": "ensureRig",
+          "effect": "the first entity with it is the rig entity"
+        },
+        {
+          "name": "Rig",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick, ensureRig",
+          "effect": "the rig model: geometry, forward kinematics, limits"
+        },
+        {
+          "name": "RigPose",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick, ensureRig",
+          "effect": "pelvis, spine, head and arm joints written; teleport set on the first tick"
+        },
+        {
+          "name": "GaitCommand",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick (gaitRig)",
+          "effect": "speed, heading and start followed"
+        },
+        {
+          "name": "GaitParams",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick (gaitRig)",
+          "effect": "the gait's laws and shapes"
+        },
+        {
+          "name": "GaitState",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick (gaitRig)",
+          "effect": "phase, speed, heading, reference point, gait laws, slope and scrambling state"
+        },
+        {
+          "name": "BalanceState",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "centre of mass height (omega) and the hips' offset of the last tick"
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read+create",
+          "where": "tick",
+          "effect": "heights and normals of the ground (groundField makes a level plane when missing)"
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "GaitFootIK",
+      "class": "GaitFootIKSys",
+      "file": "src/logic/agents/gait.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Plants the feet on the ground field (footsteps by the balance rule, rockers, swing arcs) and owns the legs' IKChain and IKTarget.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "read",
+          "where": "ensureRig",
+          "effect": "its body file builds the rig model"
+        },
+        {
+          "name": "HumanBotSpawn",
+          "kind": "component",
+          "access": "read",
+          "where": "ensureRig",
+          "effect": "the first entity with it is the rig entity"
+        },
+        {
+          "name": "Rig",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick, ensureRig",
+          "effect": "the model for trial solves; the ankles' IK limits widened on the first tick (shared RigModel)"
+        },
+        {
+          "name": "RigPose",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick, ensureRig",
+          "effect": "copied for trial solves"
+        },
+        {
+          "name": "GaitCommand",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick (gaitRig)",
+          "effect": "the commanded heading for the landing plan"
+        },
+        {
+          "name": "GaitParams",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick (gaitRig)",
+          "effect": "the gait's laws and shapes"
+        },
+        {
+          "name": "GaitState",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick (gaitRig)",
+          "effect": "the feet's state, feet_ready, ground_version"
+        },
+        {
+          "name": "BalanceState",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "hips' offset and lead of the extrapolated centre of mass of the last tick"
+        },
+        {
+          "name": "IKChain",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "the legs' chain entities created on the first tick; yield set every tick"
+        },
+        {
+          "name": "IKTarget",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "the legs' target entities created on the first tick and written every tick"
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read+create",
+          "where": "tick",
+          "effect": "prints fitted, swing clearance, heights (groundField makes a level plane when missing)"
+        }
+      ],
+      "side_effects": [
+        "Creates two IK chain entities and two IK target entities on the first tick of a gait."
+      ]
+    },
+    {
+      "name": "GaitHandIK",
+      "class": "GaitHandIKSys",
+      "file": "src/logic/agents/gait.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Scrambling: a hand within reach lays its palm flat on the ground, holds, moves on; owns the arms' IKChain and IKTarget.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "read",
+          "where": "ensureRig",
+          "effect": "its body file builds the rig model"
+        },
+        {
+          "name": "HumanBotSpawn",
+          "kind": "component",
+          "access": "read",
+          "where": "ensureRig",
+          "effect": "the first entity with it is the rig entity"
+        },
+        {
+          "name": "Rig",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick, ensureRig",
+          "effect": "the model: arm geometry, trial solves, limits"
+        },
+        {
+          "name": "RigPose",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick, ensureRig",
+          "effect": "copied for the trial pose"
+        },
+        {
+          "name": "GaitCommand",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (gaitRig)",
+          "effect": "only emplaced with its defaults when missing; not read"
+        },
+        {
+          "name": "GaitParams",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick (gaitRig)",
+          "effect": "scramble and the hand parameters"
+        },
+        {
+          "name": "GaitState",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick (gaitRig)",
+          "effect": "the hands' state and hands_ready; heading, uphill, low, moving read"
+        },
+        {
+          "name": "BalanceState",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "the hips' offset of the last tick"
+        },
+        {
+          "name": "IKChain",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "the arms' chain entities created the first time scrambling is on; yield set every tick"
+        },
+        {
+          "name": "IKTarget",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "the arms' target entities created disabled, then enabled and written every tick"
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read+create",
+          "where": "tick",
+          "effect": "holds fitted on the ground (groundField makes a level plane when missing)"
+        }
+      ],
+      "side_effects": [
+        "Creates two IK chain entities and two IK target entities the first time scrambling is on."
+      ]
+    },
+    {
+      "name": "GaitBalance",
+      "class": "GaitBalanceSys",
+      "file": "src/logic/agents/gait.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Places the pelvis as high as the legs reach and where the solved pose's centre of mass meets its target; leans the trunk for the hands; fills BalanceState.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "read",
+          "where": "ensureRig",
+          "effect": "its body file builds the rig model"
+        },
+        {
+          "name": "HumanBotSpawn",
+          "kind": "component",
+          "access": "read",
+          "where": "ensureRig",
+          "effect": "the first entity with it is the rig entity"
+        },
+        {
+          "name": "Rig",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick, ensureRig",
+          "effect": "the model: solves, forward kinematics, centre of mass"
+        },
+        {
+          "name": "RigPose",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick, ensureRig",
+          "effect": "root position and the leaned spine joints written"
+        },
+        {
+          "name": "GaitCommand",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (gaitRig)",
+          "effect": "only emplaced with its defaults when missing; not read"
+        },
+        {
+          "name": "GaitParams",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick (gaitRig)",
+          "effect": "balance and hand parameters"
+        },
+        {
+          "name": "GaitState",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick (gaitRig)",
+          "effect": "hip centre, pivot, targets read; trunk_reach and the hands' deficit, contact and timers written"
+        },
+        {
+          "name": "BalanceState",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick",
+          "effect": "emplaced on first use; crouch, offset, centre of mass, support, capture of this tick"
+        },
+        {
+          "name": "IKChain",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "the legs' and arms' joints, poles, limits, yield"
+        },
+        {
+          "name": "IKTarget",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "the legs' and arms' goals and enabled"
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read+create",
+          "where": "tick",
+          "effect": "the ground height under the centre of mass (groundField makes a level plane when missing)"
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "GaitChecks",
+      "class": "GaitChecksSys",
+      "file": "src/logic/agents/gait.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Measures the kinematic walk's bodies after the physics step against the ground, the prints and the limits into GaitReport.",
+      "access": [
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "read",
+          "where": "tick, ensureRig",
+          "effect": "built; the bodies' poses (state, from BodySync); the body file"
+        },
+        {
+          "name": "HumanBotSpawn",
+          "kind": "component",
+          "access": "read",
+          "where": "ensureRig",
+          "effect": "the first entity with it is the rig entity"
+        },
+        {
+          "name": "Rig",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick, ensureRig",
+          "effect": "geometry, joint frames, IK and body file limits"
+        },
+        {
+          "name": "RigPose",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick, ensureRig",
+          "effect": "only created by ensureRig; not read"
+        },
+        {
+          "name": "GaitCommand",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (gaitRig)",
+          "effect": "only emplaced with its defaults when missing; not read"
+        },
+        {
+          "name": "GaitParams",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (gaitRig)",
+          "effect": "only emplaced with its defaults when missing; not read"
+        },
+        {
+          "name": "GaitState",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick (gaitRig)",
+          "effect": "the feet's and hands' contact, prints and time"
+        },
+        {
+          "name": "BalanceState",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "centre of mass, capture, support, margins"
+        },
+        {
+          "name": "IKChain",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "residuals, limit excess, yielded, solved"
+        },
+        {
+          "name": "GaitReport",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick",
+          "effect": "emplaced on first use; this tick's measures and the worst since settle"
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read+create",
+          "where": "tick",
+          "effect": "the ground under each sole and palm corner (groundField makes a level plane when missing)"
+        }
+      ],
+      "side_effects": []
+    }
+  ],
+  "components": [
+    {
+      "name": "SphereAgent",
+      "kind": "component",
+      "file": "src/logic/agents/sphere_roller.h",
+      "json": "SphereAgent",
+      "summary": "The sphere roller's agent next to the sphere's Transform and RigidBody: task settings and episode state.",
+      "fields": [
+        {
+          "name": "behavior",
+          "type": "std::string",
+          "desc": "the trainer's behaviour name (required) (default \"SphereRoller\")"
+        },
+        {
+          "name": "max_torque",
+          "type": "float",
+          "desc": "N m for an action component of 1 (default 20.0)"
+        },
+        {
+          "name": "speed_range",
+          "type": "glm::vec2",
+          "desc": "target speeds, m/s ... (default glm::vec2(0.5, 3.0))"
+        },
+        {
+          "name": "stop_chance",
+          "type": "float",
+          "desc": "... or 0 with this probability (default 0.1)"
+        },
+        {
+          "name": "turn_rate",
+          "type": "float",
+          "desc": "rad/s of the target heading toward its goal (default 0.7)"
+        },
+        {
+          "name": "acceleration",
+          "type": "float",
+          "desc": "m/s^2 of the target speed toward its goal (default 0.75)"
+        },
+        {
+          "name": "goal_interval",
+          "type": "glm::vec2",
+          "desc": "seconds between goal draws (default glm::vec2(2.0, 6.0))"
+        },
+        {
+          "name": "max_goal_turn",
+          "type": "float",
+          "desc": "rad: a new goal heading within this of the current one (default 2.1)"
+        },
+        {
+          "name": "home_radius",
+          "type": "float",
+          "desc": "beyond it from the spawn point, new goal headings point back (+- 45 deg); 0: off (default 30.0)"
+        },
+        {
+          "name": "bounds",
+          "type": "float",
+          "desc": "|x| or |z| beyond it truncates the episode; 0: off (default 55.0)"
+        },
+        {
+          "name": "fall_depth",
+          "type": "float",
+          "desc": "this far below the spawn point truncates the episode (default 100.0)"
+        },
+        {
+          "name": "spawn_radius",
+          "type": "float",
+          "desc": "spawn points within it of the spawn centre, on the ground (default 10.0)"
+        },
+        {
+          "name": "spawn_spacing",
+          "type": "float",
+          "desc": "m: world i spawns around (i * spawn_spacing, 0) (vr_roller: two players apart) (default 0.0)"
+        },
+        {
+          "name": "stagger",
+          "type": "bool",
+          "desc": "the trainer's RESET starts each agent at a random point of its episode (default true)"
+        },
+        {
+          "name": "reward_scale",
+          "type": "float",
+          "desc": "r = exp(-|v_xz - v*| / reward_scale) per tick, m/s (default 1.0)"
+        },
+        {
+          "name": "probe_distance",
+          "type": "float",
+          "desc": "horizontal distance of the look-ahead normals, m (default 1.0)"
+        },
+        {
+          "name": "max_decisions",
+          "type": "int",
+          "desc": "decisions per episode (at least 1) (default 600)"
+        },
+        {
+          "name": "steered",
+          "type": "bool",
+          "desc": "a player sets the goal (steerSphere, VRRoller): no goal draws, no time limit (default false)"
+        },
+        {
+          "name": "home",
+          "type": "glm::vec3",
+          "desc": "Episode state / the episode's spawn point (default glm::vec3(0.0))"
+        },
+        {
+          "name": "heading",
+          "type": "float",
+          "desc": "the live target: heading (rad) and speed (m/s) (default 0.0)"
+        },
+        {
+          "name": "speed",
+          "type": "float",
+          "desc": "live target speed, m/s (default 0.0)"
+        },
+        {
+          "name": "goal_heading",
+          "type": "float",
+          "desc": "heading the live target turns toward, rad (default 0.0)"
+        },
+        {
+          "name": "goal_speed",
+          "type": "float",
+          "desc": "speed the live target moves toward, m/s (default 0.0)"
+        },
+        {
+          "name": "goal_timer",
+          "type": "float",
+          "desc": "seconds before the next goal draw (default 0.0)"
+        },
+        {
+          "name": "decision_target",
+          "type": "glm::vec3",
+          "desc": "the target velocity of the last observation: rewards use it (default glm::vec3(0.0))"
+        },
+        {
+          "name": "decision_heading",
+          "type": "float",
+          "desc": "... and its frame converts the action to a world torque (default 0.0)"
+        },
+        {
+          "name": "has_decision",
+          "type": "bool",
+          "desc": "an observation went out in this episode: the action answers it (default false)"
+        },
+        {
+          "name": "torque",
+          "type": "glm::vec3",
+          "desc": "world torque held over the window (default glm::vec3(0.0))"
+        },
+        {
+          "name": "reward_sum",
+          "type": "double",
+          "desc": "sum of the window's per-tick rewards (default 0.)"
+        },
+        {
+          "name": "error_sum",
+          "type": "double",
+          "desc": "sum of the window's horizontal speed errors, m/s (default 0.)"
+        },
+        {
+          "name": "reward_ticks",
+          "type": "int",
+          "desc": "ticks summed in the window (default 0)"
+        },
+        {
+          "name": "decisions",
+          "type": "int",
+          "desc": "decisions of the episode (default 0)"
+        },
+        {
+          "name": "ended",
+          "type": "bool",
+          "desc": "the episode ends with this window (default false)"
+        },
+        {
+          "name": "out_of_bounds",
+          "type": "bool",
+          "desc": "it ended off the field or by a fall (default false)"
+        },
+        {
+          "name": "pending_reset",
+          "type": "bool",
+          "desc": "the terminal observation went out: new episode at the next window (default false)"
+        }
+      ],
+      "notes": "One per world (SphereControl expects exactly one entity with SphereAgent, Transform and RigidBody). JSON reads the settings only (behavior to steered); the episode state is the systems'. Validation: behavior not empty, max_decisions >= 1, 0 <= speed_range.x <= speed_range.y, 0 < goal_interval.x <= goal_interval.y, reward_scale > 0. steerSphere() writes goal_heading and goal_speed for a steered agent (VRRoller, DesktopRoller)."
+    },
+    {
+      "name": "PursuitDot",
+      "kind": "component",
+      "file": "src/logic/agents/pursuit.h",
+      "json": null,
+      "summary": "A chaser or a runner of the pursuit fixture, next to its AgentIO component.",
+      "fields": [
+        {
+          "name": "chaser",
+          "type": "bool",
+          "desc": "a chaser (else a runner) (default false)"
+        },
+        {
+          "name": "position",
+          "type": "glm::vec2",
+          "desc": "x, z (default glm::vec2(0.0))"
+        },
+        {
+          "name": "velocity",
+          "type": "glm::vec2",
+          "desc": "x, z, m/s, from the last displacement (default glm::vec2(0.0))"
+        },
+        {
+          "name": "yaw",
+          "type": "float",
+          "desc": "radians about +y, 0 looks down -z, positive to the left (default 0.0)"
+        },
+        {
+          "name": "stamina",
+          "type": "float",
+          "desc": "0..1, drained while sprinting (default 1.0)"
+        },
+        {
+          "name": "speed",
+          "type": "float",
+          "desc": "the held speed action, 0..1 (default 0.0)"
+        },
+        {
+          "name": "turn",
+          "type": "float",
+          "desc": "the held turn action, -1..1 (default 0.0)"
+        },
+        {
+          "name": "sprint",
+          "type": "bool",
+          "desc": "the held discrete action: sprinting (default false)"
+        },
+        {
+          "name": "phase",
+          "type": "int",
+          "desc": "a runner decides on windows where (window + phase) % runner_every == 0 (default 0)"
+        },
+        {
+          "name": "decisions",
+          "type": "int",
+          "desc": "decisions of its episode (default 0)"
+        },
+        {
+          "name": "reward",
+          "type": "double",
+          "desc": "since its last decision (default 0.)"
+        },
+        {
+          "name": "nearest",
+          "type": "float",
+          "desc": "a chaser: how far the nearest runner was at its last decision, < 0 none (default -1.0)"
+        },
+        {
+          "name": "catches",
+          "type": "int",
+          "desc": "a chaser's catches since its last decision (default 0)"
+        },
+        {
+          "name": "fresh",
+          "type": "bool",
+          "desc": "no observation of this episode went out yet (default true)"
+        },
+        {
+          "name": "caught",
+          "type": "bool",
+          "desc": "a runner that was caught (it stops; -1 paid) (default false)"
+        },
+        {
+          "name": "ended",
+          "type": "bool",
+          "desc": "its terminal step went out: leaves or starts again at the next window (default false)"
+        }
+      ],
+      "notes": "Created and destroyed by Pursuit (populate, a runner's end) and PursuitObserve (a RESET); a chaser's entity lives across its episodes. Methods forward() and left() give its frame on the field."
+    },
+    {
+      "name": "PursuitField",
+      "kind": "context",
+      "file": "src/logic/agents/pursuit.h",
+      "json": null,
+      "summary": "World context of the pursuit fixture: its parameters and counters.",
+      "fields": [
+        {
+          "name": "params",
+          "type": "PursuitParams",
+          "desc": "the Pursuit system's parameters: field, chasers, runners, catch_radius, speed, sprint, turn_rate, stamina_drain, stamina_gain, chaser_decisions, runner_decisions, runner_every, alive_reward, others, runners_still, approach_reward"
+        },
+        {
+          "name": "windows",
+          "type": "uint64_t",
+          "desc": "decision windows observed (PursuitObserve) (default 0)"
+        },
+        {
+          "name": "catches",
+          "type": "uint64_t",
+          "desc": "catches since the start (Pursuit) (default 0)"
+        },
+        {
+          "name": "births",
+          "type": "uint64_t",
+          "desc": "runners born after one ended (Pursuit) (default 0)"
+        }
+      ],
+      "notes": "Emplaced by Pursuit in preinit; read by PursuitObserve. PursuitParams (same header) holds the defaults listed on the Pursuit page."
+    },
+    {
+      "name": "GroundField",
+      "kind": "context",
+      "file": "src/logic/agents/ground_field.h",
+      "json": null,
+      "summary": "The world's ground as a density function: what the kinematic walk, the routes and the animals' gaits plant feet on, with no collider.",
+      "fields": [
+        {
+          "name": "version",
+          "type": "uint64_t",
+          "desc": "counts changes of the ground (PlaneField::setTilt): planted feet are fitted again (default 0)"
+        }
+      ],
+      "notes": "Stored as std::shared_ptr<GroundField> (abstract class: density(p) > 0 inside, below(from, distance), top(x, z), height(x, z, from_y, fallback)). Implementations: PlaneField (tilted plane: origin, pitch, roll, normal) set by GroundPlane, TerrainField (marching cubes of the TerrainGenerator's samples, lazily meshed blocks of 4^3 cubes, at most 4096 cached) set by GroundTerrain. groundField(reg) emplaces a level PlaneField at y = 0 when none exists. AgentFactory, AnimalFactory, herds, steering and gait scenes copy the pointer in init. Not thread safe (TerrainField's cache is mutable)."
+    },
+    {
+      "name": "WalkRoutes",
+      "kind": "component",
+      "file": "src/logic/agents/walk_routes.h",
+      "json": "WalkRoutes",
+      "summary": "Slope band and spawn area of a walker's routes on uneven ground; on the entity with HumanBotSpawn.",
+      "fields": [
+        {
+          "name": "up",
+          "type": "float",
+          "desc": "steepest climb along a path (20 degrees) (default 0.349066)"
+        },
+        {
+          "name": "down",
+          "type": "float",
+          "desc": "steepest descent along it (7 degrees: beyond, the kinematic walk's swing knee passes 95 degrees) (default 0.122173)"
+        },
+        {
+          "name": "across",
+          "type": "float",
+          "desc": "steepest slope across it (12 degrees) (default 0.209440)"
+        },
+        {
+          "name": "length",
+          "type": "float",
+          "desc": "m of path ahead that must stay in the band (default 12.0)"
+        },
+        {
+          "name": "half_width",
+          "type": "float",
+          "desc": "m to each side of the path that must stay in it too (default 1.0)"
+        },
+        {
+          "name": "clear",
+          "type": "float",
+          "desc": "m around a spawn point where the ground is no steeper than the least of the three, whatever the direction (default 1.5)"
+        },
+        {
+          "name": "centre",
+          "type": "glm::vec2",
+          "desc": "spawn points are drawn within spawn_radius of it (x, z) (default glm::vec2(0.0))"
+        },
+        {
+          "name": "spawn_radius",
+          "type": "float",
+          "desc": "m around centre where spawn points are drawn (default 1000.0)"
+        },
+        {
+          "name": "direction_tries",
+          "type": "int",
+          "desc": "directions tried from a point, spread evenly around it (default 96)"
+        },
+        {
+          "name": "spawn_tries",
+          "type": "int",
+          "desc": "points tried for a spawn (default 20000)"
+        }
+      ],
+      "notes": "Angles are radians in the component, degrees in JSON (each between 0 and 80). Validation: length > 0, spawn_radius >= 0, direction_tries and spawn_tries >= 1. Read by drawStart / drawDirection (GaitRoutes, and the physical walker's Task on the terrain); GaitRoutes overrides length with the episode's path length on a copy."
+    },
+    {
+      "name": "GaitRoute",
+      "kind": "component",
+      "file": "src/logic/agents/walk_routes.h",
+      "json": null,
+      "summary": "The route the kinematic walker is recording (GaitRoutes), on the rig entity.",
+      "fields": [
+        {
+          "name": "episode",
+          "type": "int",
+          "desc": "routes started so far (default 0)"
+        },
+        {
+          "name": "found",
+          "type": "bool",
+          "desc": "drawn in the slope band (default false)"
+        },
+        {
+          "name": "from",
+          "type": "glm::vec3",
+          "desc": "the route's start point, on the ground (default glm::vec3(0.0))"
+        },
+        {
+          "name": "direction",
+          "type": "glm::vec3",
+          "desc": "horizontal unit direction of the route (default glm::vec3(0.0, 0.0, -1.0))"
+        },
+        {
+          "name": "start_tick",
+          "type": "uint64_t",
+          "desc": "WorldClock tick at which the route started (default 0)"
+        },
+        {
+          "name": "warm_ticks",
+          "type": "uint64_t",
+          "desc": "ticks walked before recording, whole windows (default 0)"
+        }
+      ],
+      "notes": "Emplaced and written by GaitRoutes only."
+    },
+    {
+      "name": "IKChain",
+      "kind": "component",
+      "file": "src/logic/agents/ik.h",
+      "json": null,
+      "summary": "A chain of a rig's joints from root to tip, solved by Fabrik; one entity per chain.",
+      "fields": [
+        {
+          "name": "rig",
+          "type": "entt::entity",
+          "desc": "the rig entity (Rig + RigPose) (default entt::null)"
+        },
+        {
+          "name": "name",
+          "type": "std::string",
+          "desc": "for logs and views (\"left leg\", \"right arm\")"
+        },
+        {
+          "name": "joints",
+          "type": "std::vector<int>",
+          "desc": "joint indices root to tip, each one's child the next one's parent; the target position is for the last joint's anchor"
+        },
+        {
+          "name": "pole_rest",
+          "type": "glm::vec3",
+          "desc": "where the inner joints point at the rest pose (zero: no pole) (default glm::vec3(0.0))"
+        },
+        {
+          "name": "limits",
+          "type": "bool",
+          "desc": "clamp to the rig model's joint limits (default true)"
+        },
+        {
+          "name": "yield",
+          "type": "bool",
+          "desc": "... unless the tip then misses its target: the limits give way (default false)"
+        },
+        {
+          "name": "solved",
+          "type": "bool",
+          "desc": "The last solve (default false)"
+        },
+        {
+          "name": "iterations",
+          "type": "int",
+          "desc": "FABRIK iterations of the last solve (default 0)"
+        },
+        {
+          "name": "position_error",
+          "type": "float",
+          "desc": "The last solve / m between the tip anchor and the target (default 0.0)"
+        },
+        {
+          "name": "rotation_error",
+          "type": "float",
+          "desc": "radians between the tip segment and the target (default 0.0)"
+        },
+        {
+          "name": "limit_excess",
+          "type": "float",
+          "desc": "radians the limits took away, or would have (yielded), the worst joint (default 0.0)"
+        },
+        {
+          "name": "yielded",
+          "type": "bool",
+          "desc": "the limits gave way on this solve (default false)"
+        }
+      ],
+      "notes": "Entities created by GaitFootIK (legs) and GaitHandIK (arms), destroyed by GaitRoutes at a new route (legs). Fabrik writes the last-solve fields; GaitBalance and GaitChecks read them."
+    },
+    {
+      "name": "IKTarget",
+      "kind": "component",
+      "file": "src/logic/agents/ik.h",
+      "json": null,
+      "summary": "What a system wants from an IKChain; any number per chain, the highest priority wins, equal priorities blend by weight.",
+      "fields": [
+        {
+          "name": "chain",
+          "type": "entt::entity",
+          "desc": "the chain entity (default entt::null)"
+        },
+        {
+          "name": "position",
+          "type": "glm::vec3",
+          "desc": "world, of the tip joint's anchor (default glm::vec3(0.0))"
+        },
+        {
+          "name": "rotation",
+          "type": "glm::quat",
+          "desc": "world, of the tip segment (default glm::quat(1.0, 0.0, 0.0, 0.0))"
+        },
+        {
+          "name": "use_rotation",
+          "type": "bool",
+          "desc": "the tip segment takes the target rotation (default true)"
+        },
+        {
+          "name": "pole",
+          "type": "glm::vec3",
+          "desc": "world direction; zero: the chain's rest pole carried by the root's parent (default glm::vec3(0.0))"
+        },
+        {
+          "name": "weight",
+          "type": "float",
+          "desc": "blend weight among equal priorities; a total under 1 blends the solution with the pose found (default 1.0)"
+        },
+        {
+          "name": "priority",
+          "type": "int",
+          "desc": "the highest among enabled targets wins (default 0)"
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "desc": "disabled targets are ignored (default true)"
+        },
+        {
+          "name": "owner",
+          "type": "std::string",
+          "desc": "the system that updates it"
+        }
+      ],
+      "notes": "One entity per target. Written every tick by its owner (GaitFootIK, GaitHandIK); read by Fabrik and GaitBalance."
+    },
+    {
+      "name": "RigPose",
+      "kind": "component",
+      "file": "src/logic/agents/rig_pose.h",
+      "json": null,
+      "summary": "A rig's pose as joint angles: the pelvis' world pose and one constraint-frame rotation per joint (identity at rest).",
+      "fields": [
+        {
+          "name": "root_position",
+          "type": "glm::vec3",
+          "desc": "world position of the pelvis segment (default glm::vec3(0.0))"
+        },
+        {
+          "name": "root_rotation",
+          "type": "glm::quat",
+          "desc": "world rotation of the pelvis segment (default glm::quat(1.0, 0.0, 0.0, 0.0))"
+        },
+        {
+          "name": "joint",
+          "type": "std::vector<glm::quat>",
+          "desc": "per joint, rotation in its constraint frame (X twist, Y plane, Z normal)"
+        },
+        {
+          "name": "teleport",
+          "type": "bool",
+          "desc": "the next RigPoseApply sets the bodies instead of moving them (default true)"
+        }
+      ],
+      "notes": "On the rig entity (the one with HumanBotSpawn), created at the spawn pose by ensureRig. GaitBase writes it, GaitBalance places the pelvis, Fabrik corrects the chains, RigPoseApply moves the kinematic bodies to it."
+    },
+    {
+      "name": "Rig",
+      "kind": "component",
+      "file": "src/logic/agents/rig_pose.h",
+      "json": null,
+      "summary": "The rig of a world: the kinematic tree of the body file (RigModel), next to RigPose.",
+      "fields": [
+        {
+          "name": "model",
+          "type": "std::shared_ptr<RigModel>",
+          "desc": "forward kinematics, joint frames and conversions, IK limits (limits, enlargeable) and body file limits, segment masses"
+        }
+      ],
+      "notes": "Created by ensureRig from HumanBot::body on the first call of any gait or IK system. The RigModel is shared and mutable: GaitFootIK widens the ankles' IK limits in it."
+    },
+    {
+      "name": "GaitCommand",
+      "kind": "component",
+      "file": "src/logic/agents/gait.h",
+      "json": "GaitCommand",
+      "summary": "What the kinematic walker is asked to do: speed, heading, where it starts.",
+      "fields": [
+        {
+          "name": "speed",
+          "type": "float",
+          "desc": "m/s, horizontal (default 1.36)"
+        },
+        {
+          "name": "heading",
+          "type": "float",
+          "desc": "radians about +y; 0 walks toward -z (default 0.0)"
+        },
+        {
+          "name": "start",
+          "type": "glm::vec2",
+          "desc": "x, z where it stands at the first tick (default glm::vec2(0.0))"
+        }
+      ],
+      "notes": "On the rig entity. JSON heading in degrees (radians in the component), speed >= 0. Emplaced with defaults by any gait system when missing; GaitRoutes writes start and heading at every route."
+    },
+    {
+      "name": "GaitParams",
+      "kind": "component",
+      "file": "src/logic/agents/gait.h",
+      "json": "GaitParams",
+      "summary": "The kinematic gait's laws and shapes (angles in radians, lengths in metres).",
+      "fields": [
+        {
+          "name": "step_factor",
+          "type": "float",
+          "desc": "Step length / leg length = step_factor * (speed / sqrt(g * leg length)) ^ step_exponent; the stride never lasts longer than max_stride_time (slow walking shortens the step instead) (default 1.11)"
+        },
+        {
+          "name": "step_exponent",
+          "type": "float",
+          "desc": "Step length / leg length = step_factor * (speed / sqrt(g * leg length)) ^ step_exponent; the stride never lasts longer than max_stride_time (slow walking shortens the step instead) (default 0.42)"
+        },
+        {
+          "name": "max_stride_time",
+          "type": "float",
+          "desc": "Step length / leg length = step_factor * (speed / sqrt(g * leg length)) ^ step_exponent; the stride never lasts longer than max_stride_time (slow walking shortens the step instead) (default 1.6)"
+        },
+        {
+          "name": "stance_share",
+          "type": "float",
+          "desc": "Share of the stride a foot is on the ground: stance_share at reference_speed, changing with speed / rate per m/s (default 0.62)"
+        },
+        {
+          "name": "stance_share_rate",
+          "type": "float",
+          "desc": "Share of the stride a foot is on the ground: stance_share at reference_speed, changing with speed / rate per m/s (default -0.055)"
+        },
+        {
+          "name": "reference_speed",
+          "type": "float",
+          "desc": "Share of the stride a foot is on the ground: stance_share at reference_speed, changing with speed / rate per m/s (default 1.36)"
+        },
+        {
+          "name": "step_width",
+          "type": "float",
+          "desc": "between the sole centres' paths (default 0.14)"
+        },
+        {
+          "name": "flat_start",
+          "type": "float",
+          "desc": "Stance, as shares of its duration: heel rocker until flat_start, flat until heel_off, then the toe rocker (default 0.16)"
+        },
+        {
+          "name": "heel_off",
+          "type": "float",
+          "desc": "Stance, as shares of its duration: heel rocker until flat_start, flat until heel_off, then the toe rocker (default 0.5)"
+        },
+        {
+          "name": "strike_angle",
+          "type": "float",
+          "desc": "Stance, as shares of its duration: heel rocker until flat_start, flat until heel_off, then the toe rocker / sole pitch at heel strike and at toe-off, at reference_speed (default 0.26)"
+        },
+        {
+          "name": "toe_angle",
+          "type": "float",
+          "desc": "Stance, as shares of its duration: heel rocker until flat_start, flat until heel_off, then the toe rocker / sole pitch at heel strike and at toe-off, at reference_speed (default 1.05)"
+        },
+        {
+          "name": "swing_lift",
+          "type": "float",
+          "desc": "extra ankle arc; least gap between the sole and the ground (default 0.03)"
+        },
+        {
+          "name": "swing_clearance",
+          "type": "float",
+          "desc": "extra ankle arc; least gap between the sole and the ground (default 0.025)"
+        },
+        {
+          "name": "swing_level",
+          "type": "float",
+          "desc": "share of the swing by which the sole has turned from its toe-off pitch to its landing pitch (default 0.6)"
+        },
+        {
+          "name": "replan_until",
+          "type": "float",
+          "desc": "share of the swing during which the landing is still planned (default 0.6)"
+        },
+        {
+          "name": "max_heel_rise",
+          "type": "float",
+          "desc": "the most the toe rocker pitches the sole, radians (default 1.4)"
+        },
+        {
+          "name": "heel_drop_rate",
+          "type": "float",
+          "desc": "rad/s: how fast a heel raised for reach or for the ankle comes back down (default 2.5)"
+        },
+        {
+          "name": "ankle_margin",
+          "type": "float",
+          "desc": "the heel rises when the ankle is this close to its dorsiflexion stop (default 0.035)"
+        },
+        {
+          "name": "knee_follow",
+          "type": "float",
+          "desc": "in a turn the knee points this share of the way from the pelvis' forward to the foot's (default 0.5)"
+        },
+        {
+          "name": "knee_out",
+          "type": "float",
+          "desc": "the knee points this share of the way from the walker's forward to the foot's toes (default 0.5)"
+        },
+        {
+          "name": "ankle_roll_extra",
+          "type": "float",
+          "desc": "Added to the ankles' swing limits for the IK only, about the foot's long axis (roll) and the sole's normal (yaw). 0: the body file's, which were widened for 15 degree side slopes (assets.md) (default 0.0)"
+        },
+        {
+          "name": "ankle_yaw_extra",
+          "type": "float",
+          "desc": "Added to the ankles' swing limits for the IK only, about the foot's long axis (roll) and the sole's normal (yaw). 0: the body file's, which were widened for 15 degree side slopes (assets.md) (default 0.0)"
+        },
+        {
+          "name": "yield_limits",
+          "type": "bool",
+          "desc": "A planted foot comes first: where a leg cannot put its foot on its print inside the joint limits, the limits give way (steep ground). false: the limits always hold and the foot misses its print (default true)"
+        },
+        {
+          "name": "leg_extension",
+          "type": "float",
+          "desc": "Pelvis and trunk / most of the thigh + shank length a leg stretches to (the knee keeps 14 degrees) (default 0.992)"
+        },
+        {
+          "name": "hip_height",
+          "type": "float",
+          "desc": "the hips' height over the ankles in mid stance, as a share of that reach (default 1.0)"
+        },
+        {
+          "name": "bob",
+          "type": "float",
+          "desc": "the hips sink this much at each double support, at reference_speed (default 0.035)"
+        },
+        {
+          "name": "crouch_time",
+          "type": "float",
+          "desc": "seconds: how fast the hips settle to the crouch the last step needed (default 0.35)"
+        },
+        {
+          "name": "pelvis_yaw",
+          "type": "float",
+          "desc": "amplitudes at reference_speed (default 0.07)"
+        },
+        {
+          "name": "pelvis_list",
+          "type": "float",
+          "desc": "amplitudes at reference_speed (default 0.035)"
+        },
+        {
+          "name": "counter_rotation",
+          "type": "float",
+          "desc": "shoulders turn against the pelvis by this share of its yaw (default 0.6)"
+        },
+        {
+          "name": "lean",
+          "type": "float",
+          "desc": "trunk pitch at reference_speed; per radian of slope along the heading (default 0.035)"
+        },
+        {
+          "name": "lean_slope_gain",
+          "type": "float",
+          "desc": "trunk pitch at reference_speed; per radian of slope along the heading (default 0.5)"
+        },
+        {
+          "name": "arm_swing",
+          "type": "float",
+          "desc": "arm swing amplitude at reference_speed, radians (default 0.32)"
+        },
+        {
+          "name": "arm_bias",
+          "type": "float",
+          "desc": "arms held forward by this at reference_speed, radians (default 0.05)"
+        },
+        {
+          "name": "elbow",
+          "type": "float",
+          "desc": "elbow bend, radians (default 0.17)"
+        },
+        {
+          "name": "elbow_swing",
+          "type": "float",
+          "desc": "extra elbow bend as the arm swings forward, radians (default 0.2)"
+        },
+        {
+          "name": "acceleration",
+          "type": "float",
+          "desc": "Command following (default 1.0)"
+        },
+        {
+          "name": "turn_rate",
+          "type": "float",
+          "desc": "Command following (default 0.7)"
+        },
+        {
+          "name": "min_speed",
+          "type": "float",
+          "desc": "Command following (default 0.05)"
+        },
+        {
+          "name": "slope_slowdown",
+          "type": "float",
+          "desc": "Command following / the speed walked is the command times exp(-slope_slowdown * |tan slope|), (default 1.5)"
+        },
+        {
+          "name": "slope_speed_floor",
+          "type": "float",
+          "desc": "... and no less than this share of it, however steep, (default 0.25)"
+        },
+        {
+          "name": "step_rise",
+          "type": "float",
+          "desc": "... but slow enough that a step climbs or drops no more than this, m (0: no such cap) (default 0.35)"
+        },
+        {
+          "name": "look_ahead",
+          "type": "float",
+          "desc": "m ahead of the walker where a steeper slope already slows it (default 0.8)"
+        },
+        {
+          "name": "braking",
+          "type": "float",
+          "desc": "m/s2, slowing down (acceleration is for speeding up) (default 2.5)"
+        },
+        {
+          "name": "max_print_rise",
+          "type": "float",
+          "desc": "m between a foot's landing and the other foot's print: the step shortens to keep it (default 0.5)"
+        },
+        {
+          "name": "max_print_tilt",
+          "type": "float",
+          "desc": "radians: steeper ground than this (75 degrees) is stood on at this tilt (default 1.31)"
+        },
+        {
+          "name": "balance_iterations",
+          "type": "int",
+          "desc": "GaitBalance's iterations of the pelvis placement (default 8)"
+        },
+        {
+          "name": "balance_tolerance",
+          "type": "float",
+          "desc": "m of centre of mass error at which GaitBalance stops (default 3e-4)"
+        },
+        {
+          "name": "velocity_smoothing",
+          "type": "float",
+          "desc": "Balance / seconds, the centre of mass velocity filter (default 0.08)"
+        },
+        {
+          "name": "scramble",
+          "type": "bool",
+          "desc": "Scrambling (GaitHandIK in the lane): the steeper the ground, the lower the trunk, and a hand that comes within reach of the ground lays its palm flat on it (default false)"
+        },
+        {
+          "name": "scramble_from",
+          "type": "float",
+          "desc": "Scrambling (GaitHandIK in the lane): the steeper the ground, the lower the trunk, and a hand that comes within reach of the ground lays its palm flat on it / radians of slope (20 and 50 degrees) between which the trunk comes down (default 0.35)"
+        },
+        {
+          "name": "scramble_full",
+          "type": "float",
+          "desc": "Scrambling (GaitHandIK in the lane): the steeper the ground, the lower the trunk, and a hand that comes within reach of the ground lays its palm flat on it / radians of slope (20 and 50 degrees) between which the trunk comes down (default 0.87)"
+        },
+        {
+          "name": "scramble_crouch",
+          "type": "float",
+          "desc": "the hips come down by this share of the legs' reach on the steepest ground, (default 0.15)"
+        },
+        {
+          "name": "scramble_shoulder",
+          "type": "float",
+          "desc": "... and the trunk tilts toward the slope until the shoulders are this far from the ground, m, (default 0.3)"
+        },
+        {
+          "name": "scramble_lean",
+          "type": "float",
+          "desc": "... by this much at most, radians, (default 1.5)"
+        },
+        {
+          "name": "scramble_past",
+          "type": "float",
+          "desc": "... and no further than this past lying along the slope, radians. (default 0.5)"
+        },
+        {
+          "name": "scramble_forward",
+          "type": "float",
+          "desc": "Then the centre of mass target moves up the slope, by this at most, m: the hands will take weight (default 0.45)"
+        },
+        {
+          "name": "scramble_spine",
+          "type": "float",
+          "desc": "radians each of the two spine joints bends for that tilt; the pelvis tips for the rest (default 0.42)"
+        },
+        {
+          "name": "hand_plant_reach",
+          "type": "float",
+          "desc": "a hand takes a hold no further from its shoulder than this share of the arm, (default 0.86)"
+        },
+        {
+          "name": "hand_reach",
+          "type": "float",
+          "desc": "... and keeps it until the arm is stretched to this share (default 0.97)"
+        },
+        {
+          "name": "hand_behind",
+          "type": "float",
+          "desc": "m behind its shoulder from where a hand moves on to a hold ahead, if there is one, (default 0.12)"
+        },
+        {
+          "name": "hand_over",
+          "type": "float",
+          "desc": "... or radians its arm is outside its limits, (default 0.35)"
+        },
+        {
+          "name": "hand_hold",
+          "type": "float",
+          "desc": "... once it has held for this long, seconds (default 0.4)"
+        },
+        {
+          "name": "hand_time",
+          "type": "float",
+          "desc": "seconds a hand takes to reach a hold, or to go back to its swing (default 0.3)"
+        },
+        {
+          "name": "hand_lift",
+          "type": "float",
+          "desc": "m off the ground on its way (default 0.05)"
+        },
+        {
+          "name": "hand_max_tilt",
+          "type": "float",
+          "desc": "radians: steeper ground than this (85 degrees) is held at this tilt (default 1.48)"
+        },
+        {
+          "name": "trunk_reach",
+          "type": "float",
+          "desc": "radians the trunk leans further so that a planted hand stays within reach (default 0.35)"
+        },
+        {
+          "name": "trunk_return",
+          "type": "float",
+          "desc": "seconds for that lean to go once no hand asks for it (default 0.4)"
+        },
+        {
+          "name": "hand_support",
+          "type": "float",
+          "desc": "the centre of mass target moves this share of the way to each planted palm (default 0.1)"
+        }
+      ],
+      "notes": "On the rig entity. JSON reads only a subset (step_factor, step_exponent, max_stride_time, stance_share, step_width, strike_angle, toe_angle, swing_lift, swing_clearance, leg_extension, hip_height, lean_slope_gain, acceleration, turn_rate, slope_slowdown, slope_speed_floor, step_rise, knee_out, yield_limits, ankle_roll_extra, ankle_yaw_extra, scramble, scramble_from, scramble_full, scramble_crouch, scramble_lean, scramble_shoulder, hand_time, hand_support, trunk_reach); its angles are in degrees there. Emplaced with defaults by any gait system when missing."
+    },
+    {
+      "name": "GaitState",
+      "kind": "component",
+      "file": "src/logic/agents/gait.h",
+      "json": null,
+      "summary": "The kinematic walk's state: clock, command followed, gait laws of the tick, feet, hands and scrambling.",
+      "fields": [
+        {
+          "name": "started",
+          "type": "bool",
+          "desc": "GaitBase's first tick is done (default false)"
+        },
+        {
+          "name": "feet_ready",
+          "type": "bool",
+          "desc": "GaitFootIK made the legs' chains and prints (default false)"
+        },
+        {
+          "name": "time",
+          "type": "double",
+          "desc": "seconds walked (default 0.)"
+        },
+        {
+          "name": "phase",
+          "type": "float",
+          "desc": "of the stride, 0 at the left heel strike (default 0.0)"
+        },
+        {
+          "name": "speed",
+          "type": "float",
+          "desc": "the command, followed at the allowed rates and slowed by the slope (default 0.0)"
+        },
+        {
+          "name": "heading",
+          "type": "float",
+          "desc": "the command, followed at the allowed rates and slowed by the slope (default 0.0)"
+        },
+        {
+          "name": "wanted_speed",
+          "type": "float",
+          "desc": "what the speed is heading for (default 0.0)"
+        },
+        {
+          "name": "moving",
+          "type": "bool",
+          "desc": "the command or the speed is over min_speed (default false)"
+        },
+        {
+          "name": "centre",
+          "type": "glm::vec3",
+          "desc": "the walker's reference point on the ground (default glm::vec3(0.0))"
+        },
+        {
+          "name": "ground_version",
+          "type": "uint64_t",
+          "desc": "GroundField::version the prints were fitted on (default 0)"
+        },
+        {
+          "name": "leg_length",
+          "type": "float",
+          "desc": "This tick's gait laws / hip to sole; the longest hip to ankle distance (default 0.96)"
+        },
+        {
+          "name": "reach",
+          "type": "float",
+          "desc": "This tick's gait laws / hip to sole; the longest hip to ankle distance (default 0.84)"
+        },
+        {
+          "name": "fold",
+          "type": "float",
+          "desc": "the shortest hip to ankle distance (scrambling) (default 0.36)"
+        },
+        {
+          "name": "step_length",
+          "type": "float",
+          "desc": "m (default 0.0)"
+        },
+        {
+          "name": "stride_time",
+          "type": "float",
+          "desc": "s (default 1.0)"
+        },
+        {
+          "name": "stance_share",
+          "type": "float",
+          "desc": "share of the stride a foot is down (default 0.62)"
+        },
+        {
+          "name": "amplitude",
+          "type": "float",
+          "desc": "step length over the one at reference_speed, 0..1.25 (default 0.0)"
+        },
+        {
+          "name": "omega",
+          "type": "float",
+          "desc": "sqrt(g / height of the centre of mass) (default 3.1)"
+        },
+        {
+          "name": "capture_offset",
+          "type": "float",
+          "desc": "the heel lands this far behind the extrapolated centre of mass (default 0.0)"
+        },
+        {
+          "name": "sway",
+          "type": "float",
+          "desc": "lateral offset of the centre of mass target, along the walker's right (default 0.0)"
+        },
+        {
+          "name": "slope_pitch",
+          "type": "float",
+          "desc": "of the ground along and across the heading (uphill, right side up) (default 0.0)"
+        },
+        {
+          "name": "slope_roll",
+          "type": "float",
+          "desc": "of the ground along and across the heading (uphill, right side up) (default 0.0)"
+        },
+        {
+          "name": "steepness",
+          "type": "float",
+          "desc": "tan of the steepest slope under or just ahead of the walker (default 0.0)"
+        },
+        {
+          "name": "lean",
+          "type": "float",
+          "desc": "trunk pitch, radians (default 0.0)"
+        },
+        {
+          "name": "hip_centre",
+          "type": "glm::vec3",
+          "desc": "between the hip joints, before GaitBalance (default glm::vec3(0.0))"
+        },
+        {
+          "name": "pivot",
+          "type": "glm::vec3",
+          "desc": "the same point in the pelvis frame (default glm::vec3(0.0))"
+        },
+        {
+          "name": "com_target",
+          "type": "glm::vec2",
+          "desc": "x, z (default glm::vec2(0.0))"
+        },
+        {
+          "name": "foot",
+          "type": "std::array<FootState, 2>",
+          "desc": "left, right: geometry, IK chain and target entities, contact, prints, rockers, swing, pose (FootState)"
+        },
+        {
+          "name": "hands_ready",
+          "type": "bool",
+          "desc": "Scrambling (default false)"
+        },
+        {
+          "name": "hand",
+          "type": "std::array<HandState, 2>",
+          "desc": "left, right: geometry, IK chain and target entities, contact, prints, grip, timers, pose (HandState)"
+        },
+        {
+          "name": "low",
+          "type": "float",
+          "desc": "0 upright, 1 as low as the steepest ground brings the trunk (default 0.0)"
+        },
+        {
+          "name": "tilt",
+          "type": "glm::vec2",
+          "desc": "radians the pelvis and the trunk tilt toward the slope, along the heading and to the right (default glm::vec2(0.0))"
+        },
+        {
+          "name": "forward",
+          "type": "float",
+          "desc": "m the centre of mass target is moved up the slope, at low = 1 (default 0.0)"
+        },
+        {
+          "name": "shoulder_gap",
+          "type": "float",
+          "desc": "m from the shoulders to the ground, as GaitBase last saw them (default 0.0)"
+        },
+        {
+          "name": "uphill",
+          "type": "glm::vec3",
+          "desc": "horizontal unit vector up the slope under the walker (zero on level ground) (default glm::vec3(0.0))"
+        },
+        {
+          "name": "trunk_reach",
+          "type": "glm::vec3",
+          "desc": "the trunk's lean for the hands, a world rotation vector (default glm::vec3(0.0))"
+        }
+      ],
+      "notes": "On the rig entity, emplaced by the gait systems; GaitRoutes replaces it at every route (the gait starts over). The entities named in foot[] and hand[] are owned by GaitFootIK and GaitHandIK."
+    },
+    {
+      "name": "BalanceState",
+      "kind": "component",
+      "file": "src/logic/agents/gait.h",
+      "json": null,
+      "summary": "The kinematic walk's balance, written by GaitBalance each tick: centre of mass, crouch, support, capture.",
+      "fields": [
+        {
+          "name": "valid",
+          "type": "bool",
+          "desc": "written at least once (default false)"
+        },
+        {
+          "name": "com",
+          "type": "glm::vec3",
+          "desc": "centre of mass of the solved pose (default glm::vec3(0.0))"
+        },
+        {
+          "name": "velocity",
+          "type": "glm::vec3",
+          "desc": "filtered centre of mass velocity (default glm::vec3(0.0))"
+        },
+        {
+          "name": "xcom",
+          "type": "glm::vec3",
+          "desc": "extrapolated centre of mass on the ground: com + velocity / omega (default glm::vec3(0.0))"
+        },
+        {
+          "name": "ground",
+          "type": "float",
+          "desc": "height of the ground under the centre of mass (default 0.0)"
+        },
+        {
+          "name": "lead",
+          "type": "float",
+          "desc": "m the extrapolated centre of mass is ahead of the reference point (default 0.0)"
+        },
+        {
+          "name": "error",
+          "type": "float",
+          "desc": "m left between the centre of mass and its target (default 0.0)"
+        },
+        {
+          "name": "iterations",
+          "type": "int",
+          "desc": "pelvis placement iterations this tick (default 0)"
+        },
+        {
+          "name": "crouch",
+          "type": "float",
+          "desc": "m the hips sit under their nominal height (default 0.0)"
+        },
+        {
+          "name": "bias",
+          "type": "float",
+          "desc": "m of that held through the stride, so the hips move smoothly (default 0.0)"
+        },
+        {
+          "name": "deficit",
+          "type": "float",
+          "desc": "the most reach this step lacked so far (default 0.0)"
+        },
+        {
+          "name": "wanted",
+          "type": "float",
+          "desc": "what bias is settling to (default 0.0)"
+        },
+        {
+          "name": "lift",
+          "type": "float",
+          "desc": "m the hips are held up so that the knees do not fold past their stop (scrambling) (default 0.0)"
+        },
+        {
+          "name": "lift_room",
+          "type": "float",
+          "desc": "the least the legs' reach left over the hips in the last step (default 10.0)"
+        },
+        {
+          "name": "lift_room_step",
+          "type": "float",
+          "desc": "the same in this step so far (default 10.0)"
+        },
+        {
+          "name": "offset",
+          "type": "glm::vec3",
+          "desc": "where the hips ended, from where GaitBase put them (default glm::vec3(0.0))"
+        },
+        {
+          "name": "support",
+          "type": "std::vector<glm::vec2>",
+          "desc": "convex hull of the soles' last and next prints and of the planted palms, x z"
+        },
+        {
+          "name": "outside",
+          "type": "float",
+          "desc": "m the centre of mass is outside it (default 0.0)"
+        },
+        {
+          "name": "lateral_margin",
+          "type": "float",
+          "desc": "m from the extrapolated centre of mass to the stance foot's outer edge (default 0.0)"
+        },
+        {
+          "name": "captured",
+          "type": "bool",
+          "desc": "a heel struck on this tick (default false)"
+        },
+        {
+          "name": "capture_error",
+          "type": "float",
+          "desc": "m along the heading between that heel and xcom - capture_offset (default 0.0)"
+        }
+      ],
+      "notes": "On the rig entity, emplaced by GaitBalance; read on the next tick by GaitBase, GaitFootIK, GaitHandIK, and by GaitChecks; removed by GaitRoutes at a new route."
+    },
+    {
+      "name": "GaitReport",
+      "kind": "component",
+      "file": "src/logic/agents/gait.h",
+      "json": null,
+      "summary": "Measures of the kinematic walk's bodies (GaitChecks): this tick's values and the worst since settle seconds.",
+      "fields": [
+        {
+          "name": "settle",
+          "type": "double",
+          "desc": "seconds of walk before the max_* / min_* start (default 2) (default 2.)"
+        },
+        {
+          "name": "ticks",
+          "type": "int",
+          "desc": "ticks measured (default 0)"
+        },
+        {
+          "name": "steps",
+          "type": "int",
+          "desc": "heel strikes (default 0)"
+        },
+        {
+          "name": "contact_error",
+          "type": "float",
+          "desc": "m between a planted sole point and the ground (default 0.0)"
+        },
+        {
+          "name": "max_contact_error",
+          "type": "float",
+          "desc": "m between a planted sole point and the ground (default 0.0)"
+        },
+        {
+          "name": "penetration",
+          "type": "float",
+          "desc": "m any sole point is under the ground (default 0.0)"
+        },
+        {
+          "name": "max_penetration",
+          "type": "float",
+          "desc": "m any sole point is under the ground (default 0.0)"
+        },
+        {
+          "name": "slip",
+          "type": "float",
+          "desc": "m a planted sole point moved since it was planted (default 0.0)"
+        },
+        {
+          "name": "max_slip",
+          "type": "float",
+          "desc": "m a planted sole point moved since it was planted (default 0.0)"
+        },
+        {
+          "name": "sole_angle",
+          "type": "float",
+          "desc": "radians between a flat sole and its footprint (default 0.0)"
+        },
+        {
+          "name": "max_sole_angle",
+          "type": "float",
+          "desc": "radians between a flat sole and its footprint (default 0.0)"
+        },
+        {
+          "name": "limit_excess",
+          "type": "float",
+          "desc": "radians outside the IK limits (the bodies' pose) (default 0.0)"
+        },
+        {
+          "name": "max_limit_excess",
+          "type": "float",
+          "desc": "radians outside the IK limits (the bodies' pose) (default 0.0)"
+        },
+        {
+          "name": "body_limit_excess",
+          "type": "float",
+          "desc": "... outside the body file's (default 0.0)"
+        },
+        {
+          "name": "max_body_limit_excess",
+          "type": "float",
+          "desc": "... outside the body file's (default 0.0)"
+        },
+        {
+          "name": "worst_joint",
+          "type": "int",
+          "desc": "the joint furthest outside the body file's limits (default -1)"
+        },
+        {
+          "name": "ik_position",
+          "type": "float",
+          "desc": "m and radians, the residual of the legs in stance (default 0.0)"
+        },
+        {
+          "name": "max_ik_position",
+          "type": "float",
+          "desc": "m and radians, the residual of the legs in stance (default 0.0)"
+        },
+        {
+          "name": "ik_rotation",
+          "type": "float",
+          "desc": "radians, the residual rotation of the legs in stance (default 0.0)"
+        },
+        {
+          "name": "max_ik_rotation",
+          "type": "float",
+          "desc": "worst ik_rotation since settle (default 0.0)"
+        },
+        {
+          "name": "swing_ik_position",
+          "type": "float",
+          "desc": "... of the legs in swing (default 0.0)"
+        },
+        {
+          "name": "max_swing_ik_position",
+          "type": "float",
+          "desc": "... of the legs in swing (default 0.0)"
+        },
+        {
+          "name": "swing_ik_rotation",
+          "type": "float",
+          "desc": "radians, the residual rotation of the legs in swing (default 0.0)"
+        },
+        {
+          "name": "max_swing_ik_rotation",
+          "type": "float",
+          "desc": "worst swing_ik_rotation since settle (default 0.0)"
+        },
+        {
+          "name": "max_relief",
+          "type": "float",
+          "desc": "radians, the most heel rise an ankle stop asked for (default 0.0)"
+        },
+        {
+          "name": "ik_limit",
+          "type": "float",
+          "desc": "radians the IK limits took away, or would have where they gave way (default 0.0)"
+        },
+        {
+          "name": "max_ik_limit",
+          "type": "float",
+          "desc": "radians the IK limits took away, or would have where they gave way (default 0.0)"
+        },
+        {
+          "name": "yielded",
+          "type": "int",
+          "desc": "ticks on which a leg's limits gave way, since settle (default 0)"
+        },
+        {
+          "name": "capture_error",
+          "type": "float",
+          "desc": "m between a heel strike and where the rule puts it (default 0.0)"
+        },
+        {
+          "name": "max_capture_error",
+          "type": "float",
+          "desc": "m between a heel strike and where the rule puts it (default 0.0)"
+        },
+        {
+          "name": "max_com_error",
+          "type": "float",
+          "desc": "worst BalanceState::error since settle, m (default 0.0)"
+        },
+        {
+          "name": "max_outside",
+          "type": "float",
+          "desc": "worst distance of the centre of mass outside the support, m (default 0.0)"
+        },
+        {
+          "name": "min_lateral_margin",
+          "type": "float",
+          "desc": "least BalanceState::lateral_margin since settle, m (default 1.0)"
+        },
+        {
+          "name": "max_gap",
+          "type": "float",
+          "desc": "m, the least flat ground a foot stood on (default 0.0)"
+        },
+        {
+          "name": "mean_speed",
+          "type": "float",
+          "desc": "m/s of the centre of mass since settle (default 0.0)"
+        },
+        {
+          "name": "planted",
+          "type": "std::array<std::array<glm::vec3, 4>, 2>",
+          "desc": "where each sole point was planted"
+        },
+        {
+          "name": "is_planted",
+          "type": "std::array<std::array<bool, 4>, 2>",
+          "desc": "which sole points are planted"
+        },
+        {
+          "name": "settle_com",
+          "type": "glm::vec3",
+          "desc": "centre of mass at the settle time (default glm::vec3(0.0))"
+        },
+        {
+          "name": "settle_time",
+          "type": "double",
+          "desc": "GaitState::time when measuring started, -1 before (default -1.)"
+        },
+        {
+          "name": "hand_contact_error",
+          "type": "float",
+          "desc": "Hands (scrambling) / m between a planted palm point and the ground (default 0.0)"
+        },
+        {
+          "name": "max_hand_contact_error",
+          "type": "float",
+          "desc": "Hands (scrambling) / m between a planted palm point and the ground (default 0.0)"
+        },
+        {
+          "name": "hand_penetration",
+          "type": "float",
+          "desc": "m a planted palm point is under the ground (default 0.0)"
+        },
+        {
+          "name": "max_hand_penetration",
+          "type": "float",
+          "desc": "m a planted palm point is under the ground (default 0.0)"
+        },
+        {
+          "name": "hand_slip",
+          "type": "float",
+          "desc": "m a planted palm point moved since it was planted (default 0.0)"
+        },
+        {
+          "name": "max_hand_slip",
+          "type": "float",
+          "desc": "m a planted palm point moved since it was planted (default 0.0)"
+        },
+        {
+          "name": "hand_ik_position",
+          "type": "float",
+          "desc": "m and radians, the residual of the arms of planted hands (default 0.0)"
+        },
+        {
+          "name": "max_hand_ik_position",
+          "type": "float",
+          "desc": "m and radians, the residual of the arms of planted hands (default 0.0)"
+        },
+        {
+          "name": "hand_ik_rotation",
+          "type": "float",
+          "desc": "radians, the residual rotation of the arms of planted hands (default 0.0)"
+        },
+        {
+          "name": "max_hand_ik_rotation",
+          "type": "float",
+          "desc": "worst hand_ik_rotation since settle (default 0.0)"
+        },
+        {
+          "name": "max_arm_limit",
+          "type": "float",
+          "desc": "radians the arms' limits took away, or gave (default 0.0)"
+        },
+        {
+          "name": "hand_ticks",
+          "type": "std::array<int, 2>",
+          "desc": "ticks each palm was planted, holds it took, since settle"
+        },
+        {
+          "name": "hand_holds",
+          "type": "std::array<int, 2>",
+          "desc": "ticks each palm was planted, holds it took, since settle"
+        },
+        {
+          "name": "max_low",
+          "type": "float",
+          "desc": "the most GaitState::low since settle (default 0.0)"
+        },
+        {
+          "name": "min_hip_height",
+          "type": "float",
+          "desc": "m of the hips over the walker's reference point (default 10.0)"
+        },
+        {
+          "name": "hand_planted",
+          "type": "std::array<std::array<glm::vec3, 4>, 2>",
+          "desc": "where each palm point was planted"
+        },
+        {
+          "name": "hand_is_planted",
+          "type": "std::array<std::array<bool, 4>, 2>",
+          "desc": "which palm points are planted"
+        }
+      ],
+      "notes": "On the rig entity, emplaced by GaitChecks; GaitRoutes clears is_planted and settle_time at a new route. Read by the IK and GAIT tests, the terrain walker tests and the gait viewer."
+    }
+  ]
+}

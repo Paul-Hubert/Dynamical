@@ -1,0 +1,995 @@
+{
+  "systems": [
+    {
+      "name": "terrain",
+      "class": "TerrainPass",
+      "file": "src/renderer/passes/terrain_pass.cpp",
+      "kind": "pass",
+      "scope": "Host",
+      "summary": "Draws the marching cubes chunks: earth, soil patches, rock, relief, darkened under the grass.",
+      "access": [
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "constructor, record",
+          "effect": "Ground anisotropy; terrain, grass, grass_pass, grass_params.height, scree, relief."
+        },
+        {
+          "name": "Settings",
+          "kind": "context",
+          "access": "read",
+          "where": "record",
+          "effect": "ground_relief scales the relief depths."
+        },
+        {
+          "name": "Executor",
+          "kind": "context",
+          "access": "read",
+          "where": "loadGround",
+          "effect": "tf::Executor that decodes the ground textures (a local one when absent)."
+        },
+        {
+          "name": "TerrainBuffers",
+          "kind": "context",
+          "access": "read",
+          "where": "record",
+          "effect": "Vertex buffer of each slot and the indirect draw buffer."
+        },
+        {
+          "name": "SoilLayers",
+          "kind": "context",
+          "access": "read",
+          "where": "record",
+          "effect": "Layer of the soil map of each chunk, pushed per draw."
+        },
+        {
+          "name": "ChunkC",
+          "kind": "component",
+          "access": "read",
+          "where": "record",
+          "effect": "Chunk origin for the soil map lookup."
+        },
+        {
+          "name": "ChunkGPU",
+          "kind": "component",
+          "access": "read",
+          "where": "record",
+          "effect": "Slot of the chunk's mesh."
+        },
+        {
+          "name": "ChunkReady",
+          "kind": "tag",
+          "access": "read",
+          "where": "record",
+          "effect": "Only chunks whose mesh is drawable are drawn."
+        }
+      ],
+      "side_effects": [
+        "Reads resources/textures/grass.png, rock.jpg and resources/ground/ground.json with its textures, uploads them as texture arrays.",
+        "Reads, or bakes and writes, ./resources/ground_relief_{mud,stones,sand}.bin and uploads the relief rays.",
+        "Decodes the ground textures as taskflow tasks and waits for them in the constructor.",
+        "Logs a warning without ground textures, an info line per relief baked.",
+        "Records one indirect draw per ready chunk into each target's command buffer."
+      ]
+    },
+    {
+      "name": "grass",
+      "class": "GrassPass",
+      "file": "src/renderer/passes/grass_pass.cpp",
+      "kind": "pass",
+      "scope": "Host",
+      "summary": "Draws the grass shell over the chunks, looking the view rays up in rays baked against tiles of plants.",
+      "access": [
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "constructor, update, record",
+          "effect": "Sets grass_pass = true (constructor); reads grass_anisotropy, grass and grass_params."
+        },
+        {
+          "name": "Settings",
+          "kind": "context",
+          "access": "read",
+          "where": "constructor",
+          "effect": "grass_kind: one kind of plant everywhere."
+        },
+        {
+          "name": "TerrainBuffers",
+          "kind": "context",
+          "access": "read",
+          "where": "update, record",
+          "effect": "Slot count, vertex buffers, indirect draws."
+        },
+        {
+          "name": "SoilLayers",
+          "kind": "context",
+          "access": "read",
+          "where": "record",
+          "effect": "Soil map layer of each chunk (no grass on the patches)."
+        },
+        {
+          "name": "ChunkC",
+          "kind": "component",
+          "access": "read",
+          "where": "update, record",
+          "effect": "Chunk position for its height map; origin for the draw."
+        },
+        {
+          "name": "ChunkGPU",
+          "kind": "component",
+          "access": "read",
+          "where": "update (ChunkLayers::update), record",
+          "effect": "Slot of the chunk's mesh."
+        },
+        {
+          "name": "ChunkReady",
+          "kind": "tag",
+          "access": "read",
+          "where": "update (ChunkLayers::update), record",
+          "effect": "Drawable chunks get a height map and a draw."
+        }
+      ],
+      "side_effects": [
+        "Reads, or bakes and writes, ./resources/grass_raycast_<kind>.bin for the ten kinds of plants; uploads the ray textures (about 250 MB, less in blocks).",
+        "Uploads the species noise, a tile noise and the height map array.",
+        "Queues height map image updates for new chunks and up to 16 rebakes a frame after a parameter change.",
+        "Logs bake times and sizes; warns on an unknown grass_kind or an unwritable file.",
+        "Records up to three draws of each chunk's shell per target (stencil see through)."
+      ]
+    },
+    {
+      "name": "vegetation",
+      "class": "VegetationPass",
+      "file": "src/renderer/passes/vegetation_pass.cpp",
+      "kind": "pass",
+      "scope": "Host",
+      "summary": "Draws the Plant entities with the SpeedTree library, levels of detail, far plants from their baked volumes; gives species to the rays.",
+      "access": [
+        {
+          "name": "Plant",
+          "kind": "component",
+          "access": "read",
+          "where": "update",
+          "effect": "Species and forced level of each plant."
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "update",
+          "effect": "Position, scale and matrix of each plant."
+        },
+        {
+          "name": "VegetationStats",
+          "kind": "context",
+          "access": "write+create",
+          "where": "constructor, update",
+          "effect": "Plants, drawn, triangles, species loaded and loading."
+        },
+        {
+          "name": "VegetationLibrary",
+          "kind": "context",
+          "access": "read+create",
+          "where": "constructor (vegetationLibrary), request, finishJob",
+          "effect": "Species list and files; loaded and emplaced when absent."
+        },
+        {
+          "name": "VegetationPreload",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Species to load before any plant uses them."
+        },
+        {
+          "name": "RayMeshes",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "constructor, finishJob",
+          "effect": "Adds each species' traced mesh and its leaf textures (ray tracing)."
+        },
+        {
+          "name": "RayPlantMeshes",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "constructor, finishJob",
+          "effect": "Emplaced with ray tracing; mesh index and bounds of each loaded species."
+        },
+        {
+          "name": "PlantVolumeSet",
+          "kind": "context",
+          "access": "read",
+          "where": "update, record",
+          "effect": "Which species have a baked volume, and its bounds and index."
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "constructor, update, record",
+          "effect": "vegetation, vegetation_params (lod_bias, force_lod, cull, normal_maps, subsurface), far_plants_on_screen, anisotropy."
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Desktop eye for levels of detail and culling."
+        },
+        {
+          "name": "VRInput",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Headset session and head position."
+        },
+        {
+          "name": "VRRig",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Rig transform of the headset eye."
+        },
+        {
+          "name": "Executor",
+          "kind": "context",
+          "access": "read",
+          "where": "request",
+          "effect": "tf::Executor that loads species on workers."
+        }
+      ],
+      "side_effects": [
+        "Loads species geometry and textures on taskflow workers (silent_async, 6 at a time); uploads buffers and textures, allocates descriptor sets.",
+        "Logs each species loaded, errors for species and textures that fail.",
+        "With ray tracing gives meshes and textures to the rays (RayMeshes).",
+        "Records the plant draws and the far volume boxes of both targets; the destructor waits for running jobs."
+      ]
+    },
+    {
+      "name": "animals",
+      "class": "AnimalPass",
+      "file": "src/renderer/passes/animal_pass.cpp",
+      "kind": "pass",
+      "scope": "Host",
+      "summary": "Draws the skinned animals of the library; with ray tracing skins the nearest ones for the rays (RayAnimals).",
+      "access": [
+        {
+          "name": "Animal",
+          "kind": "component",
+          "access": "read",
+          "where": "update",
+          "effect": "Species of each animal."
+        },
+        {
+          "name": "AnimalPose",
+          "kind": "component",
+          "access": "read",
+          "where": "update",
+          "effect": "skin matrices copied into the frame's joint buffer."
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "update",
+          "effect": "Position, rotation, scale and matrix."
+        },
+        {
+          "name": "AnimalStats",
+          "kind": "context",
+          "access": "write+create",
+          "where": "constructor, update",
+          "effect": "Animals, drawn, triangles, joints, species loaded and loading."
+        },
+        {
+          "name": "AnimalLibrary",
+          "kind": "context",
+          "access": "read+create",
+          "where": "constructor (animalLibrary), request, finishJob",
+          "effect": "Species definitions and directory; loaded and emplaced when absent."
+        },
+        {
+          "name": "RayAnimals",
+          "kind": "context",
+          "access": "readwrite+create+destroy",
+          "where": "constructor, update, destructor",
+          "effect": "Emplaced with ray tracing; cleared and filled every frame with the skinned shadow casters; erased."
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "constructor, update, record",
+          "effect": "animals, vegetation_params (lod_bias, force_lod, cull, normal_maps), lighting[target].traced_range and animals, anisotropy."
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Desktop eye."
+        },
+        {
+          "name": "VRInput",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Headset session and head position."
+        },
+        {
+          "name": "VRRig",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Rig transform."
+        },
+        {
+          "name": "Executor",
+          "kind": "context",
+          "access": "read",
+          "where": "request",
+          "effect": "tf::Executor that loads species on workers."
+        }
+      ],
+      "side_effects": [
+        "Loads species geometry and textures on taskflow workers; uploads buffers and textures.",
+        "Writes the skinning matrices of the frame into a mapped storage buffer per frame in flight.",
+        "With ray tracing records animal_skin.rt.comp.glsl dispatches into the frame's compute command buffer.",
+        "Logs species loaded and failures, and a warning past 65536 joints in view."
+      ]
+    },
+    {
+      "name": "model",
+      "class": "ModelPass",
+      "file": "src/renderer/passes/model_pass.cpp",
+      "kind": "pass",
+      "scope": "Host",
+      "summary": "Draws the glTF models (Transform + ModelRenderable); gives their meshes to the rays.",
+      "access": [
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "update, record",
+          "effect": "Material sets and ray_mesh written in update; buffers, parts and materials read in record."
+        },
+        {
+          "name": "ModelRenderable",
+          "kind": "component",
+          "access": "read",
+          "where": "record",
+          "effect": "Model entity and tint."
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "record",
+          "effect": "Model matrix."
+        },
+        {
+          "name": "RayMeshes",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "update",
+          "effect": "Adds each model's mesh to the rays (ray tracing)."
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "record",
+          "effect": "models: false draws nothing."
+        }
+      ],
+      "side_effects": [
+        "Allocates a descriptor set per material and an image view per texture.",
+        "Records the indexed draws of every model part into both targets."
+      ]
+    },
+    {
+      "name": "ui",
+      "class": "UIPass",
+      "file": "src/renderer/passes/ui_pass.cpp",
+      "kind": "pass",
+      "scope": "Host",
+      "summary": "Dear ImGui on the desktop window, an overlay drawn after the scene.",
+      "access": [],
+      "side_effects": [
+        "Creates the ImGui context when absent and uploads its font atlas.",
+        "Calls ImGui::Render() every frame and copies the draw lists into mapped buffers.",
+        "Records the UI draws into the desktop command buffer."
+      ]
+    },
+    {
+      "name": "sky",
+      "class": "SkyPass",
+      "file": "src/renderer/passes/sky_pass.cpp",
+      "kind": "pass",
+      "scope": "Host",
+      "summary": "The sky, sun, moon and stars: one fullscreen triangle, always the first pass.",
+      "access": [],
+      "side_effects": [
+        "Records one fullscreen triangle per target and eye; reads the lights buffer through the view set."
+      ]
+    },
+    {
+      "name": "RayScene",
+      "class": "RayScene",
+      "file": "src/renderer/lighting/ray_scene.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "Acceleration structures of chunks, meshes, animals and the top level every frame, with the geometry table (ray tracing).",
+      "access": [
+        {
+          "name": "ChunkLit",
+          "kind": "tag",
+          "access": "readwrite+create+destroy",
+          "where": "updateChunks, destructor",
+          "effect": "Added when a chunk is in the rays, removed when it lost ChunkTriangles; cleared at the end."
+        },
+        {
+          "name": "ChunkTriangles",
+          "kind": "component",
+          "access": "read",
+          "where": "updateChunks, on_destroy signal",
+          "effect": "Triangle count and slot of the chunk's mesh; its destruction frees the structure."
+        },
+        {
+          "name": "ChunkC",
+          "kind": "component",
+          "access": "read",
+          "where": "updateChunks",
+          "effect": "Distance to the camera for the build order."
+        },
+        {
+          "name": "ChunkGPU",
+          "kind": "component",
+          "access": "read",
+          "where": "updateChunks",
+          "effect": "Slot must be the one that was counted."
+        },
+        {
+          "name": "ChunkDestroying",
+          "kind": "tag",
+          "access": "read",
+          "where": "updateChunks",
+          "effect": "Excluded from builds and from pending."
+        },
+        {
+          "name": "ChunkReady",
+          "kind": "tag",
+          "access": "read",
+          "where": "updateChunks",
+          "effect": "Counts chunks pending."
+        },
+        {
+          "name": "TerrainBuffers",
+          "kind": "context",
+          "access": "read",
+          "where": "updateChunks",
+          "effect": "Vertex buffers the chunk structures are built from."
+        },
+        {
+          "name": "LightingStats",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "constructor, queueBuild, updateChunks, updateMeshes, gatherInstances, buildTop",
+          "effect": "structure_bytes, chunks_lit, chunks_pending, structures_pending, plants_near, plants_far, instances."
+        },
+        {
+          "name": "RayMeshes",
+          "kind": "context",
+          "access": "readwrite+create+destroy",
+          "where": "constructor, updateMeshes, gatherInstances, destructor",
+          "effect": "Emplaced and erased here; meshes, boxes and textures read once the passes added them."
+        },
+        {
+          "name": "RayBake",
+          "kind": "context",
+          "access": "readwrite+create+destroy",
+          "where": "constructor, gatherInstances, destructor",
+          "effect": "Places the bake mesh in the scene and sets placed."
+        },
+        {
+          "name": "RayAnimals",
+          "kind": "context",
+          "access": "read",
+          "where": "updateAnimals",
+          "effect": "Animals skinned this frame: built or refitted."
+        },
+        {
+          "name": "RayPlantMeshes",
+          "kind": "context",
+          "access": "read",
+          "where": "gatherInstances",
+          "effect": "Mesh and volume box of each species."
+        },
+        {
+          "name": "PlantInRays",
+          "kind": "tag",
+          "access": "readwrite+create+destroy",
+          "where": "gatherInstances, destructor",
+          "effect": "Plants within the plant geometry range (with a margin to leave)."
+        },
+        {
+          "name": "PlantRayTransforms",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "gatherInstances, destructor",
+          "effect": "Instance rows of a plant's mesh and box, worked out once."
+        },
+        {
+          "name": "Plant",
+          "kind": "component",
+          "access": "read",
+          "where": "gatherInstances",
+          "effect": "Species of each plant."
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "gatherInstances",
+          "effect": "Positions and matrices of plants and models."
+        },
+        {
+          "name": "ModelRenderable",
+          "kind": "component",
+          "access": "read",
+          "where": "gatherInstances",
+          "effect": "Model entity of each instance."
+        },
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "read",
+          "where": "gatherInstances",
+          "effect": "ray_mesh of the model."
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "gatherInstances",
+          "effect": "motion: models that move are dynamic instances."
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "read",
+          "where": "updateChunks, gatherInstances",
+          "effect": "Build order of the chunks; a viewer."
+        },
+        {
+          "name": "VRInput",
+          "kind": "context",
+          "access": "read",
+          "where": "gatherInstances",
+          "effect": "Headset session and head position."
+        },
+        {
+          "name": "VRRig",
+          "kind": "context",
+          "access": "read",
+          "where": "gatherInstances",
+          "effect": "Rig transform."
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "updateChunks, gatherInstances",
+          "effect": "streaming.ray_chunks, lighting[t].plant_geometry_range, far_plants_in_rays."
+        }
+      ],
+      "side_effects": [
+        "Builds and refits acceleration structures in the frame's compute command buffer; allocates their buffers, scratch, geometry table and instance buffers.",
+        "Writes Context::tlas, ray_geometries and ray_textures, which every view set gets.",
+        "Connects onChunkGone to on_destroy<ChunkTriangles>; the destructor disconnects it and waits for the device."
+      ]
+    },
+    {
+      "name": "ProbeVolume",
+      "class": "ProbeVolume",
+      "file": "src/renderer/lighting/probe_volume.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "The irradiance probes on the GPU: bricks per lit chunk, a ray budget a frame (ray tracing).",
+      "access": [
+        {
+          "name": "ChunkC",
+          "kind": "component",
+          "access": "read",
+          "where": "syncBricks",
+          "effect": "Chunk position, centre and origin."
+        },
+        {
+          "name": "ChunkVolume",
+          "kind": "component",
+          "access": "read",
+          "where": "syncBricks",
+          "effect": "Densities the probes are classified from."
+        },
+        {
+          "name": "ChunkLit",
+          "kind": "tag",
+          "access": "read",
+          "where": "syncBricks",
+          "effect": "Only chunks in the rays get a brick."
+        },
+        {
+          "name": "ChunkDestroying",
+          "kind": "tag",
+          "access": "read",
+          "where": "syncBricks",
+          "effect": "Going chunks lose their brick."
+        },
+        {
+          "name": "Plant",
+          "kind": "component",
+          "access": "read",
+          "where": "syncBricks",
+          "effect": "Plants around a new brick: the air near them is traced."
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "syncBricks, update",
+          "effect": "Plant positions; torch positions."
+        },
+        {
+          "name": "PointLight",
+          "kind": "component",
+          "access": "read",
+          "where": "update",
+          "effect": "Torches: probes within their radius are traced every frame."
+        },
+        {
+          "name": "VegetationLibrary",
+          "kind": "context",
+          "access": "read",
+          "where": "syncBricks",
+          "effect": "Species height and radius."
+        },
+        {
+          "name": "LightingStats",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "syncBricks, update",
+          "effect": "bricks, probes_pending, probes_active."
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "update (and treeShadeView)",
+          "effect": "rays_per_probe, probe_rays_per_frame, tree_shade."
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Viewer."
+        },
+        {
+          "name": "VRInput",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Headset session and head position."
+        },
+        {
+          "name": "VRRig",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Rig transform."
+        }
+      ],
+      "side_effects": [
+        "Allocates pages of 3D probe textures (61 MB each, logged), uploads the brick table and the probe classes.",
+        "Records the probe dispatches into the frame's compute command buffer.",
+        "Writes the Context probe pointers read by every view set; waits for the device when its buffer grows."
+      ]
+    },
+    {
+      "name": "PlantVolumes",
+      "class": "PlantVolumes",
+      "file": "src/renderer/lighting/plant_volumes.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "Bakes a density, colour and normal volume per plant species against the rays (ray tracing).",
+      "access": [
+        {
+          "name": "PlantVolumeSet",
+          "kind": "context",
+          "access": "readwrite+create+destroy",
+          "where": "constructor, finish, destructor",
+          "effect": "The baked volume of each species, for the vegetation pass."
+        },
+        {
+          "name": "RayPlantMeshes",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "prepare, start, finish",
+          "effect": "Species meshes and bounds read; box of the volume written."
+        },
+        {
+          "name": "RayMeshes",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "start, finish",
+          "effect": "Parts of the species' mesh read; the volume's RayBox added."
+        },
+        {
+          "name": "RayBake",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "prepare, update",
+          "effect": "Asks for the baking species in the scene; reads placed."
+        },
+        {
+          "name": "LightingStats",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "update",
+          "effect": "structures_pending += species still to bake."
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "streaming.plant_volume_slices."
+        },
+        {
+          "name": "VegetationLibrary",
+          "kind": "context",
+          "access": "read",
+          "where": "finish",
+          "effect": "Species id for the log."
+        }
+      ],
+      "side_effects": [
+        "Allocates three 3D images per baked species; records bake dispatches and mip blits into the frame's compute command buffer.",
+        "Writes Context::plant_volumes (view set bindings 10 to 12).",
+        "Logs an info line per volume baked."
+      ]
+    },
+    {
+      "name": "SunVisibility",
+      "class": "SunVisibility",
+      "file": "src/renderer/lighting/sun_visibility.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "Per target scene render pass with the sun apart, the traced and filtered sun visibility, the composite (ray tracing).",
+      "access": [],
+      "side_effects": [
+        "Creates the scene and visibility render passes, images, framebuffers and pipelines of its target.",
+        "Records the scene pass, the sun trace and resolve and the composite into the target's command buffer every frame.",
+        "Keeps a registry reference but reads nothing from it."
+      ]
+    },
+    {
+      "name": "Lights",
+      "class": "Lights",
+      "file": "src/renderer/lighting/lights.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "Fills the lights uniform of the frame from the Sky and the nearest point lights.",
+      "access": [
+        {
+          "name": "Sky",
+          "kind": "context",
+          "access": "read+create",
+          "where": "constructor, update",
+          "effect": "Emplaced when the scene has no Sky system; the light, sky colours and ambient light of the time of day."
+        },
+        {
+          "name": "PointLight",
+          "kind": "component",
+          "access": "read",
+          "where": "update",
+          "effect": "Torches: colour, intensity, radius."
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "update",
+          "effect": "Torch positions."
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Viewer."
+        },
+        {
+          "name": "VRInput",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Headset session and head position."
+        },
+        {
+          "name": "VRRig",
+          "kind": "context",
+          "access": "read",
+          "where": "update",
+          "effect": "Rig transform."
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "lightingView",
+          "effect": "Lighting tier of a target for its ViewUBO."
+        }
+      ],
+      "side_effects": [
+        "Writes the mapped lights uniform buffer of the frame and sets Context::lights_buffers."
+      ]
+    }
+  ],
+  "components": [
+    {
+      "name": "ChunkLit",
+      "kind": "tag",
+      "file": "src/renderer/lighting/ray_scene.h",
+      "summary": "A chunk whose acceleration structure is in the scene the rays see (or that has no triangle).",
+      "json": null,
+      "fields": [],
+      "notes": "Added by RayScene::updateChunks once the chunk's bottom level structure is queued (at once when it has no triangle); removed when the chunk loses ChunkTriangles (meshed again); the storage is cleared when RayScene is destroyed. ProbeVolume gives bricks only to ChunkLit chunks. Ray tracing only."
+    },
+    {
+      "name": "RayMeshes",
+      "kind": "context",
+      "file": "src/renderer/lighting/ray_meshes.h",
+      "summary": "The meshes, volume boxes and textures the passes give to the rays (ray tracing only).",
+      "json": null,
+      "fields": [
+        {
+          "name": "meshes",
+          "type": "std::vector<RayMesh>",
+          "desc": "Meshes to trace: kind (Terrain, Solid, Plant, Volume), vertex and index buffers, vertex stride, first vertex, vertex count, parts (first index, index count, opaque, texture, alpha cutoff, colour, transmission)."
+        },
+        {
+          "name": "boxes",
+          "type": "std::vector<RayBox>",
+          "desc": "Boxes of the baked plant volumes: volume index (bindings 10 to 12), min, size, voxel."
+        },
+        {
+          "name": "textures",
+          "type": "std::vector<vk::DescriptorImageInfo>",
+          "desc": "Textures the rays test leaves against (view set binding 6), at most max_textures (512)."
+        }
+      ],
+      "notes": "Emplaced by RayScene's constructor, erased by its destructor. add(RayMesh) and add(RayBox) return stable indices (nothing is taken back); texture(view, sampler) returns the index of a texture, -1 past 512. Added to by VegetationPass, ModelPass, PlantVolumes; read by RayScene. Main thread only."
+    },
+    {
+      "name": "RayBake",
+      "kind": "context",
+      "file": "src/renderer/lighting/ray_meshes.h",
+      "summary": "A mesh to put alone in the scene of this frame, for the rays that bake a plant volume.",
+      "json": null,
+      "fields": [
+        {
+          "name": "mesh",
+          "type": "int32_t",
+          "desc": "Index in RayMeshes::meshes, -1: none."
+        },
+        {
+          "name": "origin",
+          "type": "glm::vec3",
+          "desc": "Where its instance goes (0, -20000, 0): far under the world."
+        },
+        {
+          "name": "placed",
+          "type": "bool",
+          "desc": "RayScene put it in this frame's top level structure."
+        }
+      ],
+      "notes": "Emplaced and erased by RayScene. PlantVolumes::prepare writes mesh and origin, RayScene::gatherInstances writes placed, PlantVolumes::update bakes only when placed."
+    },
+    {
+      "name": "RayPlantMeshes",
+      "kind": "context",
+      "file": "src/renderer/lighting/ray_meshes.h",
+      "summary": "The traced mesh, volume box and bounds of each species of the vegetation library.",
+      "json": null,
+      "fields": [
+        {
+          "name": "mesh",
+          "type": "std::vector<int32_t>",
+          "desc": "Per species: index in RayMeshes::meshes, -1 while not loaded."
+        },
+        {
+          "name": "box",
+          "type": "std::vector<int32_t>",
+          "desc": "Per species: index in RayMeshes::boxes, -1 while its volume is not baked."
+        },
+        {
+          "name": "min",
+          "type": "std::vector<glm::vec3>",
+          "desc": "Bounds of the most detailed level, low corner."
+        },
+        {
+          "name": "max",
+          "type": "std::vector<glm::vec3>",
+          "desc": "High corner."
+        }
+      ],
+      "notes": "Emplaced by VegetationPass's constructor when RayMeshes exists (ray tracing); mesh, min, max written by VegetationPass::finishJob, box by PlantVolumes::finish; read by RayScene::gatherInstances and PlantVolumes. Never erased (lives with the registry context)."
+    },
+    {
+      "name": "PlantVolumeSet",
+      "kind": "context",
+      "file": "src/renderer/lighting/ray_meshes.h",
+      "summary": "The baked volume of each species, for the pass that draws far plants from it.",
+      "json": null,
+      "fields": [
+        {
+          "name": "species",
+          "type": "std::vector<PlantVolumeSet::Volume>",
+          "desc": "Per species: index (of its textures in bindings 10 to 12, -1 not baked), min (bounds in plant space), size, voxel (metres a texel)."
+        }
+      ],
+      "notes": "Emplaced and erased by PlantVolumes (ray tracing only); an entry written by PlantVolumes::finish; read by VegetationPass::update and record."
+    },
+    {
+      "name": "RayAnimals",
+      "kind": "context",
+      "file": "src/renderer/lighting/ray_meshes.h",
+      "summary": "The animals that cast shadows this frame, skinned by the compute commands of the frame.",
+      "json": null,
+      "fields": [
+        {
+          "name": "animals",
+          "type": "std::vector<RayAnimals::Animal>",
+          "desc": "Per animal: entity, vertices (skinned buffer, four floats a vertex), first_vertex, vertex_count, indices (shadow level, relative to its first vertex), index_count, matrix, color."
+        }
+      ],
+      "notes": "Emplaced by AnimalPass's constructor with ray tracing, cleared and filled by AnimalPass::update every frame (the nearest casters within the traced range), erased by its destructor. RayScene::updateAnimals builds a structure for each, refits it while it stays listed and lets it go otherwise."
+    },
+    {
+      "name": "PlantInRays",
+      "kind": "tag",
+      "file": "src/renderer/lighting/ray_meshes.h",
+      "summary": "A plant that is its leaves in the rays (within the plant geometry range of the tiers, with a margin to leave).",
+      "json": null,
+      "fields": [],
+      "notes": "Added and removed by RayScene::gatherInstances (enters at plant_geometry_range, leaves at 1.15 x it); storage cleared by RayScene's destructor."
+    },
+    {
+      "name": "PlantRayTransforms",
+      "kind": "component",
+      "file": "src/renderer/lighting/ray_meshes.h",
+      "summary": "Where the instances of a plant go in the top level structure, worked out once (plants do not move).",
+      "json": null,
+      "fields": [
+        {
+          "name": "mesh",
+          "type": "float[12]",
+          "desc": "Three rows of four of the plant's matrix, for its mesh instance."
+        },
+        {
+          "name": "box",
+          "type": "float[12]",
+          "desc": "Rows of the box of its species' volume over its bounds."
+        },
+        {
+          "name": "boxed",
+          "type": "int32_t",
+          "desc": "The RayBox the box rows were made for, -1 none."
+        }
+      ],
+      "notes": "Emplaced by RayScene::gatherInstances on every Transform + Plant entity without one; box rows recomputed when the species' box changes; storage cleared by RayScene's destructor. A plant that moves keeps its first rows."
+    }
+  ]
+}
