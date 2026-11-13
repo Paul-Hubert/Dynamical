@@ -43,6 +43,7 @@ Animals that walk side by side, each along a path of its own (a circle, a figure
 | [Transform](../components/Transform.md) | component | readwrite+create | init, tick (`stepWalker`) | made at init; heading read on the first step, position and rotation written; the followed one read |
 | [Animal](../components/Animal.md) | component | write+create | init | species, clip, rate without procedural |
 | [Animal](../components/Animal.md) | component | read | tick | species: size and sole |
+| [AnimalPose](../components/AnimalPose.md) | component | read | preinit | storage only: the pool is made before the first view; AnimalAnimation writes the poses |
 | [AnimalWalker](../components/AnimalWalker.md) | component | readwrite+create | init, tick | path, radius, speed; yaw, travelled, height, pitch advanced |
 | [AnimalGait](../components/AnimalGait.md) | component | write+create | init | the style, with `procedural` |
 | [AnimalLibrary](../components/AnimalLibrary.md) | context | read+create | init, tick (`animalLibrary`) | species, sizes, clips |

@@ -564,6 +564,13 @@
           "access": "read",
           "where": "init",
           "effect": "Level ground and heights without a field (std::shared_ptr)."
+        },
+        {
+          "name": "AnimalPose",
+          "kind": "component",
+          "access": "read",
+          "where": "preinit",
+          "effect": "storage only: the pool is made before the first view; AnimalAnimation writes the poses"
         }
       ],
       "side_effects": [
@@ -641,6 +648,13 @@
           "access": "read",
           "where": "init",
           "effect": "Level ground and the ground without a field (std::shared_ptr)."
+        },
+        {
+          "name": "AnimalPose",
+          "kind": "component",
+          "access": "read",
+          "where": "preinit",
+          "effect": "storage only: the pool is made before the first view; AnimalAnimation writes the poses"
         }
       ],
       "side_effects": [

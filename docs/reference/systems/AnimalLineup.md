@@ -36,6 +36,7 @@ Puts the animals of the library in rows on the ground, the small ones in front, 
 | [Transform](../components/Transform.md) | component | write+create | init | one entity per animal, on the ground |
 | [Animal](../components/Animal.md) | component | write+create | init | its species |
 | [Animal](../components/Animal.md) | component | readwrite | tick | clip read; next clip played (`play`), `rate` = 1 |
+| [AnimalPose](../components/AnimalPose.md) | component | read | preinit | storage only: the pool is made before the first view; AnimalAnimation writes the poses |
 | [AnimalShow](../components/AnimalShow.md) | component | readwrite+create | init, tick | the clips to play; index and time left advanced |
 | [AnimalLibrary](../components/AnimalLibrary.md) | context | read+create | init, tick (`animalLibrary`) | entries, sizes, species and clips |
 | [Camera](../components/Camera.md) | context | write | init | in front of the first row, with `camera` |
