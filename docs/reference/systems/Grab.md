@@ -12,7 +12,7 @@ Unity's Grabber and Thrower on the VR hands: while a hand's grip is held, what i
 - **step(h)**: advances its own simulation clock. For every `Hand` + `Grabber`:
   - `grabbing = grip > grip_threshold`.
   - A grip already held is released when the grip is let go (thrown) or the hand was teleported (`teleports` changed:
-    not thrown, what it held stays behind).
+    not thrown, what it held stays behind; with the grip still held the hand grabs again in the same step).
   - Grabbing and not `grabbed`: **grab**. Needs the hand's body and the player's group (`PlayerLegs::group`). Collides
     the hand's shape with the world, max separation `touch`, ignoring sensors and the player's own bodies except what
     the other hand holds; hits sorted deepest first. The first hit that is not the hand nor an `Ungrabbable` entity gets
