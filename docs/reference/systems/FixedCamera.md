@@ -38,6 +38,7 @@ order). A capture shot with a camera overrides it.
 ## Used in scenes
 
 <!-- generated -->
+- [`test_boxes_view.scene.json`](../../../resources/scenes/test_boxes_view.scene.json): `host.pre`
 
 ## Tests
 

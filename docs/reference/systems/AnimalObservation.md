@@ -44,7 +44,13 @@ None.
   `AnimalEpisode@observe`. The host reads `AgentIO` after the observe phase.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/animal_demo_terrain_world.json`](../../../resources/scenes/common/animal_demo_terrain_world.json): `fixed@observe`
+- [`common/animal_demo_world.json`](../../../resources/scenes/common/animal_demo_world.json): `fixed@observe`
+- [`common/animal_orders_world.json`](../../../resources/scenes/common/animal_orders_world.json): `fixed@observe`
+- [`common/animal_terrain_world.json`](../../../resources/scenes/common/animal_terrain_world.json): `fixed@observe`
+- [`common/animal_world.json`](../../../resources/scenes/common/animal_world.json): `fixed@observe`
 
 ## Tests
 

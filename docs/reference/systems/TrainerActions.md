@@ -30,7 +30,17 @@ None: the system touches nothing.
   (`SphereControl`, `AnimalDrive@act`, `Pursuit`, the walker's drive).
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/animal_orders_world.json`](../../../resources/scenes/common/animal_orders_world.json): `fixed@act`
+- [`common/animal_terrain_world.json`](../../../resources/scenes/common/animal_terrain_world.json): `fixed@act`
+- [`common/animal_world.json`](../../../resources/scenes/common/animal_world.json): `fixed@act`
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed@act`
+- [`common/humanbot_world.json`](../../../resources/scenes/common/humanbot_world.json): `fixed@act`
+- [`common/pursuit_world.json`](../../../resources/scenes/common/pursuit_world.json): `fixed@act`
+- [`common/sandbox_world.json`](../../../resources/scenes/common/sandbox_world.json): `fixed@act`
+- [`common/sphere_world.json`](../../../resources/scenes/common/sphere_world.json): `fixed@act`
+- [`common/sphere_world_hills.json`](../../../resources/scenes/common/sphere_world_hills.json): `fixed@act`
 
 ## Tests
 

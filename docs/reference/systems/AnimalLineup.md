@@ -55,7 +55,9 @@ Puts the animals of the library in rows on the ground, the small ones in front, 
 - After the terrain generator is in the context (scene setup), for the ground.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`animals_test.scene.json`](../../../resources/scenes/animals_test.scene.json): `host.pre`
 
 ## Tests
 

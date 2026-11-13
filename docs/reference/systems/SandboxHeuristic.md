@@ -47,7 +47,9 @@ None.
   [Sandbox](Sandbox.md) reads the minds' actions in the same tick; needs the Sandbox context.
 
 ## Used in scenes
+
 <!-- generated -->
+No scene lists it.
 
 ## Tests
 

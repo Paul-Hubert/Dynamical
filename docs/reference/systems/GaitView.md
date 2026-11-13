@@ -76,6 +76,9 @@ next tick reads them. `groundField(w)` emplaces a flat plane in a world that has
 ## Used in scenes
 
 <!-- generated -->
+- [`ik_walk_slope.scene.json`](../../../resources/scenes/ik_walk_slope.scene.json): `host.pre`
+- [`ik_walk_terrain.scene.json`](../../../resources/scenes/ik_walk_terrain.scene.json): `host.pre`
+- [`walker_demo_terrain_view.scene.json`](../../../resources/scenes/walker_demo_terrain_view.scene.json): `host.pre`
 
 ## Tests
 

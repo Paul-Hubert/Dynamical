@@ -59,6 +59,7 @@ world is stepping (same thread, after the step).
 ## Used in scenes
 
 <!-- generated -->
+- [`sandbox_view.scene.json`](../../../resources/scenes/sandbox_view.scene.json): `host.pre`
 
 ## Tests
 

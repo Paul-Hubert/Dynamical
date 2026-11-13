@@ -66,6 +66,23 @@ same grid (`gridOffset`) and alpha.
 ## Used in scenes
 
 <!-- generated -->
+- [`animal_demo_view.scene.json`](../../../resources/scenes/animal_demo_view.scene.json): `host.post`
+- [`animal_terrain_view.scene.json`](../../../resources/scenes/animal_terrain_view.scene.json): `host.post`
+- [`animal_view.scene.json`](../../../resources/scenes/animal_view.scene.json): `host.post`
+- [`devita_view.scene.json`](../../../resources/scenes/devita_view.scene.json): `host.post`
+- [`ik_walk_slope.scene.json`](../../../resources/scenes/ik_walk_slope.scene.json): `host.post`
+- [`ik_walk_terrain.scene.json`](../../../resources/scenes/ik_walk_terrain.scene.json): `host.post`
+- [`player_deer.scene.json`](../../../resources/scenes/player_deer.scene.json): `host.post`
+- [`rig_anim.scene.json`](../../../resources/scenes/rig_anim.scene.json): `host.post`
+- [`sandbox_view.scene.json`](../../../resources/scenes/sandbox_view.scene.json): `host.post`
+- [`sphere_view.scene.json`](../../../resources/scenes/sphere_view.scene.json): `host.post`
+- [`sphere_view_heuristic.scene.json`](../../../resources/scenes/sphere_view_heuristic.scene.json): `host.post`
+- [`test_boxes_view.scene.json`](../../../resources/scenes/test_boxes_view.scene.json): `host.post`
+- [`vr_roller.scene.json`](../../../resources/scenes/vr_roller.scene.json): `host.post`
+- [`walker_demo_terrain_view.scene.json`](../../../resources/scenes/walker_demo_terrain_view.scene.json): `host.post`
+- [`walker_terrain_view.scene.json`](../../../resources/scenes/walker_terrain_view.scene.json): `host.post`
+- [`walker_view.scene.json`](../../../resources/scenes/walker_view.scene.json): `host.post`
+- [`wheel_view.scene.json`](../../../resources/scenes/wheel_view.scene.json): `host.post`
 
 ## Tests
 

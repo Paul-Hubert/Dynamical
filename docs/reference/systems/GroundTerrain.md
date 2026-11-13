@@ -45,7 +45,15 @@ collided ground.
 - Its preinit comes before every init, so `AgentFactory`, `AnimalFactory` and the others find the field there.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/animal_demo_terrain_world.json`](../../../resources/scenes/common/animal_demo_terrain_world.json): `fixed`
+- [`common/animal_terrain_world.json`](../../../resources/scenes/common/animal_terrain_world.json): `fixed`
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed`
+- [`ik_check_terrain.scene.json`](../../../resources/scenes/ik_check_terrain.scene.json): `fixed`
+- [`ik_walk_terrain.scene.json`](../../../resources/scenes/ik_walk_terrain.scene.json): `fixed`
+- [`walker_demo_terrain.scene.json`](../../../resources/scenes/walker_demo_terrain.scene.json): `fixed`
+- [`walker_demo_terrain_view.scene.json`](../../../resources/scenes/walker_demo_terrain_view.scene.json): `fixed`
 
 ## Tests
 

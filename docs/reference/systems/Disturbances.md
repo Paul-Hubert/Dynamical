@@ -37,7 +37,10 @@ environment parameters.
   (targets, speeds) when it is on.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed`
+- [`common/humanbot_world.json`](../../../resources/scenes/common/humanbot_world.json): `fixed`
 
 ## Tests
 

@@ -57,7 +57,10 @@ None for the system: `GaitReport::settle` (2 s by default) is the start of the m
 - `GaitRoutes` clears the report's planted points and settle time at each new route.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/ik_demo_world.json`](../../../resources/scenes/common/ik_demo_world.json): `fixed`
+- [`common/ik_world.json`](../../../resources/scenes/common/ik_world.json): `fixed`
 
 ## Tests
 

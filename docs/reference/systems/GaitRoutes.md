@@ -80,7 +80,9 @@ last one done.
 - `Observation@observe` records the decisions marked `recordable`; the demonstration writer reads `done`.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/ik_demo_world.json`](../../../resources/scenes/common/ik_demo_world.json): `fixed`
 
 ## Tests
 

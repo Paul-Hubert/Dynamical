@@ -43,7 +43,9 @@ None (see `AnimalParams::soft_resistance`, `soft_lift`, and `AnimalSpawn::soft_d
   only shows in the observation.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/animal_world.json`](../../../resources/scenes/common/animal_world.json): `fixed`
 
 ## Tests
 

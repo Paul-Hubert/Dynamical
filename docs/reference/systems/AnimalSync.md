@@ -44,7 +44,13 @@ None.
 - `origin_velocity` is what the observation, the rewards and the checks call a velocity.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/animal_demo_terrain_world.json`](../../../resources/scenes/common/animal_demo_terrain_world.json): `fixed`
+- [`common/animal_demo_world.json`](../../../resources/scenes/common/animal_demo_world.json): `fixed`
+- [`common/animal_orders_world.json`](../../../resources/scenes/common/animal_orders_world.json): `fixed`
+- [`common/animal_terrain_world.json`](../../../resources/scenes/common/animal_terrain_world.json): `fixed`
+- [`common/animal_world.json`](../../../resources/scenes/common/animal_world.json): `fixed`
 
 ## Tests
 

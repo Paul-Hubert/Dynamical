@@ -40,7 +40,10 @@ None; `energyBonusWeight`, `statsSettleSeconds`, `totalMass` from the params / e
 - After `Energy` (contact impulses, joint torques of the step). `Task` and eval legs read `devita.strikes`.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed`
+- [`common/humanbot_world.json`](../../../resources/scenes/common/humanbot_world.json): `fixed`
 
 ## Tests
 

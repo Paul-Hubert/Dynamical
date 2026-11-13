@@ -45,7 +45,11 @@ None.
 - Its `window_ticks = 0` starts the window that `AnimalSync` counts and `AnimalRewards` divides by.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/animal_orders_world.json`](../../../resources/scenes/common/animal_orders_world.json): `fixed@act`
+- [`common/animal_terrain_world.json`](../../../resources/scenes/common/animal_terrain_world.json): `fixed@act`
+- [`common/animal_world.json`](../../../resources/scenes/common/animal_world.json): `fixed@act`
 
 ## Tests
 

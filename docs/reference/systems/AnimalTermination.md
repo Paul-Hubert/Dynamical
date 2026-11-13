@@ -39,7 +39,11 @@ None (`AnimalParams::die_on_fall`, `fall_height`, `touch_margin`, `max_frames_60
 - After `AnimalSync` and `AnimalTask`, before `AnimalRewards@observe` (death reward) and `AnimalEpisode@observe` (done).
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/animal_orders_world.json`](../../../resources/scenes/common/animal_orders_world.json): `fixed`
+- [`common/animal_terrain_world.json`](../../../resources/scenes/common/animal_terrain_world.json): `fixed`
+- [`common/animal_world.json`](../../../resources/scenes/common/animal_world.json): `fixed`
 
 ## Tests
 

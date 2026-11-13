@@ -51,7 +51,9 @@ None for the system: it uses the parameters of `Pursuit`, from [`PursuitField`](
   agents whose `requested` is set right after it.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/pursuit_world.json`](../../../resources/scenes/common/pursuit_world.json): `fixed@observe`
 
 ## Tests
 

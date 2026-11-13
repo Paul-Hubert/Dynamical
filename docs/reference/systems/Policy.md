@@ -45,7 +45,22 @@ None.
 - A handle replaced between two windows (ModelWatcher loading a newer checkpoint) is used from the next decision.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`animal_eval.scene.json`](../../../resources/scenes/animal_eval.scene.json): `fixed@act`
+- [`animal_orders_eval.scene.json`](../../../resources/scenes/animal_orders_eval.scene.json): `fixed@act`
+- [`animal_terrain_eval.scene.json`](../../../resources/scenes/animal_terrain_eval.scene.json): `fixed@act`
+- [`animal_terrain_view.scene.json`](../../../resources/scenes/animal_terrain_view.scene.json): `fixed@act`
+- [`animal_view.scene.json`](../../../resources/scenes/animal_view.scene.json): `fixed@act`
+- [`devita_view.scene.json`](../../../resources/scenes/devita_view.scene.json): `fixed@act`
+- [`player_deer.scene.json`](../../../resources/scenes/player_deer.scene.json): `fixed@act`
+- [`sphere_view.scene.json`](../../../resources/scenes/sphere_view.scene.json): `fixed@act`
+- [`vr_roller.scene.json`](../../../resources/scenes/vr_roller.scene.json): `fixed@act`
+- [`walker_eval.scene.json`](../../../resources/scenes/walker_eval.scene.json): `fixed@act`
+- [`walker_terrain_eval.scene.json`](../../../resources/scenes/walker_terrain_eval.scene.json): `fixed@act`
+- [`walker_terrain_view.scene.json`](../../../resources/scenes/walker_terrain_view.scene.json): `fixed@act`
+- [`walker_view.scene.json`](../../../resources/scenes/walker_view.scene.json): `fixed@act`
+- [`wheel_view.scene.json`](../../../resources/scenes/wheel_view.scene.json): `fixed@act`
 
 ## Tests
 

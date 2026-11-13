@@ -50,7 +50,11 @@ another system (the sandbox's scripted minds) or nobody to answer. Only in binar
 - In the sandbox it runs before Sandbox's own `heuristic` minds, which answer only what it left requested.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`pursuit_eval.scene.json`](../../../resources/scenes/pursuit_eval.scene.json): `fixed@act`
+- [`sandbox_eval.scene.json`](../../../resources/scenes/sandbox_eval.scene.json): `fixed@act`
+- [`sandbox_view.scene.json`](../../../resources/scenes/sandbox_view.scene.json): `fixed@act`
 
 ## Tests
 

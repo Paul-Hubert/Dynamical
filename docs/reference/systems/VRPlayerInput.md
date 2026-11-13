@@ -40,6 +40,7 @@ After the renderer has written `VRInput` (the renderer's `prepare()` precedes th
 ## Used in scenes
 
 <!-- generated -->
+- [`player_vr.scene.json`](../../../resources/scenes/player_vr.scene.json): `host.pre`
 
 ## Tests
 

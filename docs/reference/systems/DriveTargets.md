@@ -48,7 +48,10 @@ environment parameters at every episode start.
 - `Rewards` reads the same action for its per-joint stats.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed@act`
+- [`common/humanbot_world.json`](../../../resources/scenes/common/humanbot_world.json): `fixed@act`
 
 ## Tests
 

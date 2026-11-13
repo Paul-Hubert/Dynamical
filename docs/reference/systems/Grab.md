@@ -61,6 +61,7 @@ After `VRHands` (the grip and the teleport count of this step) and `PlayerLegs` 
 ## Used in scenes
 
 <!-- generated -->
+- [`player_vr.scene.json`](../../../resources/scenes/player_vr.scene.json): `host.pre`
 
 ## Tests
 

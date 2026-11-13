@@ -95,7 +95,16 @@ destroyed.
 - A chunk destroyed takes its plants with it through the signal, whoever destroys it.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`forest.scene.json`](../../../resources/scenes/forest.scene.json): `host.pre`
+- [`forest_herds.scene.json`](../../../resources/scenes/forest_herds.scene.json): `host.pre`
+- [`forest_herds_watch.scene.json`](../../../resources/scenes/forest_herds_watch.scene.json): `host.pre`
+- [`forest_torch.scene.json`](../../../resources/scenes/forest_torch.scene.json): `host.pre`
+- [`forest_walk.scene.json`](../../../resources/scenes/forest_walk.scene.json): `host.pre`
+- [`player_horse.scene.json`](../../../resources/scenes/player_horse.scene.json): `host.pre`
+- [`tautavel_walk.scene.json`](../../../resources/scenes/tautavel_walk.scene.json): `host.pre`
+- [`tautavel_walk_torch.scene.json`](../../../resources/scenes/tautavel_walk_torch.scene.json): `host.pre`
 
 ## Tests
 

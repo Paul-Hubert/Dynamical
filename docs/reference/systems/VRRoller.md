@@ -67,6 +67,7 @@ area): both checked by SR.18. The steer is read by the sphere's world at its nex
 ## Used in scenes
 
 <!-- generated -->
+- [`vr_roller.scene.json`](../../../resources/scenes/vr_roller.scene.json): `host.pre`
 
 ## Tests
 

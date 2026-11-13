@@ -60,6 +60,8 @@ After the input systems and `LookTurn`; before `MountSteering` (needs the `Anima
 ## Used in scenes
 
 <!-- generated -->
+- [`player_deer.scene.json`](../../../resources/scenes/player_deer.scene.json): `host.pre`
+- [`player_horse.scene.json`](../../../resources/scenes/player_horse.scene.json): `host.pre`
 
 ## Tests
 

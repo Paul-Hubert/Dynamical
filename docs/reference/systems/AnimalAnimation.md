@@ -44,7 +44,15 @@ None.
 - Before the renderer's `AnimalPass` (it reads `AnimalPose::skin`).
 
 ## Used in scenes
+
 <!-- generated -->
+- [`animals_gait.scene.json`](../../../resources/scenes/animals_gait.scene.json): `host.pre`
+- [`animals_test.scene.json`](../../../resources/scenes/animals_test.scene.json): `host.pre`
+- [`forest_herds.scene.json`](../../../resources/scenes/forest_herds.scene.json): `host.pre`
+- [`forest_herds_watch.scene.json`](../../../resources/scenes/forest_herds_watch.scene.json): `host.pre`
+- [`player_horse.scene.json`](../../../resources/scenes/player_horse.scene.json): `host.pre`
+- [`tautavel_walk.scene.json`](../../../resources/scenes/tautavel_walk.scene.json): `host.pre`
+- [`tautavel_walk_torch.scene.json`](../../../resources/scenes/tautavel_walk_torch.scene.json): `host.pre`
 
 ## Tests
 

@@ -67,6 +67,8 @@ After the systems that make and move the animals (`Herds`, `MountSpawn`, `Steere
 ## Used in scenes
 
 <!-- generated -->
+- [`player_deer.scene.json`](../../../resources/scenes/player_deer.scene.json): `host.pre`
+- [`player_horse.scene.json`](../../../resources/scenes/player_horse.scene.json): `host.pre`
 
 ## Tests
 

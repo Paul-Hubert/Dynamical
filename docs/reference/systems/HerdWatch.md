@@ -54,7 +54,9 @@ Puts the desktop camera round a herd, at the height of someone standing, for vid
 - Without `Herds` in the scene it does nothing.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`forest_herds_watch.scene.json`](../../../resources/scenes/forest_herds_watch.scene.json): `host.pre`
 
 ## Tests
 

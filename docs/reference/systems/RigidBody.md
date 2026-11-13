@@ -79,7 +79,31 @@ pages) and the world's `PhysicsConfig` (`allow_sleeping`).
 - In init it runs in scene order: world systems listed after it find the grounds already in Jolt.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`base.scene.json`](../../../resources/scenes/base.scene.json): `host.pre`
+- [`common/animal_demo_terrain_world.json`](../../../resources/scenes/common/animal_demo_terrain_world.json): `fixed`
+- [`common/animal_demo_world.json`](../../../resources/scenes/common/animal_demo_world.json): `fixed`
+- [`common/animal_orders_world.json`](../../../resources/scenes/common/animal_orders_world.json): `fixed`
+- [`common/animal_terrain_world.json`](../../../resources/scenes/common/animal_terrain_world.json): `fixed`
+- [`common/animal_world.json`](../../../resources/scenes/common/animal_world.json): `fixed`
+- [`common/box_world.json`](../../../resources/scenes/common/box_world.json): `fixed`
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed`
+- [`common/humanbot_world.json`](../../../resources/scenes/common/humanbot_world.json): `fixed`
+- [`common/ik_demo_world.json`](../../../resources/scenes/common/ik_demo_world.json): `fixed`
+- [`common/ik_world.json`](../../../resources/scenes/common/ik_world.json): `fixed`
+- [`common/rig_world.json`](../../../resources/scenes/common/rig_world.json): `fixed`
+- [`common/sandbox_world.json`](../../../resources/scenes/common/sandbox_world.json): `fixed`
+- [`common/sphere_world.json`](../../../resources/scenes/common/sphere_world.json): `fixed`
+- [`common/sphere_world_hills.json`](../../../resources/scenes/common/sphere_world_hills.json): `fixed`
+- [`forest.scene.json`](../../../resources/scenes/forest.scene.json): `host.pre`
+- [`forest_herds.scene.json`](../../../resources/scenes/forest_herds.scene.json): `host.pre`
+- [`player_deer.scene.json`](../../../resources/scenes/player_deer.scene.json): `host.pre`
+- [`player_fps.scene.json`](../../../resources/scenes/player_fps.scene.json): `host.pre`
+- [`player_horse.scene.json`](../../../resources/scenes/player_horse.scene.json): `host.pre`
+- [`player_vr.scene.json`](../../../resources/scenes/player_vr.scene.json): `host.pre`
+- [`vegetation_test.scene.json`](../../../resources/scenes/vegetation_test.scene.json): `host.pre`
+- [`vr_roller.scene.json`](../../../resources/scenes/vr_roller.scene.json): `host.pre`
 
 ## Tests
 

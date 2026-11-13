@@ -87,7 +87,9 @@ None.
 - Reads the reward programs [Sandbox](Sandbox.md) loaded in preinit.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/sandbox_world.json`](../../../resources/scenes/common/sandbox_world.json): `fixed@observe`
 
 ## Tests
 

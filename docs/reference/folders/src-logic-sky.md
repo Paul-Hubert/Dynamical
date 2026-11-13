@@ -35,7 +35,7 @@ Touched from elsewhere: [PointLight](../components/PointLight.md) (`src/logic/co
 
 - `src/logic/components/` (Camera, PointLight, Transform), `src/logic/systems/` (System), `src/scene/` (RunArgs,
   `registerSystem`).
-- Used by `src/renderer/lighting/lights.cpp` (the frame's lights), `src/renderer/tree_shade.cpp`, the sky pass, the
+- Used by `src/renderer/lighting/lights.cpp` (the frame's lights), `src/renderer/tree_shade.cpp` (crown shadows from the sun), the
   debug menu (`src/view/systems/`), `tests/unit/lighting.cpp`.
 
 ## Design docs

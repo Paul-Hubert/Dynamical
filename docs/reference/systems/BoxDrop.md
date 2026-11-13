@@ -51,7 +51,9 @@ ticks. The physics regression scenes (`test_boxes`, `test_boxes_view`) are built
 - The order of the draws is the determinism contract of `S2.2` / `S2.3`: changing it changes every test_boxes result.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/box_world.json`](../../../resources/scenes/common/box_world.json): `fixed`
 
 ## Tests
 

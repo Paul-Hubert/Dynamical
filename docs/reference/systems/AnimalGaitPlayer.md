@@ -61,7 +61,10 @@ None (`AnimalSpawn`: `gait`, `speed`, `warmup`, `heading`, `soft_depth`, `record
   `AnimalTask`, `AnimalTermination` and `AnimalSoftGround` do nothing for a kinematic body.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/animal_demo_terrain_world.json`](../../../resources/scenes/common/animal_demo_terrain_world.json): `fixed`
+- [`common/animal_demo_world.json`](../../../resources/scenes/common/animal_demo_world.json): `fixed`
 
 ## Tests
 

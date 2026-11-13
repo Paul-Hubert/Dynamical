@@ -61,7 +61,10 @@ None for the system: [`GaitParams`](../components/GaitParams.md) on the rig enti
   these targets to place the pelvis) and `Fabrik` (which solves them on the applied pose).
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/ik_demo_world.json`](../../../resources/scenes/common/ik_demo_world.json): `fixed`
+- [`common/ik_world.json`](../../../resources/scenes/common/ik_world.json): `fixed`
 
 ## Tests
 

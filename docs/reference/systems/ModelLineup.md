@@ -42,6 +42,7 @@ Needs `TerrainGenerator` (ChunkGenerator) and `ModelManager` (renderer). Before 
 ## Used in scenes
 
 <!-- generated -->
+- [`base.scene.json`](../../../resources/scenes/base.scene.json): `host.pre`
 
 ## Tests
 

@@ -71,7 +71,10 @@ None for the system. The task settings are the fields of the [`SphereAgent`](../
   `pending_reset` this system acts on.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/sphere_world.json`](../../../resources/scenes/common/sphere_world.json): `fixed`
+- [`common/sphere_world_hills.json`](../../../resources/scenes/common/sphere_world_hills.json): `fixed`
 
 ## Tests
 

@@ -60,7 +60,15 @@ ground (`TerrainColliders::require`, `surfaceHeight`).
   preinit or init (spawning on the ground, `GroundTerrain`, `WalkRoutes`).
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/animal_terrain_world.json`](../../../resources/scenes/common/animal_terrain_world.json): `fixed`
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed`
+- [`common/sphere_world.json`](../../../resources/scenes/common/sphere_world.json): `fixed`
+- [`sphere_view.scene.json`](../../../resources/scenes/sphere_view.scene.json): `fixed`
+- [`sphere_view_heuristic.scene.json`](../../../resources/scenes/sphere_view_heuristic.scene.json): `fixed`
+- [`vr_roller.scene.json`](../../../resources/scenes/vr_roller.scene.json): `fixed`
+- [`wheel_view.scene.json`](../../../resources/scenes/wheel_view.scene.json): `fixed`
 
 ## Tests
 

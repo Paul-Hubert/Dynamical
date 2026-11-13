@@ -54,6 +54,7 @@ After `PlayerLegs` in the scene so that its step runs after the legs' (it reads 
 ## Used in scenes
 
 <!-- generated -->
+- [`player_vr.scene.json`](../../../resources/scenes/player_vr.scene.json): `host.pre`
 
 ## Tests
 

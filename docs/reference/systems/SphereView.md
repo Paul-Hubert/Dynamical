@@ -73,6 +73,10 @@ rollers. Its markers are host entities drawn by ModelPass.
 ## Used in scenes
 
 <!-- generated -->
+- [`sphere_view.scene.json`](../../../resources/scenes/sphere_view.scene.json): `host.pre`
+- [`sphere_view_heuristic.scene.json`](../../../resources/scenes/sphere_view_heuristic.scene.json): `host.pre`
+- [`vr_roller.scene.json`](../../../resources/scenes/vr_roller.scene.json): `host.pre`
+- [`wheel_view.scene.json`](../../../resources/scenes/wheel_view.scene.json): `host.pre`
 
 ## Tests
 

@@ -34,7 +34,9 @@ None (the gain is fixed at 1).
   reads is the one `SphereObserve@observe` wrote at the end of the last window.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`sphere_view_heuristic.scene.json`](../../../resources/scenes/sphere_view_heuristic.scene.json): `fixed@act`
 
 ## Tests
 

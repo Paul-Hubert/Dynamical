@@ -53,7 +53,9 @@ Walks the kinematic animals someone steers (a rider, docs/players.md): an entity
 - With `Herds`: either order works, `Herds` skips members that have an `AnimalSteer` or a `SteeredWalk`; the scene `player_horse` puts `Herds` first.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`player_horse.scene.json`](../../../resources/scenes/player_horse.scene.json): `host.pre`
 
 ## Tests
 

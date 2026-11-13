@@ -65,7 +65,18 @@ still be writing it).
 - The worlds need the [Policy](Policy.md) system in their Act phase for the handle to be used.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`animal_terrain_view.scene.json`](../../../resources/scenes/animal_terrain_view.scene.json): `host.pre`
+- [`animal_view.scene.json`](../../../resources/scenes/animal_view.scene.json): `host.pre`
+- [`devita_view.scene.json`](../../../resources/scenes/devita_view.scene.json): `host.pre`
+- [`player_deer.scene.json`](../../../resources/scenes/player_deer.scene.json): `host.pre`
+- [`sphere_view.scene.json`](../../../resources/scenes/sphere_view.scene.json): `host.pre`
+- [`sphere_view_heuristic.scene.json`](../../../resources/scenes/sphere_view_heuristic.scene.json): `host.pre`
+- [`vr_roller.scene.json`](../../../resources/scenes/vr_roller.scene.json): `host.pre`
+- [`walker_terrain_view.scene.json`](../../../resources/scenes/walker_terrain_view.scene.json): `host.pre`
+- [`walker_view.scene.json`](../../../resources/scenes/walker_view.scene.json): `host.pre`
+- [`wheel_view.scene.json`](../../../resources/scenes/wheel_view.scene.json): `host.pre`
 
 ## Tests
 

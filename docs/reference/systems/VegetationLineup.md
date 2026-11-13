@@ -48,7 +48,9 @@ its baked volume. The positions are logged.
 - After `ChunkGenerator`, whose preinit makes the TerrainGenerator (systems init after every preinit).
 
 ## Used in scenes
+
 <!-- generated -->
+- [`vegetation_test.scene.json`](../../../resources/scenes/vegetation_test.scene.json): `host.pre`
 
 ## Tests
 

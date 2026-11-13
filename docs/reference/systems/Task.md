@@ -45,7 +45,11 @@ None; `arcFrames`, `randomTarget`, `randomSpeed`, `speeds`, `continuousSpeed` fr
   `route_lost`).
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed`
+- [`common/humanbot_world.json`](../../../resources/scenes/common/humanbot_world.json): `fixed`
+- [`common/rig_world.json`](../../../resources/scenes/common/rig_world.json): `fixed`
 
 ## Tests
 

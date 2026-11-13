@@ -150,7 +150,9 @@ walls.
   (`reported`), so the host always sees an agent's end.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/sandbox_world.json`](../../../resources/scenes/common/sandbox_world.json): `fixed`
 
 ## Tests
 

@@ -54,6 +54,10 @@ After WorldStepper and PlayerControl.
 ## Used in scenes
 
 <!-- generated -->
+- [`devita_view.scene.json`](../../../resources/scenes/devita_view.scene.json): `host.pre`
+- [`rig_anim.scene.json`](../../../resources/scenes/rig_anim.scene.json): `host.pre`
+- [`walker_terrain_view.scene.json`](../../../resources/scenes/walker_terrain_view.scene.json): `host.pre`
+- [`walker_view.scene.json`](../../../resources/scenes/walker_view.scene.json): `host.pre`
 
 ## Tests
 

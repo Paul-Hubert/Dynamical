@@ -49,7 +49,9 @@ The host's stand-in for the physical animal of each world (docs/players.md, "Rid
 - Needs the worlds' `AnimalFactory` to have built the `AnimalBot`.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`player_deer.scene.json`](../../../resources/scenes/player_deer.scene.json): `host.pre`
 
 ## Tests
 

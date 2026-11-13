@@ -52,6 +52,23 @@ None.
 ## Used in scenes
 
 <!-- generated -->
+- [`animal_demo_view.scene.json`](../../../resources/scenes/animal_demo_view.scene.json): `host.pre`
+- [`animal_terrain_view.scene.json`](../../../resources/scenes/animal_terrain_view.scene.json): `host.pre`
+- [`animal_view.scene.json`](../../../resources/scenes/animal_view.scene.json): `host.pre`
+- [`devita_view.scene.json`](../../../resources/scenes/devita_view.scene.json): `host.pre`
+- [`ik_walk_slope.scene.json`](../../../resources/scenes/ik_walk_slope.scene.json): `host.pre`
+- [`ik_walk_terrain.scene.json`](../../../resources/scenes/ik_walk_terrain.scene.json): `host.pre`
+- [`player_deer.scene.json`](../../../resources/scenes/player_deer.scene.json): `host.pre`
+- [`rig_anim.scene.json`](../../../resources/scenes/rig_anim.scene.json): `host.pre`
+- [`sandbox_view.scene.json`](../../../resources/scenes/sandbox_view.scene.json): `host.pre`
+- [`sphere_view.scene.json`](../../../resources/scenes/sphere_view.scene.json): `host.pre`
+- [`sphere_view_heuristic.scene.json`](../../../resources/scenes/sphere_view_heuristic.scene.json): `host.pre`
+- [`test_boxes_view.scene.json`](../../../resources/scenes/test_boxes_view.scene.json): `host.pre`
+- [`vr_roller.scene.json`](../../../resources/scenes/vr_roller.scene.json): `host.pre`
+- [`walker_demo_terrain_view.scene.json`](../../../resources/scenes/walker_demo_terrain_view.scene.json): `host.pre`
+- [`walker_terrain_view.scene.json`](../../../resources/scenes/walker_terrain_view.scene.json): `host.pre`
+- [`walker_view.scene.json`](../../../resources/scenes/walker_view.scene.json): `host.pre`
+- [`wheel_view.scene.json`](../../../resources/scenes/wheel_view.scene.json): `host.pre`
 
 ## Tests
 

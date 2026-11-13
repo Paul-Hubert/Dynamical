@@ -51,6 +51,7 @@ After `VRPlayerInput` (or a test writing `VRTracking`), before `PlayerLegs` (whi
 ## Used in scenes
 
 <!-- generated -->
+- [`player_vr.scene.json`](../../../resources/scenes/player_vr.scene.json): `host.pre`
 
 ## Tests
 

@@ -45,7 +45,22 @@ None. `substeps` comes from the world template's `physics` block (`PhysicsConfig
 - Before the systems that read the new poses (`BodySync`, `AnimalSync`, tasks, rewards, observations `@observe`).
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/animal_demo_terrain_world.json`](../../../resources/scenes/common/animal_demo_terrain_world.json): `fixed`
+- [`common/animal_demo_world.json`](../../../resources/scenes/common/animal_demo_world.json): `fixed`
+- [`common/animal_orders_world.json`](../../../resources/scenes/common/animal_orders_world.json): `fixed`
+- [`common/animal_terrain_world.json`](../../../resources/scenes/common/animal_terrain_world.json): `fixed`
+- [`common/animal_world.json`](../../../resources/scenes/common/animal_world.json): `fixed`
+- [`common/box_world.json`](../../../resources/scenes/common/box_world.json): `fixed`
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed`
+- [`common/humanbot_world.json`](../../../resources/scenes/common/humanbot_world.json): `fixed`
+- [`common/ik_demo_world.json`](../../../resources/scenes/common/ik_demo_world.json): `fixed`
+- [`common/ik_world.json`](../../../resources/scenes/common/ik_world.json): `fixed`
+- [`common/rig_world.json`](../../../resources/scenes/common/rig_world.json): `fixed`
+- [`common/sandbox_world.json`](../../../resources/scenes/common/sandbox_world.json): `fixed`
+- [`common/sphere_world.json`](../../../resources/scenes/common/sphere_world.json): `fixed`
+- [`common/sphere_world_hills.json`](../../../resources/scenes/common/sphere_world_hills.json): `fixed`
 
 ## Tests
 

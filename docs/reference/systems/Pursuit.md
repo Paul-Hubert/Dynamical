@@ -77,7 +77,9 @@ that decides at half the rate of the other. This system owns the dots: it create
 - `PursuitObserve` sets `ended` and `fresh`, which this system acts on at the start of the next window.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/pursuit_world.json`](../../../resources/scenes/common/pursuit_world.json): `fixed`
 
 ## Tests
 

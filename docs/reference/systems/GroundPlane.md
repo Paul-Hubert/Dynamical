@@ -41,7 +41,11 @@ collider involved. Scenes on the marching cubes terrain replace it with [GroundT
 - A later `PlaneField::setTilt` (tests) bumps the field's `version`, and `GaitFootIK` fits the planted prints again.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/animal_demo_world.json`](../../../resources/scenes/common/animal_demo_world.json): `fixed`
+- [`common/ik_demo_world.json`](../../../resources/scenes/common/ik_demo_world.json): `fixed`
+- [`common/ik_world.json`](../../../resources/scenes/common/ik_world.json): `fixed`
 
 ## Tests
 

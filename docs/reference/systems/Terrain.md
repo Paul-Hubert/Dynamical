@@ -77,6 +77,28 @@ None.
 ## Used in scenes
 
 <!-- generated -->
+- [`animal_terrain_view.scene.json`](../../../resources/scenes/animal_terrain_view.scene.json): `host.post`
+- [`animals_gait.scene.json`](../../../resources/scenes/animals_gait.scene.json): `host.post`
+- [`animals_test.scene.json`](../../../resources/scenes/animals_test.scene.json): `host.post`
+- [`base.scene.json`](../../../resources/scenes/base.scene.json): `host.post`
+- [`forest.scene.json`](../../../resources/scenes/forest.scene.json): `host.post`
+- [`forest_herds.scene.json`](../../../resources/scenes/forest_herds.scene.json): `host.post`
+- [`forest_herds_watch.scene.json`](../../../resources/scenes/forest_herds_watch.scene.json): `host.post`
+- [`forest_torch.scene.json`](../../../resources/scenes/forest_torch.scene.json): `host.post`
+- [`forest_walk.scene.json`](../../../resources/scenes/forest_walk.scene.json): `host.post`
+- [`ik_walk_terrain.scene.json`](../../../resources/scenes/ik_walk_terrain.scene.json): `host.post`
+- [`player_fps.scene.json`](../../../resources/scenes/player_fps.scene.json): `host.post`
+- [`player_horse.scene.json`](../../../resources/scenes/player_horse.scene.json): `host.post`
+- [`player_vr.scene.json`](../../../resources/scenes/player_vr.scene.json): `host.post`
+- [`sphere_view.scene.json`](../../../resources/scenes/sphere_view.scene.json): `host.post`
+- [`sphere_view_heuristic.scene.json`](../../../resources/scenes/sphere_view_heuristic.scene.json): `host.post`
+- [`tautavel_walk.scene.json`](../../../resources/scenes/tautavel_walk.scene.json): `host.post`
+- [`tautavel_walk_torch.scene.json`](../../../resources/scenes/tautavel_walk_torch.scene.json): `host.post`
+- [`vegetation_test.scene.json`](../../../resources/scenes/vegetation_test.scene.json): `host.post`
+- [`vr_roller.scene.json`](../../../resources/scenes/vr_roller.scene.json): `host.post`
+- [`walker_demo_terrain_view.scene.json`](../../../resources/scenes/walker_demo_terrain_view.scene.json): `host.post`
+- [`walker_terrain_view.scene.json`](../../../resources/scenes/walker_terrain_view.scene.json): `host.post`
+- [`wheel_view.scene.json`](../../../resources/scenes/wheel_view.scene.json): `host.post`
 
 ## Tests
 

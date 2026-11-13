@@ -53,7 +53,10 @@ None.
 - Before `RigPoseApply`, which moves the kinematic bodies to the solved pose.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/ik_demo_world.json`](../../../resources/scenes/common/ik_demo_world.json): `fixed`
+- [`common/ik_world.json`](../../../resources/scenes/common/ik_world.json): `fixed`
 
 ## Tests
 

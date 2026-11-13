@@ -49,7 +49,10 @@ None for the system: the [`SphereAgent`](../components/SphereAgent.md) fields (`
 - Before `SphereObserve@observe`, which turns the sums into the window's reward and the end flag into `done`.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/sphere_world.json`](../../../resources/scenes/common/sphere_world.json): `fixed`
+- [`common/sphere_world_hills.json`](../../../resources/scenes/common/sphere_world_hills.json): `fixed`
 
 ## Tests
 

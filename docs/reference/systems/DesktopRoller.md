@@ -50,6 +50,7 @@ both checked by SR.18. SphereView of the same world runs with `camera` false.
 ## Used in scenes
 
 <!-- generated -->
+- [`vr_roller.scene.json`](../../../resources/scenes/vr_roller.scene.json): `host.pre`
 
 ## Tests
 

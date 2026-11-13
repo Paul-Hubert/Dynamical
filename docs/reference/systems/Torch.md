@@ -50,7 +50,10 @@ position + `offset.x` along its right, `offset.y` along its up (right x forward)
   camera is when the frame is drawn.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`forest_torch.scene.json`](../../../resources/scenes/forest_torch.scene.json): `host.pre`
+- [`tautavel_walk_torch.scene.json`](../../../resources/scenes/tautavel_walk_torch.scene.json): `host.pre`
 
 ## Tests
 

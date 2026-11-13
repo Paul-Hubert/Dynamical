@@ -40,7 +40,13 @@ None.
   (`ik_world`) it runs alone in the observe phase so that the kinematic walk can be recorded as demonstrations.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed@observe`
+- [`common/humanbot_world.json`](../../../resources/scenes/common/humanbot_world.json): `fixed@observe`
+- [`common/ik_demo_world.json`](../../../resources/scenes/common/ik_demo_world.json): `fixed@observe`
+- [`common/ik_world.json`](../../../resources/scenes/common/ik_world.json): `fixed@observe`
+- [`common/rig_world.json`](../../../resources/scenes/common/rig_world.json): `fixed@observe`
 
 ## Tests
 

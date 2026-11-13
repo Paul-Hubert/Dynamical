@@ -102,6 +102,10 @@ the [CameraWalk](../components/CameraWalk.md) context variable.
 ## Used in scenes
 
 <!-- generated -->
+- [`forest_torch.scene.json`](../../../resources/scenes/forest_torch.scene.json): `host.pre`
+- [`forest_walk.scene.json`](../../../resources/scenes/forest_walk.scene.json): `host.pre`
+- [`tautavel_walk.scene.json`](../../../resources/scenes/tautavel_walk.scene.json): `host.pre`
+- [`tautavel_walk_torch.scene.json`](../../../resources/scenes/tautavel_walk_torch.scene.json): `host.pre`
 
 ## Tests
 

@@ -44,6 +44,8 @@ After `AnimalAnimation` and `AnimalGait` (the saddle of this frame) and after `M
 ## Used in scenes
 
 <!-- generated -->
+- [`player_deer.scene.json`](../../../resources/scenes/player_deer.scene.json): `host.pre`
+- [`player_horse.scene.json`](../../../resources/scenes/player_horse.scene.json): `host.pre`
 
 ## Tests
 

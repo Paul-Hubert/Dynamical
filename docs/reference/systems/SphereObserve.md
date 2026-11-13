@@ -59,7 +59,10 @@ None for the system: the [`SphereAgent`](../components/SphereAgent.md) fields (`
   the next window. The training host reads `AgentIO` right after this phase.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/sphere_world.json`](../../../resources/scenes/common/sphere_world.json): `fixed@observe`
+- [`common/sphere_world_hills.json`](../../../resources/scenes/common/sphere_world_hills.json): `fixed@observe`
 
 ## Tests
 

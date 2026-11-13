@@ -59,6 +59,13 @@ None.
 ## Used in scenes
 
 <!-- generated -->
+- [`animals_gait.scene.json`](../../../resources/scenes/animals_gait.scene.json): `host.pre`
+- [`animals_test.scene.json`](../../../resources/scenes/animals_test.scene.json): `host.pre`
+- [`base.scene.json`](../../../resources/scenes/base.scene.json): `host.pre`
+- [`forest.scene.json`](../../../resources/scenes/forest.scene.json): `host.pre`
+- [`forest_herds.scene.json`](../../../resources/scenes/forest_herds.scene.json): `host.pre`
+- [`vegetation_test.scene.json`](../../../resources/scenes/vegetation_test.scene.json): `host.pre`
+- [`vr_roller.scene.json`](../../../resources/scenes/vr_roller.scene.json): `host.pre`
 
 ## Tests
 

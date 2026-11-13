@@ -51,6 +51,7 @@ After the terrain is in the context (`ChunkGenerator` or the scene's `GroundFiel
 ## Used in scenes
 
 <!-- generated -->
+- [`player_horse.scene.json`](../../../resources/scenes/player_horse.scene.json): `host.pre`
 
 ## Tests
 

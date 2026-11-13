@@ -62,7 +62,10 @@ None for the system: [`GaitParams`](../components/GaitParams.md) (`balance_*`, `
 - `GaitBase`, `GaitFootIK` and `GaitHandIK` of the next tick read the `BalanceState` it leaves (offset, lead, com).
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/ik_demo_world.json`](../../../resources/scenes/common/ik_demo_world.json): `fixed`
+- [`common/ik_world.json`](../../../resources/scenes/common/ik_world.json): `fixed`
 
 ## Tests
 

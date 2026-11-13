@@ -45,7 +45,11 @@ None (the ranges file of `AnimalSpawn::ranges`, and `AnimalSpawn::speed`, `order
   and the observe phase (`AnimalObservation` snapshots the command for the next window).
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/animal_orders_world.json`](../../../resources/scenes/common/animal_orders_world.json): `fixed`
+- [`common/animal_terrain_world.json`](../../../resources/scenes/common/animal_terrain_world.json): `fixed`
+- [`common/animal_world.json`](../../../resources/scenes/common/animal_world.json): `fixed`
 
 ## Tests
 

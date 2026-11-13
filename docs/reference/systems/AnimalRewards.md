@@ -68,7 +68,13 @@ None (`AnimalParams`: `root_reward`, `life_reward`, `death_penalty`, `reward_fac
 - The eval (`TrainHost::evalAnimals`) sets `reset_requested` and runs the observe phase alone to start every world.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/animal_demo_terrain_world.json`](../../../resources/scenes/common/animal_demo_terrain_world.json): `fixed@observe`
+- [`common/animal_demo_world.json`](../../../resources/scenes/common/animal_demo_world.json): `fixed@observe`
+- [`common/animal_orders_world.json`](../../../resources/scenes/common/animal_orders_world.json): `fixed@observe`
+- [`common/animal_terrain_world.json`](../../../resources/scenes/common/animal_terrain_world.json): `fixed@observe`
+- [`common/animal_world.json`](../../../resources/scenes/common/animal_world.json): `fixed@observe`
 
 ## Tests
 

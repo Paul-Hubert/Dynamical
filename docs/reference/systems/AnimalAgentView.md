@@ -88,6 +88,10 @@ this system writes the poses.
 ## Used in scenes
 
 <!-- generated -->
+- [`animal_demo_view.scene.json`](../../../resources/scenes/animal_demo_view.scene.json): `host.pre`
+- [`animal_terrain_view.scene.json`](../../../resources/scenes/animal_terrain_view.scene.json): `host.pre`
+- [`animal_view.scene.json`](../../../resources/scenes/animal_view.scene.json): `host.pre`
+- [`player_deer.scene.json`](../../../resources/scenes/player_deer.scene.json): `host.pre`
 
 ## Tests
 

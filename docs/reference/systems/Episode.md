@@ -35,7 +35,11 @@ None.
 - Last of `Rewards@observe`, `Observation@observe`, `Episode@observe`. The host reads `AgentIO` after it.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed@observe`
+- [`common/humanbot_world.json`](../../../resources/scenes/common/humanbot_world.json): `fixed@observe`
+- [`common/rig_world.json`](../../../resources/scenes/common/rig_world.json): `fixed@observe`
 
 ## Tests
 

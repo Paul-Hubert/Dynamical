@@ -62,7 +62,9 @@ Animals that walk side by side, each along a path of its own (a circle, a figure
 - Before `AnimalAnimation` and `AnimalGait` in the scene (the procedural walk reads the motion of the `Transform` this system wrote).
 
 ## Used in scenes
+
 <!-- generated -->
+- [`animals_gait.scene.json`](../../../resources/scenes/animals_gait.scene.json): `host.pre`
 
 ## Tests
 

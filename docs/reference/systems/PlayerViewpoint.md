@@ -42,6 +42,10 @@ After `Physics` (the `Transform`s it reads are this frame's interpolated poses) 
 ## Used in scenes
 
 <!-- generated -->
+- [`player_deer.scene.json`](../../../resources/scenes/player_deer.scene.json): `host.pre`
+- [`player_fps.scene.json`](../../../resources/scenes/player_fps.scene.json): `host.pre`
+- [`player_horse.scene.json`](../../../resources/scenes/player_horse.scene.json): `host.pre`
+- [`player_vr.scene.json`](../../../resources/scenes/player_vr.scene.json): `host.pre`
 
 ## Tests
 

@@ -133,7 +133,13 @@ the `slope*` keys above. Booleans are true above 0.
   `HumanBot`), and before `TrackActions` (its `init` checks the track's body against the bot).
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed`
+- [`common/humanbot_world.json`](../../../resources/scenes/common/humanbot_world.json): `fixed`
+- [`common/ik_demo_world.json`](../../../resources/scenes/common/ik_demo_world.json): `fixed`
+- [`common/ik_world.json`](../../../resources/scenes/common/ik_world.json): `fixed`
+- [`common/rig_world.json`](../../../resources/scenes/common/rig_world.json): `fixed`
 
 ## Tests
 

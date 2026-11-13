@@ -44,6 +44,9 @@ After Input and UI; after PlayerSpawn (which makes the player) and before the pl
 ## Used in scenes
 
 <!-- generated -->
+- [`player_deer.scene.json`](../../../resources/scenes/player_deer.scene.json): `host.pre`
+- [`player_fps.scene.json`](../../../resources/scenes/player_fps.scene.json): `host.pre`
+- [`player_horse.scene.json`](../../../resources/scenes/player_horse.scene.json): `host.pre`
 
 ## Tests
 

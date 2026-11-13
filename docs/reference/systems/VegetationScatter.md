@@ -71,7 +71,9 @@ ChunkPlants and not ChunkDestroying, is scattered in the same tick. `scatter(chu
 - After `ChunkGenerator` (ChunkVolume). The plants are drawn by `VegetationPass`.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`vegetation_test.scene.json`](../../../resources/scenes/vegetation_test.scene.json): `host.pre`
 
 ## Tests
 

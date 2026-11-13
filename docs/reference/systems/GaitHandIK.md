@@ -63,7 +63,9 @@ None for the system: [`GaitParams`](../components/GaitParams.md) (`scramble`, `h
   before `Fabrik`.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/ik_world.json`](../../../resources/scenes/common/ik_world.json): `fixed`
 
 ## Tests
 

@@ -46,7 +46,13 @@ None.
 - `DriveTargets` resets `window_ticks` at the act phase; `Rewards` divides by it.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed`
+- [`common/humanbot_world.json`](../../../resources/scenes/common/humanbot_world.json): `fixed`
+- [`common/ik_demo_world.json`](../../../resources/scenes/common/ik_demo_world.json): `fixed`
+- [`common/ik_world.json`](../../../resources/scenes/common/ik_world.json): `fixed`
+- [`common/rig_world.json`](../../../resources/scenes/common/rig_world.json): `fixed`
 
 ## Tests
 

@@ -42,7 +42,9 @@ None. The component's `track` (required, under `resources/`), `loop` (false), `t
   `PhysicsStep`, then `BodySync` reads the poses back.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/rig_world.json`](../../../resources/scenes/common/rig_world.json): `fixed`
 
 ## Tests
 

@@ -80,7 +80,9 @@ None (the rules are the [Sandbox](Sandbox.md)'s).
   steps and Sandbox's next window drops them.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/sandbox_world.json`](../../../resources/scenes/common/sandbox_world.json): `fixed`
 
 ## Tests
 

@@ -79,7 +79,13 @@ The definition file: `{ "cell", "density", "radius", "range", "max_slope", "graz
 - A member steered by `Mounting` / `SteeredWalk` is skipped while it has `AnimalSteer` or `SteeredWalk`.
 
 ## Used in scenes
+
 <!-- generated -->
+- [`forest_herds.scene.json`](../../../resources/scenes/forest_herds.scene.json): `host.pre`
+- [`forest_herds_watch.scene.json`](../../../resources/scenes/forest_herds_watch.scene.json): `host.pre`
+- [`player_horse.scene.json`](../../../resources/scenes/player_horse.scene.json): `host.pre`
+- [`tautavel_walk.scene.json`](../../../resources/scenes/tautavel_walk.scene.json): `host.pre`
+- [`tautavel_walk_torch.scene.json`](../../../resources/scenes/tautavel_walk_torch.scene.json): `host.pre`
 
 ## Tests
 

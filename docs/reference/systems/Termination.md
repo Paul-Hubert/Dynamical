@@ -44,7 +44,11 @@ from the params file / env params.
 - After `BodySync` (state) and `Task` (`route_lost`); before the observe phase (`Rewards`, `Episode`).
 
 ## Used in scenes
+
 <!-- generated -->
+- [`common/humanbot_terrain_world.json`](../../../resources/scenes/common/humanbot_terrain_world.json): `fixed`
+- [`common/humanbot_world.json`](../../../resources/scenes/common/humanbot_world.json): `fixed`
+- [`common/rig_world.json`](../../../resources/scenes/common/rig_world.json): `fixed`
 
 ## Tests
 
