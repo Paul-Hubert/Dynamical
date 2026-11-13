@@ -1,0 +1,1957 @@
+{
+  "systems": [
+    {
+      "name": "Input",
+      "class": "InputSys",
+      "file": "src/view/systems/input.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Polls SDL's event queue into the Input context variable: keys as actions, mouse buttons, motion, wheel, text, window state.",
+      "access": [
+        {
+          "name": "Input",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "constructor (emplace), tick",
+          "effect": "clears the per-frame clicks, wheel and motion, then sets the action bits, buttons, motion, text, focus, screen size and mouse position"
+        },
+        {
+          "name": "Context",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "the SDL window (Context::win) for its size; stored as Context*"
+        }
+      ],
+      "side_effects": [
+        "Drains SDL's event queue every frame (SDL_PollEvent): no other system may poll it, and the capture's scripted events pushed by Capture::beginFrame are read here.",
+        "Reads the window size (SDL_GetWindowSize) and, while focused, the cursor position (SDL_GetMouseState).",
+        "Escape or closing the window sets Input::EXIT, which ends the main loop of Game::start."
+      ]
+    },
+    {
+      "name": "UI",
+      "class": "UISys",
+      "file": "src/view/systems/ui.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Feeds the Input state to ImGui and starts the ImGui frame; takes the mouse buttons from the scene while ImGui wants the mouse.",
+      "access": [
+        {
+          "name": "Input",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "reads buttons, text, keys, mouse position, screen size; consumes text; clears leftClick/rightClick/middleClick and *Down when ImGui wants the mouse, else copies mouse* into *Down"
+        },
+        {
+          "name": "RunArgs",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "deterministic(): ImGui's DeltaTime is the frame's dt instead of the wall clock"
+        }
+      ],
+      "side_effects": [
+        "Creates the ImGui context (dark style) in its constructor when the renderer's UI pass has not made it yet.",
+        "Creates eight SDL system cursors in its constructor (never set nor freed).",
+        "Calls ImGui::NewFrame every tick: every system that draws an ImGui window must come after it in the frame; the UI pass renders the frame."
+      ]
+    },
+    {
+      "name": "Time",
+      "class": "TimeSys",
+      "file": "src/view/systems/time.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "The game calendar (Time context variable): pause with P, a speed selector, and the frame time window.",
+      "access": [
+        {
+          "name": "Time",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit (emplace), tick",
+          "effect": "speed_modifier from P and the radio buttons, last_speed_modifier, dt = speed x modifier x dt x 10, current += dt"
+        },
+        {
+          "name": "Input",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "reads Input::PAUSE and clears it once used; screenSize places the window"
+        }
+      ],
+      "side_effects": [
+        "Two ImGui windows: \"Time\" (date, speed radio buttons 0/1/3/10/50) at the top right, and \"Frame time\" (ms, fps)."
+      ]
+    },
+    {
+      "name": "PlayerControl",
+      "class": "PlayerControlSys",
+      "file": "src/view/systems/player_control.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Makes the desktop Camera and flies it: right mouse looks, WASD/Space/Ctrl move, wheel sets the speed, Shift sprints, R brings the VR play area under it.",
+      "access": [
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit (emplace), init, tick",
+          "effect": "made in preinit; init puts it at (0, ground + 20, 60) looking down 0.3 rad; tick turns yaw/pitch and moves position, sets sprinting"
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "init, tick",
+          "effect": "surfaceHeight() for the spawn height and the play area's floor; std::shared_ptr<TerrainGenerator>, optional"
+        },
+        {
+          "name": "Input",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "rightDown, mouseDelta, mouseWheel, the movement actions; clears Input::VR_RIG once used"
+        },
+        {
+          "name": "DesktopView",
+          "kind": "tag",
+          "access": "read",
+          "where": "tick",
+          "effect": "any entity with it (a physical player) owns the camera: the system does nothing"
+        },
+        {
+          "name": "VRRig",
+          "kind": "context",
+          "access": "write",
+          "where": "tick",
+          "effect": "on VR_RIG: position under the camera on the ground, yaw = camera yaw"
+        }
+      ],
+      "side_effects": [
+        "SDL_SetRelativeMouseMode on while the right mouse button is held, off otherwise (not touched while a DesktopView player exists).",
+        "The fly speed (30 m/s, x1.25 / x0.8 a wheel notch, 1 to 2000) is a function-static shared by every instance."
+      ]
+    },
+    {
+      "name": "VRControl",
+      "class": "VRControlSys",
+      "file": "src/view/systems/vr_control.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "VR locomotion (left stick), smooth turn (right stick), box throwing (right trigger) and two kinematic box hands following the controllers.",
+      "access": [
+        {
+          "name": "VRHands",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit (emplace), init, tick",
+          "effect": "the two hand entities, made in init, read every tick"
+        },
+        {
+          "name": "VRRig",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "init, tick",
+          "effect": "init puts the play area on the ground at the origin; tick moves position (stick, onto the ground) and yaw (turn)"
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "init, tick",
+          "effect": "surfaceHeight() under the play area; optional"
+        },
+        {
+          "name": "VRInput",
+          "kind": "context",
+          "access": "read",
+          "where": "init, tick",
+          "effect": "enabled / session_running / focused, head pose, thumbsticks, right trigger, hand poses and velocity"
+        },
+        {
+          "name": "ModelManager",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "init, tick (spawnBox)",
+          "effect": "load(\"./resources/models/box.gltf\")"
+        },
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init, tick (ModelManager::load)",
+          "effect": "the box model, made on its first load"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "init, tick",
+          "effect": "hand entities made in init; tick writes their position, rotation, scale (0 when untracked); thrown boxes"
+        },
+        {
+          "name": "ModelRenderable",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init, tick (spawnBox)",
+          "effect": "blue left hand, red right hand, yellow thrown boxes"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init, tick (spawnBox)",
+          "effect": "kinematic 8 cm boxes for the hands; dynamic 0.3 m thrown boxes"
+        }
+      ],
+      "side_effects": [
+        "Hands are only made when VRInput is enabled and box.gltf loads; the RigidBody system gives them kinematic Jolt bodies that push dynamic bodies around.",
+        "Each press of the right trigger spawns a box 20 cm ahead of the controller with 1.5x the hand's velocity (a new entity and Jolt body per press, never destroyed)."
+      ]
+    },
+    {
+      "name": "DebugMenu",
+      "class": "DebugMenuSys",
+      "file": "src/view/systems/debug_menu.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "The \"Dynamical\" ImGui window: graphics level, terrain/soil/sky/lighting/physics/grass/vegetation/animals/VR panels editing RenderSettings and friends.",
+      "access": [
+        {
+          "name": "Settings",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "view_distance slider and graphics level; vr_mode shown"
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "terrain/grass/models/soil/vegetation/animals toggles, soil, grass, lighting and vegetation parameters; applyGraphicsPreset"
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "position shown; where torches and dropped boxes go"
+        },
+        {
+          "name": "Graphics",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "the Graphics combo: current preset, applied to RenderSettings and Settings::view_distance"
+        },
+        {
+          "name": "ChunkC",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "count of loaded chunks"
+        },
+        {
+          "name": "ChunkGenerated",
+          "kind": "tag",
+          "access": "read",
+          "where": "tick",
+          "effect": "count of generated chunks"
+        },
+        {
+          "name": "ChunkReady",
+          "kind": "tag",
+          "access": "read",
+          "where": "tick",
+          "effect": "count of meshed chunks"
+        },
+        {
+          "name": "Sky",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "time of the day, day_length, declination sliders; skyLight() for sun or moon"
+        },
+        {
+          "name": "PointLight",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "tick",
+          "effect": "counted; \"Torch here\" makes one 1.5 m ahead of the camera; \"No torches\" destroys every entity with one"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "of a new torch and of the dropped boxes (removed with the torches' entities)"
+        },
+        {
+          "name": "LightingStats",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "ray tracing statistics shown"
+        },
+        {
+          "name": "PhysicsStats",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "bodies, terrain colliders, step times shown"
+        },
+        {
+          "name": "VegetationStats",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "plants, species loaded / loading shown"
+        },
+        {
+          "name": "AnimalStats",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "animals, species shown"
+        },
+        {
+          "name": "HerdStats",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "herds, travelling, moving shown"
+        },
+        {
+          "name": "GaitStyleOverride",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "tick",
+          "effect": "emplaced when the Animals header is drawn; \"One walk for all\" and the GaitStyle sliders"
+        },
+        {
+          "name": "VRInput",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "enabled, session_running, focused shown"
+        },
+        {
+          "name": "VRRig",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "play area position shown"
+        },
+        {
+          "name": "Input",
+          "kind": "context",
+          "access": "write",
+          "where": "tick",
+          "effect": "\"Move play area to camera\" sets Input::VR_RIG (PlayerControl acts on it)"
+        },
+        {
+          "name": "ModelManager",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick (spawnBox)",
+          "effect": "box.gltf for the dropped boxes"
+        },
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (spawnBox, ModelManager::load)",
+          "effect": "the box model on its first load"
+        },
+        {
+          "name": "ModelRenderable",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (spawnBox)",
+          "effect": "the dropped boxes"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (spawnBox)",
+          "effect": "\"Drop 50 boxes\": 50 dynamic 1 m boxes 15 m ahead of the camera"
+        }
+      ],
+      "side_effects": [
+        "One ImGui window \"Dynamical\" (needs UI before it).",
+        "Changing the soil or grass height-map parameters makes SoilMaps / GrassPass bake their per-chunk maps again (they watch RenderSettings).",
+        "Creates torch entities and dynamic boxes (Jolt bodies through RigidBodySys) on button presses; destroys every PointLight entity on \"No torches\"."
+      ]
+    },
+    {
+      "name": "BoxRing",
+      "class": "BoxRingSys",
+      "file": "src/view/systems/base_scene.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "base scene: twelve coloured boxes of 1 to 4 m dropped in a ring of 25 m around the spawn at init.",
+      "access": [
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "surfaceHeight() under each box; required (ChunkGenerator makes it in preinit)"
+        },
+        {
+          "name": "ModelManager",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "init (spawnBox)",
+          "effect": "load(\"./resources/models/box.gltf\"): cached after the first call"
+        },
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (spawnBox, ModelManager::load)",
+          "effect": "the box model's entity, made the first time the file is loaded"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "init (spawnBox)",
+          "effect": "box entities; the rotation is set after spawnBox"
+        },
+        {
+          "name": "ModelRenderable",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (spawnBox)",
+          "effect": "draws box.gltf tinted with the colour"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init (spawnBox)",
+          "effect": "dynamic box, half_extent = size / 2, initial_velocity; RigidBodySys makes the Jolt body"
+        }
+      ],
+      "side_effects": [
+        "12 dynamic boxes with Jolt bodies (made by RigidBodySys) 4 m + size above the ground, rotated about (1, 1, 0)."
+      ]
+    },
+    {
+      "name": "ModelLineup",
+      "class": "ModelLineupSys",
+      "file": "src/view/systems/base_scene.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "base scene: every glTF of resources/models (not box.gltf, not subfolders) lined up at z = 15, 4 m tall, with a box collider.",
+      "access": [
+        {
+          "name": "ModelManager",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "init",
+          "effect": "load() of each file found"
+        },
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "read+create",
+          "where": "init",
+          "effect": "made by ModelManager::load; its min / max give the scale, the collider and the height"
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "surfaceHeight() under each model; required"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init",
+          "effect": "x from -20 every 8 m, z = 15, 2 m above the ground, scale to 4 m tall"
+        },
+        {
+          "name": "ModelRenderable",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init",
+          "effect": "the loaded model, untinted"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init",
+          "effect": "dynamic box around the model's bounds (half_extent, offset)"
+        }
+      ],
+      "side_effects": [
+        "Lists ./resources/models with std::filesystem (errors ignored) and loads each .gltf / .glb: files read, GPU buffers uploaded by the model loader.",
+        "One dynamic Jolt body per model (RigidBodySys)."
+      ]
+    },
+    {
+      "name": "BoxThrower",
+      "class": "BoxThrowerSys",
+      "file": "src/view/systems/base_scene.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Left click (outside ImGui) throws a 1 m box from the desktop camera at 25 m/s.",
+      "access": [
+        {
+          "name": "Input",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "leftClick (UI clears it while ImGui wants the mouse)"
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "position and forward(): the box starts 3 m ahead"
+        },
+        {
+          "name": "ModelManager",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick (spawnBox)",
+          "effect": "load(\"./resources/models/box.gltf\"): cached after the first call"
+        },
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (spawnBox, ModelManager::load)",
+          "effect": "the box model's entity, made the first time the file is loaded"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (spawnBox)",
+          "effect": "a new box entity at the position, scale = size"
+        },
+        {
+          "name": "ModelRenderable",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (spawnBox)",
+          "effect": "draws box.gltf tinted with the colour"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (spawnBox)",
+          "effect": "dynamic box, half_extent = size / 2, initial_velocity; RigidBodySys makes the Jolt body"
+        }
+      ],
+      "side_effects": [
+        "A new entity with a dynamic Jolt body per click, never destroyed; colours cycle from a function-static counter."
+      ]
+    },
+    {
+      "name": "Terrain",
+      "class": "TerrainSys",
+      "file": "src/renderer/terrain/terrain_sys.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "GPU marching cubes: meshes the nearest pending chunks into per-slot vertex buffers and indirect draws, recycles slots, destroys chunks on their way out.",
+      "access": [
+        {
+          "name": "Context",
+          "kind": "context",
+          "access": "read",
+          "where": "init, tick, destructor",
+          "effect": "the device, VMA and the compute command buffer of the frame; stored as Context*"
+        },
+        {
+          "name": "TerrainBuffers",
+          "kind": "context",
+          "access": "readwrite+create+destroy",
+          "where": "init (emplace), allocateSlot, destructor (erase)",
+          "effect": "the indirect buffer and its stride; a vertex buffer appended per new slot"
+        },
+        {
+          "name": "ChunkGPU",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "init (storage), tick, destructor (clear)",
+          "effect": "slot of a chunk's mesh: the old slot is freed when remeshed or destroyed"
+        },
+        {
+          "name": "ChunkReady",
+          "kind": "tag",
+          "access": "readwrite+create+destroy",
+          "where": "init (storage), tick, destructor (clear)",
+          "effect": "set when the mesh is in this frame's compute submit: drawable"
+        },
+        {
+          "name": "ChunkTriangles",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "init (storage), tick, destructor (clear)",
+          "effect": "removed when remeshed; with ray tracing, set NUM_FRAMES later from the read back vertex count"
+        },
+        {
+          "name": "ChunkMeshPending",
+          "kind": "tag",
+          "access": "read+destroy",
+          "where": "tick",
+          "effect": "the chunks to mesh; removed once dispatched"
+        },
+        {
+          "name": "ChunkC",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "centre (nearest first) and pos (push constants)"
+        },
+        {
+          "name": "ChunkVolume",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "the 67^3 densities copied into the staging ring"
+        },
+        {
+          "name": "ChunkDestroying",
+          "kind": "tag",
+          "access": "read+destroy",
+          "where": "tick",
+          "effect": "chunks out of view distance (without ChunkGenerating): their slot is freed later and the entity destroyed"
+        },
+        {
+          "name": "ChunkGenerating",
+          "kind": "tag",
+          "access": "read",
+          "where": "tick",
+          "effect": "excluded: a chunk a worker still writes is not destroyed yet"
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "position: the nearest chunks are meshed first (origin without a camera)"
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "streaming.chunk_meshes: chunks meshed a frame (1 to max_per_frame = 8)"
+        }
+      ],
+      "side_effects": [
+        "Reads ./resources/mclookup.bin (throws when it is not 256 x 16 bytes) and ./resources/shaders/marchingcubes.comp.glsl.spv in init.",
+        "Allocates GPU memory: indirect buffer (2048 slots), staging ring (ring size x 8 chunks), lookup texel buffer, a 3 MB vertex buffer per slot (2^15 triangles x 3 vertices x 32 bytes, ray tracing usages when enabled), a readback buffer with ray tracing; descriptor pool and sets, compute pipeline.",
+        "Records into the compute command buffer of the frame: indirect resets, one dispatch per chunk, a clamp pass, with ray tracing copies of the indirect commands to the readback buffer; Tracy GPU zone \"Marching cubes\", CPU zone \"Mesh chunks\", plot \"Chunks meshed\".",
+        "Destroys the entities of chunks marked ChunkDestroying (all their components go with them).",
+        "Logs a warning \"Terrain : out of chunk slots\" when 2048 slots are used.",
+        "The destructor waits for the device to be idle and clears its components and TerrainBuffers."
+      ]
+    },
+    {
+      "name": "WorldStepper",
+      "class": "WorldStepperSys",
+      "file": "src/view/world_stepper.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Steps the scene's worlds in real time from the frame dt (at most 8 ticks a frame), with a pause / step panel; publishes the interpolation alpha.",
+      "access": [
+        {
+          "name": "WorldStepperState",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit (emplace), tick",
+          "effect": "h from world 0's clock, paused / step_once from the panel, ticks, alpha = accumulator / h (1 when paused)"
+        },
+        {
+          "name": "Worlds",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "worlds->step(ticks): every world runs that many fixed ticks"
+        },
+        {
+          "name": "WorldClock",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (world 0's registry)",
+          "effect": "dt: the fixed step h"
+        }
+      ],
+      "side_effects": [
+        "Runs every world's fixed systems (physics, agents, ...) on the main thread, sequentially (no executor passed to Worlds::step).",
+        "Frame dt is clamped to 0.25 s; when more than h is left after 8 ticks the remaining time is dropped (no spiral).",
+        "ImGui window \"Worlds\" (world count, tick, h, Pause checkbox, Step button)."
+      ]
+    },
+    {
+      "name": "FixedCamera",
+      "class": "FixedCameraSys",
+      "file": "src/view/fixed_camera.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Places the desktop camera once at init at \"pos\", looking at \"look_at\".",
+      "access": [
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "write",
+          "where": "init",
+          "effect": "position, pitch = asin(dir.y), yaw = atan2(-dir.x, -dir.z)"
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "SandboxWatch",
+      "class": "SandboxWatchSys",
+      "file": "src/view/sandbox_watch.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "The desktop camera orbiting a living animal of world 0's sandbox, or touring from animal to animal of alternating species.",
+      "access": [
+        {
+          "name": "Worlds",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "world 0's registry"
+        },
+        {
+          "name": "Sandbox",
+          "kind": "context",
+          "access": "read",
+          "where": "tick, pick (world 0's registry)",
+          "effect": "present or the system does nothing; species[...].life id and predator for the first pick"
+        },
+        {
+          "name": "SandboxAnimal",
+          "kind": "component",
+          "access": "read",
+          "where": "tick, pick (world 0's registry)",
+          "effect": "dead, species: who can be watched"
+        },
+        {
+          "name": "AnimalBot",
+          "kind": "component",
+          "access": "read",
+          "where": "tick, pick (world 0's registry)",
+          "effect": "position[0] (trunk), body length / height / stand_height for the framing"
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "write",
+          "where": "tick",
+          "effect": "position on the orbit (at least 0.4 m up), yaw and pitch toward the animal"
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "CameraWalk",
+      "class": "CameraWalkSys",
+      "file": "src/view/camera_walk.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Walks the desktop camera at eye height along a line through open land and forest, routed around trunks and branches; waits for the land to load.",
+      "access": [
+        {
+          "name": "CameraWalk",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit (emplace), init, tick, look",
+          "effect": "start / heading / distance in init; started, progress, finished in tick"
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "init, plan, groundHeight",
+          "effect": "TerrainField for the ground, heightfield slopes for planning; std::shared_ptr<TerrainGenerator>, optional"
+        },
+        {
+          "name": "RenderSettings",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "soil and soil_params: the SoilField the line is scored on (with soil > 0)"
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "init, place",
+          "effect": "init reads the spawn position and yaw when no line is given or found; place writes position, yaw, pitch every tick"
+        },
+        {
+          "name": "ForestField",
+          "kind": "context",
+          "access": "read",
+          "where": "plan, tick",
+          "effect": "cover and stand of the nodes for the line; with it the walk waits until every chunk is planted; std::shared_ptr<ForestField>"
+        },
+        {
+          "name": "HerdSys",
+          "kind": "context",
+          "access": "read",
+          "where": "plan (herdsBy)",
+          "effect": "def() and describe(cell) for the herd homes near a candidate line; stored as HerdSys*; with herds > 0"
+        },
+        {
+          "name": "HerdStats",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (look)",
+          "effect": "list of herds: the nearest one ahead is looked at; with herds > 0"
+        },
+        {
+          "name": "VegetationLibrary",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (route, reach)",
+          "effect": "species height / radius and, once per species, the geometry of its first LOD read from disk"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (route)",
+          "effect": "position, yaw and scale of the plants near the line"
+        },
+        {
+          "name": "Plant",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (route)",
+          "effect": "species of the plants near the line"
+        },
+        {
+          "name": "ChunkVolume",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "chunks with a volume..."
+        },
+        {
+          "name": "ChunkForest",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "...but no ChunkForest yet: the forest is still being planted"
+        },
+        {
+          "name": "ChunkC",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (terrainReady)",
+          "effect": "chunks not yet generated (without ChunkGenerated) keep the walk waiting"
+        },
+        {
+          "name": "ChunkGenerated",
+          "kind": "tag",
+          "access": "read",
+          "where": "tick (terrainReady)",
+          "effect": "excluded: a generated chunk is not waited for"
+        },
+        {
+          "name": "ChunkMeshPending",
+          "kind": "tag",
+          "access": "read",
+          "where": "tick (terrainReady)",
+          "effect": "a chunk waiting for its mesh keeps the walk waiting"
+        },
+        {
+          "name": "ChunkDestroying",
+          "kind": "tag",
+          "access": "read",
+          "where": "tick (terrainReady, unplanted view)",
+          "effect": "excluded: chunks on their way out are not waited for"
+        },
+        {
+          "name": "VegetationStats",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (vegetationReady)",
+          "effect": "species_loading == 0 (true without it)"
+        },
+        {
+          "name": "AnimalStats",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (animalsReady)",
+          "effect": "species_loading == 0 (true without it); only with herds > 0"
+        },
+        {
+          "name": "LightingStats",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (lightingReady)",
+          "effect": "settled() (true without ray tracing)"
+        },
+        {
+          "name": "Input",
+          "kind": "context",
+          "access": "write",
+          "where": "tick",
+          "effect": "sets Input::EXIT at the end of the walk with \"exit\": the process ends"
+        }
+      ],
+      "side_effects": [
+        "Log lines \"CameraWalk : from x z heading ...\" (plan), soil / herds scores, and each herd it turns to.",
+        "profile::message(\"CameraWalk : started\") when the route is made and (\"CameraWalk : finished\") at the end: tools/profile_run.py --between cuts on them; DY_FRAME_NAMED(\"Walk\") marks every frame of the walk; CPU zone \"Route the walk\".",
+        "Reads species geometry files through VegetationLibrary::loadSpecies / loadGeometry (once per species, main thread).",
+        "With \"exit\", ends the process at the end of the walk (Input::EXIT)."
+      ]
+    },
+    {
+      "name": "SphereView",
+      "class": "SphereViewSys",
+      "file": "src/view/sphere_view.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Follows a world's sphere roller with the desktop camera, draws its target / velocity bars and rotation dots, shows a panel.",
+      "access": [
+        {
+          "name": "Worlds",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "the world asked for (clamped to the count)"
+        },
+        {
+          "name": "SphereAgent",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "heading, targetVelocity(), speed, decisions, steered"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "body id (velocity) and half_extent.x (radius)"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "position and rotation when there is no PhysicsPose"
+        },
+        {
+          "name": "PhysicsPose",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "prev / current pose mixed with the stepper alpha"
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "linear velocity of the body, castStatic / groundBelow to keep the camera out of the terrain"
+        },
+        {
+          "name": "AgentIO",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "reward shown"
+        },
+        {
+          "name": "WorldStepperState",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "alpha: drawn where WorldView draws it"
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "follow camera writes position, yaw, pitch; read to hide the dots from a camera inside the sphere"
+        },
+        {
+          "name": "PolicySources",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "policy file, step or error of the world (built with DYNAMICAL_ONNX)"
+        },
+        {
+          "name": "ModelManager",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick (part)",
+          "effect": "load(\"./resources/models/primitives/box.gltf\")"
+        },
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (part, ModelManager::load)",
+          "effect": "the primitive box, on its first load"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "tick (part, place), finish",
+          "effect": "five host marker entities (2 bars, 3 dots) made when missing, posed every tick, destroyed in finish"
+        },
+        {
+          "name": "ModelRenderable",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "tick (part, place), finish",
+          "effect": "the markers' box model, tint set every tick"
+        }
+      ],
+      "side_effects": [
+        "ImGui window \"Sphere roller\"; collapses \"Dynamical\", \"Worlds\" and \"Frame time\" on first use.",
+        "Five host entities for the markers, destroyed in finish."
+      ]
+    },
+    {
+      "name": "VRRoller",
+      "class": "RollerPlayerSys",
+      "file": "src/view/roller_player.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "The VR player rides a world's steered sphere: left stick or head lean gives the command, the play area follows the sphere's floor.",
+      "access": [
+        {
+          "name": "VRRig",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "init, tick (vrCommand)",
+          "effect": "init turns stick_locomotion off (VRControl no longer moves it); tick moves position onto the sphere's floor; transform() turns the command to the world"
+        },
+        {
+          "name": "Worlds",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "the world of \"world\""
+        },
+        {
+          "name": "SphereAgent",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick (world registry, steerSphere)",
+          "effect": "goal_heading and goal_speed from the player's command"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "the sphere's position without a PhysicsPose"
+        },
+        {
+          "name": "PhysicsPose",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "interpolated position with the stepper alpha"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "half_extent.x: the floor is the sphere's lowest point"
+        },
+        {
+          "name": "WorldStepperState",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "alpha"
+        },
+        {
+          "name": "VRInput",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (vrCommand)",
+          "effect": "session_running, focused, head pose, left thumbstick, right primary (A) press"
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "DesktopRoller",
+      "class": "RollerPlayerSys",
+      "file": "src/view/roller_player.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "The desktop player rides a world's steered sphere: WASD relative to the camera gives the command, the camera sits eye_height above the sphere's floor.",
+      "access": [
+        {
+          "name": "Worlds",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "the world of \"world\""
+        },
+        {
+          "name": "SphereAgent",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick (world registry, steerSphere)",
+          "effect": "goal_heading and goal_speed from the player's command"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "the sphere's position without a PhysicsPose"
+        },
+        {
+          "name": "PhysicsPose",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "interpolated position with the stepper alpha"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "half_extent.x: the floor is the sphere's lowest point"
+        },
+        {
+          "name": "WorldStepperState",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "alpha"
+        },
+        {
+          "name": "Input",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (desktopCommand)",
+          "effect": "FORWARD / BACKWARD / LEFT / RIGHT / SPRINT"
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "yaw and right() for the command; position written eye_height above the floor"
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "AnimalAgentView",
+      "class": "AnimalAgentViewSys",
+      "file": "src/view/animal_view.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Skins the library mesh of each world's physical animal on its ragdoll, follows one with the camera, can drive it with scripted orders, log it, lay a chequer.",
+      "access": [
+        {
+          "name": "Worlds",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "every world, and the viewed one"
+        },
+        {
+          "name": "AnimalLibrary",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, tick (animalLibrary, species)",
+          "effect": "made and loaded from the library directory when missing; species() loads the viewed species from disk on first use"
+        },
+        {
+          "name": "AnimalBot",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick (world registries)",
+          "effect": "built ragdoll: body, position / rotation of the segments, groundUnder, command (written by \"orders\"), tick, decisions, rewards"
+        },
+        {
+          "name": "AgentIO",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (viewed world's registry)",
+          "effect": "reward shown"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "tick",
+          "effect": "one skin entity per world (at the trunk + the world's grid offset); the chequer tiles"
+        },
+        {
+          "name": "Animal",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "species index of the skin entity"
+        },
+        {
+          "name": "AnimalPose",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "world joints from skeletonFromSegments and skin matrices, every tick"
+        },
+        {
+          "name": "AnimalSkin",
+          "kind": "tag",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "marks the skin entity: only a ragdoll's drawn skin"
+        },
+        {
+          "name": "ModelManager",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "load(\"./resources/models/primitives/box.gltf\") for the chequer (marks > 0)"
+        },
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (ModelManager::load)",
+          "effect": "the primitive box on its first load"
+        },
+        {
+          "name": "ModelRenderable",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "800 grey chequer tiles (marks > 0)"
+        },
+        {
+          "name": "FrameClock",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "frame number written to the log"
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "write",
+          "where": "tick",
+          "effect": "position, yaw, pitch behind the commanded heading (camera true)"
+        }
+      ],
+      "side_effects": [
+        "Loads the animal library index (preinit) and the viewed species (first tick) from disk on the main thread; logs which.",
+        "With \"log\", opens the file once (truncated) and appends a CSV line every frame, flushed.",
+        "ImGui window \"Animal\".",
+        "Creates host entities (one skin per world with a built bot, 800 tiles with marks) that are never destroyed (no finish)."
+      ]
+    },
+    {
+      "name": "WalkerView",
+      "class": "WalkerViewSys",
+      "file": "src/view/walker_view.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Side camera following a world's human walker (from where the ground hides neither feet nor body on a terrain) and the \"Walker\" panel.",
+      "access": [
+        {
+          "name": "Worlds",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "the world of \"world\""
+        },
+        {
+          "name": "HumanBot",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "built, state (pelvis, feet, velocity), target, ground field, tick, decisions, heights, rewards"
+        },
+        {
+          "name": "AgentIO",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "reward shown; required once the bot is built"
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "write",
+          "where": "tick",
+          "effect": "position, yaw, pitch (camera true)"
+        }
+      ],
+      "side_effects": [
+        "ImGui window \"Walker\" (tick, decisions, target speed, speed, head height, reward, slope)."
+      ]
+    },
+    {
+      "name": "GaitView",
+      "class": "GaitViewSys",
+      "file": "src/view/gait_view.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Camera, command panel and markers (plane grid, prints, IK targets, centre of mass) of a world's kinematic IK walker.",
+      "access": [
+        {
+          "name": "Worlds",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "the world of \"world\""
+        },
+        {
+          "name": "GaitState",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "started, heading, centre, feet / hands state and prints, speeds and slope shown"
+        },
+        {
+          "name": "GaitCommand",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick (world registry)",
+          "effect": "speed and heading sliders"
+        },
+        {
+          "name": "BalanceState",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "com, xcom, ground, support polygon, errors shown"
+        },
+        {
+          "name": "GaitReport",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "checks shown (now / worst)"
+        },
+        {
+          "name": "GaitParams",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick (world registry)",
+          "effect": "heel strike, toe-off, step width, slope slowdown, lean, yield_limits, scramble sliders"
+        },
+        {
+          "name": "IKTarget",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registry)",
+          "effect": "positions of the feet's and hands' targets (markers)"
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "tick (world registry, groundField)",
+          "effect": "a PlaneField is emplaced when none; the plane's pitch / roll sliders call setTilt; std::shared_ptr<GroundField>"
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "write",
+          "where": "tick",
+          "effect": "position, yaw, pitch (camera true)"
+        },
+        {
+          "name": "ModelManager",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick (place)",
+          "effect": "primitive box and sphere"
+        },
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (place, ModelManager::load)",
+          "effect": "primitives on their first load"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "tick (place, hide), finish",
+          "effect": "marker entities, pooled: made when the pool is short, posed each frame, unused ones scaled to 0, destroyed in finish"
+        },
+        {
+          "name": "ModelRenderable",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "tick (place), finish",
+          "effect": "marker model and tint"
+        }
+      ],
+      "side_effects": [
+        "ImGui window \"Gait\" (with \"panel\").",
+        "Pooled host marker entities, destroyed in finish."
+      ]
+    },
+    {
+      "name": "MouseKeyboardInput",
+      "class": "MouseKeyboardInputSys",
+      "file": "src/view/player_input.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Copies the keyboard and mouse from Input into the MouseKeyboardInput of the DesktopView player; left Alt toggles the mouse capture.",
+      "access": [
+        {
+          "name": "Input",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "the action bits, mouseDelta, mouseLeft / mouseRight, wheel; clears Input::CURSOR once used"
+        },
+        {
+          "name": "DesktopView",
+          "kind": "tag",
+          "access": "read",
+          "where": "tick",
+          "effect": "the player whose devices these are"
+        },
+        {
+          "name": "MouseKeyboardInput",
+          "kind": "component",
+          "access": "write",
+          "where": "tick",
+          "effect": "keys (W A S D Space LeftShift E, none while ImGui wants the keyboard), captured, mouse, left, right, wheel, last_action"
+        }
+      ],
+      "side_effects": [
+        "SDL_SetRelativeMouseMode on while captured (every tick); ImGui's NoMouse config flag set while captured; both undone in finish."
+      ]
+    },
+    {
+      "name": "ControllersInput",
+      "class": "ControllersInputSys",
+      "file": "src/view/player_input.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Opens the first SDL gamepad and copies its sticks, triggers and buttons into the ControllersInput of the DesktopView player.",
+      "access": [
+        {
+          "name": "RunArgs",
+          "kind": "context",
+          "access": "read",
+          "where": "preinit",
+          "effect": "deterministic(): captures and probes do not open the game controller subsystem"
+        },
+        {
+          "name": "DesktopView",
+          "kind": "tag",
+          "access": "read",
+          "where": "tick",
+          "effect": "the player whose devices these are"
+        },
+        {
+          "name": "ControllersInput",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "connected, sticks, triggers, a, x, left_shoulder, dpad (a notch per press), last_action; reads its deadzone"
+        }
+      ],
+      "side_effects": [
+        "SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) in preinit (not in captures and probes), SDL_QuitSubSystem in finish.",
+        "Looks for a gamepad every second while none is open (SDL_GameControllerOpen), closes it when detached and in finish."
+      ]
+    },
+    {
+      "name": "PlayerModels",
+      "class": "PlayerModelsSys",
+      "file": "src/view/player_input.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Gives a box model to the players' hands and props, which the simulation makes without one.",
+      "access": [
+        {
+          "name": "ModelManager",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "load(\"./resources/models/box.gltf\")"
+        },
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (ModelManager::load)",
+          "effect": "the box model on its first load"
+        },
+        {
+          "name": "Hand",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "side: blue left, red right"
+        },
+        {
+          "name": "Prop",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "color"
+        },
+        {
+          "name": "ModelRenderable",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "added to every Hand and Prop without one (unit box, the Transform's scale is the box)"
+        }
+      ],
+      "side_effects": []
+    },
+    {
+      "name": "WorldView",
+      "class": "WorldViewSys",
+      "file": "src/view/world_view.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Mirrors the bodies and shapes of the worlds as host entities with Transform + ModelRenderable, laid out on a grid, interpolated between ticks.",
+      "access": [
+        {
+          "name": "Worlds",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "every world (or those of \"worlds\")"
+        },
+        {
+          "name": "WorldStepperState",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "alpha between the last two ticks (1 without it)"
+        },
+        {
+          "name": "Ground",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registries)",
+          "effect": "created grounds: a box of size, top at top_y"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registries)",
+          "effect": "position, rotation of bodies and shapes"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registries)",
+          "effect": "created bodies: shape, half_extent, offset"
+        },
+        {
+          "name": "PhysicsPose",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registries)",
+          "effect": "prev / current pose mixed with alpha"
+        },
+        {
+          "name": "ModelRef",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registries)",
+          "effect": "color of the body or shape"
+        },
+        {
+          "name": "WorldShape",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (world registries)",
+          "effect": "drawn-only shapes (type, half_extent) of the ragdolls"
+        },
+        {
+          "name": "ModelManager",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "load() of the primitive box / sphere; add() of a capsule mesh per (radius, half height)"
+        },
+        {
+          "name": "ModelC",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick (ModelManager::load / add)",
+          "effect": "primitives on first load, generated capsules (GPU upload)"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "tick, finish",
+          "effect": "one host entity per (world, body or shape): made on first sight, posed at offset + pose every tick, destroyed when the source goes and in finish"
+        },
+        {
+          "name": "ModelRenderable",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "tick, finish",
+          "effect": "model and colour of the host entity, set when it is made"
+        },
+        {
+          "name": "WorldViewLink",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "tick, finish",
+          "effect": "which world and entity the host entity draws"
+        }
+      ],
+      "side_effects": [
+        "Uploads generated capsule meshes to the GPU through ModelManager::add (Transfer), once per size.",
+        "Creates and destroys host entities as bodies appear and go; destroys all of them in finish."
+      ]
+    },
+    {
+      "name": "Capture",
+      "class": "Capture",
+      "file": "src/view/capture.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "summary": "Runs a capture script (capture=<script.json>): scripted input, the camera of each shot, waits for the land to load, writes PNGs.",
+      "access": [
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "beginFrame",
+          "effect": "spawn camera remembered on the first frame; the shot's pos / offset / above / yaw / pitch / look_at written"
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "beginFrame",
+          "effect": "the TerrainField of \"above\" shots (a default generator without it)"
+        },
+        {
+          "name": "ChunkC",
+          "kind": "component",
+          "access": "read",
+          "where": "due (terrainReady)",
+          "effect": "chunks not yet generated delay the shot"
+        },
+        {
+          "name": "ChunkGenerated",
+          "kind": "tag",
+          "access": "read",
+          "where": "due (terrainReady)",
+          "effect": "excluded from the wait"
+        },
+        {
+          "name": "ChunkMeshPending",
+          "kind": "tag",
+          "access": "read",
+          "where": "due (terrainReady)",
+          "effect": "chunks waiting for a mesh delay the shot"
+        },
+        {
+          "name": "ChunkDestroying",
+          "kind": "tag",
+          "access": "read",
+          "where": "due (terrainReady)",
+          "effect": "excluded from the wait"
+        },
+        {
+          "name": "VegetationStats",
+          "kind": "context",
+          "access": "read",
+          "where": "due (vegetationReady)",
+          "effect": "species_loading"
+        },
+        {
+          "name": "AnimalStats",
+          "kind": "context",
+          "access": "read",
+          "where": "due (animalsReady)",
+          "effect": "species_loading"
+        },
+        {
+          "name": "LightingStats",
+          "kind": "context",
+          "access": "read",
+          "where": "due (lightingReady)",
+          "effect": "settled()"
+        }
+      ],
+      "side_effects": [
+        "Reads the capture script (constructor; Game::start also reads its scene and vars with readScene).",
+        "Pushes SDL key, mouse button and motion events (sendInput) that InputSys reads the same frame; sets ImGui's MousePos; with hide_ui sets ImGui's style alpha to 0.",
+        "Creates capture_dir and writes <capture_dir>/<shot>.png (stb_image_write) from the renderer's readback; logs each shot and late shots.",
+        "Fails the run (Game::start returns 1) when a shot waits more than 1200 frames for the terrain or a PNG cannot be written; a late sequence frame delays the ones after it."
+      ]
+    }
+  ],
+  "components": [
+    {
+      "name": "Input",
+      "kind": "context",
+      "file": "src/view/components/input.h",
+      "summary": "The window's keyboard, mouse and window state of the frame, written by Input (SDL events) and UI.",
+      "json": null,
+      "fields": [
+        {
+          "name": "text",
+          "type": "std::optional<std::array<char, SDL_TEXTINPUTEVENT_TEXT_SIZE>>",
+          "desc": "text typed this frame (UTF-8), consumed by UI"
+        },
+        {
+          "name": "on",
+          "type": "std::bitset<Action::END_ENUM>",
+          "desc": "held actions (FORWARD W, BACKWARD S, LEFT A, RIGHT D, PAUSE P, MENU M, DEBUG K, BACKSPACE, TAB, ROTATE_LEFT/RIGHT arrows, ANGLE_UP/DOWN arrows, UP Space, DOWN LCtrl, SPRINT LShift, VR_RIG R, INTERACT E, CURSOR LAlt) and the events RESIZE, EXIT (Escape / window closed); some are one-shot flags cleared by their consumer (PAUSE, VR_RIG, CURSOR, EXIT)"
+        },
+        {
+          "name": "mousePos",
+          "type": "glm::ivec2",
+          "desc": "cursor in window pixels, updated while focused"
+        },
+        {
+          "name": "mouseWheel",
+          "type": "glm::ivec2",
+          "desc": "wheel notches of the last wheel event this frame"
+        },
+        {
+          "name": "mouseDelta",
+          "type": "glm::ivec2",
+          "desc": "relative mouse motion this frame"
+        },
+        {
+          "name": "screenSize",
+          "type": "glm::ivec2",
+          "desc": "window size in pixels"
+        },
+        {
+          "name": "mouseLeft / mouseRight / mouseMiddle",
+          "type": "bool",
+          "desc": "raw button state"
+        },
+        {
+          "name": "leftDown / rightDown / middleDown",
+          "type": "bool",
+          "desc": "button state for the scene: false while ImGui wants the mouse (UI)"
+        },
+        {
+          "name": "leftClick / rightClick / middleClick",
+          "type": "bool",
+          "desc": "pressed this frame, cleared by UI while ImGui wants the mouse"
+        },
+        {
+          "name": "focused",
+          "type": "bool",
+          "desc": "the window has the keyboard focus"
+        },
+        {
+          "name": "window_showing",
+          "type": "bool",
+          "desc": "false while minimised"
+        }
+      ],
+      "notes": "Emplaced by InputSys's constructor (so before any preinit); Game::start reads Input::EXIT to end the loop. CameraWalk sets EXIT at the end of a walk with exit. Not the player components (MouseKeyboardInput reads it for the DesktopView player)."
+    },
+    {
+      "name": "Time",
+      "kind": "context",
+      "file": "src/view/components/time.h",
+      "summary": "The game calendar of the Time system: seconds since start, speed and pause.",
+      "json": null,
+      "fields": [
+        {
+          "name": "current",
+          "type": "dy::time_t (uint64_t)",
+          "desc": "game seconds since start"
+        },
+        {
+          "name": "speed",
+          "type": "dy::time_t",
+          "desc": "game seconds per real second (60)"
+        },
+        {
+          "name": "speed_modifier",
+          "type": "dy::time_t",
+          "desc": "0 (paused), 1, 3, 10, 50"
+        },
+        {
+          "name": "last_speed_modifier",
+          "type": "dy::time_t",
+          "desc": "the modifier P brings back"
+        },
+        {
+          "name": "dt",
+          "type": "dy::time_t",
+          "desc": "game seconds of this frame (speed x modifier x dt x 10, truncated)"
+        },
+        {
+          "name": "minute / hour / day / month / year",
+          "type": "static constexpr dy::time_t",
+          "desc": "lengths in seconds (28-day months, 4 seasons a year)"
+        }
+      ],
+      "notes": "Emplaced by Time in preinit. Date (same header) splits a time into years, months (Spring..Winter), days, hours, minutes, seconds for display. No other system reads it: the sky has its own clock (Sky)."
+    },
+    {
+      "name": "ModelRenderable",
+      "kind": "component",
+      "file": "src/view/components/model_renderable.h",
+      "summary": "Draws the ModelC held by another entity (from ModelManager) at this entity's Transform, tinted.",
+      "json": "ModelRenderable",
+      "fields": [
+        {
+          "name": "model",
+          "type": "entt::entity",
+          "desc": "entity holding the ModelC (ModelManager::load / add)"
+        },
+        {
+          "name": "tint",
+          "type": "glm::vec4",
+          "desc": "colour multiplied with the material (1 by default)"
+        }
+      ],
+      "notes": "Scenes and prefabs: { \"path\": <under resources/>, \"tint\": [r, g, b, a] }; only valid once the renderer exists (registered in register_view.cpp: ComponentError without ModelManager or when the model cannot load); saved back as its tint only. Read by ModelPass and RayScene; made by spawnBox, VRControl, ModelLineup, PlayerModels, WorldView, SphereView, GaitView, AnimalAgentView."
+    },
+    {
+      "name": "WorldStepperState",
+      "kind": "context",
+      "file": "src/view/world_stepper.h",
+      "summary": "Where the drawn worlds are between their last two ticks, and the Worlds panel state.",
+      "json": null,
+      "fields": [
+        {
+          "name": "alpha",
+          "type": "double",
+          "desc": "accumulator / h after this frame's ticks: interpolation factor between PhysicsPose prev and current (1 when paused)"
+        },
+        {
+          "name": "h",
+          "type": "double",
+          "desc": "fixed tick of world 0 (WorldClock::dt), 1/60 s by default"
+        },
+        {
+          "name": "paused",
+          "type": "bool",
+          "desc": "Pause checkbox"
+        },
+        {
+          "name": "step_once",
+          "type": "bool",
+          "desc": "Step button: one tick while paused"
+        },
+        {
+          "name": "ticks",
+          "type": "uint64_t",
+          "desc": "ticks stepped since start"
+        }
+      ],
+      "notes": "Emplaced by WorldStepper in preinit; read by WorldView, SphereView, VRRoller, DesktopRoller (all treat it as optional, alpha 1 without)."
+    },
+    {
+      "name": "WorldViewLink",
+      "kind": "component",
+      "file": "src/view/world_view.h",
+      "summary": "On a host entity made by WorldView: the world body or shape it draws.",
+      "json": null,
+      "fields": [
+        {
+          "name": "world",
+          "type": "uint32_t",
+          "desc": "world index"
+        },
+        {
+          "name": "entity",
+          "type": "entt::entity",
+          "desc": "entity in that world's registry"
+        }
+      ],
+      "notes": "Created and destroyed by WorldView only (its own map is what it reads); lets other code tell mirrored entities apart."
+    },
+    {
+      "name": "CameraWalk",
+      "kind": "context",
+      "file": "src/view/camera_walk.h",
+      "summary": "Where the walk of the CameraWalk system is: its line, progress, started and finished.",
+      "json": null,
+      "fields": [
+        {
+          "name": "start",
+          "type": "glm::vec2",
+          "desc": "x, z of the start of the line"
+        },
+        {
+          "name": "heading",
+          "type": "float",
+          "desc": "radians, as Camera::yaw (0 toward -z)"
+        },
+        {
+          "name": "distance",
+          "type": "float",
+          "desc": "length of the line, m"
+        },
+        {
+          "name": "progress",
+          "type": "float",
+          "desc": "metres along the line"
+        },
+        {
+          "name": "started",
+          "type": "bool",
+          "desc": "false while the terrain, plants, animals and lighting load"
+        },
+        {
+          "name": "finished",
+          "type": "bool",
+          "desc": "the end of the line or of the path is reached"
+        }
+      ],
+      "notes": "Emplaced by CameraWalk in preinit, written by it only; for tools and tests that wait on the walk."
+    },
+    {
+      "name": "VRHands",
+      "kind": "context",
+      "file": "src/view/systems/vr_control.cpp",
+      "summary": "The two entities that follow the VR controllers (VRControl).",
+      "json": null,
+      "fields": [
+        {
+          "name": "hands",
+          "type": "entt::entity[2]",
+          "desc": "left, right (VRInput::left / right); entt::null without a headset"
+        }
+      ],
+      "notes": "Defined in an anonymous namespace of vr_control.cpp: only VRControl sees it. Emplaced in preinit, filled in init."
+    }
+  ]
+}

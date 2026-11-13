@@ -235,11 +235,15 @@ def main():
             cls = h["scope"].split("::")[0]
             t = re.sub(r"^(std::shared_ptr|std::unique_ptr|ThreadSafe)<(.*)>$", r"\2", h["type"])
             by_class[cls].add(t.split("::")[-1] if "::" in t and not t.startswith("entt") else t)
+    named_by_class = defaultdict(set)   # a class registered under several names (modes): the union of their tables
+    for s in systems:
+        for x in s.get("access", []):
+            named_by_class[s.get("class")] |= {x["name"], x["name"].split("_")[-1]}
     for s in systems:
         cls = s.get("class")
         if not cls or cls not in by_class:
             continue
-        named = {x["name"].split("_")[-1] for x in s.get("access", [])} | {x["name"] for x in s.get("access", [])}
+        named = named_by_class[cls]
         missing = sorted(t for t in by_class[cls] if t not in named and not t.startswith(("entt", "std")))
         if missing:
             problems.append(f"scan: {cls} ({s['name']}) touches {', '.join(missing)} not in its table")
