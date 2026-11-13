@@ -1,0 +1,1666 @@
+{
+ "systems": [
+  {
+   "name": "Sandbox",
+   "class": "SandboxSys",
+   "file": "src/logic/sandbox/sandbox.cpp",
+   "kind": "system",
+   "scope": "World",
+   "summary": "The sandbox world's rules at the start of each decision window: carcasses leave, the fallen stand again, births, newcomers, minds' actions become walk commands and orders, walkers' actions become joint drives.",
+   "access": [
+    {
+     "name": "Sandbox",
+     "kind": "context",
+     "access": "write+create",
+     "where": "preinit",
+     "effect": "made from the life params file with the scene's overrides, the species' bodies by growth stage, walker params and reward programs"
+    },
+    {
+     "name": "Sandbox",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "init, tick, finish",
+     "effect": "grass field made in init; species counters, `by_group`, `next_group` kept by every birth, death and newcomer"
+    },
+    {
+     "name": "AgentsReset",
+     "kind": "context",
+     "access": "write+create",
+     "where": "preinit",
+     "effect": "emplaced when the world has none, so that the host's RESET reaches SandboxObserve"
+    },
+    {
+     "name": "AgentEnvParams",
+     "kind": "context",
+     "access": "read",
+     "where": "preinit, tick (applyEnv)",
+     "effect": "`lifeScale`, `walkerShare`, `rewardScale` over the file's values, at the start of every window"
+    },
+    {
+     "name": "WorldInfo",
+     "kind": "context",
+     "access": "read",
+     "where": "init",
+     "effect": "the world's seed for the grass field"
+    },
+    {
+     "name": "WorldRng",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "init (populate), tick",
+     "effect": "places, yaws, sexes, ages and mind phases of the animals drawn from it"
+    },
+    {
+     "name": "WorldClock",
+     "kind": "context",
+     "access": "read",
+     "where": "tick",
+     "effect": "`tick % decision_period == 0` is the first tick of a window"
+    },
+    {
+     "name": "PhysicsWorld",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "init, tick, finish",
+     "effect": "the contact listener set (init) and cleared (finish), four static walls round the arena added and removed, puppets' bodies moved with SetPositionAndRotation every tick"
+    },
+    {
+     "name": "SandboxAnimal",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init (populate), tick",
+     "effect": "spawnSandboxAnimal: a new animal entity with its species, ragdoll group, sex, age, energy and growth stage"
+    },
+    {
+     "name": "AnimalBot",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init (populate), tick",
+     "effect": "spawnSandboxAnimal: the ragdoll (body of its stage, walker params, ranges, kinematic in puppet worlds, orders on) built and stood at its place"
+    },
+    {
+     "name": "AgentIO",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init (populate), tick",
+     "effect": "spawnSandboxAnimal: the walker's agent on the animal (Animal_<id>, stacked observation, `nogail_order` sensor; not in puppet worlds) and the mind's on a second entity (Action_<id>, 39 floats, 4 actions, a 5-way branch, the `Interests` buffer)"
+    },
+    {
+     "name": "SandboxMind",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init (populate), tick",
+     "effect": "spawnSandboxAnimal: the mind's entity, linked to its animal, with a random phase in `mind_every`"
+    },
+    {
+     "name": "AgentEnvParams",
+     "kind": "context",
+     "access": "read",
+     "where": "init (populate), tick (applyAnimalEnvParams)",
+     "effect": "the walker's reward and fall parameters overridden by the trainer's environment parameters"
+    },
+    {
+     "name": "TerrainColliders",
+     "kind": "context",
+     "access": "read",
+     "where": "init (populate), tick (buildAnimalRagdoll)",
+     "effect": "only whether a std::shared_ptr<TerrainColliders> exists: the ragdoll's bodies get LinearCast motion quality then"
+    },
+    {
+     "name": "SandboxShape",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init (populate), tick (makeShapes, draw)",
+     "effect": "one entity per collision shape of the ragdoll, linked to its animal, when the world draws (`draw`)"
+    },
+    {
+     "name": "WorldShape",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init (populate), tick (makeShapes, draw)",
+     "effect": "capsule, sphere or box of the shape, its segment and local offset, for WorldView"
+    },
+    {
+     "name": "Transform",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init (populate), tick (makeShapes, draw)",
+     "effect": "next to each drawn shape, placed every tick by SandboxLife"
+    },
+    {
+     "name": "ModelRef",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init (populate), tick (makeShapes, draw)",
+     "effect": "an empty model with the colour of the animal: brown deer, grey wolves, males darker, the head lighter"
+    },
+    {
+     "name": "SandboxAnimal",
+     "kind": "component",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "dead and reported: mind dropped; restand: stood up again (grown or stunned); births: gestation ends, +1 objective to both parents; minds' orders"
+    },
+    {
+     "name": "AnimalBot",
+     "kind": "component",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "limp on death (zero drives), regrown ragdoll, stood up again (standAnimalBot), mode, head, command from the mind (mindOrders), drives from the walker (driveAnimalBot, weakened by lost health), command eased every tick"
+    },
+    {
+     "name": "AgentIO",
+     "kind": "component",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "walker's action read for the drives, mind's action and discrete choice read for the orders; restood walkers get done/truncated cleared and zero actions; `heuristic`: the scripted mind writes the action of every mind that asked, clears `requested` and its stats"
+    },
+    {
+     "name": "AgentIO",
+     "kind": "component",
+     "access": "destroy",
+     "where": "tick",
+     "effect": "removed from a dead animal once its last steps went out (reported), with the mind's entity"
+    },
+    {
+     "name": "SandboxMind",
+     "kind": "component",
+     "access": "read",
+     "where": "tick (heuristic)",
+     "effect": "which animal a requesting mind is for"
+    },
+    {
+     "name": "SandboxAnimal",
+     "kind": "component",
+     "access": "destroy",
+     "where": "init (populate), tick, finish (removeAnimal)",
+     "effect": "the animal's entity is destroyed with its components"
+    },
+    {
+     "name": "AnimalBot",
+     "kind": "component",
+     "access": "destroy",
+     "where": "init (populate), tick, finish (removeAnimal)",
+     "effect": "destroyAnimalRagdoll removes its Jolt bodies and constraints, then the entity goes"
+    },
+    {
+     "name": "SandboxMind",
+     "kind": "component",
+     "access": "destroy",
+     "where": "init (populate), tick, finish (removeAnimal)",
+     "effect": "the mind's entity is destroyed with its AgentIO"
+    },
+    {
+     "name": "AgentIO",
+     "kind": "component",
+     "access": "destroy",
+     "where": "init (populate), tick, finish (removeAnimal)",
+     "effect": "both agents leave the world with their entities"
+    },
+    {
+     "name": "SandboxShape",
+     "kind": "component",
+     "access": "read+destroy",
+     "where": "init (populate), tick, finish (removeShapes)",
+     "effect": "the drawn shapes whose `animal` is the one removed are destroyed (with their Transform, WorldShape, ModelRef, PhysicsPose)"
+    },
+    {
+     "name": "Transform",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init (draw)",
+     "effect": "one flat box per 5 m square of the arena that is mostly grass"
+    },
+    {
+     "name": "WorldShape",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init (draw)",
+     "effect": "the grass tiles, as boxes 2 cm thick"
+    },
+    {
+     "name": "ModelRef",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init (draw)",
+     "effect": "the grass tiles' colour, darker where the grass is taller"
+    }
+   ],
+   "side_effects": [
+    "Reads resources/agents/params/life.params.json (or `life`), resources/agents/params/animal.params.json, the generated bodies resources/animals/bodies/<id>.body.json and resources/agents/rewards/<id>.rewards.json (hashes kept); throws std::runtime_error on a missing life file, an unknown species or a weapon segment the body lacks.",
+    "Builds a Jolt ragdoll per animal (bodies and constraints in the animal collision layer, group = its ragdoll group), destroys it when the animal leaves or grows; four static wall boxes round the arena.",
+    "Installs SandboxSys::Contacts as the PhysicsSystem's contact listener: it records the estimated impulse of every contact between two ragdolls (from Jolt's threads, under a mutex) for SandboxLife.",
+    "Creates and destroys entities: animals, minds, drawn shapes and grass tiles.",
+    "Logs one debug line per species at init (count, bodies, standing muzzle height, reward terms and round)."
+   ]
+  },
+  {
+   "name": "SandboxLife",
+   "class": "SandboxLifeSys",
+   "file": "src/logic/sandbox/sandbox.cpp",
+   "kind": "system",
+   "scope": "World",
+   "summary": "Every tick after PhysicsStep: reads the ragdolls back, falls, energy spent and gained, wounds from the contacts, mating, deaths, grass regrowth.",
+   "access": [
+    {
+     "name": "Sandbox",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "`seconds`, the grass eaten and grown back, `contacts` and `blows`, species counters (falls, deaths, work, distance) through die()"
+    },
+    {
+     "name": "WorldClock",
+     "kind": "context",
+     "access": "read",
+     "where": "tick",
+     "effect": "the grass grows back once a simulated second"
+    },
+    {
+     "name": "PhysicsWorld",
+     "kind": "context",
+     "access": "read",
+     "where": "tick",
+     "effect": "bodies' positions, rotations and velocities (syncAnimalBot); the contact events SandboxSys::Contacts collected during the step are drained"
+    },
+    {
+     "name": "SandboxAnimal",
+     "kind": "component",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "ages, timers, falls, power and energy, feeding, health, gestation, growth due, wounds, mating, death and its cause, a carcass's meat and rot"
+    },
+    {
+     "name": "AnimalBot",
+     "kind": "component",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "state read back from the bodies (syncAnimalBot), `killed` / `fall_cause` / `fall_segment` on a fall; mode and muzzle read"
+    },
+    {
+     "name": "SandboxShape",
+     "kind": "component",
+     "access": "read",
+     "where": "tick (moveShapes, draw)",
+     "effect": "the animal each drawn shape follows"
+    },
+    {
+     "name": "WorldShape",
+     "kind": "component",
+     "access": "read",
+     "where": "tick (moveShapes, draw)",
+     "effect": "segment and local offset of the shape"
+    },
+    {
+     "name": "Transform",
+     "kind": "component",
+     "access": "write",
+     "where": "tick (moveShapes, draw)",
+     "effect": "position and rotation of the shape from its segment"
+    },
+    {
+     "name": "PhysicsPose",
+     "kind": "component",
+     "access": "readwrite+create",
+     "where": "tick (moveShapes, draw)",
+     "effect": "emplaced on a drawn shape on its first tick, then previous = current, current = the segment's pose, for WorldView's interpolation"
+    }
+   ],
+   "side_effects": [
+    "Drains the contact listener's recorded events (the listener is SandboxSys's)."
+   ]
+  },
+  {
+   "name": "SandboxObserve",
+   "class": "SandboxObserveSys",
+   "file": "src/logic/sandbox/sandbox.cpp",
+   "kind": "system",
+   "scope": "World",
+   "summary": "Observe phase of the sandbox: the trainer's RESET, then every walker's reward, end and observation, and the same for the minds that are due or whose animal died.",
+   "access": [
+    {
+     "name": "Sandbox",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "`windows` counted; on a RESET the grass made again, the animals again (populate), `seconds` 0; species reward programs read"
+    },
+    {
+     "name": "WorldClock",
+     "kind": "context",
+     "access": "read",
+     "where": "tick",
+     "effect": "window length and the walker's episode length in ticks"
+    },
+    {
+     "name": "AgentsReset",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "a pending RESET is consumed (requested back to false)"
+    },
+    {
+     "name": "WorldInfo",
+     "kind": "context",
+     "access": "read",
+     "where": "tick (reset)",
+     "effect": "seed of the new grass field"
+    },
+    {
+     "name": "WorldRng",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "tick (reset: populate)",
+     "effect": "draws of the new population"
+    },
+    {
+     "name": "PhysicsWorld",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "tick (reset)",
+     "effect": "the old ragdolls destroyed, new ones built and stood"
+    },
+    {
+     "name": "SandboxAnimal",
+     "kind": "component",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "signals of the decision (the nearest distances kept for the closings), objective paid and cleared, window reset, lifetime reward, `share`, `walker_ticks`, `walker_fresh`, `restand`, `fell` cleared, `reported` set on a death"
+    },
+    {
+     "name": "AnimalBot",
+     "kind": "component",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "rateAnimal over the window, snapshots of trunk, command, mode and head, `previous_frame`, `killed` cleared"
+    },
+    {
+     "name": "SandboxMind",
+     "kind": "component",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "`fresh` cleared at its first decision, `phase` read for when it is due"
+    },
+    {
+     "name": "AgentIO",
+     "kind": "component",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "mind: reward (objective + the reward file's terms), done, truncated, stats, observation and `Interests` rows (observeSandboxMind), requested; walker: reward (rateAnimal, a fall's penalty, its share of the mind's), done, truncated, stats, stacked observation and order sensor, requested"
+    },
+    {
+     "name": "SandboxAnimal",
+     "kind": "component",
+     "access": "write+create",
+     "where": "tick (reset: populate)",
+     "effect": "spawnSandboxAnimal: a new animal entity with its species, ragdoll group, sex, age, energy and growth stage"
+    },
+    {
+     "name": "AnimalBot",
+     "kind": "component",
+     "access": "write+create",
+     "where": "tick (reset: populate)",
+     "effect": "spawnSandboxAnimal: the ragdoll (body of its stage, walker params, ranges, kinematic in puppet worlds, orders on) built and stood at its place"
+    },
+    {
+     "name": "AgentIO",
+     "kind": "component",
+     "access": "write+create",
+     "where": "tick (reset: populate)",
+     "effect": "spawnSandboxAnimal: the walker's agent on the animal (Animal_<id>, stacked observation, `nogail_order` sensor; not in puppet worlds) and the mind's on a second entity (Action_<id>, 39 floats, 4 actions, a 5-way branch, the `Interests` buffer)"
+    },
+    {
+     "name": "SandboxMind",
+     "kind": "component",
+     "access": "write+create",
+     "where": "tick (reset: populate)",
+     "effect": "spawnSandboxAnimal: the mind's entity, linked to its animal, with a random phase in `mind_every`"
+    },
+    {
+     "name": "AgentEnvParams",
+     "kind": "context",
+     "access": "read",
+     "where": "tick (reset: populate) (applyAnimalEnvParams)",
+     "effect": "the walker's reward and fall parameters overridden by the trainer's environment parameters"
+    },
+    {
+     "name": "TerrainColliders",
+     "kind": "context",
+     "access": "read",
+     "where": "tick (reset: populate) (buildAnimalRagdoll)",
+     "effect": "only whether a std::shared_ptr<TerrainColliders> exists: the ragdoll's bodies get LinearCast motion quality then"
+    },
+    {
+     "name": "SandboxShape",
+     "kind": "component",
+     "access": "write+create",
+     "where": "tick (reset: populate) (makeShapes, draw)",
+     "effect": "one entity per collision shape of the ragdoll, linked to its animal, when the world draws (`draw`)"
+    },
+    {
+     "name": "WorldShape",
+     "kind": "component",
+     "access": "write+create",
+     "where": "tick (reset: populate) (makeShapes, draw)",
+     "effect": "capsule, sphere or box of the shape, its segment and local offset, for WorldView"
+    },
+    {
+     "name": "Transform",
+     "kind": "component",
+     "access": "write+create",
+     "where": "tick (reset: populate) (makeShapes, draw)",
+     "effect": "next to each drawn shape, placed every tick by SandboxLife"
+    },
+    {
+     "name": "ModelRef",
+     "kind": "component",
+     "access": "write+create",
+     "where": "tick (reset: populate) (makeShapes, draw)",
+     "effect": "an empty model with the colour of the animal: brown deer, grey wolves, males darker, the head lighter"
+    },
+    {
+     "name": "SandboxAnimal",
+     "kind": "component",
+     "access": "destroy",
+     "where": "tick (reset: populate) (removeAnimal)",
+     "effect": "the animal's entity is destroyed with its components"
+    },
+    {
+     "name": "AnimalBot",
+     "kind": "component",
+     "access": "destroy",
+     "where": "tick (reset: populate) (removeAnimal)",
+     "effect": "destroyAnimalRagdoll removes its Jolt bodies and constraints, then the entity goes"
+    },
+    {
+     "name": "SandboxMind",
+     "kind": "component",
+     "access": "destroy",
+     "where": "tick (reset: populate) (removeAnimal)",
+     "effect": "the mind's entity is destroyed with its AgentIO"
+    },
+    {
+     "name": "AgentIO",
+     "kind": "component",
+     "access": "destroy",
+     "where": "tick (reset: populate) (removeAnimal)",
+     "effect": "both agents leave the world with their entities"
+    },
+    {
+     "name": "SandboxShape",
+     "kind": "component",
+     "access": "read+destroy",
+     "where": "tick (reset: populate) (removeShapes)",
+     "effect": "the drawn shapes whose `animal` is the one removed are destroyed (with their Transform, WorldShape, ModelRef, PhysicsPose)"
+    }
+   ],
+   "side_effects": [
+    "On a RESET: every animal and its ragdoll destroyed and the population drawn again (entities and Jolt bodies created and destroyed)."
+   ]
+  },
+  {
+   "name": "SandboxHeuristic",
+   "class": "SandboxHeuristicSys",
+   "file": "src/logic/sandbox/sandbox.cpp",
+   "kind": "system",
+   "scope": "World",
+   "summary": "Act phase: the scripted mind (sandboxHeuristic) answers every mind that asked for a decision.",
+   "access": [
+    {
+     "name": "Sandbox",
+     "kind": "context",
+     "access": "read",
+     "where": "tick",
+     "effect": "the species of the animal a mind is for"
+    },
+    {
+     "name": "SandboxMind",
+     "kind": "component",
+     "access": "read",
+     "where": "tick",
+     "effect": "the mind's animal"
+    },
+    {
+     "name": "SandboxAnimal",
+     "kind": "component",
+     "access": "read",
+     "where": "tick",
+     "effect": "its species"
+    },
+    {
+     "name": "AgentIO",
+     "kind": "component",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "observation and `Interests` rows read; action, discrete mode written; `requested` cleared, stats cleared"
+    }
+   ],
+   "side_effects": []
+  },
+  {
+   "name": "Policy",
+   "class": "PolicySys",
+   "file": "src/onnx/policy_systems.cpp",
+   "kind": "system",
+   "scope": "World",
+   "summary": "Act phase of a world with one agent: runs the world's PolicyHandle (ONNX) on the world's AgentIO and writes the window's action.",
+   "access": [
+    {
+     "name": "PolicyHandle",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "the runner or agent policy run; an AgentPolicy that throws is dropped (agent reset)"
+    },
+    {
+     "name": "AgentIO",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "observation (and sensors) read, action (and discrete choices) written"
+    }
+   ],
+   "side_effects": [
+    "ONNX Runtime inference on the CPU, on the worker that steps the world.",
+    "Logs an error and drops the AgentPolicy when its layout does not match the agent."
+   ]
+  },
+  {
+   "name": "ModelWatcher",
+   "class": "ModelWatcherSys",
+   "file": "src/onnx/policy_systems.cpp",
+   "kind": "system",
+   "scope": "Host",
+   "summary": "Viewer host system: loads ONNX policies (a file or the newest checkpoint of a folder, polled) and injects them as PolicyHandle into the worlds.",
+   "access": [
+    {
+     "name": "PolicySources",
+     "kind": "context",
+     "access": "write+create",
+     "where": "constructor",
+     "effect": "emplaced empty in the host registry"
+    },
+    {
+     "name": "PolicySources",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "tick (first, load)",
+     "effect": "one PolicySource per world: spec, loaded file, step, error"
+    },
+    {
+     "name": "Worlds",
+     "kind": "context",
+     "access": "read",
+     "where": "tick (first, load)",
+     "effect": "how many worlds and their registries"
+    },
+    {
+     "name": "RunArgs",
+     "kind": "context",
+     "access": "read",
+     "where": "tick",
+     "effect": "no polling in fixed-clock runs (deterministic())"
+    },
+    {
+     "name": "AgentIO",
+     "kind": "context",
+     "access": "read",
+     "where": "tick (load)",
+     "effect": "the layout of the first world of a feed (observation size, sensors, branches) picks PolicyRunner or AgentPolicy"
+    },
+    {
+     "name": "PolicyHandle",
+     "kind": "context",
+     "access": "write+create",
+     "where": "tick (load)",
+     "effect": "insert_or_assign into the registry of every world of the feed: the Policy system there runs it from its next decision"
+    }
+   ],
+   "side_effects": [
+    "Reads the file system: lists <dir> (or the directories matching a '*' component) for <behavior>-<step>.onnx every `poll` seconds of wall clock; a new checkpoint is loaded once two polls see the same size and write time.",
+    "Creates ONNX Runtime sessions (PolicyRunner, or AgentPolicy through a process-wide cache keyed by path and write time).",
+    "Logs info on every load, a warning when a folder has no checkpoint, an error when a model is refused."
+   ]
+  },
+  {
+   "name": "Policies",
+   "class": "AgentPoliciesSys",
+   "file": "src/onnx/agent_policy.cpp",
+   "kind": "system",
+   "scope": "World",
+   "summary": "Act phase of a world whose agents are components: every AgentIO that asked for a decision gets its behaviour's ONNX policy's action.",
+   "access": [
+    {
+     "name": "AgentIO",
+     "kind": "component",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "behaviour, observation and sensors read; action and discrete choices written; `requested` and stats cleared once answered, `requested` cleared on a done agent"
+    }
+   ],
+   "side_effects": [
+    "Looks up <models>/<behavior>.onnx, else the largest step of <models>/<behavior>/<behavior>-<step>.onnx, once per behaviour.",
+    "ONNX Runtime sessions shared by every world of the process (static cache under a mutex, keyed by canonical path and write time).",
+    "Logs info per behaviour loaded, debug when a behaviour has no model, error when a model is refused (the behaviour is then left to others)."
+   ]
+  },
+  {
+   "name": "Sky",
+   "class": "SkySys",
+   "file": "src/logic/sky/sky.cpp",
+   "kind": "system",
+   "scope": "Host",
+   "summary": "Sets the scene's Sky (time of day, day length, latitude, declination) and moves its time.",
+   "access": [
+    {
+     "name": "Sky",
+     "kind": "context",
+     "access": "write+create",
+     "where": "constructor",
+     "effect": "insert_or_assign with the scene's time, latitude, declination and day length"
+    },
+    {
+     "name": "Sky",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "tick",
+     "effect": "time += dt x 24 / day_length, wrapped to [0, 24)"
+    },
+    {
+     "name": "RunArgs",
+     "kind": "context",
+     "access": "read",
+     "where": "constructor",
+     "effect": "a fixed frame clock (captures, probes) makes the default day length 0"
+    }
+   ],
+   "side_effects": []
+  },
+  {
+   "name": "Torch",
+   "class": "TorchSys",
+   "file": "src/logic/sky/sky.cpp",
+   "kind": "system",
+   "scope": "Host",
+   "summary": "A point light entity of the scene, left where it is or carried in front of the desktop camera.",
+   "access": [
+    {
+     "name": "Transform",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init",
+     "effect": "the torch's entity at `position`"
+    },
+    {
+     "name": "PointLight",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init",
+     "effect": "colour, intensity and radius from the params"
+    },
+    {
+     "name": "Transform",
+     "kind": "component",
+     "access": "write",
+     "where": "tick",
+     "effect": "carried: the camera's position + offset along its right, up and forward"
+    },
+    {
+     "name": "Camera",
+     "kind": "context",
+     "access": "read",
+     "where": "tick",
+     "effect": "position and orientation of the desktop camera"
+    },
+    {
+     "name": "Transform",
+     "kind": "component",
+     "access": "destroy",
+     "where": "finish",
+     "effect": "the torch's entity is destroyed"
+    },
+    {
+     "name": "PointLight",
+     "kind": "component",
+     "access": "destroy",
+     "where": "finish",
+     "effect": "with its entity"
+    }
+   ],
+   "side_effects": [
+    "Creates one entity in init and destroys it in finish."
+   ]
+  },
+  {
+   "name": "Forest",
+   "class": "ForestSys",
+   "file": "src/logic/vegetation/forest.cpp",
+   "kind": "system",
+   "scope": "Host",
+   "summary": "Forests in patches on the gentle land: makes the ForestField, plants each generated chunk's candidates on its ground and takes them away with the chunk.",
+   "access": [
+    {
+     "name": "Plant",
+     "kind": "component",
+     "access": "write+create",
+     "where": "preinit (storage), tick (scatter)",
+     "effect": "one entity per kept candidate: its species index"
+    },
+    {
+     "name": "Transform",
+     "kind": "component",
+     "access": "write+create",
+     "where": "tick (scatter)",
+     "effect": "on the ground of the chunk, sunk a little, yawed, scaled"
+    },
+    {
+     "name": "ChunkForest",
+     "kind": "component",
+     "access": "write+create",
+     "where": "tick (scatter)",
+     "effect": "on the chunk: the list of its plants (empty for a chunk without full samples)"
+    },
+    {
+     "name": "ChunkForest",
+     "kind": "component",
+     "access": "read",
+     "where": "signal on_destroy<ChunkForest> (onChunkForestDestroyed)",
+     "effect": "the plants of the chunk being destroyed"
+    },
+    {
+     "name": "Plant",
+     "kind": "component",
+     "access": "destroy",
+     "where": "signal on_destroy<ChunkForest> (onChunkForestDestroyed)",
+     "effect": "the chunk's plant entities are destroyed with it"
+    },
+    {
+     "name": "Transform",
+     "kind": "component",
+     "access": "destroy",
+     "where": "signal on_destroy<ChunkForest> (onChunkForestDestroyed)",
+     "effect": "with the plant entities"
+    },
+    {
+     "name": "ChunkC",
+     "kind": "component",
+     "access": "read",
+     "where": "tick",
+     "effect": "chunks to plant (view) and their origin"
+    },
+    {
+     "name": "ChunkVolume",
+     "kind": "component",
+     "access": "read",
+     "where": "tick",
+     "effect": "the densities: highest surface per column, slope from the neighbours"
+    },
+    {
+     "name": "ChunkDestroying",
+     "kind": "tag",
+     "access": "read",
+     "where": "tick",
+     "effect": "excluded: a chunk on its way out is not planted"
+    },
+    {
+     "name": "TerrainGenerator",
+     "kind": "context",
+     "access": "read",
+     "where": "init",
+     "effect": "std::shared_ptr<TerrainGenerator> of the ChunkGenerator: the heightfield the ForestField takes the land's slope from"
+    },
+    {
+     "name": "ForestField",
+     "kind": "context",
+     "access": "write+create",
+     "where": "init",
+     "effect": "insert_or_assign of the std::shared_ptr<ForestField> (cover and stands), read by CameraWalk and HerdSys"
+    },
+    {
+     "name": "VegetationPreload",
+     "kind": "context",
+     "access": "write+create",
+     "where": "init",
+     "effect": "every species of the definition's layers, for VegetationPass to load before any plant needs them"
+    },
+    {
+     "name": "VegetationLibrary",
+     "kind": "context",
+     "access": "read+create",
+     "where": "init (vegetationLibrary), tick (scatter)",
+     "effect": "loaded from resources/vegetation on first use; species ids for the definition, heights for the sinking"
+    },
+    {
+     "name": "RunArgs",
+     "kind": "context",
+     "access": "read",
+     "where": "tick",
+     "effect": "fixed-clock runs plant every pending chunk in the frame, else two a frame"
+    }
+   ],
+   "side_effects": [
+    "Connects to on_destroy<ChunkForest> in preinit (onChunkForestDestroyed), disconnects in finish.",
+    "Reads ./resources/forest/tautavel.forest.json (or `definition`) in init, and resources/vegetation/library.json through vegetationLibrary when no system loaded it yet.",
+    "Creates the plant entities, destroys them with their chunk.",
+    "Logs info (stands, layers, species, patch size), a warning per species the library lacks, an error without a terrain generator or with a bad definition (the system then does nothing)."
+   ]
+  },
+  {
+   "name": "VegetationScatter",
+   "class": "VegetationScatterSys",
+   "file": "src/logic/vegetation/vegetation_scatter.cpp",
+   "kind": "system",
+   "scope": "Host",
+   "summary": "Test scattering: a few random plants of the selected species on every generated chunk that crosses the surface, gone with the chunk.",
+   "access": [
+    {
+     "name": "Plant",
+     "kind": "component",
+     "access": "write+create",
+     "where": "preinit (storage), tick (scatter)",
+     "effect": "one entity per kept draw: its species index"
+    },
+    {
+     "name": "Transform",
+     "kind": "component",
+     "access": "write+create",
+     "where": "tick (scatter)",
+     "effect": "on the surface of the chunk, sunk a little, yawed, scaled"
+    },
+    {
+     "name": "ChunkPlants",
+     "kind": "component",
+     "access": "write+create",
+     "where": "tick (scatter)",
+     "effect": "on the chunk: the list of its plants"
+    },
+    {
+     "name": "ChunkPlants",
+     "kind": "component",
+     "access": "read",
+     "where": "signal on_destroy<ChunkPlants> (onChunkPlantsDestroyed)",
+     "effect": "the plants of the chunk being destroyed"
+    },
+    {
+     "name": "Plant",
+     "kind": "component",
+     "access": "destroy",
+     "where": "signal on_destroy<ChunkPlants> (onChunkPlantsDestroyed)",
+     "effect": "the chunk's plants are destroyed with it"
+    },
+    {
+     "name": "Transform",
+     "kind": "component",
+     "access": "destroy",
+     "where": "signal on_destroy<ChunkPlants> (onChunkPlantsDestroyed)",
+     "effect": "with the plant entities"
+    },
+    {
+     "name": "ChunkC",
+     "kind": "component",
+     "access": "read",
+     "where": "tick",
+     "effect": "chunks to plant (view), their position for the seed and the origin"
+    },
+    {
+     "name": "ChunkVolume",
+     "kind": "component",
+     "access": "read",
+     "where": "tick",
+     "effect": "densities: the surface of a column and the slope around it"
+    },
+    {
+     "name": "ChunkDestroying",
+     "kind": "tag",
+     "access": "read",
+     "where": "tick",
+     "effect": "excluded from the view"
+    },
+    {
+     "name": "VegetationLibrary",
+     "kind": "context",
+     "access": "read+create",
+     "where": "init (vegetationLibrary), tick (scatter)",
+     "effect": "species selection by id or category; species heights for the sinking"
+    }
+   ],
+   "side_effects": [
+    "Connects to on_destroy<ChunkPlants> in preinit, disconnects in finish.",
+    "Reads resources/vegetation/library.json through vegetationLibrary when no system loaded it yet.",
+    "Creates plant entities, destroys them with their chunk.",
+    "Logs the selected species (info) and a warning per unknown id."
+   ]
+  },
+  {
+   "name": "VegetationLineup",
+   "class": "VegetationLineupSys",
+   "file": "src/logic/vegetation/vegetation_scatter.cpp",
+   "kind": "system",
+   "scope": "Host",
+   "summary": "One plant of each selected species in a row on the terrain (and optionally a copy per level of detail and one from its baked volume behind it), positions logged.",
+   "access": [
+    {
+     "name": "VegetationLibrary",
+     "kind": "context",
+     "access": "read+create",
+     "where": "init (vegetationLibrary)",
+     "effect": "the species, their radius, height and number of levels"
+    },
+    {
+     "name": "TerrainGenerator",
+     "kind": "context",
+     "access": "read",
+     "where": "init",
+     "effect": "the ground height at each plant from the density function itself (no chunk needed)"
+    },
+    {
+     "name": "Transform",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init",
+     "effect": "the plant on the ground"
+    },
+    {
+     "name": "Plant",
+     "kind": "component",
+     "access": "write+create",
+     "where": "init",
+     "effect": "species, and `lod` -1 (by distance), a held level, or Plant::volume"
+    }
+   ],
+   "side_effects": [
+    "Creates the lineup's entities once in init (never destroyed by the system).",
+    "Logs one info line per plant (species, level, position, height)."
+   ]
+  },
+  {
+   "name": "WorldsEnvironment",
+   "class": "WorldsEnvironment",
+   "file": "src/train/worlds_env.cpp",
+   "kind": "service",
+   "scope": "World",
+   "summary": "mode=train's environment: gathers the agents of every world (the world's AgentIO and every AgentIO component), writes the trainer's actions into them, steps the worlds until one asks or ends.",
+   "access": [
+    {
+     "name": "AgentIO",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "check, behaviors, describe, gather, step, write, reset",
+     "effect": "the world's agent: layout checked, id = world index, actions written, observation, reward and stats read, `reset_requested` set on RESET"
+    },
+    {
+     "name": "AgentIO",
+     "kind": "component",
+     "access": "readwrite",
+     "where": "check, behaviors, describe, gather, step, write",
+     "effect": "component agents: layout checked, id given once, `requested` cleared when sent, actions and discrete choices written (zeros for a done one), observation, sensors, reward, done read, stats read and cleared"
+    },
+    {
+     "name": "AgentsReset",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "check, reset",
+     "effect": "a world with it counts as a world of agents; RESET sets `requested`"
+    },
+    {
+     "name": "WorldClock",
+     "kind": "context",
+     "access": "read",
+     "where": "check, constructor",
+     "effect": "every world must share world 0's decision period, the step length"
+    }
+   ],
+   "side_effects": [
+    "Owns a tf::Executor of `threads` named workers (threads > 1) that steps the worlds in parallel (ScenarioRunner::step).",
+    "On RESET runs every world's Observe phase alone (SystemSet::fixed_observe_only).",
+    "Writes the ML-Agents protobuf output: AgentInfos per behaviour, brain parameters with a behaviour's first agents, averaged stats in the stats side channel."
+   ]
+  },
+  {
+   "name": "TrainHost",
+   "class": "TrainHost",
+   "file": "src/train/train_host.cpp",
+   "kind": "service",
+   "scope": "World",
+   "summary": "dynamical_train's loop: modes bench, null, train, record-demo, eval, signals; talks gRPC to the trainer and reads or seeds the worlds' context variables.",
+   "access": [
+    {
+     "name": "AgentEnvParams",
+     "kind": "context",
+     "access": "write+create",
+     "where": "pushEnvParams",
+     "effect": "the resolved environment parameters (-set > live > -envParams file) in every world, at each connection and on every side channel message"
+    },
+    {
+     "name": "AgentIO",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "recordDemo, eval, evalAnimals",
+     "effect": "observation, sensors, done, recordable, stats read; `reset_requested` set before an eval"
+    },
+    {
+     "name": "PolicyHandle",
+     "kind": "context",
+     "access": "write+create",
+     "where": "eval, evalAnimals",
+     "effect": "the eval's policy (var.model) in every world, deterministic unless var.stochastic"
+    },
+    {
+     "name": "WorldClock",
+     "kind": "context",
+     "access": "read",
+     "where": "recordDemo, eval, evalAnimals, evalSandbox, writeAnimalChecks",
+     "effect": "decision period and dt"
+    },
+    {
+     "name": "HumanBot",
+     "kind": "context",
+     "access": "read",
+     "where": "eval",
+     "effect": "the walker's episodes: ticks, falls, legs, energy books, replay segments"
+    },
+    {
+     "name": "AnimalBot",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "animalWorlds, recordAnimalReplay, writeAnimalChecks, evalAnimals",
+     "effect": "which kind of worlds; segments for replays; finished `episodes` taken and cleared by the eval"
+    },
+    {
+     "name": "AnimalWalkState",
+     "kind": "context",
+     "access": "read",
+     "where": "animalDemoProblem",
+     "effect": "a recording whose walk is not ready is refused with its problem"
+    },
+    {
+     "name": "AnimalDemoChecks",
+     "kind": "context",
+     "access": "readwrite",
+     "where": "writeAnimalChecks",
+     "effect": "`foot_slide` (99th percentile) and `speed_error` completed, then written as JSON"
+    },
+    {
+     "name": "Sandbox",
+     "kind": "context",
+     "access": "read",
+     "where": "sandboxWorlds, evalSandbox",
+     "effect": "is this a sandbox scene; species counters, grass, contacts and blows for the summary"
+    },
+    {
+     "name": "SandboxAnimal",
+     "kind": "component",
+     "access": "read",
+     "where": "evalSandbox",
+     "effect": "alive animals' energy and health, replay records"
+    },
+    {
+     "name": "AnimalBot",
+     "kind": "component",
+     "access": "read",
+     "where": "evalSandbox",
+     "effect": "trunk position, heading, mode and head direction for the replay"
+    }
+   ],
+   "side_effects": [
+    "gRPC client of the ML-Agents trainer (MlAgentsClient on localhost:<port>); reads the environment parameters and engine configuration side channels.",
+    "Files: envparams.txt (-envParamsOut, written on change), .demo (record-demo), eval summaries (var.out), replays (<prefix>.track.*, .replay.*, .sandbox.*, .grass.bin), legs CSV, cot_out, demo checks JSON.",
+    "tf::Executor workers for bench, eval and the worlds' steps.",
+    "Restarts the worlds with the trainer's seed (ScenarioRunner::restart) when the trainer connects in mode=train.",
+    "Logs the mode's progress and summaries; exit codes 0 (QUIT, stop signal), 1 (bad arguments), 2 (connection lost)."
+   ]
+  }
+ ],
+ "components": [
+  {
+   "name": "Sandbox",
+   "kind": "context",
+   "file": "src/logic/sandbox/sandbox.h",
+   "summary": "World context variable of the sandbox: the rules of life, the species, the grass, the counters.",
+   "json": null,
+   "fields": [
+    {
+     "name": "params",
+     "type": "LifeParams",
+     "desc": "the life params in use: `base` with the environment parameters lifeScale, walkerShare, rewardScale applied at every window"
+    },
+    {
+     "name": "base",
+     "type": "LifeParams",
+     "desc": "as the file (with the scene's overrides) has them"
+    },
+    {
+     "name": "species",
+     "type": "std::vector<SandboxSpecies>",
+     "desc": "per species: its SpeciesLife, bodies and scales by growth stage and the ages they begin, walker params, gait ranges, reward program, walker and action behaviour names, weapon segment, and counters since the world began (born, spawned, starved, killed, aged, kills, falls, lives, lifetime, work, moved, ticks, alive)"
+    },
+    {
+     "name": "grass",
+     "type": "GrassField",
+     "desc": "the grid of grass heights of the arena, eaten and growing back"
+    },
+    {
+     "name": "by_group",
+     "type": "std::unordered_map<uint32_t, entt::entity>",
+     "desc": "the animal of each ragdoll collision group (to read the contact events)"
+    },
+    {
+     "name": "next_group",
+     "type": "uint32_t",
+     "desc": "the next ragdoll group, from 1"
+    },
+    {
+     "name": "windows",
+     "type": "uint64_t",
+     "desc": "Observe phases so far (minds are due when (windows + phase) % mind_every == 0)"
+    },
+    {
+     "name": "seconds",
+     "type": "double",
+     "desc": "simulated since the start or the last RESET"
+    },
+    {
+     "name": "puppet",
+     "type": "bool",
+     "desc": "a check: kinematic bodies slid along their command, no walker agents"
+    },
+    {
+     "name": "heuristic",
+     "type": "bool",
+     "desc": "the scripted minds answer the minds nothing answered (in Sandbox's tick)"
+    },
+    {
+     "name": "draw",
+     "type": "bool",
+     "desc": "shapes (Transform + WorldShape + ModelRef) per body and grass tiles for WorldView"
+    },
+    {
+     "name": "rewards_dir",
+     "type": "std::string",
+     "desc": "resources folder of <species>.rewards.json"
+    },
+    {
+     "name": "contacts",
+     "type": "uint64_t",
+     "desc": "contacts between two animals so far"
+    },
+    {
+     "name": "blows",
+     "type": "uint64_t",
+     "desc": "... of which wounded"
+    }
+   ],
+   "notes": "Emplaced by Sandbox in preinit, one per sandbox world; read by SandboxLife, SandboxObserve, SandboxHeuristic, the free functions spawnSandboxAnimal / observeSandboxMind / sandboxSignals, SandboxWatch (viewer) and TrainHost (eval). Its presence makes TrainHost treat the scene as a sandbox scene."
+  },
+  {
+   "name": "SandboxAnimal",
+   "kind": "component",
+   "file": "src/logic/sandbox/sandbox.h",
+   "summary": "An animal of the sandbox: its life (age, energy, health, growth, gestation, death) and the windows of its two agents.",
+   "json": null,
+   "fields": [
+    {
+     "name": "species",
+     "type": "int",
+     "desc": "index in Sandbox::species"
+    },
+    {
+     "name": "group",
+     "type": "uint32_t",
+     "desc": "its ragdoll's collision group, unique in the world"
+    },
+    {
+     "name": "mind",
+     "type": "entt::entity",
+     "desc": "the entity of its action agent (SandboxMind + AgentIO); null once dead and reported"
+    },
+    {
+     "name": "male",
+     "type": "bool",
+     "desc": "sex"
+    },
+    {
+     "name": "age",
+     "type": "float",
+     "desc": "seconds"
+    },
+    {
+     "name": "energy",
+     "type": "float",
+     "desc": "0..1 of a full store"
+    },
+    {
+     "name": "health",
+     "type": "float",
+     "desc": "0..1"
+    },
+    {
+     "name": "stage",
+     "type": "int",
+     "desc": "growth stage, index into SandboxSpecies::bodies (the adult's last)"
+    },
+    {
+     "name": "pregnant",
+     "type": "bool",
+     "desc": "carrying a young"
+    },
+    {
+     "name": "gestation",
+     "type": "float",
+     "desc": "seconds of the current pregnancy"
+    },
+    {
+     "name": "father",
+     "type": "entt::entity",
+     "desc": "of the young on its way"
+    },
+    {
+     "name": "mating",
+     "type": "float",
+     "desc": "seconds together with a partner, both in Mate mode"
+    },
+    {
+     "name": "stun",
+     "type": "float",
+     "desc": "seconds left standing where it was put back up"
+    },
+    {
+     "name": "since_fed",
+     "type": "float",
+     "desc": "seconds since it last fed"
+    },
+    {
+     "name": "lived",
+     "type": "float",
+     "desc": "seconds in this world"
+    },
+    {
+     "name": "offspring",
+     "type": "int",
+     "desc": "young born to it"
+    },
+    {
+     "name": "feeding",
+     "type": "bool",
+     "desc": "fed this tick"
+    },
+    {
+     "name": "dead",
+     "type": "bool",
+     "desc": "a carcass"
+    },
+    {
+     "name": "cause",
+     "type": "int",
+     "desc": "SandboxAnimal::Cause: Alive, Starved, Killed, Old"
+    },
+    {
+     "name": "reported",
+     "type": "bool",
+     "desc": "its agents' terminal steps went out"
+    },
+    {
+     "name": "meat",
+     "type": "float",
+     "desc": "a carcass: what is left, in full stores of an adult of its species"
+    },
+    {
+     "name": "rot",
+     "type": "float",
+     "desc": "seconds the carcass has lain"
+    },
+    {
+     "name": "attacker",
+     "type": "entt::entity",
+     "desc": "who wounded it last"
+    },
+    {
+     "name": "attacked",
+     "type": "float",
+     "desc": "seconds since"
+    },
+    {
+     "name": "walker_ticks",
+     "type": "int",
+     "desc": "ticks of the walker's episode"
+    },
+    {
+     "name": "walker_fresh",
+     "type": "bool",
+     "desc": "the walker's next step is the first of an episode"
+    },
+    {
+     "name": "fell",
+     "type": "bool",
+     "desc": "fell this window: the walker's episode ends"
+    },
+    {
+     "name": "restand",
+     "type": "bool",
+     "desc": "to be stood up again at the next window (a fall, a new size)"
+    },
+    {
+     "name": "grow",
+     "type": "bool",
+     "desc": "a new size is due"
+    },
+    {
+     "name": "share",
+     "type": "float",
+     "desc": "of the mind's last reward, for the walker's next step"
+    },
+    {
+     "name": "mechanical",
+     "type": "double",
+     "desc": "mechanical energy of the bodies, J"
+    },
+    {
+     "name": "mechanical_valid",
+     "type": "bool",
+     "desc": "`mechanical` holds the last tick's value"
+    },
+    {
+     "name": "power",
+     "type": "float",
+     "desc": "positive mechanical power, W, smoothed over a quarter second"
+    },
+    {
+     "name": "window",
+     "type": "SandboxAnimal::Window",
+     "desc": "since the mind's last decision: energy gained and spent, damage taken and dealt, kills, births, falls, feeding ticks, ticks, conceptions, ticks per mode, trunk position at the start"
+    },
+    {
+     "name": "nearest",
+     "type": "float[5]",
+     "desc": "distances to the nearest predator, prey, mate, carcass and grass at the mind's last decision (< 0: none), for the closing signals"
+    },
+    {
+     "name": "objective",
+     "type": "float",
+     "desc": "births (+1) and an early death (-1) to pay with the mind's next reward"
+    },
+    {
+     "name": "lifetime_reward",
+     "type": "float",
+     "desc": "the mind's rewards summed over the life"
+    }
+   ],
+   "notes": "On the animal's entity next to its AnimalBot and, while it lives, the walker's AgentIO (not in puppet worlds). Created by spawnSandboxAnimal (Sandbox at init and births/newcomers, SandboxObserve on RESET); a dead animal stays as a carcass until its meat is eaten or it rots, then Sandbox destroys the entity."
+  },
+  {
+   "name": "SandboxMind",
+   "kind": "component",
+   "file": "src/logic/sandbox/sandbox.h",
+   "summary": "The entity of an animal's action agent (its mind), next to that agent's AgentIO.",
+   "json": null,
+   "fields": [
+    {
+     "name": "animal",
+     "type": "entt::entity",
+     "desc": "the animal it decides for"
+    },
+    {
+     "name": "phase",
+     "type": "int",
+     "desc": "decides on windows where (window + phase) % mind_every == 0"
+    },
+    {
+     "name": "fresh",
+     "type": "bool",
+     "desc": "its next Observe is its first decision (no reward)"
+    }
+   ],
+   "notes": "Created with its animal by spawnSandboxAnimal; destroyed by Sandbox at the first window after the animal's death was reported, or with the animal."
+  },
+  {
+   "name": "SandboxShape",
+   "kind": "component",
+   "file": "src/logic/sandbox/sandbox.h",
+   "summary": "A drawn collision shape of a sandbox animal (Sandbox::draw), next to its Transform, WorldShape and ModelRef.",
+   "json": null,
+   "fields": [
+    {
+     "name": "animal",
+     "type": "entt::entity",
+     "desc": "the animal whose segment it follows"
+    }
+   ],
+   "notes": "Created by makeShapes (draw worlds only) when an animal spawns or grows, placed every tick by SandboxLife (moveShapes, which adds a PhysicsPose), destroyed with its animal."
+  },
+  {
+   "name": "PolicyHandle",
+   "kind": "context",
+   "file": "src/onnx/policy_runner.h",
+   "summary": "World context variable: the ONNX policy the world's Policy system runs on its AgentIO.",
+   "json": null,
+   "fields": [
+    {
+     "name": "runner",
+     "type": "std::shared_ptr<PolicyRunner>",
+     "desc": "for an agent with one vector observation and continuous actions"
+    },
+    {
+     "name": "deterministic",
+     "type": "bool",
+     "desc": "the mean action (true) or mean + noise"
+    },
+    {
+     "name": "agent",
+     "type": "std::shared_ptr<AgentPolicy>",
+     "desc": "for an agent with sensors or discrete branches; used instead of `runner` when set"
+    }
+   ],
+   "notes": "Injected by ModelWatcher (viewer), TrainHost (mode=eval) or tests with insert_or_assign; replacing it swaps the policy at the next decision. makePolicyHandle picks runner or agent from an AgentIO's layout. Sessions are shared between worlds."
+  },
+  {
+   "name": "PolicySources",
+   "kind": "context",
+   "file": "src/onnx/policy_systems.h",
+   "summary": "Host context variable written by ModelWatcher: what policy each world runs, for panels and overlays.",
+   "json": null,
+   "fields": [
+    {
+     "name": "worlds",
+     "type": "std::vector<PolicySource>",
+     "desc": "one per world: `spec` (the model parameter), `file` (the loaded checkpoint, empty before the first load), `step` (from <behavior>-<step>.onnx, -1 without), `error`"
+    }
+   ],
+   "notes": "Emplaced by ModelWatcher's constructor, filled at its first tick, updated at every load; read by SphereView."
+  },
+  {
+   "name": "Sky",
+   "kind": "context",
+   "file": "src/logic/sky/sky.h",
+   "summary": "Host context variable: the time of day and the place, from which the sun, the moon and the sky follow.",
+   "json": null,
+   "fields": [
+    {
+     "name": "time",
+     "type": "float",
+     "desc": "hours, 0 to 24 (default 10.3349: the sun at normalize(0.5, 1, 0.5))"
+    },
+    {
+     "name": "day_length",
+     "type": "float",
+     "desc": "seconds of play for a day; 0: the sun is stopped"
+    },
+    {
+     "name": "latitude",
+     "type": "float",
+     "desc": "degrees (42.8, Tautavel)"
+    },
+    {
+     "name": "declination",
+     "type": "float",
+     "desc": "degrees: the season (14.787)"
+    }
+   ],
+   "notes": "Set by the Sky system (constructor) and moved by its tick; the renderer's Lights emplaces a default one when a scene has no Sky system. skyLight(Sky) gives the directional light, sky colours and ambient light (mirrored by the shaders). Read by Lights, TreeShade, the debug menu (which may change the time)."
+  },
+  {
+   "name": "Plant",
+   "kind": "component",
+   "file": "src/logic/vegetation/vegetation.h",
+   "summary": "A plant of the vegetation library next to a Transform (uniform scale), drawn by VegetationPass.",
+   "json": null,
+   "fields": [
+    {
+     "name": "species",
+     "type": "uint32_t",
+     "desc": "index in VegetationLibrary::species"
+    },
+    {
+     "name": "lod",
+     "type": "int32_t",
+     "desc": "-1: level of detail by screen height; >= 0: always this level (clamped); Plant::volume (-2): always from the species' baked volume"
+    }
+   ],
+   "notes": "Created by Forest and VegetationScatter (per chunk, destroyed with the chunk through ChunkForest / ChunkPlants) and VegetationLineup (kept). Read by VegetationPass, TreeShade (crown shadows), PlantVolumes, ProbeVolume, RayScene, HerdSys (trunks to walk around)."
+  },
+  {
+   "name": "ChunkForest",
+   "kind": "component",
+   "file": "src/logic/vegetation/forest.h",
+   "summary": "On a chunk: the plants Forest put on it, destroyed with the chunk.",
+   "json": null,
+   "fields": [
+    {
+     "name": "plants",
+     "type": "std::vector<entt::entity>",
+     "desc": "the plant entities of the chunk"
+    }
+   ],
+   "notes": "Emplaced by Forest when it plants a chunk (also empty, to mark it planted); its on_destroy signal (connected by Forest) destroys the plants. Read by CameraWalk (trunks to route around)."
+  },
+  {
+   "name": "ChunkPlants",
+   "kind": "component",
+   "file": "src/logic/vegetation/vegetation_scatter.h",
+   "summary": "On a chunk: the plants VegetationScatter put on it, destroyed with the chunk.",
+   "json": null,
+   "fields": [
+    {
+     "name": "plants",
+     "type": "std::vector<entt::entity>",
+     "desc": "the plant entities of the chunk"
+    }
+   ],
+   "notes": "Emplaced by VegetationScatter (also empty, to mark it done); its on_destroy signal destroys the plants."
+  },
+  {
+   "name": "VegetationLibrary",
+   "kind": "context",
+   "file": "src/logic/vegetation/vegetation.h",
+   "summary": "Host context variable: the index of resources/vegetation (SpeedTree species imported by tools/speedtree_import.py).",
+   "json": null,
+   "fields": [
+    {
+     "name": "directory",
+     "type": "std::filesystem::path",
+     "desc": "the library folder (./resources/vegetation, else the source tree's)"
+    },
+    {
+     "name": "species",
+     "type": "std::vector<VegetationLibrary::Species>",
+     "desc": "id, name, category (ground, shrub, tree), height, radius, triangles of the most detailed level, number of levels"
+    }
+   ],
+   "notes": "Created on first use by vegetationLibrary(reg) (Forest, VegetationScatter, VegetationLineup, VegetationPass, HerdSys, CameraWalk...), empty when the folder has no library.json. loadSpecies / loadGeometry read species/<id>.json and .bin on demand."
+  },
+  {
+   "name": "ForestField",
+   "kind": "context",
+   "file": "src/logic/vegetation/forest.h",
+   "summary": "Host context variable (held as std::shared_ptr<ForestField>): forest cover 0..1 and stand from patch noise and the land's slope, on an 8 m lattice anchored to the world.",
+   "json": null,
+   "fields": [
+    {
+     "name": "params",
+     "type": "const ForestParams",
+     "desc": "seed, patch_size, coverage, edge, max_slope, slope_fade, slope_reach, stand_size"
+    },
+    {
+     "name": "generator",
+     "type": "std::shared_ptr<const TerrainGenerator>",
+     "desc": "(private) the heightfield the slope is measured on"
+    },
+    {
+     "name": "patches",
+     "type": "FastNoise::SmartNode<>",
+     "desc": "(private) FBm simplex, 4 octaves: the patch noise"
+    },
+    {
+     "name": "stands",
+     "type": "FastNoise::SmartNode<>",
+     "desc": "(private) FBm simplex, 2 octaves: the stand noise"
+    },
+    {
+     "name": "cover_low",
+     "type": "float",
+     "desc": "(private) patch noise where the forest starts (measured quantile)"
+    },
+    {
+     "name": "cover_high",
+     "type": "float",
+     "desc": "(private) ... and where it is thick"
+    },
+    {
+     "name": "stand_sorted",
+     "type": "std::vector<float>",
+     "desc": "(private) sorted samples of the stand noise, to make it uniform"
+    }
+   ],
+   "notes": "The context variable is std::shared_ptr<ForestField>, insert_or_assign'ed by Forest in init. Thread safe (const queries). Read by CameraWalk and HerdSys."
+  },
+  {
+   "name": "VegetationPreload",
+   "kind": "context",
+   "file": "src/logic/vegetation/vegetation.h",
+   "summary": "Host context variable: species VegetationPass loads before any plant uses them.",
+   "json": null,
+   "fields": [
+    {
+     "name": "species",
+     "type": "std::vector<uint32_t>",
+     "desc": "library indices, sorted"
+    }
+   ],
+   "notes": "Written by Forest in init (every species of its layers); read by VegetationPass."
+  },
+  {
+   "name": "VegetationStats",
+   "kind": "context",
+   "file": "src/logic/vegetation/vegetation.h",
+   "summary": "Host context variable written by VegetationPass: how many plants, how many drawn, species loaded and loading.",
+   "json": null,
+   "fields": [
+    {
+     "name": "plants",
+     "type": "uint32_t",
+     "desc": "Plant entities"
+    },
+    {
+     "name": "drawn",
+     "type": "uint32_t",
+     "desc": "instances drawn on the desktop target"
+    },
+    {
+     "name": "triangles",
+     "type": "uint32_t",
+     "desc": "triangles drawn"
+    },
+    {
+     "name": "species_loaded",
+     "type": "uint32_t",
+     "desc": "species in GPU memory"
+    },
+    {
+     "name": "species_loading",
+     "type": "uint32_t",
+     "desc": "asked for and not drawn yet: plants are missing"
+    }
+   ],
+   "notes": "Emplaced by VegetationPass; read by the debug menu and by captures (they wait for species_loading == 0)."
+  }
+ ]
+}

@@ -1,0 +1,1893 @@
+{
+  "systems": [
+    {
+      "name": "ChunkManager",
+      "class": "ChunkManagerSys",
+      "file": "src/logic/systems/chunk_systems.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Creates chunk entities within the view distance of the desktop camera and the VR rig, tags far ones ChunkDestroying",
+      "access": [
+        {
+          "name": "ChunkMap",
+          "kind": "context",
+          "access": "write+create",
+          "where": "preinit",
+          "effect": "emplaced empty"
+        },
+        {
+          "name": "ChunkMap",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "chunks added on load, erased on unload"
+        },
+        {
+          "name": "Settings",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "view_distance (768 without Settings)"
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (loadCenters)",
+          "effect": "desktop camera position, a load centre"
+        },
+        {
+          "name": "VRInput",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (loadCenters)",
+          "effect": "session_running: the rig is a load centre only then"
+        },
+        {
+          "name": "VRRig",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (loadCenters)",
+          "effect": "rig position, the second load centre"
+        },
+        {
+          "name": "ChunkC",
+          "kind": "component",
+          "access": "read+create",
+          "where": "tick",
+          "effect": "made on new chunk entities; read for the centre of loaded chunks"
+        },
+        {
+          "name": "ChunkDestroying",
+          "kind": "tag",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "put on chunks farther than view distance + 256"
+        }
+      ],
+      "side_effects": [
+        "Creates one entity per chunk coming into range; never destroys (TerrainSys destroys ChunkDestroying chunks)."
+      ]
+    },
+    {
+      "name": "ChunkGenerator",
+      "class": "ChunkGeneratorSys",
+      "file": "src/logic/systems/chunk_systems.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Fills chunk densities with the TerrainGenerator on the taskflow executor, nearest chunks first, ChunkVolume + ChunkMeshPending or ChunkEmpty",
+      "access": [
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "write+create",
+          "where": "preinit",
+          "effect": "std::shared_ptr<TerrainGenerator> emplaced (seed 1337), shared by every terrain user"
+        },
+        {
+          "name": "RunArgs",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "deterministic(): every pending chunk generated synchronously"
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "position: nearest chunks first"
+        },
+        {
+          "name": "Executor",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "tf::Executor the generation jobs run on (get: must exist)"
+        },
+        {
+          "name": "ChunkC",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "chunk coordinates and centre of the candidates"
+        },
+        {
+          "name": "ChunkGenerating",
+          "kind": "tag",
+          "access": "readwrite+create+destroy",
+          "where": "tick, collect",
+          "effect": "excluded from candidates; added when a job starts, removed when collected"
+        },
+        {
+          "name": "ChunkGenerated",
+          "kind": "tag",
+          "access": "readwrite+create",
+          "where": "collect",
+          "effect": "excluded from candidates; added when the job is collected"
+        },
+        {
+          "name": "ChunkDestroying",
+          "kind": "tag",
+          "access": "read",
+          "where": "tick",
+          "effect": "chunks being unloaded are not generated"
+        },
+        {
+          "name": "ChunkVolume",
+          "kind": "component",
+          "access": "write+create",
+          "where": "collect",
+          "effect": "densities of a chunk that crosses the surface"
+        },
+        {
+          "name": "ChunkMeshPending",
+          "kind": "tag",
+          "access": "write+create",
+          "where": "collect",
+          "effect": "asks TerrainSys for a marching cubes dispatch"
+        },
+        {
+          "name": "ChunkEmpty",
+          "kind": "component",
+          "access": "write+create",
+          "where": "collect",
+          "effect": "chunk with no surface, with its mean density"
+        }
+      ],
+      "side_effects": [
+        "Up to 16 taskflow silent_async jobs at a time (all pending chunks in deterministic runs), FastNoise2 on worker threads.",
+        "Blocks the main thread on the jobs in deterministic runs and in finish.",
+        "Profiler zones Generate chunk, Wait for the chunks; plot Chunk jobs."
+      ]
+    },
+    {
+      "name": "RigidBody",
+      "class": "RigidBodySys",
+      "file": "src/physics/physics_sys.cpp",
+      "kind": "system",
+      "scope": "Both",
+      "summary": "Makes the Jolt bodies of new RigidBody, Ground and HeightField components and removes them with the component",
+      "access": [
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit (physicsWorld), init, tick, finish, handlers",
+          "effect": "created with the default config when missing; bodies created, added, removed, destroyed"
+        },
+        {
+          "name": "PhysicsStats",
+          "kind": "context",
+          "access": "write+create",
+          "where": "preinit",
+          "effect": "emplaced when missing"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "initial pose of a new body"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "readwrite+destroy",
+          "where": "tick, finish, destroyBody (on_destroy)",
+          "effect": "body settings read, body id written; removed where the body failed"
+        },
+        {
+          "name": "PhysicsPose",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "put on new dynamic bodies, both poses at the Transform"
+        },
+        {
+          "name": "Ground",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "init, tick (createGrounds), finish, destroyGround",
+          "effect": "static box made, body id written / reset"
+        },
+        {
+          "name": "HeightField",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "init, tick (createGrounds), finish, destroyHeightField",
+          "effect": "waves drawn into wave_list, static height field made, body id written / reset"
+        },
+        {
+          "name": "WorldRng",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "init, tick (createGrounds)",
+          "effect": "one engine draw for a HeightField whose seed is 0"
+        }
+      ],
+      "side_effects": [
+        "Creates, adds, removes and destroys Jolt bodies; OptimizeBroadPhase after static geometry is added.",
+        "Connects on_destroy<RigidBody>, on_destroy<Ground>, on_destroy<HeightField> (disconnected in finish and the destructor).",
+        "Log warnings on invalid shapes, invalid height fields and when Jolt is out of bodies."
+      ]
+    },
+    {
+      "name": "TerrainColliders",
+      "class": "TerrainCollidersSys",
+      "file": "src/physics/physics_sys.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Marching cubes mesh colliders in 64 m cells around the host's dynamic bodies, built before the step, prefetched along their path, evicted after 5 s",
+      "access": [
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit (physicsWorld), tick (update), finish (clear)",
+          "effect": "body bounds and velocities read; collider bodies created, added, removed"
+        },
+        {
+          "name": "PhysicsStats",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, tick",
+          "effect": "colliders_ms, terrain_cells, terrain_triangles written"
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "preinit (TerrainColliders constructor)",
+          "effect": "the shared density function for cells without a loaded chunk"
+        },
+        {
+          "name": "TerrainNeeds",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "boxes taken into the required set, then cleared"
+        },
+        {
+          "name": "FixedStepClock",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "tick",
+          "effect": "stepsFor(dt) and sim_time; emplaced when missing"
+        },
+        {
+          "name": "RunArgs",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (deterministic)",
+          "effect": "no prefetch and no wall-clock timing in fixed-clock runs"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "dynamic created bodies whose bounds need colliders"
+        },
+        {
+          "name": "ChunkMap",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (makeJob)",
+          "effect": "the chunk entity of a cell, when streamed"
+        },
+        {
+          "name": "ChunkEmpty",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (makeJob)",
+          "effect": "a cell of an empty chunk needs no mesh"
+        },
+        {
+          "name": "ChunkVolume",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (makeJob)",
+          "effect": "densities copied from the loaded chunk"
+        },
+        {
+          "name": "Executor",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (update)",
+          "effect": "tf::Executor: required cells in parallel, prefetch tasks"
+        }
+      ],
+      "side_effects": [
+        "Creates and destroys static Jolt MeshShape bodies in sorted cell order (deterministic).",
+        "Taskflow for_each (waited) over new required cells and silent_async prefetch jobs; zone Build collider cell.",
+        "Reads ./resources/mclookup.bin in preinit (throws when missing).",
+        "Log warning 'Terrain collider : ...' when Jolt refuses a mesh."
+      ]
+    },
+    {
+      "name": "Physics",
+      "class": "PhysicsSys",
+      "file": "src/physics/physics_sys.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Host Jolt step: 60 Hz accumulator (4 steps a frame at most), kinematic bodies follow Transforms, FixedSteps hooks, interpolated Transforms, fallen bodies destroyed",
+      "access": [
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit (physicsWorld), tick",
+          "effect": "Jolt update, kinematic moves, pose reads, body counts"
+        },
+        {
+          "name": "FixedStepClock",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, tick",
+          "effect": "accumulator and sim_time advanced"
+        },
+        {
+          "name": "PhysicsStats",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit, tick",
+          "effect": "steps_last_frame, step_ms, bodies, active_bodies written"
+        },
+        {
+          "name": "FixedSteps",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "before / after hooks called around each step"
+        },
+        {
+          "name": "RunArgs",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (deterministic)",
+          "effect": "timings reported as 0 in fixed-clock runs"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite+destroy",
+          "where": "tick",
+          "effect": "kinematic targets read; interpolated pose written for dynamic bodies; fallen entities destroyed"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read+destroy",
+          "where": "tick",
+          "effect": "motion and body id; destroyed with fallen entities"
+        },
+        {
+          "name": "PhysicsPose",
+          "kind": "component",
+          "access": "readwrite+destroy",
+          "where": "tick",
+          "effect": "last two simulated poses shifted and read back; destroyed with fallen entities"
+        }
+      ],
+      "side_effects": [
+        "Steps the host's Jolt PhysicsSystem on its job system threads.",
+        "Destroys entities whose interpolated position is under -1000 m.",
+        "Runs the FixedSteps functions of other systems inside its tick.",
+        "Profiler zones Physics step, Fixed steps before, Jolt update, Fixed steps after; plots Physics steps, Active bodies."
+      ]
+    },
+    {
+      "name": "PhysicsStep",
+      "class": "PhysicsStepSys",
+      "file": "src/physics/physics_sys.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "One fixed tick of a world: kinematic bodies moved, PhysicsConfig::substeps Jolt updates, dynamic poses and Transforms written",
+      "access": [
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit (physicsWorld), tick",
+          "effect": "Jolt updates, kinematic moves, pose reads, substeps"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "kinematic targets read; dynamic bodies' pose written"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "motion and body id"
+        },
+        {
+          "name": "PhysicsPose",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "previous / current pose shifted and updated"
+        }
+      ],
+      "side_effects": [
+        "Steps the world's Jolt PhysicsSystem (single threaded with threads 1)."
+      ]
+    },
+    {
+      "name": "WorldTerrain",
+      "class": "WorldTerrainSys",
+      "file": "src/physics/physics_sys.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Marching cubes ground of a world: TerrainColliders built inline around dynamic bodies and ragdoll segments, shared as std::shared_ptr<TerrainColliders>",
+      "access": [
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "write+create",
+          "where": "preinit",
+          "effect": "std::shared_ptr<TerrainGenerator> with the seed parameter"
+        },
+        {
+          "name": "TerrainColliders",
+          "kind": "context",
+          "access": "write+create",
+          "where": "preinit",
+          "effect": "std::shared_ptr<TerrainColliders> shared with the world's systems"
+        },
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit (physicsWorld), tick, finish",
+          "effect": "body bounds read; collider bodies added and removed"
+        },
+        {
+          "name": "WorldClock",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "tick x dt: time of the cells' last use"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "dynamic created bodies needing ground"
+        },
+        {
+          "name": "TerrainUsers",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "ragdoll segments needing ground (one box around them)"
+        },
+        {
+          "name": "ChunkMap",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (makeJob)",
+          "effect": "looked up, absent in worlds: cells sample the generator"
+        },
+        {
+          "name": "Executor",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (update)",
+          "effect": "looked up, absent in worlds: cells built inline"
+        }
+      ],
+      "side_effects": [
+        "Creates and destroys static Jolt MeshShape bodies in the world's PhysicsWorld, in sorted cell order.",
+        "CPU marching cubes and FastNoise2 sampling on the world's thread.",
+        "Reads ./resources/mclookup.bin in preinit; log warning on a refused mesh."
+      ]
+    },
+    {
+      "name": "BoxDrop",
+      "class": "BoxDropSys",
+      "file": "src/logic/systems/box_drop.cpp",
+      "kind": "system",
+      "scope": "World",
+      "summary": "Test worlds: drops count boxes (and capsules) on a jittered grid in init, from the world RNG",
+      "access": [
+        {
+          "name": "WorldRng",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "init",
+          "effect": "jitter, height, size, orientation and colour draws"
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init",
+          "effect": "pose of each dropped body"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init",
+          "effect": "dynamic box or capsule"
+        },
+        {
+          "name": "ModelRef",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init",
+          "effect": "primitive model and colour drawn by WorldView"
+        }
+      ],
+      "side_effects": [
+        "Creates count entities in init."
+      ]
+    },
+    {
+      "name": "Game",
+      "class": "Game",
+      "file": "src/view/game.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "page": "systems/service-Game.md",
+      "summary": "The dynamical process: emplaces Settings, Executor, RunArgs, Graphics, FrameClock, Worlds; builds the renderer and the host SystemSet; runs the frame loop",
+      "access": [
+        {
+          "name": "Settings",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "Game::Game, Game::start",
+          "effect": "emplaced from config.7.json and arguments; window, vr_mode, view_distance adjusted"
+        },
+        {
+          "name": "Executor",
+          "kind": "context",
+          "access": "write+create",
+          "where": "Game::Game",
+          "effect": "the host's tf::Executor (hardware_concurrency named workers)"
+        },
+        {
+          "name": "RunArgs",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "Game::Game, Game::start",
+          "effect": "parsed arguments; ray_tracing set by the graphics level"
+        },
+        {
+          "name": "Graphics",
+          "kind": "context",
+          "access": "write+create",
+          "where": "Game::Game",
+          "effect": "levels of resources/graphics.json and the current one"
+        },
+        {
+          "name": "FrameClock",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "Game::Game, frame loop",
+          "effect": "dt, time, frame written before the systems tick"
+        },
+        {
+          "name": "Worlds",
+          "kind": "context",
+          "access": "write+create",
+          "where": "Game::start, Game::~Game",
+          "effect": "the scene's worlds for WorldStepper and WorldView; finished in the destructor"
+        },
+        {
+          "name": "Input",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "frame loop",
+          "effect": "on[EXIT] read and cleared"
+        }
+      ],
+      "side_effects": [
+        "Reads and writes ./config.7.json; reads resources/graphics.json and the scene files.",
+        "Creates the Renderer (Vulkan, SDL window, OpenXR).",
+        "Creates the host thread pool (tf::Executor).",
+        "Logs unknown arguments, ignored values, the graphics level and scene errors."
+      ]
+    },
+    {
+      "name": "World",
+      "class": "World",
+      "file": "src/scene/world.cpp",
+      "kind": "service",
+      "scope": "World",
+      "page": "systems/service-Game.md",
+      "summary": "One simulation: its registry with PhysicsWorld, WorldClock, WorldRng, WorldInfo, Parked, the template's entities and its fixed lane",
+      "access": [
+        {
+          "name": "PhysicsWorld",
+          "kind": "context",
+          "access": "write+create",
+          "where": "World::World; read in World::hash",
+          "effect": "the world's Jolt system from the template's physics block"
+        },
+        {
+          "name": "WorldClock",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "World::World, World::tick",
+          "effect": "fixed tick and decision window; tick advanced"
+        },
+        {
+          "name": "WorldRng",
+          "kind": "context",
+          "access": "write+create",
+          "where": "World::World",
+          "effect": "the world's random stream, seeded worldSeed(base, index)"
+        },
+        {
+          "name": "WorldInfo",
+          "kind": "context",
+          "access": "write+create",
+          "where": "World::World",
+          "effect": "index, seed, template name"
+        },
+        {
+          "name": "Parked",
+          "kind": "context",
+          "access": "write+create",
+          "where": "World::World",
+          "effect": "flag read by SystemSet::fixed_tick"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "World::hash",
+          "effect": "poses of created bodies hashed in entity order"
+        }
+      ],
+      "side_effects": [
+        "Creates the template's entities in World::init through the registered component emplacers.",
+        "One Jolt job system per world (single threaded with threads 1); Worlds::step runs worlds in parallel on an executor."
+      ]
+    },
+    {
+      "name": "SystemSet",
+      "class": "SystemSet",
+      "file": "src/logic/systems/system_set.cpp",
+      "kind": "service",
+      "scope": "Both",
+      "page": "systems/service-Game.md",
+      "summary": "Holds the systems of a registry in Pre, Post and Fixed lists and calls them; phases Act / Observe and Parked in the fixed lane",
+      "access": [
+        {
+          "name": "Parked",
+          "kind": "context",
+          "access": "read",
+          "where": "fixed_tick",
+          "effect": "while set only Observe systems run"
+        }
+      ],
+      "side_effects": [
+        "Opens a profiler zone named after the system around every call (preinit, init, tick, finish)."
+      ]
+    },
+    {
+      "name": "Probe",
+      "class": "Probe",
+      "file": "src/scene/probe.cpp",
+      "kind": "service",
+      "scope": "Host",
+      "page": "systems/service-Game.md",
+      "summary": "probe=<csv>: every probe_every frames the poses of the RigidBody (or Transform) entities, in entity order",
+      "access": [
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "sample",
+          "effect": "pose written to the CSV"
+        },
+        {
+          "name": "RigidBody",
+          "kind": "component",
+          "access": "read",
+          "where": "sample",
+          "effect": "which entities are probed (probe_entities=RigidBody)"
+        }
+      ],
+      "side_effects": [
+        "Writes the probe CSV file, flushed after every sample."
+      ]
+    }
+  ],
+  "components": [
+    {
+      "name": "Transform",
+      "kind": "component",
+      "file": "src/logic/components/transform.h",
+      "summary": "Position, rotation and scale of an entity in the world",
+      "json": "Transform",
+      "fields": [
+        {
+          "name": "position",
+          "type": "glm::vec3",
+          "desc": "world position, metres (0)"
+        },
+        {
+          "name": "rotation",
+          "type": "glm::quat",
+          "desc": "orientation (identity)"
+        },
+        {
+          "name": "scale",
+          "type": "glm::vec3",
+          "desc": "scale (1); a kinematic body with scale.x <= 0 is hidden and not moved by Physics"
+        }
+      ],
+      "notes": "matrix() = translate x rotate x scale. Dynamic bodies' Transforms are written by Physics (interpolated) or PhysicsStep; kinematic bodies follow theirs."
+    },
+    {
+      "name": "RigidBody",
+      "kind": "component",
+      "file": "src/logic/components/rigid_body.h",
+      "summary": "A Jolt body next to a Transform: static, dynamic (simulated) or kinematic (follows its Transform)",
+      "json": "RigidBody",
+      "fields": [
+        {
+          "name": "motion",
+          "type": "RigidBody::Motion",
+          "desc": "Static, Dynamic (default), Kinematic; JSON static / dynamic / kinematic"
+        },
+        {
+          "name": "shape",
+          "type": "RigidBody::Shape",
+          "desc": "Box (default), Sphere, Capsule; JSON box / sphere / capsule"
+        },
+        {
+          "name": "half_extent",
+          "type": "glm::vec3",
+          "desc": "box half sizes (0.5); sphere radius x; capsule radius x and cylinder half height y (local Y)"
+        },
+        {
+          "name": "offset",
+          "type": "glm::vec3",
+          "desc": "shape centre relative to the Transform position, local space (0)"
+        },
+        {
+          "name": "friction",
+          "type": "float",
+          "desc": "0.6"
+        },
+        {
+          "name": "restitution",
+          "type": "float",
+          "desc": "0.1"
+        },
+        {
+          "name": "angular_damping",
+          "type": "float",
+          "desc": "0.05 (Jolt's default)"
+        },
+        {
+          "name": "mass",
+          "type": "float",
+          "desc": "kg, inertia scaled to it; 0: Jolt's density of 1000 kg/m3"
+        },
+        {
+          "name": "lock_rotation",
+          "type": "bool",
+          "desc": "dynamic only: translations only (a player's body)"
+        },
+        {
+          "name": "initial_velocity",
+          "type": "glm::vec3",
+          "desc": "dynamic only, m/s at creation"
+        },
+        {
+          "name": "initial_angular_velocity",
+          "type": "glm::vec3",
+          "desc": "dynamic only, rad/s at creation"
+        },
+        {
+          "name": "body",
+          "type": "uint32_t",
+          "desc": "JPH::BodyID (index and sequence), 0xffffffff until RigidBodySys creates it; created()"
+        }
+      ],
+      "notes": "RigidBodySys makes the body on its next tick and removes it when the component or entity goes (on_destroy). Removed by RigidBodySys when the body cannot be made. Body user data = entity + 1 (bodyEntity)."
+    },
+    {
+      "name": "Ground",
+      "kind": "component",
+      "file": "src/logic/components/rigid_body.h",
+      "summary": "Flat ground: a static box whose top face is at top_y, centred on x = z = 0, STATIC layer",
+      "json": "Ground",
+      "fields": [
+        {
+          "name": "size",
+          "type": "glm::vec3",
+          "desc": "full extents (150, 10, 150), must be positive"
+        },
+        {
+          "name": "top_y",
+          "type": "float",
+          "desc": "height of the top face (0)"
+        },
+        {
+          "name": "friction",
+          "type": "float",
+          "desc": "1"
+        },
+        {
+          "name": "restitution",
+          "type": "float",
+          "desc": "0"
+        },
+        {
+          "name": "body",
+          "type": "uint32_t",
+          "desc": "JPH::BodyID, 0xffffffff until created"
+        }
+      ],
+      "notes": "Created by RigidBodySys in init and on later ticks; removed with the component."
+    },
+    {
+      "name": "HeightField",
+      "kind": "component",
+      "file": "src/logic/components/rigid_body.h",
+      "summary": "Rolling hills: a static Jolt height field centred on the origin, heights from a sum of plane waves",
+      "json": "HeightField",
+      "fields": [
+        {
+          "name": "samples",
+          "type": "int",
+          "desc": "per side, a power of 2 >= 8 (256)"
+        },
+        {
+          "name": "spacing",
+          "type": "float",
+          "desc": "metres between samples (0.5)"
+        },
+        {
+          "name": "waves",
+          "type": "int",
+          "desc": "number of plane waves (6)"
+        },
+        {
+          "name": "wavelength",
+          "type": "glm::vec2",
+          "desc": "log-uniform range of the wavelengths, metres (6, 40)"
+        },
+        {
+          "name": "wave_slope",
+          "type": "float",
+          "desc": "steepest slope of each wave, amplitude x wavenumber (0.07)"
+        },
+        {
+          "name": "friction",
+          "type": "float",
+          "desc": "1"
+        },
+        {
+          "name": "restitution",
+          "type": "float",
+          "desc": "0"
+        },
+        {
+          "name": "seed",
+          "type": "uint32_t",
+          "desc": "wave draw seed; 0: one draw of the WorldRng"
+        },
+        {
+          "name": "wave_list",
+          "type": "std::vector<HeightField::Wave>",
+          "desc": "drawn at creation (k: wave vector on XZ rad/m, amplitude, phase)"
+        },
+        {
+          "name": "body",
+          "type": "uint32_t",
+          "desc": "JPH::BodyID, 0xffffffff until created"
+        }
+      ],
+      "notes": "height(x, z) is the smooth surface (src/physics/height_field.cpp); the collider is its triangulation. size() = (samples - 1) x spacing."
+    },
+    {
+      "name": "PhysicsStats",
+      "kind": "context",
+      "file": "src/logic/components/rigid_body.h",
+      "summary": "What the host physics did this frame, for the debug menu",
+      "json": "null",
+      "fields": [
+        {
+          "name": "bodies",
+          "type": "uint32_t",
+          "desc": "bodies in the Jolt system"
+        },
+        {
+          "name": "active_bodies",
+          "type": "uint32_t",
+          "desc": "awake rigid bodies"
+        },
+        {
+          "name": "terrain_cells",
+          "type": "uint32_t",
+          "desc": "active terrain collider cells"
+        },
+        {
+          "name": "terrain_triangles",
+          "type": "uint32_t",
+          "desc": "triangles of those cells"
+        },
+        {
+          "name": "steps_last_frame",
+          "type": "int",
+          "desc": "fixed steps taken this frame"
+        },
+        {
+          "name": "step_ms",
+          "type": "float",
+          "desc": "wall time of the steps (0 in deterministic runs)"
+        },
+        {
+          "name": "colliders_ms",
+          "type": "float",
+          "desc": "wall time of the terrain colliders (0 in deterministic runs)"
+        }
+      ],
+      "notes": "Emplaced by RigidBody, TerrainColliders and Physics (whichever preinit runs first), read by DebugMenu."
+    },
+    {
+      "name": "ModelRef",
+      "kind": "component",
+      "file": "src/logic/components/model_ref.h",
+      "summary": "A glTF model to draw at the entity's Transform, by path under resources/",
+      "json": "ModelRef",
+      "fields": [
+        {
+          "name": "path",
+          "type": "std::string",
+          "desc": "model path under resources/ (required)"
+        },
+        {
+          "name": "color",
+          "type": "glm::vec4",
+          "desc": "tint (1)"
+        }
+      ],
+      "notes": "dynamical resolves it into a ModelRenderable; headless runs ignore it. models/primitives/capsule and box.gltf are the primitives of BoxDrop."
+    },
+    {
+      "name": "PointLight",
+      "kind": "component",
+      "file": "src/logic/components/point_light.h",
+      "summary": "A torch or fire next to a Transform; the nearest light the scene",
+      "json": "PointLight",
+      "fields": [
+        {
+          "name": "color",
+          "type": "glm::vec3",
+          "desc": "(1, 0.62, 0.3)"
+        },
+        {
+          "name": "intensity",
+          "type": "float",
+          "desc": "light on a surface facing it one metre away (12)"
+        },
+        {
+          "name": "radius",
+          "type": "float",
+          "desc": "metres, nothing lit beyond (18), must be positive"
+        }
+      ],
+      "notes": "Gathered into the renderer's Lights each frame."
+    },
+    {
+      "name": "Camera",
+      "kind": "context",
+      "file": "src/logic/components/camera.h",
+      "summary": "The desktop free camera: Y up, yaw 0 looks toward -Z",
+      "json": "null",
+      "fields": [
+        {
+          "name": "position",
+          "type": "glm::vec3",
+          "desc": "(0, 150, 0)"
+        },
+        {
+          "name": "yaw",
+          "type": "float",
+          "desc": "radians"
+        },
+        {
+          "name": "pitch",
+          "type": "float",
+          "desc": "radians (-0.4)"
+        },
+        {
+          "name": "fov",
+          "type": "float",
+          "desc": "vertical field of view (70 degrees)"
+        },
+        {
+          "name": "near_plane",
+          "type": "float",
+          "desc": "0.1"
+        },
+        {
+          "name": "far_plane",
+          "type": "float",
+          "desc": "3000"
+        },
+        {
+          "name": "sprinting",
+          "type": "bool",
+          "desc": "PlayerControl's sprint state"
+        }
+      ],
+      "notes": "Emplaced by PlayerControl (or the player systems); getView(), getProjection(aspect) in Vulkan clip space. ChunkManager and ChunkGenerator stream around it."
+    },
+    {
+      "name": "VRRig",
+      "kind": "context",
+      "file": "src/logic/components/vr.h",
+      "summary": "Where the VR play area (OpenXR stage space) sits in the world",
+      "json": "null",
+      "fields": [
+        {
+          "name": "position",
+          "type": "glm::vec3",
+          "desc": "world position of the stage origin"
+        },
+        {
+          "name": "yaw",
+          "type": "float",
+          "desc": "radians"
+        },
+        {
+          "name": "stick_locomotion",
+          "type": "bool",
+          "desc": "VRControl moves the rig with the left stick (true); off when a system drives it"
+        }
+      ],
+      "notes": "Emplaced by VRRender; transform() gives stage to world."
+    },
+    {
+      "name": "VRInput",
+      "kind": "context",
+      "file": "src/logic/components/vr.h",
+      "summary": "Headset and controller state written by the VR renderer after xrWaitFrame, in stage space",
+      "json": "null",
+      "fields": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "desc": "a headset is connected"
+        },
+        {
+          "name": "session_running",
+          "type": "bool",
+          "desc": "the OpenXR session runs"
+        },
+        {
+          "name": "focused",
+          "type": "bool",
+          "desc": "the session has focus"
+        },
+        {
+          "name": "head",
+          "type": "VRPose",
+          "desc": "head pose (valid, position, rotation)"
+        },
+        {
+          "name": "hands",
+          "type": "VRInput::Hand[2]",
+          "desc": "left (0) and right (1): pose, linear / angular velocity, trigger, grip, thumbstick, trigger_pressed and primary_pressed (rising edges), primary, thumbstick_click"
+        }
+      ],
+      "notes": "Emplaced by VRActions (renderer)."
+    },
+    {
+      "name": "FrameClock",
+      "kind": "context",
+      "file": "src/logic/components/frame_clock.h",
+      "summary": "The main loop's clock, written before the systems tick",
+      "json": "null",
+      "fields": [
+        {
+          "name": "dt",
+          "type": "double",
+          "desc": "seconds of this frame (RunArgs::fixed_frame_dt in deterministic runs)"
+        },
+        {
+          "name": "time",
+          "type": "double",
+          "desc": "sum of dt"
+        },
+        {
+          "name": "frame",
+          "type": "uint64_t",
+          "desc": "1 for the first frame"
+        }
+      ],
+      "notes": "Emplaced and written by Game."
+    },
+    {
+      "name": "RenderSettings",
+      "kind": "context",
+      "file": "src/logic/components/render_settings.h",
+      "summary": "Runtime toggles and parameters of the scene passes, edited from the debug menu and by the graphics level",
+      "json": "null",
+      "fields": [
+        {
+          "name": "terrain, grass, models, vegetation, animals",
+          "type": "bool",
+          "desc": "pass toggles (true)"
+        },
+        {
+          "name": "grass_pass",
+          "type": "bool",
+          "desc": "set by GrassPass: the terrain is dark under the grass"
+        },
+        {
+          "name": "tree_shade",
+          "type": "float",
+          "desc": "darkness under the plants (0.85)"
+        },
+        {
+          "name": "lighting",
+          "type": "RenderSettings::Lighting[2]",
+          "desc": "desktop (High), VR (Medium): tier, traced_range, sun_rays, plant_geometry_range, shadowed_torches, animals; Lighting::of(tier)"
+        },
+        {
+          "name": "far_plants_in_rays, far_plants_on_screen",
+          "type": "bool",
+          "desc": "far plants as boxes in the rays / drawn from their volume (true)"
+        },
+        {
+          "name": "probe_rays_per_frame",
+          "type": "int",
+          "desc": "250000"
+        },
+        {
+          "name": "rays_per_probe",
+          "type": "int",
+          "desc": "48"
+        },
+        {
+          "name": "textures",
+          "type": "RenderSettings::Textures",
+          "desc": "anisotropy of grass (16), ground, vegetation, animals (8), read when the passes are made"
+        },
+        {
+          "name": "streaming",
+          "type": "RenderSettings::Streaming",
+          "desc": "chunk_meshes, ray_chunks, plant_volume_slices a frame (8 each)"
+        },
+        {
+          "name": "soil",
+          "type": "bool",
+          "desc": "soil patches (true)"
+        },
+        {
+          "name": "soil_params",
+          "type": "SoilParams",
+          "desc": "the patches' noises"
+        },
+        {
+          "name": "scree",
+          "type": "float",
+          "desc": "stones at the foot of the rock (1)"
+        },
+        {
+          "name": "relief",
+          "type": "float",
+          "desc": "depth of the ground relief (1)"
+        },
+        {
+          "name": "vegetation_params",
+          "type": "RenderSettings::Vegetation",
+          "desc": "lod_bias 2, force_lod -1, normal_maps, subsurface, cull"
+        },
+        {
+          "name": "grass_params",
+          "type": "RenderSettings::Grass",
+          "desc": "base_normal, follow_terrain, tile_size, height, height_map, patch_amount, patch_size, noise, wind, layers, colour, dryness, curve, shadow, canopy, silhouette, azimuth_dither, baked_colour, species"
+        }
+      ],
+      "notes": "Emplaced by the Renderer, which applies the Graphics level to it before the command line keys."
+    },
+    {
+      "name": "LightingStats",
+      "kind": "context",
+      "file": "src/logic/components/lighting_stats.h",
+      "summary": "What the ray traced lighting still builds; captures wait for settled()",
+      "json": "null",
+      "fields": [
+        {
+          "name": "chunks_lit",
+          "type": "uint32_t",
+          "desc": "chunks with an acceleration structure"
+        },
+        {
+          "name": "chunks_pending",
+          "type": "uint32_t",
+          "desc": "meshed, not yet in the rays"
+        },
+        {
+          "name": "instances",
+          "type": "uint32_t",
+          "desc": "of the top level structure"
+        },
+        {
+          "name": "plants_near",
+          "type": "uint32_t",
+          "desc": "plants that are their leaves in the rays"
+        },
+        {
+          "name": "plants_far",
+          "type": "uint32_t",
+          "desc": "plants that are a box"
+        },
+        {
+          "name": "structures_pending",
+          "type": "uint32_t",
+          "desc": "species, models and animals waiting for a structure"
+        },
+        {
+          "name": "probes_pending",
+          "type": "uint32_t",
+          "desc": "probes of new bricks never traced"
+        },
+        {
+          "name": "probes_active",
+          "type": "uint32_t",
+          "desc": "probes traced"
+        },
+        {
+          "name": "bricks",
+          "type": "uint32_t",
+          "desc": "chunks with probes"
+        },
+        {
+          "name": "structure_bytes",
+          "type": "uint64_t",
+          "desc": "memory of the bottom level structures"
+        }
+      ],
+      "notes": "Only there with ray tracing; written by the renderer's lighting."
+    },
+    {
+      "name": "ChunkC",
+      "kind": "component",
+      "file": "src/logic/terrain/chunk.h",
+      "summary": "A marching cubes chunk entity at chunk coordinates pos (256 m a side)",
+      "json": "null",
+      "fields": [
+        {
+          "name": "pos",
+          "type": "glm::ivec3",
+          "desc": "chunk coordinates; origin() = pos x 256, center() = origin + 128"
+        }
+      ],
+      "notes": "Created by ChunkManager; the entity is destroyed by TerrainSys after ChunkDestroying."
+    },
+    {
+      "name": "ChunkVolume",
+      "kind": "component",
+      "file": "src/logic/terrain/chunk.h",
+      "summary": "Density samples of a chunk crossing the surface",
+      "json": "null",
+      "fields": [
+        {
+          "name": "values",
+          "type": "std::vector<float>",
+          "desc": "67^3 densities, [x][z][y] (chunk::index), > 0 solid, one sample of border"
+        }
+      ],
+      "notes": "Written by ChunkGenerator; read by TerrainSys, TerrainColliders, Forest, VegetationScatter, the lighting."
+    },
+    {
+      "name": "ChunkEmpty",
+      "kind": "component",
+      "file": "src/logic/terrain/chunk.h",
+      "summary": "Every sample of the chunk is on the same side of the surface: nothing to mesh",
+      "json": "null",
+      "fields": [
+        {
+          "name": "mean",
+          "type": "float",
+          "desc": "mean density (> 0: solid, else air)"
+        }
+      ],
+      "notes": "Written by ChunkGenerator."
+    },
+    {
+      "name": "ChunkGenerating",
+      "kind": "tag",
+      "file": "src/logic/terrain/chunk.h",
+      "summary": "Density being computed on a worker thread",
+      "json": "null",
+      "fields": [],
+      "notes": "Added and removed by ChunkGenerator; TerrainSys does not destroy a chunk while it has it."
+    },
+    {
+      "name": "ChunkGenerated",
+      "kind": "tag",
+      "file": "src/logic/terrain/chunk.h",
+      "summary": "ChunkVolume or ChunkEmpty present",
+      "json": "null",
+      "fields": [],
+      "notes": "Added by ChunkGenerator when a job is collected."
+    },
+    {
+      "name": "ChunkMeshPending",
+      "kind": "tag",
+      "file": "src/logic/terrain/chunk.h",
+      "summary": "Waits for a marching cubes dispatch",
+      "json": "null",
+      "fields": [],
+      "notes": "Added by ChunkGenerator, removed by TerrainSys when meshed."
+    },
+    {
+      "name": "ChunkDestroying",
+      "kind": "tag",
+      "file": "src/logic/terrain/chunk.h",
+      "summary": "Out of view distance: destroyed once the GPU and the workers are done with it",
+      "json": "null",
+      "fields": [],
+      "notes": "Added by ChunkManager (the chunk leaves ChunkMap at once), consumed by TerrainSys."
+    },
+    {
+      "name": "ChunkMap",
+      "kind": "context",
+      "file": "src/logic/terrain/chunk.h",
+      "summary": "Chunk coordinates to chunk entity",
+      "json": "null",
+      "fields": [
+        {
+          "name": "chunks",
+          "type": "std::unordered_map<glm::ivec3, entt::entity, IVec3Hash>",
+          "desc": "the chunks in range; get(pos) gives entt::null when absent"
+        }
+      ],
+      "notes": "Emplaced and maintained by ChunkManager; looked up by TerrainColliders and the other terrain users."
+    },
+    {
+      "name": "TerrainGenerator",
+      "kind": "context",
+      "file": "src/logic/terrain/terrain_generator.h",
+      "summary": "Density function of the marching cubes world: FastNoise2 heightfield plus 3D overhang noise, thread safe",
+      "json": "null",
+      "fields": [
+        {
+          "name": "seed",
+          "type": "int",
+          "desc": "1337 by default"
+        },
+        {
+          "name": "base_level",
+          "type": "float",
+          "desc": "60"
+        },
+        {
+          "name": "height_amplitude",
+          "type": "float",
+          "desc": "90"
+        },
+        {
+          "name": "height_frequency",
+          "type": "float",
+          "desc": "1/700 per metre"
+        },
+        {
+          "name": "overhang_amplitude",
+          "type": "float",
+          "desc": "14"
+        },
+        {
+          "name": "overhang_frequency",
+          "type": "float",
+          "desc": "1/90 per metre"
+        }
+      ],
+      "notes": "Held as std::shared_ptr<TerrainGenerator> in the context: ChunkGenerator (host) or WorldTerrain (worlds) emplace it. generate, sample, surfaceHeight(s)."
+    },
+    {
+      "name": "Settings",
+      "kind": "context",
+      "file": "src/logic/settings/settings.h",
+      "summary": "dynamical's settings: ./config.7.json with key=value overrides",
+      "json": "null",
+      "fields": [
+        {
+          "name": "window_width, window_height",
+          "type": "int",
+          "desc": "0: the display"
+        },
+        {
+          "name": "fullscreen",
+          "type": "bool",
+          "desc": "true"
+        },
+        {
+          "name": "fps_max",
+          "type": "int",
+          "desc": "60"
+        },
+        {
+          "name": "username",
+          "type": "std::string",
+          "desc": "John Doe"
+        },
+        {
+          "name": "server_side, client_side",
+          "type": "bool",
+          "desc": "false (legacy)"
+        },
+        {
+          "name": "vr_mode",
+          "type": "int",
+          "desc": "0 desktop only, 1 VR alongside when a headset is found (1)"
+        },
+        {
+          "name": "spectator_mode",
+          "type": "int",
+          "desc": "2"
+        },
+        {
+          "name": "view_distance",
+          "type": "int",
+          "desc": "chunks loaded within, world units (768)"
+        },
+        {
+          "name": "graphics",
+          "type": "std::string",
+          "desc": "level of resources/graphics.json (high)"
+        },
+        {
+          "name": "grass_kind",
+          "type": "std::string",
+          "desc": "one GrassKind everywhere, not saved"
+        },
+        {
+          "name": "ground_relief",
+          "type": "float",
+          "desc": "times the relief depth, not saved (1)"
+        }
+      ],
+      "notes": "Emplaced by Game; absent in headless runs (ChunkManager then uses the default view distance)."
+    },
+    {
+      "name": "Graphics",
+      "kind": "context",
+      "file": "src/logic/settings/graphics.h",
+      "summary": "The levels of resources/graphics.json, from the cheapest, and the applied one",
+      "json": "null",
+      "fields": [
+        {
+          "name": "presets",
+          "type": "std::vector<GraphicsPreset>",
+          "desc": "the levels (name, view_distance, ray_tracing, lighting[2], probe rays, far plants, textures, relief, grass layers / shadow / see-through, lod_bias, normal maps, subsurface, streaming)"
+        },
+        {
+          "name": "current",
+          "type": "int",
+          "desc": "index of the applied level, -1: the defaults of the code"
+        }
+      ],
+      "notes": "Emplaced by Game; the Renderer applies it, the debug menu switches it."
+    },
+    {
+      "name": "PhysicsPose",
+      "kind": "component",
+      "file": "src/physics/physics_sys.h",
+      "summary": "The last two simulated poses of a dynamic body",
+      "json": "null",
+      "fields": [
+        {
+          "name": "prev_position",
+          "type": "glm::vec3",
+          "desc": "pose before the last step"
+        },
+        {
+          "name": "position",
+          "type": "glm::vec3",
+          "desc": "pose after the last step"
+        },
+        {
+          "name": "prev_rotation",
+          "type": "glm::quat",
+          "desc": ""
+        },
+        {
+          "name": "rotation",
+          "type": "glm::quat",
+          "desc": ""
+        }
+      ],
+      "notes": "Put on dynamic bodies by RigidBody; updated by Physics (host, which interpolates the Transform between them) and PhysicsStep (worlds; WorldView interpolates)."
+    },
+    {
+      "name": "FixedStepClock",
+      "kind": "context",
+      "file": "src/physics/physics_sys.h",
+      "summary": "The host's fixed-step accumulator (60 Hz, 4 steps a frame at most)",
+      "json": "null",
+      "fields": [
+        {
+          "name": "accumulator",
+          "type": "double",
+          "desc": "seconds not simulated yet"
+        },
+        {
+          "name": "sim_time",
+          "type": "double",
+          "desc": "seconds simulated"
+        },
+        {
+          "name": "fixed_dt",
+          "type": "static constexpr float",
+          "desc": "1/60"
+        },
+        {
+          "name": "max_steps",
+          "type": "static constexpr int",
+          "desc": "4"
+        }
+      ],
+      "notes": "stepsFor(dt): the steps the next Physics tick takes. Shared by TerrainColliders (reads ahead) and Physics (advances)."
+    },
+    {
+      "name": "FixedSteps",
+      "kind": "context",
+      "file": "src/physics/physics_sys.h",
+      "summary": "What host systems do at the physics rate, called by Physics around each Jolt step",
+      "json": "null",
+      "fields": [
+        {
+          "name": "before",
+          "type": "std::vector<FixedSteps::Step>",
+          "desc": "called before each step (owner, run(h))"
+        },
+        {
+          "name": "after",
+          "type": "std::vector<FixedSteps::Step>",
+          "desc": "called after it, poses of the step read"
+        }
+      ],
+      "notes": "fixedSteps(reg) emplaces it; systems add their steps in preinit and remove(this) in finish; called in registration order."
+    },
+    {
+      "name": "TerrainNeeds",
+      "kind": "context",
+      "file": "src/physics/physics_sys.h",
+      "summary": "Boxes that need terrain colliders this frame without a dynamic body in them",
+      "json": "null",
+      "fields": [
+        {
+          "name": "boxes",
+          "type": "std::vector<std::pair<glm::vec3, glm::vec3>>",
+          "desc": "min, max"
+        }
+      ],
+      "notes": "Filled every frame by the player legs, emptied by TerrainColliders."
+    },
+    {
+      "name": "PhysicsWorld",
+      "kind": "context",
+      "file": "src/physics/physics_world.h",
+      "summary": "A Jolt PhysicsSystem with its job system and temporary allocator, one per registry",
+      "json": "null",
+      "fields": [
+        {
+          "name": "settings",
+          "type": "PhysicsConfig",
+          "desc": "threads, max_bodies 65536, max_body_pairs, max_contacts 16384, temp_bytes 16 MB, gravity, substeps 1, allow_sleeping, friction / restitution combine, optional Jolt settings"
+        },
+        {
+          "name": "job_system",
+          "type": "std::unique_ptr<JPH::JobSystem>",
+          "desc": "single threaded with threads 1, else a pool (0: hardware_concurrency / 2 - 1)"
+        },
+        {
+          "name": "physics",
+          "type": "std::unique_ptr<JPH::PhysicsSystem>",
+          "desc": "the Jolt system"
+        }
+      ],
+      "notes": "Host: physicsWorld(reg) makes it with the default config on first use. Worlds: World emplaces it from the template's physics block. Needs a JoltRuntime alive."
+    },
+    {
+      "name": "TerrainUsers",
+      "kind": "context",
+      "file": "src/physics/terrain_colliders.h",
+      "summary": "Bodies that are no RigidBody and need the terrain under them (a ragdoll's segments)",
+      "json": "null",
+      "fields": [
+        {
+          "name": "bodies",
+          "type": "std::vector<JPH::BodyID>",
+          "desc": "the segments"
+        }
+      ],
+      "notes": "World context, set by the agent factories when the world has TerrainColliders, read by WorldTerrain."
+    },
+    {
+      "name": "TerrainColliders",
+      "kind": "context",
+      "file": "src/physics/terrain_colliders.h",
+      "summary": "Static Jolt mesh colliders of the marching cubes terrain, in cells of 16^3 cubes built where bodies go",
+      "json": "null",
+      "fields": [
+        {
+          "name": "cells",
+          "type": "std::unordered_map<glm::ivec3, Cell>",
+          "desc": "state (Building, Built, Active, Empty), job, body, triangles, last_used"
+        },
+        {
+          "name": "triangle_count",
+          "type": "uint32_t",
+          "desc": "triangles of the active cells"
+        },
+        {
+          "name": "marching_cubes",
+          "type": "std::shared_ptr<MarchingCubes>",
+          "desc": "CPU mesher"
+        },
+        {
+          "name": "generator",
+          "type": "std::shared_ptr<TerrainGenerator>",
+          "desc": "the context's, else a default one"
+        }
+      ],
+      "notes": "World context as std::shared_ptr<TerrainColliders> (WorldTerrain). On the host TerrainCollidersSys owns its own (not in the context). update, require, surfaceHeight, overhangAmplitude, clear."
+    },
+    {
+      "name": "WorldClock",
+      "kind": "context",
+      "file": "src/scene/world.h",
+      "summary": "A world's fixed tick and decision window",
+      "json": "null",
+      "fields": [
+        {
+          "name": "dt",
+          "type": "double",
+          "desc": "1 / physics_hz (1/60)"
+        },
+        {
+          "name": "decision_period",
+          "type": "uint32_t",
+          "desc": "ticks per decision: physics_hz / control_hz"
+        },
+        {
+          "name": "tick",
+          "type": "uint64_t",
+          "desc": "ticks done"
+        }
+      ],
+      "notes": "Emplaced by World from the template's clock block; tick advanced by World::tick."
+    },
+    {
+      "name": "WorldRng",
+      "kind": "context",
+      "file": "src/scene/world.h",
+      "summary": "The world's random stream, the same on every platform",
+      "json": "null",
+      "fields": [
+        {
+          "name": "engine",
+          "type": "std::mt19937_64",
+          "desc": "seeded worldSeed(base_seed, index)"
+        }
+      ],
+      "notes": "uniform(), uniform(a, b), normal(), unitSphere(): own distributions. Emplaced by World."
+    },
+    {
+      "name": "WorldInfo",
+      "kind": "context",
+      "file": "src/scene/world.h",
+      "summary": "Who a world is",
+      "json": "null",
+      "fields": [
+        {
+          "name": "index",
+          "type": "uint32_t",
+          "desc": "rank among the scene's worlds"
+        },
+        {
+          "name": "seed",
+          "type": "uint64_t",
+          "desc": "its seed"
+        },
+        {
+          "name": "template_name",
+          "type": "std::string",
+          "desc": "its template"
+        }
+      ],
+      "notes": "Emplaced by World."
+    },
+    {
+      "name": "Worlds",
+      "kind": "context",
+      "file": "src/scene/world.h",
+      "summary": "The worlds of a scene in index order (dynamical's host context)",
+      "json": "null",
+      "fields": [
+        {
+          "name": "list",
+          "type": "std::vector<std::unique_ptr<World>>",
+          "desc": "each with its registry, SystemSet, clock"
+        }
+      ],
+      "notes": "Emplaced by Game::start when the scene has worlds; stepped by WorldStepper, drawn by WorldView; ScenarioRunner holds its own (not in a context)."
+    },
+    {
+      "name": "RunArgs",
+      "kind": "context",
+      "file": "src/scene/run_args.h",
+      "summary": "Process arguments: scene, variables, mode, seed, capture, probe and lighting keys",
+      "json": "null",
+      "fields": [
+        {
+          "name": "scene",
+          "type": "std::string",
+          "desc": ""
+        },
+        {
+          "name": "vars",
+          "type": "std::vector<std::pair<std::string, std::string>>",
+          "desc": "var.<name>=<value>, in order"
+        },
+        {
+          "name": "mode",
+          "type": "std::string",
+          "desc": ""
+        },
+        {
+          "name": "threads",
+          "type": "int",
+          "desc": "0"
+        },
+        {
+          "name": "ticks",
+          "type": "int64_t",
+          "desc": "dynamical exits after this many frames when > 0"
+        },
+        {
+          "name": "episodes",
+          "type": "int",
+          "desc": "0"
+        },
+        {
+          "name": "seed",
+          "type": "int64_t",
+          "desc": "base seed of the worlds"
+        },
+        {
+          "name": "profile",
+          "type": "bool",
+          "desc": "start Tracy"
+        },
+        {
+          "name": "capture",
+          "type": "std::string",
+          "desc": "capture script"
+        },
+        {
+          "name": "capture_dir",
+          "type": "std::string",
+          "desc": "captures"
+        },
+        {
+          "name": "fixed_frame_dt",
+          "type": "double",
+          "desc": "> 0: fixed frame clock (deterministic())"
+        },
+        {
+          "name": "window_hidden",
+          "type": "bool",
+          "desc": ""
+        },
+        {
+          "name": "exit_after_capture",
+          "type": "bool",
+          "desc": "true"
+        },
+        {
+          "name": "gpu_times",
+          "type": "bool",
+          "desc": ""
+        },
+        {
+          "name": "capture_window",
+          "type": "bool",
+          "desc": ""
+        },
+        {
+          "name": "ray_tracing",
+          "type": "bool",
+          "desc": "true"
+        },
+        {
+          "name": "lighting",
+          "type": "std::string",
+          "desc": "off, low, medium, high"
+        },
+        {
+          "name": "probe_rays",
+          "type": "int",
+          "desc": "-1"
+        },
+        {
+          "name": "far_plants",
+          "type": "std::string",
+          "desc": "volumes, rays, screen, none"
+        },
+        {
+          "name": "probe",
+          "type": "std::string",
+          "desc": "probe CSV"
+        },
+        {
+          "name": "probe_entities",
+          "type": "std::string",
+          "desc": "RigidBody or Transform"
+        },
+        {
+          "name": "probe_every",
+          "type": "int",
+          "desc": "60"
+        }
+      ],
+      "notes": "Emplaced by Game (dynamical); deterministic() = fixed_frame_dt > 0: synchronous chunks, no collider prefetch, zero timings."
+    },
+    {
+      "name": "Parked",
+      "kind": "context",
+      "file": "src/logic/systems/system_set.h",
+      "summary": "World flag: a killed agent waits for the end of its decision window",
+      "json": "null",
+      "fields": [
+        {
+          "name": "value",
+          "type": "bool",
+          "desc": "while true only Observe systems run"
+        }
+      ],
+      "notes": "Emplaced by World; set by the agents' termination systems, read by SystemSet::fixed_tick."
+    },
+    {
+      "name": "Executor",
+      "kind": "context",
+      "file": "src/view/game.cpp",
+      "summary": "The host's taskflow thread pool (tf::Executor, an external type emplaced by Game)",
+      "json": "null",
+      "fields": [],
+      "notes": "tf::Executor from taskflow, hardware_concurrency workers named 'Worker <n>' (profile::namedWorkers). Only in dynamical's host registry: worlds and headless runs have none (TerrainColliders then builds inline). Used for chunk generation, terrain collider cells, parallel command recording, worlds' parallel steps."
+    }
+  ]
+}

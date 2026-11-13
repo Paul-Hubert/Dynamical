@@ -1,7 +1,7 @@
 # RigidBody
 
 `RigidBodySys` in [`src/physics/physics_sys.cpp`](../../../src/physics/physics_sys.cpp) · Scope: Both · Needs renderer: no
-· Lanes: `host.pre` (before `TerrainColliders`, `Physics`), a world's `fixed` list (first, before `PhysicsStep`) · Parameters: no
+· Lanes: `host.pre` (before `TerrainColliders`, `Physics`), a world's `fixed` list (at the start, before `WorldTerrain` and `PhysicsStep`) · Parameters: no
 
 Turns the physics components of the registry into Jolt bodies of the registry's `PhysicsWorld`: a body for every
 new `RigidBody` (next to a `Transform`), a static box for every `Ground`, a static height field for every
@@ -74,7 +74,7 @@ pages) and the world's `PhysicsConfig` (`allow_sleeping`).
 - Host: before [TerrainColliders](TerrainColliders.md) and [Physics](Physics.md) (bodies made this frame are
   simulated and get colliders this frame), after the systems that spawn `RigidBody` entities (`BoxThrower`,
   `BoxRing`, players).
-- Worlds: first in the `fixed` list (before `WorldTerrain`, the agent factories, `PhysicsStep`); a world's
+- Worlds: at the start of the `fixed` list (after `BoxDrop` in box_world, before `WorldTerrain`, the agent factories, `PhysicsStep`); a world's
   `PhysicsWorld` is emplaced by `World` from the template's `physics` block before any preinit.
 - In init it runs in scene order: world systems listed after it find the grounds already in Jolt.
 

@@ -1085,12 +1085,12 @@
         {
           "name": "speed_range",
           "type": "glm::vec2",
-          "desc": "target speeds, m/s ... (default glm::vec2(0.5, 3.0))"
+          "desc": "target speeds drawn in this range, m/s (default glm::vec2(0.5, 3.0))"
         },
         {
           "name": "stop_chance",
           "type": "float",
-          "desc": "... or 0 with this probability (default 0.1)"
+          "desc": "probability that a drawn target speed is 0 (default 0.1)"
         },
         {
           "name": "turn_rate",
@@ -1165,12 +1165,12 @@
         {
           "name": "home",
           "type": "glm::vec3",
-          "desc": "Episode state / the episode's spawn point (default glm::vec3(0.0))"
+          "desc": "the episode's spawn point (default glm::vec3(0.0))"
         },
         {
           "name": "heading",
           "type": "float",
-          "desc": "the live target: heading (rad) and speed (m/s) (default 0.0)"
+          "desc": "live target heading, radians (headingDirection: (cos, 0, sin)) (default 0.0)"
         },
         {
           "name": "speed",
@@ -1200,7 +1200,7 @@
         {
           "name": "decision_heading",
           "type": "float",
-          "desc": "... and its frame converts the action to a world torque (default 0.0)"
+          "desc": "heading of the last observation: its goal frame converts the action to a world torque (default 0.0)"
         },
         {
           "name": "has_decision",
@@ -1215,12 +1215,12 @@
         {
           "name": "reward_sum",
           "type": "double",
-          "desc": "sum of the window's per-tick rewards (default 0.)"
+          "desc": "sum of the window's per-tick rewards (default 0.0)"
         },
         {
           "name": "error_sum",
           "type": "double",
-          "desc": "sum of the window's horizontal speed errors, m/s (default 0.)"
+          "desc": "sum of the window's horizontal speed errors, m/s (default 0.0)"
         },
         {
           "name": "reward_ticks",
@@ -1310,7 +1310,7 @@
         {
           "name": "reward",
           "type": "double",
-          "desc": "since its last decision (default 0.)"
+          "desc": "since its last decision (default 0.0)"
         },
         {
           "name": "nearest",
@@ -1520,12 +1520,12 @@
         {
           "name": "yield",
           "type": "bool",
-          "desc": "... unless the tip then misses its target: the limits give way (default false)"
+          "desc": "with limits: when the tip then misses its target by more than 0.5 mm or 0.2 degrees, solve again without them (default false)"
         },
         {
           "name": "solved",
           "type": "bool",
-          "desc": "The last solve (default false)"
+          "desc": "the chain had enabled targets and was solved on the last tick (default false)"
         },
         {
           "name": "iterations",
@@ -1535,12 +1535,12 @@
         {
           "name": "position_error",
           "type": "float",
-          "desc": "The last solve / m between the tip anchor and the target (default 0.0)"
+          "desc": "m between the tip anchor and the target, last solve (default 0.0)"
         },
         {
           "name": "rotation_error",
           "type": "float",
-          "desc": "radians between the tip segment and the target (default 0.0)"
+          "desc": "radians between the tip segment and the target, last solve (default 0.0)"
         },
         {
           "name": "limit_excess",
@@ -1690,32 +1690,32 @@
         {
           "name": "step_factor",
           "type": "float",
-          "desc": "Step length / leg length = step_factor * (speed / sqrt(g * leg length)) ^ step_exponent; the stride never lasts longer than max_stride_time (slow walking shortens the step instead) (default 1.11)"
+          "desc": "step length / leg length = step_factor * (speed / sqrt(g * leg length)) ^ step_exponent (default 1.11)"
         },
         {
           "name": "step_exponent",
           "type": "float",
-          "desc": "Step length / leg length = step_factor * (speed / sqrt(g * leg length)) ^ step_exponent; the stride never lasts longer than max_stride_time (slow walking shortens the step instead) (default 0.42)"
+          "desc": "exponent of that law (default 0.42)"
         },
         {
           "name": "max_stride_time",
           "type": "float",
-          "desc": "Step length / leg length = step_factor * (speed / sqrt(g * leg length)) ^ step_exponent; the stride never lasts longer than max_stride_time (slow walking shortens the step instead) (default 1.6)"
+          "desc": "s: the stride never lasts longer (slow walking shortens the step instead) (default 1.6)"
         },
         {
           "name": "stance_share",
           "type": "float",
-          "desc": "Share of the stride a foot is on the ground: stance_share at reference_speed, changing with speed / rate per m/s (default 0.62)"
+          "desc": "share of the stride a foot is on the ground at reference_speed (clamped to 0.55..0.72) (default 0.62)"
         },
         {
           "name": "stance_share_rate",
           "type": "float",
-          "desc": "Share of the stride a foot is on the ground: stance_share at reference_speed, changing with speed / rate per m/s (default -0.055)"
+          "desc": "change of stance_share per m/s above reference_speed (default -0.055)"
         },
         {
           "name": "reference_speed",
           "type": "float",
-          "desc": "Share of the stride a foot is on the ground: stance_share at reference_speed, changing with speed / rate per m/s (default 1.36)"
+          "desc": "m/s at which the amplitudes, angles and stance share are given (default 1.36)"
         },
         {
           "name": "step_width",
@@ -1725,32 +1725,32 @@
         {
           "name": "flat_start",
           "type": "float",
-          "desc": "Stance, as shares of its duration: heel rocker until flat_start, flat until heel_off, then the toe rocker (default 0.16)"
+          "desc": "share of the stance at which the heel rocker ends and the sole is flat (default 0.16)"
         },
         {
           "name": "heel_off",
           "type": "float",
-          "desc": "Stance, as shares of its duration: heel rocker until flat_start, flat until heel_off, then the toe rocker (default 0.5)"
+          "desc": "share of the stance at which the heel lifts (toe rocker) (default 0.5)"
         },
         {
           "name": "strike_angle",
           "type": "float",
-          "desc": "Stance, as shares of its duration: heel rocker until flat_start, flat until heel_off, then the toe rocker / sole pitch at heel strike and at toe-off, at reference_speed (default 0.26)"
+          "desc": "sole pitch at heel strike at reference_speed, radians (degrees in JSON) (default 0.26)"
         },
         {
           "name": "toe_angle",
           "type": "float",
-          "desc": "Stance, as shares of its duration: heel rocker until flat_start, flat until heel_off, then the toe rocker / sole pitch at heel strike and at toe-off, at reference_speed (default 1.05)"
+          "desc": "sole pitch at toe-off at reference_speed, radians (degrees in JSON) (default 1.05)"
         },
         {
           "name": "swing_lift",
           "type": "float",
-          "desc": "extra ankle arc; least gap between the sole and the ground (default 0.03)"
+          "desc": "m of extra ankle arc in swing (default 0.03)"
         },
         {
           "name": "swing_clearance",
           "type": "float",
-          "desc": "extra ankle arc; least gap between the sole and the ground (default 0.025)"
+          "desc": "m: least gap between the sole and the ground in swing (default 0.025)"
         },
         {
           "name": "swing_level",
@@ -1790,12 +1790,12 @@
         {
           "name": "ankle_roll_extra",
           "type": "float",
-          "desc": "Added to the ankles' swing limits for the IK only, about the foot's long axis (roll) and the sole's normal (yaw). 0: the body file's, which were widened for 15 degree side slopes (assets.md) (default 0.0)"
+          "desc": "radians added to the ankles' swing limit about the foot's long axis, for the IK only (degrees in JSON; 0: the body file's) (default 0.0)"
         },
         {
           "name": "ankle_yaw_extra",
           "type": "float",
-          "desc": "Added to the ankles' swing limits for the IK only, about the foot's long axis (roll) and the sole's normal (yaw). 0: the body file's, which were widened for 15 degree side slopes (assets.md) (default 0.0)"
+          "desc": "radians added to the ankles' swing limit about the sole's normal, for the IK only (degrees in JSON) (default 0.0)"
         },
         {
           "name": "yield_limits",
@@ -1805,7 +1805,7 @@
         {
           "name": "leg_extension",
           "type": "float",
-          "desc": "Pelvis and trunk / most of the thigh + shank length a leg stretches to (the knee keeps 14 degrees) (default 0.992)"
+          "desc": "most of the thigh + shank length a leg stretches to (the knee keeps 14 degrees) (default 0.992)"
         },
         {
           "name": "hip_height",
@@ -1825,12 +1825,12 @@
         {
           "name": "pelvis_yaw",
           "type": "float",
-          "desc": "amplitudes at reference_speed (default 0.07)"
+          "desc": "pelvis yaw amplitude at reference_speed, radians (default 0.07)"
         },
         {
           "name": "pelvis_list",
           "type": "float",
-          "desc": "amplitudes at reference_speed (default 0.035)"
+          "desc": "pelvis list (roll) amplitude at reference_speed, radians (default 0.035)"
         },
         {
           "name": "counter_rotation",
@@ -1840,12 +1840,12 @@
         {
           "name": "lean",
           "type": "float",
-          "desc": "trunk pitch at reference_speed; per radian of slope along the heading (default 0.035)"
+          "desc": "trunk pitch at reference_speed, radians (default 0.035)"
         },
         {
           "name": "lean_slope_gain",
           "type": "float",
-          "desc": "trunk pitch at reference_speed; per radian of slope along the heading (default 0.5)"
+          "desc": "trunk pitch per radian of slope along the heading (default 0.5)"
         },
         {
           "name": "arm_swing",
@@ -1870,32 +1870,32 @@
         {
           "name": "acceleration",
           "type": "float",
-          "desc": "Command following (default 1.0)"
+          "desc": "m/s2 when speeding up (default 1.0)"
         },
         {
           "name": "turn_rate",
           "type": "float",
-          "desc": "Command following (default 0.7)"
+          "desc": "rad/s toward the commanded heading (default 0.7)"
         },
         {
           "name": "min_speed",
           "type": "float",
-          "desc": "Command following (default 0.05)"
+          "desc": "m/s: a command under it stands (default 0.05)"
         },
         {
           "name": "slope_slowdown",
           "type": "float",
-          "desc": "Command following / the speed walked is the command times exp(-slope_slowdown * |tan slope|), (default 1.5)"
+          "desc": "the speed walked is the command times exp(-slope_slowdown * |tan slope|) (default 1.5)"
         },
         {
           "name": "slope_speed_floor",
           "type": "float",
-          "desc": "... and no less than this share of it, however steep, (default 0.25)"
+          "desc": "the speed walked is no less than this share of the command, however steep (default 0.25)"
         },
         {
           "name": "step_rise",
           "type": "float",
-          "desc": "... but slow enough that a step climbs or drops no more than this, m (0: no such cap) (default 0.35)"
+          "desc": "m: the speed is capped so that a step climbs or drops no more than this (0: no cap) (default 0.35)"
         },
         {
           "name": "look_ahead",
@@ -1930,47 +1930,47 @@
         {
           "name": "velocity_smoothing",
           "type": "float",
-          "desc": "Balance / seconds, the centre of mass velocity filter (default 0.08)"
+          "desc": "seconds, the centre of mass velocity filter (default 0.08)"
         },
         {
           "name": "scramble",
           "type": "bool",
-          "desc": "Scrambling (GaitHandIK in the lane): the steeper the ground, the lower the trunk, and a hand that comes within reach of the ground lays its palm flat on it (default false)"
+          "desc": "scrambling on (GaitHandIK in the lane): the steeper the ground, the lower the trunk, and a hand within reach of the ground lays its palm flat on it (default false)"
         },
         {
           "name": "scramble_from",
           "type": "float",
-          "desc": "Scrambling (GaitHandIK in the lane): the steeper the ground, the lower the trunk, and a hand that comes within reach of the ground lays its palm flat on it / radians of slope (20 and 50 degrees) between which the trunk comes down (default 0.35)"
+          "desc": "radians of slope at which the trunk starts coming down (20 degrees; degrees in JSON) (default 0.35)"
         },
         {
           "name": "scramble_full",
           "type": "float",
-          "desc": "Scrambling (GaitHandIK in the lane): the steeper the ground, the lower the trunk, and a hand that comes within reach of the ground lays its palm flat on it / radians of slope (20 and 50 degrees) between which the trunk comes down (default 0.87)"
+          "desc": "radians of slope at which it is fully down (50 degrees; degrees in JSON) (default 0.87)"
         },
         {
           "name": "scramble_crouch",
           "type": "float",
-          "desc": "the hips come down by this share of the legs' reach on the steepest ground, (default 0.15)"
+          "desc": "the hips come down by this share of the legs' reach on the steepest ground (default 0.15)"
         },
         {
           "name": "scramble_shoulder",
           "type": "float",
-          "desc": "... and the trunk tilts toward the slope until the shoulders are this far from the ground, m, (default 0.3)"
+          "desc": "m: the trunk tilts toward the slope until the shoulders are this far from the ground (default 0.3)"
         },
         {
           "name": "scramble_lean",
           "type": "float",
-          "desc": "... by this much at most, radians, (default 1.5)"
+          "desc": "radians: the most that tilt (degrees in JSON) (default 1.5)"
         },
         {
           "name": "scramble_past",
           "type": "float",
-          "desc": "... and no further than this past lying along the slope, radians. (default 0.5)"
+          "desc": "radians past lying along the slope the tilt never goes (default 0.5)"
         },
         {
           "name": "scramble_forward",
           "type": "float",
-          "desc": "Then the centre of mass target moves up the slope, by this at most, m: the hands will take weight (default 0.45)"
+          "desc": "m: the most the centre of mass target moves up the slope when the tilt is not enough (the hands take weight) (default 0.45)"
         },
         {
           "name": "scramble_spine",
@@ -1980,27 +1980,27 @@
         {
           "name": "hand_plant_reach",
           "type": "float",
-          "desc": "a hand takes a hold no further from its shoulder than this share of the arm, (default 0.86)"
+          "desc": "a hand takes a hold no further from its shoulder than this share of the arm (default 0.86)"
         },
         {
           "name": "hand_reach",
           "type": "float",
-          "desc": "... and keeps it until the arm is stretched to this share (default 0.97)"
+          "desc": "a planted hand keeps its hold until the arm is stretched to this share (default 0.97)"
         },
         {
           "name": "hand_behind",
           "type": "float",
-          "desc": "m behind its shoulder from where a hand moves on to a hold ahead, if there is one, (default 0.12)"
+          "desc": "m behind its shoulder from where a hand moves on to a hold ahead, if there is one (default 0.12)"
         },
         {
           "name": "hand_over",
           "type": "float",
-          "desc": "... or radians its arm is outside its limits, (default 0.35)"
+          "desc": "radians its arm is outside its limits from where a hand moves on to a hold ahead (default 0.35)"
         },
         {
           "name": "hand_hold",
           "type": "float",
-          "desc": "... once it has held for this long, seconds (default 0.4)"
+          "desc": "seconds a hand holds before it may move on (default 0.4)"
         },
         {
           "name": "hand_time",
@@ -2020,7 +2020,7 @@
         {
           "name": "trunk_reach",
           "type": "float",
-          "desc": "radians the trunk leans further so that a planted hand stays within reach (default 0.35)"
+          "desc": "radians the trunk leans further so that a planted hand stays within reach (degrees in JSON) (default 0.35)"
         },
         {
           "name": "trunk_return",
@@ -2055,7 +2055,7 @@
         {
           "name": "time",
           "type": "double",
-          "desc": "seconds walked (default 0.)"
+          "desc": "seconds walked (default 0.0)"
         },
         {
           "name": "phase",
@@ -2065,12 +2065,12 @@
         {
           "name": "speed",
           "type": "float",
-          "desc": "the command, followed at the allowed rates and slowed by the slope (default 0.0)"
+          "desc": "the speed walked: the command followed at the allowed rates and slowed by the slope, m/s (default 0.0)"
         },
         {
           "name": "heading",
           "type": "float",
-          "desc": "the command, followed at the allowed rates and slowed by the slope (default 0.0)"
+          "desc": "the heading walked, radians, turning toward the command's (default 0.0)"
         },
         {
           "name": "wanted_speed",
@@ -2095,12 +2095,12 @@
         {
           "name": "leg_length",
           "type": "float",
-          "desc": "This tick's gait laws / hip to sole; the longest hip to ankle distance (default 0.96)"
+          "desc": "hip to sole, m (set on the first tick) (default 0.96)"
         },
         {
           "name": "reach",
           "type": "float",
-          "desc": "This tick's gait laws / hip to sole; the longest hip to ankle distance (default 0.84)"
+          "desc": "the longest hip to ankle distance, m (default 0.84)"
         },
         {
           "name": "fold",
@@ -2145,12 +2145,12 @@
         {
           "name": "slope_pitch",
           "type": "float",
-          "desc": "of the ground along and across the heading (uphill, right side up) (default 0.0)"
+          "desc": "slope of the ground along the heading, radians (uphill positive) (default 0.0)"
         },
         {
           "name": "slope_roll",
           "type": "float",
-          "desc": "of the ground along and across the heading (uphill, right side up) (default 0.0)"
+          "desc": "slope across the heading, radians (right side up positive) (default 0.0)"
         },
         {
           "name": "steepness",
@@ -2185,7 +2185,7 @@
         {
           "name": "hands_ready",
           "type": "bool",
-          "desc": "Scrambling (default false)"
+          "desc": "GaitHandIK made the arms' chains and targets (default false)"
         },
         {
           "name": "hand",
@@ -2350,7 +2350,7 @@
         {
           "name": "settle",
           "type": "double",
-          "desc": "seconds of walk before the max_* / min_* start (default 2) (default 2.)"
+          "desc": "seconds of walk before the max_* / min_* start (default 2.0)"
         },
         {
           "name": "ticks",
@@ -2370,7 +2370,7 @@
         {
           "name": "max_contact_error",
           "type": "float",
-          "desc": "m between a planted sole point and the ground (default 0.0)"
+          "desc": "worst since settle: m between a planted sole point and the ground (default 0.0)"
         },
         {
           "name": "penetration",
@@ -2380,7 +2380,7 @@
         {
           "name": "max_penetration",
           "type": "float",
-          "desc": "m any sole point is under the ground (default 0.0)"
+          "desc": "worst since settle: m any sole point is under the ground (default 0.0)"
         },
         {
           "name": "slip",
@@ -2390,7 +2390,7 @@
         {
           "name": "max_slip",
           "type": "float",
-          "desc": "m a planted sole point moved since it was planted (default 0.0)"
+          "desc": "worst since settle: m a planted sole point moved since it was planted (default 0.0)"
         },
         {
           "name": "sole_angle",
@@ -2400,7 +2400,7 @@
         {
           "name": "max_sole_angle",
           "type": "float",
-          "desc": "radians between a flat sole and its footprint (default 0.0)"
+          "desc": "worst since settle: radians between a flat sole and its footprint (default 0.0)"
         },
         {
           "name": "limit_excess",
@@ -2410,17 +2410,17 @@
         {
           "name": "max_limit_excess",
           "type": "float",
-          "desc": "radians outside the IK limits (the bodies' pose) (default 0.0)"
+          "desc": "worst since settle: radians outside the IK limits (the bodies' pose) (default 0.0)"
         },
         {
           "name": "body_limit_excess",
           "type": "float",
-          "desc": "... outside the body file's (default 0.0)"
+          "desc": "radians outside the body file's limits (the bodies' pose) (default 0.0)"
         },
         {
           "name": "max_body_limit_excess",
           "type": "float",
-          "desc": "... outside the body file's (default 0.0)"
+          "desc": "worst body_limit_excess since settle (default 0.0)"
         },
         {
           "name": "worst_joint",
@@ -2430,12 +2430,12 @@
         {
           "name": "ik_position",
           "type": "float",
-          "desc": "m and radians, the residual of the legs in stance (default 0.0)"
+          "desc": "m, the residual of the legs in stance (default 0.0)"
         },
         {
           "name": "max_ik_position",
           "type": "float",
-          "desc": "m and radians, the residual of the legs in stance (default 0.0)"
+          "desc": "worst since settle: m and radians, the residual of the legs in stance (default 0.0)"
         },
         {
           "name": "ik_rotation",
@@ -2450,12 +2450,12 @@
         {
           "name": "swing_ik_position",
           "type": "float",
-          "desc": "... of the legs in swing (default 0.0)"
+          "desc": "m, the residual of the legs in swing (default 0.0)"
         },
         {
           "name": "max_swing_ik_position",
           "type": "float",
-          "desc": "... of the legs in swing (default 0.0)"
+          "desc": "worst swing_ik_position since settle (default 0.0)"
         },
         {
           "name": "swing_ik_rotation",
@@ -2470,7 +2470,7 @@
         {
           "name": "max_relief",
           "type": "float",
-          "desc": "radians, the most heel rise an ankle stop asked for (default 0.0)"
+          "desc": "worst since settle: radians, the most heel rise an ankle stop asked for (default 0.0)"
         },
         {
           "name": "ik_limit",
@@ -2480,7 +2480,7 @@
         {
           "name": "max_ik_limit",
           "type": "float",
-          "desc": "radians the IK limits took away, or would have where they gave way (default 0.0)"
+          "desc": "worst since settle: radians the IK limits took away, or would have where they gave way (default 0.0)"
         },
         {
           "name": "yielded",
@@ -2495,7 +2495,7 @@
         {
           "name": "max_capture_error",
           "type": "float",
-          "desc": "m between a heel strike and where the rule puts it (default 0.0)"
+          "desc": "worst since settle: m between a heel strike and where the rule puts it (default 0.0)"
         },
         {
           "name": "max_com_error",
@@ -2515,7 +2515,7 @@
         {
           "name": "max_gap",
           "type": "float",
-          "desc": "m, the least flat ground a foot stood on (default 0.0)"
+          "desc": "worst flatness gap of the ground under a stance print since settle, m (default 0.0)"
         },
         {
           "name": "mean_speed",
@@ -2540,17 +2540,17 @@
         {
           "name": "settle_time",
           "type": "double",
-          "desc": "GaitState::time when measuring started, -1 before (default -1.)"
+          "desc": "GaitState::time when measuring started, -1 before (default -1.0)"
         },
         {
           "name": "hand_contact_error",
           "type": "float",
-          "desc": "Hands (scrambling) / m between a planted palm point and the ground (default 0.0)"
+          "desc": "m between a planted palm point and the ground (default 0.0)"
         },
         {
           "name": "max_hand_contact_error",
           "type": "float",
-          "desc": "Hands (scrambling) / m between a planted palm point and the ground (default 0.0)"
+          "desc": "worst since settle: m between a planted palm point and the ground (default 0.0)"
         },
         {
           "name": "hand_penetration",
@@ -2560,7 +2560,7 @@
         {
           "name": "max_hand_penetration",
           "type": "float",
-          "desc": "m a planted palm point is under the ground (default 0.0)"
+          "desc": "worst since settle: m a planted palm point is under the ground (default 0.0)"
         },
         {
           "name": "hand_slip",
@@ -2570,17 +2570,17 @@
         {
           "name": "max_hand_slip",
           "type": "float",
-          "desc": "m a planted palm point moved since it was planted (default 0.0)"
+          "desc": "worst since settle: m a planted palm point moved since it was planted (default 0.0)"
         },
         {
           "name": "hand_ik_position",
           "type": "float",
-          "desc": "m and radians, the residual of the arms of planted hands (default 0.0)"
+          "desc": "m, the residual of the arms of planted hands (default 0.0)"
         },
         {
           "name": "max_hand_ik_position",
           "type": "float",
-          "desc": "m and radians, the residual of the arms of planted hands (default 0.0)"
+          "desc": "worst since settle: m and radians, the residual of the arms of planted hands (default 0.0)"
         },
         {
           "name": "hand_ik_rotation",
@@ -2595,17 +2595,17 @@
         {
           "name": "max_arm_limit",
           "type": "float",
-          "desc": "radians the arms' limits took away, or gave (default 0.0)"
+          "desc": "worst since settle: radians the arms' limits took away, or gave (default 0.0)"
         },
         {
           "name": "hand_ticks",
           "type": "std::array<int, 2>",
-          "desc": "ticks each palm was planted, holds it took, since settle"
+          "desc": "ticks each palm was planted, since settle"
         },
         {
           "name": "hand_holds",
           "type": "std::array<int, 2>",
-          "desc": "ticks each palm was planted, holds it took, since settle"
+          "desc": "holds each hand took, since settle"
         },
         {
           "name": "max_low",
@@ -2615,7 +2615,7 @@
         {
           "name": "min_hip_height",
           "type": "float",
-          "desc": "m of the hips over the walker's reference point (default 10.0)"
+          "desc": "least height of the hips over the walker's reference point since settle, m (default 10.0)"
         },
         {
           "name": "hand_planted",
