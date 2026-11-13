@@ -1,0 +1,1173 @@
+{
+  "systems": [
+    {
+      "name": "AnimalAnimation",
+      "class": "AnimalAnimationSys",
+      "file": "src/logic/animals/animal.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Advances the clip of every Animal, blends it with the clip it fades from, and writes the joints, world and skinning matrices into its AnimalPose.",
+      "access": [
+        {
+          "name": "Animal",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "Species and clip read; time, fade and previous_time advanced; an out of range clip reset to -1."
+        },
+        {
+          "name": "AnimalPose",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "Emplaced when missing; local, world and skin overwritten by evaluate()."
+        },
+        {
+          "name": "AnimalLibrary",
+          "kind": "context",
+          "access": "read+create",
+          "where": "preinit, tick (animalLibrary)",
+          "effect": "Emplaced and loaded when missing; species loaded lazily into its cache."
+        },
+        {
+          "name": "Executor",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "Optional taskflow executor that evaluates the poses in batches of 16."
+        }
+      ],
+      "side_effects": [
+        "Reads resources/animals/library.json and each species' .json, .bin and .anim on first use.",
+        "Logs the library's size or absence, and each species that fails to load.",
+        "Runs taskflow tasks (batches of 16 animals when there are more than 32) and waits for them."
+      ]
+    },
+    {
+      "name": "AnimalGait",
+      "class": "AnimalGaitSys",
+      "file": "src/logic/animals/gait.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Procedural walk: animals with an AnimalGait that play a walk, trot or run clip get their pose bent along their path and their feet planted on the ground; sets the clip's rate to the speed over the ground.",
+      "access": [
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "Where the animal is: speed, turn and the world frame of the feet."
+        },
+        {
+          "name": "Animal",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "Species, clip and time read; rate written."
+        },
+        {
+          "name": "AnimalGait",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick (proceduralWalk)",
+          "effect": "Style (replaced by the override when on), feet, phase, period, speed, turn, bend, drop, model, weight."
+        },
+        {
+          "name": "AnimalPose",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick (proceduralWalk)",
+          "effect": "World matrices read, bent and planted; skin rewritten; local left as the clip's."
+        },
+        {
+          "name": "GaitModels",
+          "kind": "context",
+          "access": "readwrite+create",
+          "where": "preinit (emplace), tick (get)",
+          "effect": "Cache of analyseGait per species and clip."
+        },
+        {
+          "name": "GaitStyleOverride",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "Style forced on every animal while on."
+        },
+        {
+          "name": "AnimalLibrary",
+          "kind": "context",
+          "access": "read+create",
+          "where": "tick (animalLibrary)",
+          "effect": "The species of each animal."
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "The ground the feet are planted on (std::shared_ptr)."
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "The terrain, when there is no ground field (std::shared_ptr)."
+        }
+      ],
+      "side_effects": [
+        "Logs one line per species and gait clip analysed.",
+        "Queries the ground field several times per foot per frame."
+      ]
+    },
+    {
+      "name": "SteeredWalk",
+      "class": "SteeredWalkSys",
+      "file": "src/logic/animals/steer.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Walks kinematic animals with an AnimalSteer toward the heading and speed asked, on the ground, and picks their idle, walk or run clip; keeps a SteeredWalk until they halt once unsteered.",
+      "access": [
+        {
+          "name": "AnimalSteer",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "Heading, speed and run asked."
+        },
+        {
+          "name": "SteeredWalk",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "tick",
+          "effect": "Emplaced on newly steered animals, walker state advanced, removed once halted without steering."
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick (stepWalker)",
+          "effect": "Heading read at the start; position and rotation written over the ground."
+        },
+        {
+          "name": "HerdAnimal",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "The speed the herd had the animal walking, to start from."
+        },
+        {
+          "name": "AnimalBotProxy",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (exclude)",
+          "effect": "Proxies of physical animals are left to AnimalBotSteer."
+        },
+        {
+          "name": "Animal",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "Species read; clip played, rate written."
+        },
+        {
+          "name": "AnimalGait",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (all_of)",
+          "effect": "With one, the rate is left to AnimalGait."
+        },
+        {
+          "name": "AnimalLibrary",
+          "kind": "context",
+          "access": "read",
+          "where": "tick (find)",
+          "effect": "Species, length and clips."
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "The ground walked on (std::shared_ptr)."
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "The terrain when there is no ground field (std::shared_ptr)."
+        }
+      ],
+      "side_effects": [
+        "Adds and removes the SteeredWalk component, which Herds watches to let go of and take back its members.",
+        "Queries the ground field per walking animal per tick."
+      ]
+    },
+    {
+      "name": "AnimalBotSteer",
+      "class": "AnimalBotSteerSys",
+      "file": "src/logic/animals/steer.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Keeps a host AnimalBotProxy (Transform and AnimalPose) for each world's physical animal and turns an AnimalSteer on it into the bot's WalkCommand within its trained ranges.",
+      "access": [
+        {
+          "name": "Worlds",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "The scene's worlds and their registries."
+        },
+        {
+          "name": "AnimalBot",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick (in each world's registry)",
+          "effect": "Body, ranges and segment states read; command.wanted_speed, wanted_turn and until written."
+        },
+        {
+          "name": "AnimalBotProxy",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "One per world, filled at creation."
+        },
+        {
+          "name": "AnimalBotProxy",
+          "kind": "component",
+          "access": "destroy",
+          "where": "finish",
+          "effect": "Proxies destroyed with their entity."
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "Created with the proxy; position and rotation overwritten every tick."
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "destroy",
+          "where": "finish",
+          "effect": "Destroyed with the proxy entity."
+        },
+        {
+          "name": "AnimalPose",
+          "kind": "component",
+          "access": "write+create",
+          "where": "tick",
+          "effect": "Emplaced when the species is in the library; world overwritten."
+        },
+        {
+          "name": "AnimalPose",
+          "kind": "component",
+          "access": "destroy",
+          "where": "finish",
+          "effect": "Destroyed with the proxy entity."
+        },
+        {
+          "name": "AnimalSteer",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "Heading and speed asked of the proxy."
+        },
+        {
+          "name": "AnimalLibrary",
+          "kind": "context",
+          "access": "read+create",
+          "where": "tick (animalLibrary)",
+          "effect": "Species index and skeleton of the body."
+        }
+      ],
+      "side_effects": [
+        "Creates one proxy entity per world with a built animal, destroys them in finish.",
+        "Writes into other registries: the AnimalBot command of each world, read at the next world step."
+      ]
+    },
+    {
+      "name": "Herds",
+      "class": "HerdSys",
+      "file": "src/logic/animals/herd.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Herds anchored to cells of the world, spawned around the viewer, grazing and moving on over the ground, around trunks, letting go of steered members.",
+      "access": [
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "spawn, updateMember, despawn, rebuildTrunks",
+          "effect": "Members' made, placed on the ground every tick (read when steered), destroyed with them; plants' read for trunks."
+        },
+        {
+          "name": "Animal",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "spawn, updateMember, despawn",
+          "effect": "Species, clip and time set at spawn; clips played and rate set; destroyed with the member."
+        },
+        {
+          "name": "HerdAnimal",
+          "kind": "component",
+          "access": "readwrite+create+destroy",
+          "where": "spawn, updateMember, despawn",
+          "effect": "Kind and cell at spawn; moving and speed every tick; removed from steered members when the herd goes."
+        },
+        {
+          "name": "AnimalGait",
+          "kind": "component",
+          "access": "write+create",
+          "where": "spawn",
+          "effect": "The procedural walk's style, when procedural."
+        },
+        {
+          "name": "AnimalGait",
+          "kind": "component",
+          "access": "read+destroy",
+          "where": "updateMember (all_of), despawn",
+          "effect": "With one, the rate is left to AnimalGait; destroyed with the member."
+        },
+        {
+          "name": "AnimalPose",
+          "kind": "component",
+          "access": "destroy",
+          "where": "despawn",
+          "effect": "Destroyed with the member."
+        },
+        {
+          "name": "AnimalSteer",
+          "kind": "component",
+          "access": "read",
+          "where": "updateHerd, updateMember, despawn",
+          "effect": "A steered member is let go, not waited for, not destroyed."
+        },
+        {
+          "name": "SteeredWalk",
+          "kind": "component",
+          "access": "read",
+          "where": "updateHerd, updateMember, despawn",
+          "effect": "The same while it coasts to a halt."
+        },
+        {
+          "name": "Plant",
+          "kind": "component",
+          "access": "read",
+          "where": "tick (storage size), rebuildTrunks",
+          "effect": "Trunks to walk around."
+        },
+        {
+          "name": "HerdStats",
+          "kind": "context",
+          "access": "write+create",
+          "where": "preinit (emplace), tick",
+          "effect": "The herds of this frame."
+        },
+        {
+          "name": "HerdSys",
+          "kind": "context",
+          "access": "write+create",
+          "where": "preinit",
+          "effect": "HerdSys* to this system, for HerdWatch::nearest."
+        },
+        {
+          "name": "AnimalLibrary",
+          "kind": "context",
+          "access": "read+create",
+          "where": "init, describe, spawn",
+          "effect": "Members' species, sizes and walk clips."
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "The viewer, without centre."
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "The ground (std::shared_ptr)."
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "The ground without a field and the slope of the land (std::shared_ptr)."
+        },
+        {
+          "name": "ForestField",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "Forest cover for the kinds' where (std::shared_ptr)."
+        },
+        {
+          "name": "VegetationLibrary",
+          "kind": "context",
+          "access": "read",
+          "where": "rebuildTrunks",
+          "effect": "Height of the plants' species."
+        }
+      ],
+      "side_effects": [
+        "Reads the herd definition JSON under ./resources/ in init.",
+        "Creates and destroys member entities as the viewer moves (destroying every component on them).",
+        "Logs warnings for missing members, an error for a bad definition, an info line at init, a debug line per herd spawned.",
+        "Queries the ground field per member per tick and the generator's heightfield for slopes."
+      ]
+    },
+    {
+      "name": "HerdWatch",
+      "class": "HerdWatchSys",
+      "file": "src/logic/animals/herd.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Puts the desktop camera round the nearest (or asked for) herd at standing height, following it and keeping out of tree crowns.",
+      "access": [
+        {
+          "name": "HerdStats",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "The herds of this frame."
+        },
+        {
+          "name": "HerdSys",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "HerdSys*: nearest() for a kind that is far."
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "Position read to choose a herd; position, yaw and pitch written."
+        },
+        {
+          "name": "Plant",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "Trees around the herd."
+        },
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "Where the trees are, their scale."
+        },
+        {
+          "name": "VegetationLibrary",
+          "kind": "context",
+          "access": "read",
+          "where": "tick",
+          "effect": "Height and crown radius of the species."
+        },
+        {
+          "name": "AnimalLibrary",
+          "kind": "context",
+          "access": "read+create",
+          "where": "tick (HerdSys::nearest, describe)",
+          "effect": "Herds of the cells around a far kind."
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "The ground under the camera and along the sight line (std::shared_ptr)."
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "The ground without a field (std::shared_ptr)."
+        }
+      ],
+      "side_effects": [
+        "Moves the desktop camera every tick once it has a herd.",
+        "Logs the herd it chose.",
+        "Queries the ground field up to ten times a tick."
+      ]
+    },
+    {
+      "name": "AnimalLineup",
+      "class": "AnimalLineupSys",
+      "file": "src/logic/animals/animal_lineup.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Puts the animals of the library in rows on the ground, small ones in front, each playing its clips in turn (scene animals_test).",
+      "access": [
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init",
+          "effect": "One entity per animal, on the ground."
+        },
+        {
+          "name": "Animal",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init",
+          "effect": "Its species."
+        },
+        {
+          "name": "Animal",
+          "kind": "component",
+          "access": "readwrite",
+          "where": "tick",
+          "effect": "Clip read; next clip played, rate set to 1."
+        },
+        {
+          "name": "AnimalShow",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "init, tick",
+          "effect": "The clips to play; index and time left advanced."
+        },
+        {
+          "name": "AnimalLibrary",
+          "kind": "context",
+          "access": "read+create",
+          "where": "init, tick (animalLibrary)",
+          "effect": "Entries, sizes, species and clips."
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "write",
+          "where": "init",
+          "effect": "In front of the first row, with camera."
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "Ground heights (std::shared_ptr)."
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "Level ground and heights without a field (std::shared_ptr)."
+        }
+      ],
+      "side_effects": [
+        "Creates one entity per animal in init.",
+        "Logs missing species, the origin, and each animal's place, height and clip count."
+      ]
+    },
+    {
+      "name": "AnimalWalkers",
+      "class": "AnimalWalkersSys",
+      "file": "src/logic/animals/gait_scene.cpp",
+      "kind": "system",
+      "scope": "Host",
+      "summary": "Animals side by side walking circles, eights, weaves or straight lines over the ground, with the procedural walk, the camera optionally round one (scene animals_gait).",
+      "access": [
+        {
+          "name": "Transform",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "init, tick (stepWalker)",
+          "effect": "Made at init; heading read on the first step, position and rotation written; the followed one read."
+        },
+        {
+          "name": "Animal",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init",
+          "effect": "Species, clip, and rate without procedural."
+        },
+        {
+          "name": "Animal",
+          "kind": "component",
+          "access": "read",
+          "where": "tick",
+          "effect": "Species: size and sole."
+        },
+        {
+          "name": "AnimalWalker",
+          "kind": "component",
+          "access": "readwrite+create",
+          "where": "init, tick",
+          "effect": "Path, radius, speed; yaw, travelled, height and pitch advanced."
+        },
+        {
+          "name": "AnimalGait",
+          "kind": "component",
+          "access": "write+create",
+          "where": "init",
+          "effect": "The style, with procedural."
+        },
+        {
+          "name": "AnimalLibrary",
+          "kind": "context",
+          "access": "read+create",
+          "where": "init, tick (animalLibrary)",
+          "effect": "Species, sizes and clips."
+        },
+        {
+          "name": "Camera",
+          "kind": "context",
+          "access": "write",
+          "where": "init, tick",
+          "effect": "Placed at init; round the followed animal."
+        },
+        {
+          "name": "GroundField",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "The ground walked on (std::shared_ptr)."
+        },
+        {
+          "name": "TerrainGenerator",
+          "kind": "context",
+          "access": "read",
+          "where": "init",
+          "effect": "Level ground and the ground without a field (std::shared_ptr)."
+        }
+      ],
+      "side_effects": [
+        "Creates one entity per animal in init.",
+        "Logs missing species or walks and each animal's clip, speed, radius and place.",
+        "Queries the ground field per animal per tick."
+      ]
+    }
+  ],
+  "components": [
+    {
+      "name": "Animal",
+      "kind": "component",
+      "file": "src/logic/animals/animal.h",
+      "summary": "An animal of the library next to a Transform (uniform scale): which clip it plays and the cross fade from the previous one.",
+      "json": null,
+      "fields": [
+        {
+          "name": "species",
+          "type": "uint32_t",
+          "desc": "Index in AnimalLibrary::entries."
+        },
+        {
+          "name": "clip",
+          "type": "int",
+          "desc": "Index in the species' clips, -1: the bind pose."
+        },
+        {
+          "name": "time",
+          "type": "float",
+          "desc": "Seconds in the clip."
+        },
+        {
+          "name": "rate",
+          "type": "float",
+          "desc": "Playback speed (1)."
+        },
+        {
+          "name": "in_place",
+          "type": "bool",
+          "desc": "True: the clip's root motion is taken out, the Transform moves the animal."
+        },
+        {
+          "name": "previous",
+          "type": "int",
+          "desc": "The clip it fades from, -1 for the bind pose."
+        },
+        {
+          "name": "previous_time",
+          "type": "float",
+          "desc": "Seconds in that clip."
+        },
+        {
+          "name": "previous_rate",
+          "type": "float",
+          "desc": "Its playback speed."
+        },
+        {
+          "name": "fade",
+          "type": "float",
+          "desc": "Seconds since the change."
+        },
+        {
+          "name": "fade_duration",
+          "type": "float",
+          "desc": "Seconds of the cross fade."
+        }
+      ],
+      "notes": "play(next, seconds = 0.3) starts a clip with a cross fade (no-op when it already plays). Made by Herds, AnimalLineup, AnimalWalkers, MountSpawn, AnimalAgentView and others; AnimalAnimation advances it, AnimalPass draws it."
+    },
+    {
+      "name": "AnimalPose",
+      "kind": "component",
+      "file": "src/logic/animals/animal.h",
+      "summary": "The joints of an animal now: local poses, model space matrices and skinning matrices.",
+      "json": null,
+      "fields": [
+        {
+          "name": "local",
+          "type": "std::vector<JointPose>",
+          "desc": "Each joint relative to its parent (translation, rotation, scale), the clip's."
+        },
+        {
+          "name": "world",
+          "type": "std::vector<glm::mat4>",
+          "desc": "Model space matrices of the joints (bent and planted by AnimalGait)."
+        },
+        {
+          "name": "skin",
+          "type": "std::vector<glm::mat4>",
+          "desc": "world times inverse bind: what AnimalPass uploads."
+        }
+      ],
+      "notes": "Emplaced by AnimalAnimation on every Animal whose species loads; AnimalGait rewrites world and skin; AnimalBotSteer writes world only on its proxies. Read by AnimalPass, riders (saddle), AnimalAgentView."
+    },
+    {
+      "name": "AnimalLibrary",
+      "kind": "context",
+      "file": "src/logic/animals/animal.h",
+      "summary": "Index of resources/animals (library.json) and the species loaded on first use.",
+      "json": null,
+      "fields": [
+        {
+          "name": "directory",
+          "type": "std::filesystem::path",
+          "desc": "The library folder."
+        },
+        {
+          "name": "entries",
+          "type": "std::vector<AnimalLibrary::Entry>",
+          "desc": "Per animal: id, name, height, length, width, joints, triangles, lods, clips, walk clip name, walk_speed."
+        },
+        {
+          "name": "loaded",
+          "type": "std::vector<std::shared_ptr<const AnimalSpecies>>",
+          "desc": "(private) species loaded so far."
+        },
+        {
+          "name": "failed",
+          "type": "std::vector<bool>",
+          "desc": "(private) species that failed to load, logged once."
+        }
+      ],
+      "notes": "Made by animalLibrary(reg) on first use, loaded from animalsDirectory() (./resources/animals, else the source tree's); empty when there is no library. species(index) loads on the main thread; loadSpecies and loadGeometry are static and thread safe."
+    },
+    {
+      "name": "AnimalStats",
+      "kind": "context",
+      "file": "src/logic/animals/animal.h",
+      "summary": "Counts of the animals drawn this frame, written by AnimalPass, read by the debug menu and the captures.",
+      "json": null,
+      "fields": [
+        {
+          "name": "animals",
+          "type": "uint32_t",
+          "desc": "Animal entities."
+        },
+        {
+          "name": "drawn",
+          "type": "uint32_t",
+          "desc": "Drawn on the desktop target."
+        },
+        {
+          "name": "triangles",
+          "type": "uint32_t",
+          "desc": "Triangles drawn."
+        },
+        {
+          "name": "joints",
+          "type": "uint32_t",
+          "desc": "Skinning matrices sent this frame."
+        },
+        {
+          "name": "species_loaded",
+          "type": "uint32_t",
+          "desc": "Species on the GPU."
+        },
+        {
+          "name": "species_loading",
+          "type": "uint32_t",
+          "desc": "Asked for and not drawn yet: captures wait for 0."
+        }
+      ],
+      "notes": "Renderer side; no system of this folder touches it."
+    },
+    {
+      "name": "AnimalShow",
+      "kind": "component",
+      "file": "src/logic/animals/animal_lineup.h",
+      "summary": "On an animal of AnimalLineup: the clips it plays one after the other.",
+      "json": null,
+      "fields": [
+        {
+          "name": "clips",
+          "type": "std::vector<int>",
+          "desc": "Clip indices to play, empty: the bind pose."
+        },
+        {
+          "name": "at",
+          "type": "size_t",
+          "desc": "Index of the current one."
+        },
+        {
+          "name": "left",
+          "type": "float",
+          "desc": "Seconds of the current clip left."
+        }
+      ],
+      "notes": "Made and advanced by AnimalLineup only."
+    },
+    {
+      "name": "AnimalGait",
+      "kind": "component",
+      "file": "src/logic/animals/gait.h",
+      "summary": "On an animal: it walks procedurally whenever it plays a gait clip; the style asked and the state AnimalGait keeps.",
+      "json": null,
+      "fields": [
+        {
+          "name": "style",
+          "type": "GaitStyle",
+          "desc": "How it walks: stride, step_height, clearance, soft_depth, sink_time, exit_vertical, entry_vertical, exit_part, body_sink, crouch, spread, bend, max_bend, head_lead, bank, turn_step, ik."
+        },
+        {
+          "name": "feet",
+          "type": "std::vector<AnimalGait::Foot>",
+          "desc": "Per leg: planted, placed, position (where planted or left), target (where it lands), now (where it is), ground height, seconds since it landed."
+        },
+        {
+          "name": "model",
+          "type": "int",
+          "desc": "Clip the pose came from, -1: no gait this frame."
+        },
+        {
+          "name": "weight",
+          "type": "float",
+          "desc": "0: the clip, 1: the procedural walk (fades in over 0.3 s)."
+        },
+        {
+          "name": "phase",
+          "type": "float",
+          "desc": "Phase of the cycle, 0..1."
+        },
+        {
+          "name": "period",
+          "type": "float",
+          "desc": "Seconds of a cycle now (clip's, stretched to the speed)."
+        },
+        {
+          "name": "speed",
+          "type": "float",
+          "desc": "m/s along the heading."
+        },
+        {
+          "name": "turn",
+          "type": "float",
+          "desc": "rad/s."
+        },
+        {
+          "name": "bend",
+          "type": "float",
+          "desc": "Radians between hind and fore legs."
+        },
+        {
+          "name": "drop",
+          "type": "float",
+          "desc": "Metres (model space) the body came down for the legs to reach."
+        },
+        {
+          "name": "last_position",
+          "type": "glm::vec3",
+          "desc": "Transform position at the last tick."
+        },
+        {
+          "name": "last_yaw",
+          "type": "float",
+          "desc": "Heading at the last tick."
+        },
+        {
+          "name": "started",
+          "type": "bool",
+          "desc": "False: the feet are placed again from the clip."
+        }
+      ],
+      "notes": "Made with a style by Herds (procedural), AnimalWalkers, tests; written by AnimalGait through proceduralWalk. Presence tells SteeredWalk and Herds to leave the clip rate to AnimalGait."
+    },
+    {
+      "name": "GaitStyleOverride",
+      "kind": "context",
+      "file": "src/logic/animals/gait.h",
+      "summary": "When on, every animal walks with this style (the debug menu).",
+      "json": null,
+      "fields": [
+        {
+          "name": "on",
+          "type": "bool",
+          "desc": "Override active."
+        },
+        {
+          "name": "style",
+          "type": "GaitStyle",
+          "desc": "The style forced on every AnimalGait."
+        }
+      ],
+      "notes": "Emplaced and edited by the debug menu (view/systems/debug_menu.cpp); read by AnimalGait."
+    },
+    {
+      "name": "GaitModels",
+      "kind": "context",
+      "file": "src/logic/animals/gait.h",
+      "summary": "Gait models (analyseGait) of the species' clips, analysed on first use.",
+      "json": null,
+      "fields": [
+        {
+          "name": "models",
+          "type": "std::unordered_map<const AnimalSpecies*, std::unordered_map<int, GaitModel>>",
+          "desc": "Per species and clip index: legs, period, speed, ground, hips, anchors, valid / problem."
+        }
+      ],
+      "notes": "Emplaced by AnimalGait in preinit; get() analyses and logs on first use. Keyed by species pointer: valid while the library keeps the species."
+    },
+    {
+      "name": "AnimalWalker",
+      "kind": "component",
+      "file": "src/logic/animals/gait_scene.h",
+      "summary": "An animal that walks a path of its own (straight, circle, eight, weave, or free), moved by stepWalker.",
+      "json": null,
+      "fields": [
+        {
+          "name": "path",
+          "type": "AnimalWalker::Path",
+          "desc": "Straight, Circle, Eight, Weave, Free (turn set by whoever drives it)."
+        },
+        {
+          "name": "speed",
+          "type": "float",
+          "desc": "m/s."
+        },
+        {
+          "name": "radius",
+          "type": "float",
+          "desc": "Of the circle, of each loop of the eight, of the bends of the weave."
+        },
+        {
+          "name": "turn",
+          "type": "float",
+          "desc": "Radians a metre to the left (Free)."
+        },
+        {
+          "name": "yaw",
+          "type": "float",
+          "desc": "Heading, radians about +y."
+        },
+        {
+          "name": "travelled",
+          "type": "float",
+          "desc": "Metres walked."
+        },
+        {
+          "name": "height",
+          "type": "float",
+          "desc": "Ground height under it."
+        },
+        {
+          "name": "pitch",
+          "type": "float",
+          "desc": "Lean with the slope, radians."
+        },
+        {
+          "name": "placed",
+          "type": "bool",
+          "desc": "Put on the ground once."
+        }
+      ],
+      "notes": "Component of AnimalWalkers' animals; also embedded in SteeredWalk (Free path), GaitWalk and the demonstrations."
+    },
+    {
+      "name": "HerdAnimal",
+      "kind": "component",
+      "file": "src/logic/animals/herd.h",
+      "summary": "On each animal of a herd: its herd and whether it walks.",
+      "json": null,
+      "fields": [
+        {
+          "name": "herd",
+          "type": "uint32_t",
+          "desc": "Index of its herd's kind."
+        },
+        {
+          "name": "cell",
+          "type": "glm::ivec2",
+          "desc": "Cell of the world its herd belongs to."
+        },
+        {
+          "name": "moving",
+          "type": "bool",
+          "desc": "It walks."
+        },
+        {
+          "name": "speed",
+          "type": "float",
+          "desc": "m/s over the ground."
+        }
+      ],
+      "notes": "Made by Herds at spawn; removed (the entity kept) when the herd despawns while the animal is steered. SteeredWalk starts from its speed."
+    },
+    {
+      "name": "HerdStats",
+      "kind": "context",
+      "file": "src/logic/animals/herd.h",
+      "summary": "The herds of this frame, written by Herds.",
+      "json": null,
+      "fields": [
+        {
+          "name": "herds",
+          "type": "uint32_t",
+          "desc": "Herds spawned."
+        },
+        {
+          "name": "animals",
+          "type": "uint32_t",
+          "desc": "Their members."
+        },
+        {
+          "name": "moving",
+          "type": "uint32_t",
+          "desc": "Members walking."
+        },
+        {
+          "name": "travelling",
+          "type": "uint32_t",
+          "desc": "Herds on their way to another place."
+        },
+        {
+          "name": "list",
+          "type": "std::vector<HerdInfo>",
+          "desc": "Per herd: cell, kind name, centre (on the ground), extent, animals, travelling."
+        }
+      ],
+      "notes": "Emplaced in Herds' preinit, rebuilt every tick. Read by HerdWatch, CameraWalk and the debug menu."
+    },
+    {
+      "name": "HerdSys",
+      "kind": "context",
+      "file": "src/logic/animals/herd.h",
+      "summary": "Pointer to the Herds system, for describe() and nearest().",
+      "json": null,
+      "fields": [],
+      "notes": "Stored as HerdSys* (insert_or_assign in Herds' preinit); valid while the system lives. HerdWatch calls nearest(kind, from, reach, home) through it."
+    },
+    {
+      "name": "AnimalSteer",
+      "kind": "component",
+      "file": "src/logic/animals/steer.h",
+      "summary": "An animal that goes where someone tells it (a rider): heading, speed and run.",
+      "json": null,
+      "fields": [
+        {
+          "name": "yaw",
+          "type": "float",
+          "desc": "Heading asked, radians about +y (0 looks down -z)."
+        },
+        {
+          "name": "speed",
+          "type": "float",
+          "desc": "m/s along it, 0 stands."
+        },
+        {
+          "name": "run",
+          "type": "bool",
+          "desc": "The gait asked: kinematic animals play their run clip."
+        }
+      ],
+      "notes": "Added and written by the riding systems (Mounting, MountSteering). While present, Herds lets go of the animal; SteeredWalk walks kinematic animals, AnimalBotSteer turns it into a physical animal's command on its proxy."
+    },
+    {
+      "name": "SteeredWalk",
+      "kind": "component",
+      "file": "src/logic/animals/steer.h",
+      "summary": "The walk of a steered kinematic animal, kept until it has halted after its AnimalSteer went.",
+      "json": null,
+      "fields": [
+        {
+          "name": "walker",
+          "type": "AnimalWalker",
+          "desc": "Free path: speed and turn from the steering."
+        },
+        {
+          "name": "acceleration",
+          "type": "float",
+          "desc": "m/s^2, the eased change of speed."
+        },
+        {
+          "name": "yaw_rate",
+          "type": "float",
+          "desc": "rad/s."
+        },
+        {
+          "name": "walk_speed",
+          "type": "float",
+          "desc": "m/s of the last walk asked."
+        },
+        {
+          "name": "running",
+          "type": "bool",
+          "desc": "It plays its run."
+        }
+      ],
+      "notes": "Made, advanced and removed by SteeredWalk. Herds treats its presence like AnimalSteer."
+    },
+    {
+      "name": "AnimalBotProxy",
+      "kind": "component",
+      "file": "src/logic/animals/steer.h",
+      "summary": "The host's stand-in for the physical animal of a world: a Transform at its trunk and an AnimalPose of its ragdoll.",
+      "json": null,
+      "fields": [
+        {
+          "name": "world",
+          "type": "int",
+          "desc": "Index of the world in Worlds."
+        },
+        {
+          "name": "species",
+          "type": "int",
+          "desc": "Index in the library, -1 when not in it."
+        },
+        {
+          "name": "walk_speed",
+          "type": "float",
+          "desc": "m/s of the body's walk."
+        },
+        {
+          "name": "top_speed",
+          "type": "float",
+          "desc": "m/s of the fastest order its policy was trained with."
+        }
+      ],
+      "notes": "One per world, made and destroyed by AnimalBotSteer; Mountables / Mounting make it rideable. SteeredWalk excludes it."
+    },
+    {
+      "name": "AnimalSkin",
+      "kind": "tag",
+      "file": "src/logic/animals/steer.h",
+      "summary": "On an Animal that is only the skin drawn on something else (a world's ragdoll), not an animal to meet.",
+      "json": null,
+      "fields": [],
+      "notes": "Set by AnimalAgentView (view/animal_view.cpp); the riding systems (logic/player/mount.cpp) skip it."
+    }
+  ]
+}
